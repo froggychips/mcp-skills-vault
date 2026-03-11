@@ -1,0 +1,12 @@
+{
+  "name": "{{name}}",
+  "version": "0.1.0",
+  "description": "MCP wrapper for {{tool}}",
+  "main": "server.js",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "latest"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}
