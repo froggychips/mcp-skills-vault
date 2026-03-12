@@ -3,8 +3,12 @@
   "version": "0.1.0",
   "description": "MCP wrapper for {{tool}}",
   "main": "server.js",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "latest"
+    "@modelcontextprotocol/sdk": "^1.0.0"
   },
   "scripts": {
     "start": "node server.js"
