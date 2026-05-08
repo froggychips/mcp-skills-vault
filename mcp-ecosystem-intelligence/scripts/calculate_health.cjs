@@ -2,11 +2,14 @@
  * Calculate the Health Score for an MCP tool based on the specified formula.
  *
  * Formula:
- *   Health Score = 10 × log10(stars + 1)          [0–∞,  popularity component]
- *                + recency bonus                   [0–40, how recently maintained]
+ *   Health Score = min(20, 10 × log10(stars + 1))  [0–20,  popularity component, capped]
+ *                + recency bonus                   [0–40,  how recently maintained]
  *                + 30 (if present in official registry)
  *                + 15 (if install command exists)
  *                + 5  (if critical issues < 5)
+ *
+ * Popularity is capped at 20 so that mega-repos (50k+ stars) cannot dominate the
+ * score and crowd everything into the Core tier; max total = 110.
  *
  * Recency bonus (graduated to reward freshness, not just a binary cutoff):
  *   40  – last commit < 30 days   (actively maintained)
@@ -14,8 +17,8 @@
  *   10  – last commit < 180 days  (dormant but alive)
  *   0   – last commit >= 180 days (stale)
  *
- * Classification thresholds:
- *   85–100 → Core
+ * Classification thresholds (out of 110):
+ *   85+    → Core
  *   65–84  → Recommended
  *   40–64  → Experimental
  *   <40    → Deprecated
@@ -80,7 +83,9 @@ if (isNaN(criticalIssues) || criticalIssues < 0) {
 
 // Popularity component: logarithmic so large star counts don't dominate the score.
 // Adding 1 to stars avoids log10(0) = -Infinity for tools with zero stars.
-const popularityScore = 10 * Math.log10(stars + 1);
+// Capped at 20 so that mega-repos can't single-handedly push every entry into the
+// Core tier (without the cap, an 85k-star monorepo scores 49+ on popularity alone).
+const popularityScore = Math.min(20, 10 * Math.log10(stars + 1));
 
 // Graduated recency bonus rewards freshly-maintained tools over stale ones
 // while still giving partial credit for repos that were active within 6 months.
