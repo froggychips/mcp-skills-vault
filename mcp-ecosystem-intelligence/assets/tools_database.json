@@ -462,6 +462,20 @@
       "trust": "verified"
     },
     {
+      "name": "gitlab-mcp",
+      "category": "vcs",
+      "install_cmd": "npx -y @zereight/mcp-gitlab",
+      "source_url": "https://github.com/zereight/gitlab-mcp",
+      "stars": 1470,
+      "last_commit_days": 1,
+      "open_issues": 26,
+      "in_registry": false,
+      "health_score": 80.0,
+      "classification": "Recommended",
+      "last_checked": "2026-05-08",
+      "notes": "Comprehensive GitLab platform API (MRs, issues, pipelines, wiki, releases, tags, milestones); supports self-hosted instances and PAT/OAuth. Top community choice; gitlab-org/* has no equivalent open-source MCP."
+    },
+    {
       "name": "actors-mcp-server",
       "category": "web-scraping",
       "install_cmd": "npx -y @apify/actors-mcp-server@0.10.1",
