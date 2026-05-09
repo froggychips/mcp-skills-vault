@@ -431,7 +431,7 @@
     {
       "name": "github-mcp-server",
       "category": "vcs",
-      "install_cmd": "docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN ghcr.io/github/github-mcp-server",
+      "install_cmd": "docker run -i --rm --cap-drop ALL --security-opt no-new-privileges -e GITHUB_PERSONAL_ACCESS_TOKEN ghcr.io/github/github-mcp-server",
       "source_url": "https://github.com/github/github-mcp-server",
       "stars": 29609,
       "last_commit_days": 0,

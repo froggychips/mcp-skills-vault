@@ -208,42 +208,98 @@ Skipped
 
 ## 10. Installation (on user consent)
 
-After the user picks tools, first verify integrity, then install by **directly editing `~/.claude.json`** rather than running `claude mcp add`. The CLI prints the bearer token to stdout, which leaks into transcripts and shell history; an in-place edit doesn't.
+After the user picks tools, follow the three steps below in order. Never skip step 1.
 
-**Step 1 — integrity check** (npm packages only):
+### Step 1 — security scan
 
 ```bash
 node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs
-# Exit 0 = all clear. Exit 1 = abort and investigate before proceeding.
+# Exit 0 = all clear.  Exit 1 = ABORT — do not install until failures are resolved.
 ```
 
-**Step 2 — install** (Python so the secret never appears on the command line):
+Flags:
+| Flag | Effect |
+|---|---|
+| *(default)* | integrity + advisory check + hook detection |
+| `--strict` | treat WARNs (hook, missing repo) as hard failures |
+| `--socket` | also run [socket.dev](https://socket.dev) deeper supply-chain scan |
+| `--no-audit` | skip advisory API (offline/air-gapped environments) |
+| `--update` | refresh `version` + `pkg_integrity` fields from npm |
+
+**Interpreting output:**
+
+| Prefix | Meaning | Action |
+|---|---|---|
+| `OK` | integrity hash matches, no CVEs | proceed |
+| `MISS` | no stored hash yet | run `--update` first |
+| `HOOK` | package has install-time scripts | review the script shown; `prepare: npm run build` is normal TypeScript compilation; postinstall doing network calls or writing outside the package dir is suspicious |
+| `WARN` | `repository.url` mismatch in npm vs `source_url` | check manually before installing; could be an org rename or a hijacked package name |
+| `CVE` | advisory found; high/critical = hard fail | do not install; look for a patched version or alternative |
+| `FAIL` | stored hash does not match npm tarball | hard abort — tarball has changed; investigate before proceeding |
+| `SOCK` | socket.dev flagged issues | review output; fail = do not install |
+
+### Step 2 — choose the install method
+
+**Prefer Docker where an official image exists.** Docker gives OS-level isolation even if the package is compromised post-install.
+
+Hardened Docker template (drop all capabilities, no privilege escalation, read-only root fs):
+
+```bash
+docker run -i --rm \
+  --cap-drop ALL \
+  --security-opt no-new-privileges \
+  --read-only --tmpfs /tmp \
+  -e SECRET_VAR \
+  ghcr.io/vendor/mcp-server
+```
+
+For npm-only servers without a Docker image, wrap them in a generic node container:
+
+```bash
+docker run -i --rm \
+  --cap-drop ALL \
+  --security-opt no-new-privileges \
+  node:22-alpine \
+  npx -y <pkg>@<version>
+```
+
+**Step 3 — write to `~/.claude.json`**
+
+Install by **directly editing `~/.claude.json`** rather than running `claude mcp add`. The CLI prints the bearer token to stdout, which leaks into transcripts and shell history; an in-place edit doesn't.
+
+Pattern (Python so secrets never appear on the command line):
 
 ```bash
 TOKEN_ENV=GITHUB_TOKEN python3 - <<'PY'
-import json, os, pathlib
+import json, os, pathlib, shutil, time
 cfg = pathlib.Path.home() / ".claude.json"
+shutil.copy(cfg, str(cfg) + f".bak.{int(time.time())}")   # backup first
 data = json.loads(cfg.read_text())
 data.setdefault("mcpServers", {})["github"] = {
     "command": "docker",
-    "args": ["run","-i","--rm","-e","GITHUB_PERSONAL_ACCESS_TOKEN",
+    "args": ["run", "-i", "--rm",
+             "--cap-drop", "ALL",
+             "--security-opt", "no-new-privileges",
+             "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
              "ghcr.io/github/github-mcp-server"],
     "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": os.environ["GITHUB_TOKEN"]},
 }
 cfg.write_text(json.dumps(data, indent=2))
+print("Done. Restart Claude Code to pick up the new server.")
 PY
 ```
 
 Always:
-- Back up `~/.claude.json` to `~/.claude.json.bak.<ts>` before writing.
-- Read secrets from environment variables, never from arguments.
-- Confirm with the user before mutating the config — show the diff first.
+- Back up `~/.claude.json` before writing (shown above).
+- Read secrets from environment variables, never from CLI arguments.
+- Show the user a diff of the proposed change before applying.
 
 ## Operating principles
 
 - **Cache-first**: every step starts with `tools_database.json`.
 - **Script the score**: `calculate_health.cjs` is the source of truth, not vibes.
-- **Strict validation**: all four §4 checks must pass.
+- **Strict validation**: all five §4 checks must pass.
 - **Taste filter**: §6 heuristics override raw score.
 - **Terse output**: §9 default. Verbose on request.
 - **No token leaks**: §10 path always.
+- **Scan before install**: `verify_integrity.cjs` exit 0 is a hard prerequisite.
