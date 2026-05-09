@@ -13,11 +13,11 @@ Pragmatic discovery agent for the MCP ecosystem. Optimised for token efficiency:
 1. Detect stack         → from manifests in $CWD (package.json, pyproject.toml, …)
 2. Cache lookup         → assets/tools_database.json keyed by need
 3. Discovery (if miss)  → registry → vendor official → community
-4. Validate (4 checks)  → install cmd, MCP SDK, ListTools, recent commit
+4. Validate (5 checks)  → install cmd, MCP SDK, ListTools, recent commit, integrity
 5. Score                → node scripts/calculate_health.cjs <args>
 6. Reject heuristics    → 5-Minute Rule, Bloat, Duplication
 7. Recommend            → grouped by category, sorted by score
-8. Install (on consent) → edit ~/.claude.json directly (NOT `claude mcp add`)
+8. Install (on consent) → verify integrity, then edit ~/.claude.json (NOT `claude mcp add`)
 9. Update DB            → append to assets/tools_database.json
 ```
 
@@ -63,7 +63,7 @@ gh search repos --topic mcp-server <keyword> --limit 10 \
   --json fullName,stargazersCount,pushedAt,description
 ```
 
-## 4. Validation (all four required)
+## 4. Validation (all five required)
 
 A candidate is **rejected** if any check fails:
 
@@ -71,6 +71,15 @@ A candidate is **rejected** if any check fails:
 2. **MCP wiring** is detectable: `server.json` present **or** `@modelcontextprotocol/sdk` / `mcp` (Python) imported in source.
 3. **At least one tool** is registered in the server's `ListTools` response (read code or `npx … --help`).
 4. **Recent commit**: default branch was pushed within 180 days.
+5. **Integrity + source verify** (npm packages only): run the integrity script to confirm the tarball hash and that npm's `repository.url` matches `source_url`. A mismatch is a hard reject — it indicates a typosquatted or hijacked package.
+
+```bash
+node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs
+# or for a single candidate not yet in the DB:
+npm view "<pkg>@<version>" dist.integrity repository.url
+```
+
+For packages where npm declares no `repository.url` (some official vendor packages skip this field), verify `source_url` manually against the GitHub page before adding to the DB and document the gap in `notes`.
 
 ## 5. Health Score (use the script)
 
@@ -134,7 +143,7 @@ Log every rejection with a one-line reason (used in the final output, see §9).
     {
       "name": "string (kebab-case)",
       "category": "database|search|infra|browser|docs|vcs|...",
-      "install_cmd": "single-line shell command",
+      "install_cmd": "single-line shell command with pinned version",
       "source_url": "https://github.com/owner/name",
       "stars": 0,
       "last_commit_days": 0,
@@ -143,11 +152,20 @@ Log every rejection with a one-line reason (used in the final output, see §9).
       "health_score": 0.0,
       "classification": "Core|Recommended|Experimental|Deprecated",
       "last_checked": "YYYY-MM-DD",
+      "version": "1.2.3 or null for non-npm",
+      "pkg_integrity": "sha512-… or null for non-npm",
+      "trust": "verified|candidate",
       "notes": "optional, short caveat"
     }
   ]
 }
 ```
+
+**Field semantics:**
+- `install_cmd` — always pin to an explicit version (`@1.2.3`), never `@latest`.
+- `version` — the pinned npm/PyPI version; `null` for docker or git-URL installs.
+- `pkg_integrity` — `dist.integrity` from `npm view <pkg>@<version>` (sha512 of the tarball); `null` for non-npm. Run `node scripts/verify_integrity.cjs --update` to populate or refresh.
+- `trust` — `"verified"` for entries in the seeded DB (manually reviewed); `"candidate"` for entries added from live discovery. Only `"verified"` entries are recommended by default; `"candidate"` entries require explicit user opt-in.
 
 Sorted by `(category, -health_score, name)` for deterministic diffs.
 
@@ -157,7 +175,7 @@ Sorted by `(category, -health_score, name)` for deterministic diffs.
 { "extensions": [ { "name": "", "cli_or_api": "", "wrapper_generated": false, "notes": "" } ] }
 ```
 
-After every discovery+validation cycle, append/update entries in both files. Bump `last_checked`.
+After every discovery+validation cycle, append/update entries in both files. Bump `last_checked`. New entries from discovery always start with `"trust": "candidate"` — upgrade to `"verified"` only after §4 check 5 passes.
 
 ## 8. Wrapper generation (only when nothing fits)
 
@@ -190,9 +208,16 @@ Skipped
 
 ## 10. Installation (on user consent)
 
-After the user picks tools, install by **directly editing `~/.claude.json`** rather than running `claude mcp add`. The CLI prints the bearer token to stdout, which leaks into transcripts and shell history; an in-place edit doesn't.
+After the user picks tools, first verify integrity, then install by **directly editing `~/.claude.json`** rather than running `claude mcp add`. The CLI prints the bearer token to stdout, which leaks into transcripts and shell history; an in-place edit doesn't.
 
-Pattern (Python so the secret never appears on the command line):
+**Step 1 — integrity check** (npm packages only):
+
+```bash
+node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs
+# Exit 0 = all clear. Exit 1 = abort and investigate before proceeding.
+```
+
+**Step 2 — install** (Python so the secret never appears on the command line):
 
 ```bash
 TOKEN_ENV=GITHUB_TOKEN python3 - <<'PY'
