@@ -3,7 +3,7 @@
     {
       "name": "playwright-mcp",
       "category": "browser",
-      "install_cmd": "npx -y @playwright/mcp@latest",
+      "install_cmd": "npx -y @playwright/mcp@0.0.75",
       "source_url": "https://github.com/microsoft/playwright-mcp",
       "stars": 32190,
       "last_commit_days": 0,
@@ -11,7 +11,10 @@
       "in_registry": true,
       "health_score": 110.0,
       "classification": "Core",
-      "last_checked": "2026-05-08"
+      "last_checked": "2026-05-09",
+      "version": "0.0.75",
+      "pkg_integrity": "sha512-oBjzVXfEGZ9Ev45tKKQULNDVdF83B82lg0uPejEK3xsp/zWmdNdNVnPi032fmd/o20ZZXs+LX7cr77qRNbV4VA==",
+      "trust": "verified"
     },
     {
       "name": "mcp-redis",
@@ -24,12 +27,15 @@
       "in_registry": true,
       "health_score": 110.0,
       "classification": "Core",
-      "last_checked": "2026-05-08"
+      "last_checked": "2026-05-09",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "verified"
     },
     {
       "name": "mcp-server-neon",
       "category": "database",
-      "install_cmd": "npx -y @neondatabase/mcp-server-neon",
+      "install_cmd": "npx -y @neondatabase/mcp-server-neon@0.6.5",
       "source_url": "https://github.com/neondatabase/mcp-server-neon",
       "stars": 594,
       "last_commit_days": 0,
@@ -37,12 +43,16 @@
       "in_registry": true,
       "health_score": 110.0,
       "classification": "Core",
-      "last_checked": "2026-05-08"
+      "last_checked": "2026-05-09",
+      "version": "0.6.5",
+      "pkg_integrity": "sha512-sTqHMpAKKWL4IzAM2yjd5Q/VKnrHF0MxqidZpKoDhKBKvnOw6jAnb2nqgadY5wBA3kNv7JybCOu2h33A8eW6dw==",
+      "trust": "verified",
+      "notes": "npm does not publish a repository.url field — source_url verified manually."
     },
     {
       "name": "mongodb-mcp-server",
       "category": "database",
-      "install_cmd": "npx -y mongodb-mcp-server",
+      "install_cmd": "npx -y mongodb-mcp-server@1.10.0",
       "source_url": "https://github.com/mongodb-js/mongodb-mcp-server",
       "stars": 1014,
       "last_commit_days": 0,
@@ -50,7 +60,10 @@
       "in_registry": true,
       "health_score": 110.0,
       "classification": "Core",
-      "last_checked": "2026-05-08"
+      "last_checked": "2026-05-09",
+      "version": "1.10.0",
+      "pkg_integrity": "sha512-ai4605IiaA6BMiVY2danIthgfZaQkyiRW9tNW+866iPcWtZfGHKxhiQoDw1lUDGa28wUoZf616ug8ChlW5e8Tg==",
+      "trust": "verified"
     },
     {
       "name": "mcp-clickhouse",
@@ -63,7 +76,10 @@
       "in_registry": false,
       "health_score": 80.0,
       "classification": "Recommended",
-      "last_checked": "2026-05-08"
+      "last_checked": "2026-05-09",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "verified"
     },
     {
       "name": "supabase-mcp",
@@ -76,12 +92,15 @@
       "in_registry": false,
       "health_score": 75.0,
       "classification": "Recommended",
-      "last_checked": "2026-05-08"
+      "last_checked": "2026-05-09",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "verified"
     },
     {
       "name": "mcp-server-everything",
       "category": "demo",
-      "install_cmd": "npx -y @modelcontextprotocol/server-everything",
+      "install_cmd": "npx -y @modelcontextprotocol/server-everything@2026.1.26",
       "source_url": "https://github.com/modelcontextprotocol/servers/tree/main/src/everything",
       "stars": 85273,
       "last_commit_days": 20,
@@ -89,13 +108,16 @@
       "in_registry": true,
       "health_score": 105.0,
       "classification": "Core",
-      "last_checked": "2026-05-08",
-      "notes": "Reference/demo server bundling all sample tools."
+      "last_checked": "2026-05-09",
+      "notes": "Reference/demo server bundling all sample tools. open_issues counter is shared across the monorepo.",
+      "version": "2026.1.26",
+      "pkg_integrity": "sha512-RIEXAQuKZeXZqFzJMqLDlzmMmG5sjq2uhS/VqzF4HIZ3w1V73YcWf+UXkxJueJuHMBO3Z8ceBrQ5wI6o/plZ+Q==",
+      "trust": "verified"
     },
     {
       "name": "context7",
       "category": "docs",
-      "install_cmd": "npx -y @upstash/context7-mcp",
+      "install_cmd": "npx -y @upstash/context7-mcp@2.2.4",
       "source_url": "https://github.com/upstash/context7",
       "stars": 54769,
       "last_commit_days": 2,
@@ -103,12 +125,15 @@
       "in_registry": true,
       "health_score": 105.0,
       "classification": "Core",
-      "last_checked": "2026-05-08"
+      "last_checked": "2026-05-09",
+      "version": "2.2.4",
+      "pkg_integrity": "sha512-6kpjAxif2w+HhxSPmyi+SUsVPgFKBi+xtFgKRc9f0fhLpZGTBX1QKWFmleAIZ4T69Ykynzxc4nHGEDrr219noA==",
+      "trust": "verified"
     },
     {
       "name": "notion-mcp-server",
       "category": "docs",
-      "install_cmd": "npx -y @notionhq/notion-mcp-server",
+      "install_cmd": "npx -y @notionhq/notion-mcp-server@2.2.1",
       "source_url": "https://github.com/makenotion/notion-mcp-server",
       "stars": 4305,
       "last_commit_days": 51,
@@ -116,7 +141,10 @@
       "in_registry": true,
       "health_score": 85.0,
       "classification": "Core",
-      "last_checked": "2026-05-08"
+      "last_checked": "2026-05-09",
+      "version": "2.2.1",
+      "pkg_integrity": "sha512-Fw3ErV73sEI+ZrnOycR+5Lk8Ig6hEBy3EuyMlIEpb+DS18i3X1sxTWeyIC4ph1RjPVfoDAPrAREhnmMMzlG/oQ==",
+      "trust": "verified"
     },
     {
       "name": "mcp-atlassian",
@@ -129,12 +157,15 @@
       "in_registry": false,
       "health_score": 75.0,
       "classification": "Recommended",
-      "last_checked": "2026-05-08"
+      "last_checked": "2026-05-09",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "verified"
     },
     {
       "name": "mcp-server-filesystem",
       "category": "filesystem",
-      "install_cmd": "npx -y @modelcontextprotocol/server-filesystem <path>",
+      "install_cmd": "npx -y @modelcontextprotocol/server-filesystem@2026.1.14 <path>",
       "source_url": "https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem",
       "stars": 85273,
       "last_commit_days": 20,
@@ -142,8 +173,11 @@
       "in_registry": true,
       "health_score": 105.0,
       "classification": "Core",
-      "last_checked": "2026-05-08",
-      "notes": "open_issues counter is shared across the monorepo; per-server noise is much lower."
+      "last_checked": "2026-05-09",
+      "notes": "open_issues counter is shared across the monorepo; per-server noise is much lower.",
+      "version": "2026.1.14",
+      "pkg_integrity": "sha512-bGAfu3fWRVeF10NxvPhFBDlRen6ExSx6YkKJzoVgQMNrbdVVV4okfGGQ3KBRu9ygXYfw5/N9ermHAJXA0uys+g==",
+      "trust": "verified"
     },
     {
       "name": "mcp-server-fetch",
@@ -156,8 +190,11 @@
       "in_registry": true,
       "health_score": 105.0,
       "classification": "Core",
-      "last_checked": "2026-05-08",
-      "notes": "open_issues counter is shared across the monorepo; per-server noise is much lower."
+      "last_checked": "2026-05-09",
+      "notes": "open_issues counter is shared across the monorepo; per-server noise is much lower.",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "verified"
     },
     {
       "name": "mcp-server-aws",
@@ -170,12 +207,15 @@
       "in_registry": true,
       "health_score": 105.0,
       "classification": "Core",
-      "last_checked": "2026-05-08"
+      "last_checked": "2026-05-09",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "verified"
     },
     {
       "name": "mcp-server-cloudflare",
       "category": "infra",
-      "install_cmd": "npx -y @cloudflare/mcp-server-cloudflare",
+      "install_cmd": "npx -y @cloudflare/mcp-server-cloudflare@0.2.0",
       "source_url": "https://github.com/cloudflare/mcp-server-cloudflare",
       "stars": 3718,
       "last_commit_days": 7,
@@ -183,12 +223,16 @@
       "in_registry": true,
       "health_score": 105.0,
       "classification": "Core",
-      "last_checked": "2026-05-08"
+      "last_checked": "2026-05-09",
+      "version": "0.2.0",
+      "pkg_integrity": "sha512-506bCOY2ZI7AINJLULbqyDRLymLag2pRuKFGBPP1yFr9+wAfqHS9fk8UkDdUYCeU5MYdv8FUWHVhdg62cMXdXg==",
+      "trust": "verified",
+      "notes": "npm does not publish a repository.url field — source_url verified manually."
     },
     {
       "name": "mcp-server-kubernetes",
       "category": "infra",
-      "install_cmd": "npx -y mcp-server-kubernetes",
+      "install_cmd": "npx -y mcp-server-kubernetes@3.5.1",
       "source_url": "https://github.com/Flux159/mcp-server-kubernetes",
       "stars": 1387,
       "last_commit_days": 5,
@@ -196,12 +240,15 @@
       "in_registry": false,
       "health_score": 80.0,
       "classification": "Recommended",
-      "last_checked": "2026-05-08"
+      "last_checked": "2026-05-09",
+      "version": "3.5.1",
+      "pkg_integrity": "sha512-4+KxkNRJ8RGjK9083Zy/FtmG6Oy0j9nDmVgePG41rLw5Fa6aB+elzJUxjcb7ctCvGo9gDPEFCEVTJztJDyU1sw==",
+      "trust": "verified"
     },
     {
       "name": "mcp-server-memory",
       "category": "memory",
-      "install_cmd": "npx -y @modelcontextprotocol/server-memory",
+      "install_cmd": "npx -y @modelcontextprotocol/server-memory@2026.1.26",
       "source_url": "https://github.com/modelcontextprotocol/servers/tree/main/src/memory",
       "stars": 85273,
       "last_commit_days": 20,
@@ -209,13 +256,16 @@
       "in_registry": true,
       "health_score": 105.0,
       "classification": "Core",
-      "last_checked": "2026-05-08",
-      "notes": "open_issues counter is shared across the monorepo; per-server noise is much lower."
+      "last_checked": "2026-05-09",
+      "notes": "open_issues counter is shared across the monorepo; per-server noise is much lower.",
+      "version": "2026.1.26",
+      "pkg_integrity": "sha512-7F0hbaEB4lVqkYhNWmrC5jJjEWPCofgXd7OIk3h97HyvJL6aTAhlUNYaH8lCDxAzlK9sr2pLCkZEYI+m4HSOiA==",
+      "trust": "verified"
     },
     {
       "name": "mcp-installer",
       "category": "meta",
-      "install_cmd": "npx -y @anaisbetts/mcp-installer",
+      "install_cmd": "npx -y @anaisbetts/mcp-installer@0.5.0",
       "source_url": "https://github.com/anaisbetts/mcp-installer",
       "stars": 1517,
       "last_commit_days": 527,
@@ -223,12 +273,16 @@
       "in_registry": false,
       "health_score": 40.0,
       "classification": "Experimental",
-      "last_checked": "2026-05-08"
+      "last_checked": "2026-05-09",
+      "version": "0.5.0",
+      "pkg_integrity": "sha512-dSjBO7wmurLM58Dme/+SBJJxVTvh8zTkvGWgRVpWjn8QSeuUM89Ob4B5Ij5ZB8oHjyBdypvtkMw492ZTmAIXVw==",
+      "trust": "verified",
+      "notes": "npm does not publish a repository.url field — source_url verified manually."
     },
     {
       "name": "sentry-mcp",
       "category": "observability",
-      "install_cmd": "npx -y @sentry/mcp-server",
+      "install_cmd": "npx -y @sentry/mcp-server@0.33.0",
       "source_url": "https://github.com/getsentry/sentry-mcp",
       "stars": 678,
       "last_commit_days": 0,
@@ -236,38 +290,49 @@
       "in_registry": true,
       "health_score": 105.0,
       "classification": "Core",
-      "last_checked": "2026-05-08"
+      "last_checked": "2026-05-09",
+      "version": "0.33.0",
+      "pkg_integrity": "sha512-vVxmGXjVoMT/VebmRf7lHlx9UexGrrVW8a7GbeoFTh1tHbNI25FmrcsB1qMLI7BCaXEriKmbVQRN5ZAeE2DviA==",
+      "trust": "verified"
     },
     {
       "name": "stripe-agent-toolkit",
       "category": "payments",
-      "install_cmd": "npx -y @stripe/mcp",
-      "source_url": "https://github.com/stripe/agent-toolkit",
+      "install_cmd": "npx -y @stripe/mcp@0.3.3",
+      "source_url": "https://github.com/stripe/ai",
       "stars": 1537,
       "last_commit_days": 0,
       "open_issues": 50,
       "in_registry": true,
       "health_score": 105.0,
       "classification": "Core",
-      "last_checked": "2026-05-08"
+      "last_checked": "2026-05-09",
+      "version": "0.3.3",
+      "pkg_integrity": "sha512-Ra7keWg5GKDQ7RUIDa8L3ClKMsmhsJVAXG2/rYeaICEHjyMHYhD9KL2BWVqOqr1IjQwhnA8qbf+Tnb4x09DLyQ==",
+      "trust": "verified",
+      "notes": "Project moved from stripe/agent-toolkit to stripe/ai."
     },
     {
       "name": "linear-mcp-server",
       "category": "pm",
-      "install_cmd": "npx -y linear-mcp-server",
-      "source_url": "https://github.com/jerhadf/linear-mcp-server",
+      "install_cmd": "npx -y linear-mcp-server@0.1.0",
+      "source_url": "https://github.com/modelcontextprotocol/linear-server",
       "stars": 344,
       "last_commit_days": 371,
       "open_issues": 20,
       "in_registry": false,
       "health_score": 40.0,
       "classification": "Experimental",
-      "last_checked": "2026-05-08"
+      "last_checked": "2026-05-09",
+      "version": "0.1.0",
+      "pkg_integrity": "sha512-HNk4aB9VZzT/BYBYSe0NlbwTukJAp0PyreoQCqff+avNkaHllJq0hGuBO5W2Sk8zbBwwtj5E93b35/6gcvbp4A==",
+      "trust": "verified",
+      "notes": "Package transferred from jerhadf/linear-mcp-server to modelcontextprotocol/linear-server."
     },
     {
       "name": "mcp-server-sequentialthinking",
       "category": "reasoning",
-      "install_cmd": "npx -y @modelcontextprotocol/server-sequential-thinking",
+      "install_cmd": "npx -y @modelcontextprotocol/server-sequential-thinking@2025.12.18",
       "source_url": "https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking",
       "stars": 85273,
       "last_commit_days": 20,
@@ -275,21 +340,28 @@
       "in_registry": true,
       "health_score": 105.0,
       "classification": "Core",
-      "last_checked": "2026-05-08",
-      "notes": "open_issues counter is shared across the monorepo; per-server noise is much lower."
+      "last_checked": "2026-05-09",
+      "notes": "open_issues counter is shared across the monorepo; per-server noise is much lower.",
+      "version": "2025.12.18",
+      "pkg_integrity": "sha512-eFR5I9Z9czXQhDn05wahetZU83YNPO+p1HLSEZZEM5q9U1CLF7zv9+TrmSBfRoPaksEAoM8pTWQ33lRCScSFeQ==",
+      "trust": "verified"
     },
     {
       "name": "brave-search-mcp",
       "category": "search",
-      "install_cmd": "npx -y brave-search-mcp",
-      "source_url": "https://github.com/brave/brave-search-mcp-server",
+      "install_cmd": "npx -y brave-search-mcp@2.1.0",
+      "source_url": "https://github.com/mikechao/brave-search-mcp",
       "stars": 994,
       "last_commit_days": 1,
       "open_issues": 21,
       "in_registry": false,
       "health_score": 80.0,
       "classification": "Recommended",
-      "last_checked": "2026-05-08"
+      "last_checked": "2026-05-09",
+      "version": "2.1.0",
+      "pkg_integrity": "sha512-GoEfIa+jOIYQNvctyA67qRx4mX2ocdty0OYRsAoBvDpnX3wEqnscRumCkhOfdSOfwSjrw+Exo1BRCwZrVSLjNA==",
+      "trust": "verified",
+      "notes": "Community package by mikechao — not the official Brave SDK. npm repo field confirmed against source_url."
     },
     {
       "name": "duckduckgo-mcp-server",
@@ -302,12 +374,15 @@
       "in_registry": false,
       "health_score": 80.0,
       "classification": "Recommended",
-      "last_checked": "2026-05-08"
+      "last_checked": "2026-05-09",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "verified"
     },
     {
       "name": "exa-mcp-server",
       "category": "search",
-      "install_cmd": "npx -y exa-mcp-server",
+      "install_cmd": "npx -y exa-mcp-server@3.2.1",
       "source_url": "https://github.com/exa-labs/exa-mcp-server",
       "stars": 4400,
       "last_commit_days": 0,
@@ -315,12 +390,15 @@
       "in_registry": false,
       "health_score": 80.0,
       "classification": "Recommended",
-      "last_checked": "2026-05-08"
+      "last_checked": "2026-05-09",
+      "version": "3.2.1",
+      "pkg_integrity": "sha512-JUcqdfvOh/szKM8iZk//Bm2De4eDiNOud3tZqHSOBK8EgMKJQoXRcLKzWzHLroTwVEfxGL1aB9UdFUiXibV/5A==",
+      "trust": "verified"
     },
     {
       "name": "tavily-mcp",
       "category": "search",
-      "install_cmd": "npx -y tavily-mcp",
+      "install_cmd": "npx -y tavily-mcp@0.2.19",
       "source_url": "https://github.com/tavily-ai/tavily-mcp",
       "stars": 1929,
       "last_commit_days": 0,
@@ -328,7 +406,10 @@
       "in_registry": false,
       "health_score": 80.0,
       "classification": "Recommended",
-      "last_checked": "2026-05-08"
+      "last_checked": "2026-05-09",
+      "version": "0.2.19",
+      "pkg_integrity": "sha512-mn6koWMQJRhtDFZ6kjW/knD23gBjPufNKNxbPMqe/bbSOkvnlVQgJjg54fkqt7WA9UtVPcmSx/XbcgS7/diDDQ==",
+      "trust": "verified"
     },
     {
       "name": "mcp-server-time",
@@ -341,8 +422,11 @@
       "in_registry": true,
       "health_score": 105.0,
       "classification": "Core",
-      "last_checked": "2026-05-08",
-      "notes": "open_issues counter is shared across the monorepo; per-server noise is much lower."
+      "last_checked": "2026-05-09",
+      "notes": "open_issues counter is shared across the monorepo; per-server noise is much lower.",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "verified"
     },
     {
       "name": "github-mcp-server",
@@ -355,7 +439,10 @@
       "in_registry": true,
       "health_score": 105.0,
       "classification": "Core",
-      "last_checked": "2026-05-08"
+      "last_checked": "2026-05-09",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "verified"
     },
     {
       "name": "mcp-server-git",
@@ -368,34 +455,45 @@
       "in_registry": true,
       "health_score": 105.0,
       "classification": "Core",
-      "last_checked": "2026-05-08",
-      "notes": "open_issues counter is shared across the monorepo; per-server noise is much lower."
+      "last_checked": "2026-05-09",
+      "notes": "open_issues counter is shared across the monorepo; per-server noise is much lower.",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "verified"
     },
     {
       "name": "actors-mcp-server",
       "category": "web-scraping",
-      "install_cmd": "npx -y @apify/actors-mcp-server",
-      "source_url": "https://github.com/apify/actors-mcp-server",
+      "install_cmd": "npx -y @apify/actors-mcp-server@0.10.1",
+      "source_url": "https://github.com/apify/apify-mcp-server",
       "stars": 1198,
       "last_commit_days": 0,
       "open_issues": 114,
       "in_registry": false,
       "health_score": 75.0,
       "classification": "Recommended",
-      "last_checked": "2026-05-08"
+      "last_checked": "2026-05-09",
+      "version": "0.10.1",
+      "pkg_integrity": "sha512-pj5bN9KV5A+QN+K9eAOcP5t/z7WwTtw1qhtMgi4D7Rp98eeOFGBV8XWzE9NmjP9Myhbyj/O98fyp6g2fO898Ww==",
+      "trust": "verified",
+      "notes": "GitHub repo is apify/apify-mcp-server (npm field); actors-mcp-server is the npm package name."
     },
     {
       "name": "firecrawl-mcp-server",
       "category": "web-scraping",
-      "install_cmd": "npx -y firecrawl-mcp",
-      "source_url": "https://github.com/mendableai/firecrawl-mcp-server",
+      "install_cmd": "npx -y firecrawl-mcp@3.15.0",
+      "source_url": "https://github.com/firecrawl/firecrawl-mcp-server",
       "stars": 6240,
       "last_commit_days": 1,
       "open_issues": 108,
       "in_registry": false,
       "health_score": 75.0,
       "classification": "Recommended",
-      "last_checked": "2026-05-08"
+      "last_checked": "2026-05-09",
+      "version": "3.15.0",
+      "pkg_integrity": "sha512-JdPOrbywZrSFX2X84fCqOcx+cTUg5gqqEqbiRvD320UFVeulKeionr6C8P8bPNdCa7FmnISIiCMB0c85riU0oQ==",
+      "trust": "verified",
+      "notes": "GitHub org renamed from mendableai to firecrawl."
     }
   ]
 }
