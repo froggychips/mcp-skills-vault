@@ -68,7 +68,7 @@
     {
       "name": "mcp-clickhouse",
       "category": "database",
-      "install_cmd": "uvx mcp-clickhouse",
+      "install_cmd": "uvx mcp-clickhouse==0.3.0",
       "source_url": "https://github.com/ClickHouse/mcp-clickhouse",
       "stars": 773,
       "last_commit_days": 0,
@@ -77,15 +77,15 @@
       "health_score": 80.0,
       "classification": "Recommended",
       "last_checked": "2026-05-09",
-      "version": null,
-      "pkg_integrity": null,
+      "version": "0.3.0",
+      "pkg_integrity": "sha256-4c38d5f6bed6b99c030b0db386f987b220e5b49be9ab44c95d4a588fd74fad5d",
       "trust": "verified"
     },
     {
       "name": "supabase-mcp",
       "category": "database",
-      "install_cmd": "uvx supabase-mcp-server",
-      "source_url": "https://github.com/supabase-community/supabase-mcp",
+      "install_cmd": "uvx supabase-mcp-server==0.4",
+      "source_url": "https://github.com/alexander-zuev/supabase-mcp-server",
       "stars": 2670,
       "last_commit_days": 3,
       "open_issues": 90,
@@ -93,9 +93,10 @@
       "health_score": 75.0,
       "classification": "Recommended",
       "last_checked": "2026-05-09",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "verified"
+      "version": "0.4",
+      "pkg_integrity": "sha256-f374b96e019ace4d793cd6bc22a8e500d7fc0c10659ba893f904497c66283fb2",
+      "trust": "verified",
+      "notes": "PyPI publishes alexander-zuev/supabase-mcp-server, not supabase-community/supabase-mcp — community package, not the official Supabase one."
     },
     {
       "name": "mcp-server-everything",
@@ -149,7 +150,7 @@
     {
       "name": "mcp-atlassian",
       "category": "docs",
-      "install_cmd": "uvx mcp-atlassian",
+      "install_cmd": "uvx mcp-atlassian==0.21.1",
       "source_url": "https://github.com/sooperset/mcp-atlassian",
       "stars": 5121,
       "last_commit_days": 28,
@@ -158,9 +159,10 @@
       "health_score": 75.0,
       "classification": "Recommended",
       "last_checked": "2026-05-09",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "verified"
+      "version": "0.21.1",
+      "pkg_integrity": "sha256-dff6c81541506cb0cc80d7ac9900ffdcb246fec7808e41e8df73c09dd4a28074",
+      "trust": "verified",
+      "notes": "PyPI declares no project_urls — source_url verified manually."
     },
     {
       "name": "mcp-server-filesystem",
@@ -182,7 +184,7 @@
     {
       "name": "mcp-server-fetch",
       "category": "http",
-      "install_cmd": "uvx mcp-server-fetch",
+      "install_cmd": "uvx mcp-server-fetch==2025.4.7",
       "source_url": "https://github.com/modelcontextprotocol/servers/tree/main/src/fetch",
       "stars": 85273,
       "last_commit_days": 20,
@@ -191,15 +193,15 @@
       "health_score": 105.0,
       "classification": "Core",
       "last_checked": "2026-05-09",
-      "notes": "open_issues counter is shared across the monorepo; per-server noise is much lower.",
-      "version": null,
-      "pkg_integrity": null,
+      "notes": "open_issues counter is shared across the monorepo. PyPI declares no project_urls — source_url is the canonical monorepo path.",
+      "version": "2025.4.7",
+      "pkg_integrity": "sha256-56279e3c55cb1e506b958ca9bb23ed4413944a6f230bca21e044aee51734fe47",
       "trust": "verified"
     },
     {
       "name": "mcp-server-aws",
       "category": "infra",
-      "install_cmd": "uvx awslabs.aws-mcp-server",
+      "install_cmd": "uvx awslabs.core-mcp-server==1.0.27",
       "source_url": "https://github.com/awslabs/mcp",
       "stars": 8999,
       "last_commit_days": 0,
@@ -208,9 +210,10 @@
       "health_score": 105.0,
       "classification": "Core",
       "last_checked": "2026-05-09",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "verified"
+      "version": "1.0.27",
+      "pkg_integrity": "sha256-a75febfe46bf80b63c7e2530ace1bd915e283ce5eae9316c74a1e52f61047381",
+      "trust": "verified",
+      "notes": "Original entry referenced awslabs.aws-mcp-server which does not exist on PyPI. Replaced with awslabs.core-mcp-server (the entry-point package for the awslabs MCP suite)."
     },
     {
       "name": "mcp-server-cloudflare",
@@ -366,7 +369,7 @@
     {
       "name": "duckduckgo-mcp-server",
       "category": "search",
-      "install_cmd": "uvx duckduckgo-mcp-server",
+      "install_cmd": "uvx duckduckgo-mcp-server==0.4.0",
       "source_url": "https://github.com/nickclyde/duckduckgo-mcp-server",
       "stars": 1090,
       "last_commit_days": 2,
@@ -375,8 +378,8 @@
       "health_score": 80.0,
       "classification": "Recommended",
       "last_checked": "2026-05-09",
-      "version": null,
-      "pkg_integrity": null,
+      "version": "0.4.0",
+      "pkg_integrity": "sha256-4338b05321bcc8809aadd3b1db808e42ebe7736c5dfa74981770e7d8acf07455",
       "trust": "verified"
     },
     {
@@ -414,7 +417,7 @@
     {
       "name": "mcp-server-time",
       "category": "utility",
-      "install_cmd": "uvx mcp-server-time",
+      "install_cmd": "uvx mcp-server-time==2026.1.26",
       "source_url": "https://github.com/modelcontextprotocol/servers/tree/main/src/time",
       "stars": 85273,
       "last_commit_days": 20,
@@ -423,15 +426,15 @@
       "health_score": 105.0,
       "classification": "Core",
       "last_checked": "2026-05-09",
-      "notes": "open_issues counter is shared across the monorepo; per-server noise is much lower.",
-      "version": null,
-      "pkg_integrity": null,
+      "notes": "open_issues counter is shared across the monorepo. PyPI declares no project_urls — source_url is the canonical monorepo path.",
+      "version": "2026.1.26",
+      "pkg_integrity": "sha256-fcef6991e8d8480ed7d9be8016cb853f8c697d146322d3e698f45b586d86f1c1",
       "trust": "verified"
     },
     {
       "name": "github-mcp-server",
       "category": "vcs",
-      "install_cmd": "docker run -i --rm --cap-drop ALL --security-opt no-new-privileges -e GITHUB_PERSONAL_ACCESS_TOKEN ghcr.io/github/github-mcp-server",
+      "install_cmd": "docker run -i --rm --cap-drop ALL --security-opt no-new-privileges -e GITHUB_PERSONAL_ACCESS_TOKEN ghcr.io/github/github-mcp-server@sha256:2ac27ef03461ef2b877031b838a7d1fd7f12b12d4ace7796d8cad91446d55959",
       "source_url": "https://github.com/github/github-mcp-server",
       "stars": 29609,
       "last_commit_days": 0,
@@ -440,14 +443,15 @@
       "health_score": 105.0,
       "classification": "Core",
       "last_checked": "2026-05-09",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "verified"
+      "version": "latest@2026-05-09",
+      "pkg_integrity": "sha256-2ac27ef03461ef2b877031b838a7d1fd7f12b12d4ace7796d8cad91446d55959",
+      "trust": "verified",
+      "notes": "Docker image pinned by digest. Refresh with: docker manifest inspect ghcr.io/github/github-mcp-server."
     },
     {
       "name": "mcp-server-git",
       "category": "vcs",
-      "install_cmd": "uvx mcp-server-git",
+      "install_cmd": "uvx mcp-server-git==2026.1.14",
       "source_url": "https://github.com/modelcontextprotocol/servers/tree/main/src/git",
       "stars": 85273,
       "last_commit_days": 20,
@@ -456,15 +460,15 @@
       "health_score": 105.0,
       "classification": "Core",
       "last_checked": "2026-05-09",
-      "notes": "open_issues counter is shared across the monorepo; per-server noise is much lower.",
-      "version": null,
-      "pkg_integrity": null,
+      "notes": "open_issues counter is shared across the monorepo. PyPI declares no project_urls — source_url is the canonical monorepo path.",
+      "version": "2026.1.14",
+      "pkg_integrity": "sha256-2cd74704c7b271ab1ed7be266120c20ae8ae7cc01e52dc6c549790402bad2b44",
       "trust": "verified"
     },
     {
       "name": "gitlab-mcp",
       "category": "vcs",
-      "install_cmd": "npx -y @zereight/mcp-gitlab",
+      "install_cmd": "npx -y @zereight/mcp-gitlab@2.1.10",
       "source_url": "https://github.com/zereight/gitlab-mcp",
       "stars": 1470,
       "last_commit_days": 1,
@@ -472,7 +476,10 @@
       "in_registry": false,
       "health_score": 80.0,
       "classification": "Recommended",
-      "last_checked": "2026-05-08",
+      "last_checked": "2026-05-09",
+      "version": "2.1.10",
+      "pkg_integrity": "sha512-HHDxwge67zbyMREYOPTg821qBBe6ITlo1bs2sZg3UrBzmKORJSpS2yEgcdHDJc6tmjpDHLrz/p+EeeGUXkoxMg==",
+      "trust": "verified",
       "notes": "Comprehensive GitLab platform API (MRs, issues, pipelines, wiki, releases, tags, milestones); supports self-hosted instances and PAT/OAuth. Top community choice; gitlab-org/* has no equivalent open-source MCP."
     },
     {
