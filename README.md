@@ -9,7 +9,7 @@ Supply-chain security scanner and vetted database for the MCP ecosystem — veri
 
 | Skill | Purpose | Status |
 |---|---|---|
-| [`mcp-ecosystem-intelligence/`](./mcp-ecosystem-intelligence) | Security scanner + vetted 31-tool database. Verifies sha512/sha256/Docker digest integrity, checks advisory APIs, scores candidates by health. | Ready |
+| [`mcp-ecosystem-intelligence/`](./mcp-ecosystem-intelligence) | Pipeline orchestrator + security scanner + vetted 31-tool database. Scans project stack, matches DB, verifies sha512/sha256/Docker digest integrity, checks advisory APIs, scores candidates by health, writes `.mcp.json`. | Ready |
 | [`mcp-swift-synthesizer.skill`](./mcp-swift-synthesizer.skill) | Convert MCP server functions into native Swift binaries to cut RAM (Node 150–300 MB → Swift 1–10 MB). | Concept |
 
 ## Quick install (Ecosystem Intelligence)
@@ -29,6 +29,24 @@ Then ask Claude something like:
 ---
 
 ## What works today
+
+### Pipeline orchestrator
+
+[`scripts/orchestrate.cjs`](./mcp-ecosystem-intelligence/scripts/orchestrate.cjs) — the single entry point. Deterministically runs steps 1, 2, 7, 8 of the pipeline so Claude only interprets results.
+
+```bash
+# Scan project, match DB, show what to install
+node mcp-ecosystem-intelligence/scripts/orchestrate.cjs --cwd /path/to/project
+
+# Keyword search on top of stack detection
+node mcp-ecosystem-intelligence/scripts/orchestrate.cjs --query kubernetes
+
+# Install a tool: integrity gate → writes .mcp.json
+node mcp-ecosystem-intelligence/scripts/orchestrate.cjs --install github-mcp-server
+node mcp-ecosystem-intelligence/scripts/orchestrate.cjs --install mcp-server-memory --global
+```
+
+Detects stack from: `package.json`, `pyproject.toml`, `requirements.txt`, `go.mod`, `Cargo.toml`, `docker-compose.yml`, `.env*` (key names only — no value leaks).
 
 ### Supply-chain security scanner
 
@@ -104,7 +122,9 @@ Entry schema:
   "trust": "verified",                 // "verified" | "candidate"
   "license": "MIT",                    // SPDX; non-OSI triggers -10 penalty
   "health_score": 105.0,
-  "classification": "Core"
+  "classification": "Core",
+  "est_tools_count": 10,               // tools injected into context (~200-500 tokens each)
+  "toolsets": "--toolsets repos,issues" // how to reduce tool count; null = no native filtering
 }
 ```
 
@@ -127,8 +147,48 @@ The following are described in [`SKILL.md`](./mcp-ecosystem-intelligence/SKILL.m
 | Registry / aggregator / `gh search` discovery pipeline | Claude-executed, no dedicated script |
 | Reject heuristics (5-Minute Rule, Bloat, Duplication) | Claude-executed judgment, no dedicated script |
 | Formatted recommendation output (terse / verbose) | Claude-generated, no dedicated formatter |
-| Direct `~/.claude.json` writer after install consent | Pattern documented in SKILL.md §10, no dedicated script |
+| Project-scoped `.mcp.json` install (default path) | Pattern documented in SKILL.md §10, no dedicated script |
+| `allowedTools` per-project filtering for heavy servers | Pattern documented in SKILL.md §10, no dedicated script |
 | Wrapper generator (CLI/API → MCP boilerplate) | Template exists in `assets/mcp-wrapper-template/`; generator not scripted |
+
+---
+
+## Token cost management
+
+Every active MCP server injects its full tool list into Claude's system prompt (~200–500 tokens per tool). With 31 servers in the DB the spread is wide: `mcp-server-fetch` = 1 tool vs. `gitlab-mcp` = 153 tools.
+
+Three levers, in order of preference:
+
+**1. Native filtering** (server flag / config key) — use the `toolsets` field in the DB:
+```bash
+# github-mcp: keep only what the project needs
+--toolsets repos,issues,pull_requests
+# playwright-mcp: drop 56 tools, keep 8
+--caps core
+# mongodb-mcp: exclude destructive tools
+disabledTools: ["dropCollection", "dropDatabase"] in mcp_settings.json
+```
+
+**2. Project-scoped `.mcp.json`** (default install target) — server is active only in the repo where `.mcp.json` lives, invisible everywhere else:
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "--cap-drop", "ALL",
+               "--security-opt", "no-new-privileges",
+               "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
+               "--toolsets", "repos,issues",
+               "ghcr.io/github/github-mcp-server@sha256:…"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}" }
+    }
+  }
+}
+```
+
+Reserve `~/.claude.json` for truly cross-project servers: `mcp-server-filesystem`, `mcp-server-memory`.
+
+**3. Wrapper (anti-bloat pattern)** — when a vendor server has no native filtering and exposes 50+ tools you don't need, wrap the 3–5 tools you do need in a thin custom MCP server using `assets/mcp-wrapper-template/`. The wrapper replaces the vendor server entirely, keeping context lean.
 
 ---
 

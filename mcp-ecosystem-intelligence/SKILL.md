@@ -12,14 +12,14 @@ Pragmatic discovery agent for the MCP ecosystem. Optimised for token efficiency:
 Steps marked **[scripted]** have a dedicated script you call via Bash. Steps marked **[Claude]** are executed by Claude using available tools (Read, Bash, WebFetch) — no standalone script exists yet.
 
 ```
-1. Detect stack         → [Claude]   Read manifests in $CWD
-2. Cache lookup         → [Claude]   Read assets/tools_database.json
+1. Detect stack         → [scripted] node scripts/orchestrate.cjs --cwd $CWD
+2. Cache lookup         → [scripted] included in orchestrate.cjs output
 3. Discovery (if miss)  → [Claude]   WebFetch registry + Bash gh search
 4. Validate (5 checks)  → [scripted] node scripts/verify_integrity.cjs
 5. Score                → [scripted] node scripts/calculate_health.cjs <args>
 6. Reject heuristics    → [Claude]   apply 5-Minute / Bloat / Duplication rules
-7. Recommend            → [Claude]   format terse output grouped by category
-8. Install (on consent) → [scripted] verify_integrity.cjs exit 0, then edit ~/.claude.json
+7. Recommend            → [scripted] included in orchestrate.cjs output (with tool count)
+8. Install (on consent) → [scripted] node scripts/orchestrate.cjs --install <name>
 9. Update DB            → [Claude]   append/update assets/tools_database.json
 ```
 
@@ -46,16 +46,26 @@ Emit one line before any further output:
 
 Skip files that do not exist — do not error if the directory has none of them.
 
-## 2. Cache first
+## 2. Run the orchestrator first
 
-Always read `assets/tools_database.json` before any network call.
+**Always start here.** The orchestrator deterministically handles steps 1, 2, and 7 — stack detection, DB match, and formatted recommendations — in a single fast command:
 
 ```bash
-jq '.tools[] | select(.classification!="Deprecated") | {name,install_cmd,classification}' \
-   mcp-ecosystem-intelligence/assets/tools_database.json
+# Scan the current project and match the DB
+node mcp-ecosystem-intelligence/scripts/orchestrate.cjs --cwd $CWD
+
+# Targeted keyword search (cache miss for a specific need)
+node mcp-ecosystem-intelligence/scripts/orchestrate.cjs --cwd $CWD --query <keyword>
+
+# Machine-readable output for programmatic use
+node mcp-ecosystem-intelligence/scripts/orchestrate.cjs --cwd $CWD --json
+
+# Install a tool (runs verify_integrity gate, writes .mcp.json)
+node mcp-ecosystem-intelligence/scripts/orchestrate.cjs --install <name>
+node mcp-ecosystem-intelligence/scripts/orchestrate.cjs --install <name> --global  # → ~/.claude.json
 ```
 
-If a cached entry covers the user's need and `last_checked` is within 30 days, return it immediately. Skip steps 3–6.
+If orchestrate.cjs reports a cache miss (no matches) or the user asks about something not in the DB, proceed to step 3 (live discovery). If it prints recommendations, skip steps 3–6 and go straight to user consent → step 8.
 
 ## 3. Discovery (only on cache miss)
 
@@ -173,7 +183,7 @@ Log every rejection as a one-line entry for the Skipped section of §9 output.
 
 ## 7. Database update
 
-`assets/tools_database.json` schema (the seeded file in this repo is the canonical example, 31 entries across 14 categories):
+`assets/tools_database.json` schema (the seeded file in this repo is the canonical example, 31 entries across 17 categories):
 
 ```json
 {
@@ -189,6 +199,8 @@ Log every rejection as a one-line entry for the Skipped section of §9 output.
       "in_registry": true,
       "health_score": 0.0,
       "classification": "Core|Recommended|Experimental|Deprecated",
+      "est_tools_count": 10,
+      "toolsets": "--flag value  # how to filter; null = no filtering available",
       "last_checked": "YYYY-MM-DD",
       "version": "1.2.3 or null for non-npm",
       "pkg_integrity": "sha512-… or null for non-npm",
@@ -205,6 +217,8 @@ Log every rejection as a one-line entry for the Skipped section of §9 output.
 - `version` — the pinned npm/PyPI version; `null` for docker or git-URL installs.
 - `pkg_integrity` — `dist.integrity` from `npm view <pkg>@<version>` (sha512 of the tarball); `null` for non-npm. Run `node scripts/verify_integrity.cjs --update` to populate or refresh.
 - `trust` — `"verified"` means the tarball integrity hash was confirmed against the registry at time of seeding; it does **not** mean the source code was audited. `"candidate"` means the entry was added from live discovery or cannot be fully verified (e.g. git-URL installs). Candidate entries are recommended with a ⚠️ warning rather than silently hidden.
+- `est_tools_count` — estimated number of tools the server injects into Claude's context (each tool ~200–500 tokens). Use this to flag heavy servers and guide scoping decisions.
+- `toolsets` — string hint describing how to reduce the tool count (CLI flag, config key, or env var). `null` means the server has no native filtering. High `est_tools_count` + `null` toolsets → consider `allowedTools` in `.claude/settings.json` or project-scoped `.mcp.json` instead of global install.
 
 Sorted by `(category, -health_score, name)` for deterministic diffs.
 
@@ -234,14 +248,23 @@ After generation, register the resulting wrapper in `tools_database.json` with `
 Stack: Node/Next.js | DB: Postgres | Needs: db, search, deploy
 
 Recommended (Core / Recommended)
-  database     mcp-server-neon         npx -y @neondatabase/mcp-server-neon         (score 92, Core)
-  search       brave-search-mcp        npx -y brave-search-mcp                       (score 71, Recommended)
-  deploy       mcp-server-cloudflare   npx -y @cloudflare/mcp-server-cloudflare      (score 88, Core)
+  database     mcp-server-neon         npx -y @neondatabase/mcp-server-neon         (score 110, Core, 29 tools)
+  search       exa-mcp-server          npx -y exa-mcp-server                         (score 80, Recommended, 5 tools)
+  deploy       mcp-server-cloudflare   npx -y @cloudflare/mcp-server-cloudflare      (score 105, Core, 5 tools)
+
+Heavy (use with scoping)
+  vcs          github-mcp-server       docker run ghcr.io/github/…                   (score 105, Core, 100 tools ⚠️  --toolsets repos,issues)
+  vcs          gitlab-mcp              npx -y @zereight/mcp-gitlab                   (score 80, Recommended, 153 tools ⚠️  no filter — project-scope only)
 
 Skipped
   postgres-mcp           — covered by neon (duplication)
   generic-fetch-wrapper  — 5-Minute Rule (model can curl)
 ```
+
+Token cost rules:
+- ≥ 30 tools → flag with ⚠️ in terse output; show `toolsets` hint if available.
+- ≥ 30 tools + `toolsets: null` → recommend project-scope install (`.mcp.json`) rather than global.
+- < 10 tools → no flag needed; safe for global install.
 
 **Verbose** — only when asked: include score breakdown, full install snippets, alternates per category.
 
@@ -306,11 +329,44 @@ docker run -i --rm \
 
 For npm/PyPI servers without an upstream image, the verifier still catches integrity drift via `pkg_integrity`. Whether to additionally wrap them in a generic container is an extra (manual) hardening step — `--read-only` breaks many servers that cache locally, so apply it case-by-case.
 
-### Step 3 — write to `~/.claude.json`
+### Step 3 — write to `.mcp.json` (project-scoped) or `~/.claude.json` (global)
 
-Install by **directly editing `~/.claude.json`** rather than running `claude mcp add`. The CLI prints the bearer token to stdout, which leaks into transcripts and shell history; an in-place edit doesn't.
+**Default: project-scoped `.mcp.json`** in the repository root. This keeps the server active only in that project and avoids injecting unused tools into unrelated conversations.
 
-Pattern (Python so secrets never appear on the command line):
+**Use `~/.claude.json` only for servers needed in every project** — typically `mcp-server-filesystem` and `mcp-server-memory`.
+
+Do **not** run `claude mcp add`. The CLI prints the bearer token to stdout, which leaks into transcripts and shell history. Edit files directly instead.
+
+#### Option A — project-scoped `.mcp.json` (default)
+
+Create or update `.mcp.json` in the project root. For heavy servers (≥ 30 tools), add the toolsets flag to `args`:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "--cap-drop", "ALL",
+        "--security-opt", "no-new-privileges",
+        "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "--toolsets", "repos,issues,pull_requests",
+        "ghcr.io/github/github-mcp-server@sha256:2ac27ef03461ef2b877031b838a7d1fd7f12b12d4ace7796d8cad91446d55959"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+Show the user the proposed `.mcp.json` diff before writing. Claude Code picks it up automatically on the next session start.
+
+#### Option B — global `~/.claude.json` (filesystem / memory only)
+
+For truly global servers, edit `~/.claude.json` via Python so secrets never appear on the command line:
 
 ```bash
 TOKEN_ENV=GITHUB_TOKEN python3 - <<'PY'
@@ -318,14 +374,9 @@ import json, os, pathlib, shutil, time
 cfg = pathlib.Path.home() / ".claude.json"
 shutil.copy(cfg, str(cfg) + f".bak.{int(time.time())}")
 data = json.loads(cfg.read_text())
-data.setdefault("mcpServers", {})["github"] = {
-    "command": "docker",
-    "args": ["run", "-i", "--rm",
-             "--cap-drop", "ALL",
-             "--security-opt", "no-new-privileges",
-             "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
-             "ghcr.io/github/github-mcp-server@sha256:2ac27ef03461ef2b877031b838a7d1fd7f12b12d4ace7796d8cad91446d55959"],
-    "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": os.environ["GITHUB_TOKEN"]},
+data.setdefault("mcpServers", {})["filesystem"] = {
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-filesystem@2026.1.14", os.environ["HOME"]],
 }
 cfg.write_text(json.dumps(data, indent=2))
 print("Done. Restart Claude Code to pick up the new server.")
@@ -336,6 +387,22 @@ Always:
 - Back up `~/.claude.json` before writing (shown above).
 - Read secrets from environment variables, never from CLI arguments.
 - Show the user a diff of the proposed change before applying.
+
+#### Option C — `allowedTools` for servers without native filtering
+
+If a server has `est_tools_count ≥ 30` and `toolsets: null` (e.g. gitlab-mcp, mcp-atlassian), and project-scoping alone isn't enough, restrict visible tools in `.claude/settings.json`:
+
+```json
+{
+  "allowedTools": [
+    "mcp__gitlab__create_merge_request",
+    "mcp__gitlab__list_issues",
+    "mcp__gitlab__get_pipeline_status"
+  ]
+}
+```
+
+Tool names follow the pattern `mcp__<server-name>__<tool-name>`. List only what the project actually needs.
 
 ## Operating principles
 
