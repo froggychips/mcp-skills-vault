@@ -1,12 +1,13 @@
 name: security-scan
 
-# Two responsibilities:
+# Three responsibilities:
 #   smoke           — fast offline check on every PR / push to master
-#   refresh-hashes  — weekly cron that opens a PR with refreshed integrity hashes
-#
-# refresh-hashes runs verify_integrity.cjs --update against live registries,
-# so every refresh requires human review before merging — version bumps may
-# carry CVE fixes OR a freshly compromised release. The PR is the gate.
+#   refresh-hashes  — weekly cron that opens a PR with:
+#                       1. refreshed integrity hashes (verify_integrity --update)
+#                       2. refreshed GitHub metrics + recalculated health scores
+#                          (refresh_scores --write)
+#                     Requires human review before merging — version bumps may
+#                     carry CVE fixes OR a freshly compromised release.
 
 on:
   pull_request:
@@ -52,19 +53,25 @@ jobs:
         run: node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --update
       - name: Re-verify with refreshed hashes
         run: node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs
+      - name: refresh_scores --write
+        run: node mcp-ecosystem-intelligence/scripts/refresh_scores.cjs --write
       - name: Open PR if anything changed
         uses: peter-evans/create-pull-request@v6
         with:
-          commit-message: 'chore: weekly refresh of integrity hashes'
-          title: 'chore: weekly refresh of integrity hashes'
+          commit-message: 'chore: weekly refresh of hashes + GitHub metrics'
+          title: 'chore: weekly refresh of hashes + GitHub metrics'
           body: |
-            Automated refresh of `version` and `pkg_integrity` fields via
-            `verify_integrity.cjs --update`.
+            Automated weekly refresh via:
+            - `verify_integrity.cjs --update` — refreshes `version` + `pkg_integrity`
+            - `refresh_scores.cjs --write` — refreshes `stars`, `last_commit_days`,
+              `open_issues`, `health_score`, `classification` from GitHub API
 
             ## Reviewer checklist
             - [ ] Diff each version bump against the package's CHANGELOG / GitHub releases
             - [ ] Look for unexplained major-version jumps (could indicate package hijack)
             - [ ] Confirm no entry switched maintainer / org silently
+            - [ ] Check tier changes (Recommended → Experimental, etc.) — may need manual follow-up
+            - [ ] Large star-count drops may indicate repo transfer or star-farming removal
             - [ ] Re-run `verify_integrity.cjs` locally — should exit 0
 
             > ⚠️ This PR is the **only** human gate between npm/PyPI publishing

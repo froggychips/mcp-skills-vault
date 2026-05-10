@@ -1,6 +1,6 @@
 # mcp-skills-vault
 
-Claude Code skills for working with the Model Context Protocol (MCP) ecosystem — discovering MCP servers for a project, scoring them, and installing them safely.
+Supply-chain security scanner and vetted database for the MCP ecosystem — verify MCP server integrity before installing, score candidates by health, and get guided recommendations backed by 31 pre-audited entries.
 
 > [!NOTE]
 > Built for [Claude Code](https://claude.com/claude-code) skills. Drop a skill folder into `~/.claude/skills/` and Claude will auto-activate it when the user's prompt matches the skill description.
@@ -9,7 +9,7 @@ Claude Code skills for working with the Model Context Protocol (MCP) ecosystem �
 
 | Skill | Purpose | Status |
 |---|---|---|
-| [`mcp-ecosystem-intelligence/`](./mcp-ecosystem-intelligence) | Find, score, and install MCP servers. Comes with a seeded **31-tool database** and a supply-chain security scanner. | Ready |
+| [`mcp-ecosystem-intelligence/`](./mcp-ecosystem-intelligence) | Security scanner + vetted 31-tool database. Verifies sha512/sha256/Docker digest integrity, checks advisory APIs, scores candidates by health. | Ready |
 | [`mcp-swift-synthesizer.skill`](./mcp-swift-synthesizer.skill) | Convert MCP server functions into native Swift binaries to cut RAM (Node 150–300 MB → Swift 1–10 MB). | Concept |
 
 ## Quick install (Ecosystem Intelligence)

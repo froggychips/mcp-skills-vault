@@ -63,12 +63,16 @@ Strict tier order. Stop at the first tier that yields a viable candidate.
 
 **Tier 1 — official registry + known vendor servers**
 
-Fetch the registry index and scan for the keyword:
+Fetch all registry entries and filter client-side (no server-side search; only ~30–300 entries, pagination via cursor):
 
 ```bash
-# registry index (returns JSON array of server objects)
-# Use WebFetch: https://registry.modelcontextprotocol.io/servers
+# Page 1 — returns {servers: [...], metadata: {nextCursor, count}}
+# Use WebFetch: https://registry.modelcontextprotocol.io/v0/servers
+# If metadata.nextCursor exists, fetch next page:
+# https://registry.modelcontextprotocol.io/v0/servers?cursor=<nextCursor>
 ```
+
+Filter by keyword in `server.title`, `server.description`, `server.name`. Extract `server.packages[0].installCommand` for the install command.
 
 Also check the [`modelcontextprotocol/servers`](https://github.com/modelcontextprotocol/servers) monorepo README and vendor-maintained servers linked from there (github, microsoft/playwright, cloudflare, notion, sentry, …). Use WebFetch on those pages if needed.
 
@@ -200,7 +204,7 @@ Log every rejection as a one-line entry for the Skipped section of §9 output.
 - `install_cmd` — always pin to an explicit version (`@1.2.3`), never `@latest`.
 - `version` — the pinned npm/PyPI version; `null` for docker or git-URL installs.
 - `pkg_integrity` — `dist.integrity` from `npm view <pkg>@<version>` (sha512 of the tarball); `null` for non-npm. Run `node scripts/verify_integrity.cjs --update` to populate or refresh.
-- `trust` — `"verified"` for entries in the seeded DB (manually reviewed); `"candidate"` for entries added from live discovery. Only `"verified"` entries are recommended by default; `"candidate"` entries require explicit user opt-in.
+- `trust` — `"verified"` means the tarball integrity hash was confirmed against the registry at time of seeding; it does **not** mean the source code was audited. `"candidate"` means the entry was added from live discovery or cannot be fully verified (e.g. git-URL installs). Candidate entries are recommended with a ⚠️ warning rather than silently hidden.
 
 Sorted by `(category, -health_score, name)` for deterministic diffs.
 
