@@ -95,8 +95,9 @@ days=$(( ( $(date -u +%s) - $(date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$pushed" +%s) 
 # 'critical_issues' heuristic: open_issues_count / 10 (rough proxy for noise level).
 crit=$(( issues / 10 ))
 in_registry=true   # true only if listed under registry.modelcontextprotocol.io
+license=$(echo "$META" | jq -r '.license // "Unknown"')
 node mcp-ecosystem-intelligence/scripts/calculate_health.cjs \
-     "$stars" "$days" "$in_registry" true "$crit"
+     "$stars" "$days" "$in_registry" true "$crit" "$license"
 ```
 
 Output:
@@ -112,7 +113,10 @@ score = min(20, 10·log10(stars+1))   # popularity, capped
       + 30 if in_registry
       + 15 if install_cmd
       + 5  if open_issues/10 < 5
+      − 10 if license is non-OSI / source-available / Unknown
 ```
+
+The license penalty applies to FSL/BSL/SSPL/Elastic-2.0/Commons Clause and similar source-available licenses, plus packages with no published license. OSI-approved permissive (MIT/Apache/BSD/ISC/MPL) and copyleft (GPL/LGPL/AGPL) get no penalty — they're still open source.
 
 Tier mapping (matches `classify()` in `scripts/calculate_health.cjs`):
 
@@ -155,6 +159,7 @@ Log every rejection with a one-line reason (used in the final output, see §9).
       "version": "1.2.3 or null for non-npm",
       "pkg_integrity": "sha512-… or null for non-npm",
       "trust": "verified|candidate",
+      "license": "MIT|Apache-2.0|… (SPDX); non-OSI triggers -10 score penalty",
       "notes": "optional, short caveat"
     }
   ]

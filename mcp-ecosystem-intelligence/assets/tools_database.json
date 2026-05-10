@@ -9,12 +9,13 @@
       "last_commit_days": 0,
       "open_issues": 3,
       "in_registry": true,
-      "health_score": 110.0,
+      "health_score": 110,
       "classification": "Core",
       "last_checked": "2026-05-09",
       "version": "0.0.75",
       "pkg_integrity": "sha512-oBjzVXfEGZ9Ev45tKKQULNDVdF83B82lg0uPejEK3xsp/zWmdNdNVnPi032fmd/o20ZZXs+LX7cr77qRNbV4VA==",
-      "trust": "verified"
+      "trust": "verified",
+      "license": "Apache-2.0"
     },
     {
       "name": "mcp-redis",
@@ -25,12 +26,13 @@
       "last_commit_days": 16,
       "open_issues": 12,
       "in_registry": true,
-      "health_score": 110.0,
+      "health_score": 110,
       "classification": "Core",
       "last_checked": "2026-05-09",
       "version": null,
       "pkg_integrity": null,
-      "trust": "verified"
+      "trust": "verified",
+      "license": "MIT"
     },
     {
       "name": "mcp-server-neon",
@@ -41,13 +43,14 @@
       "last_commit_days": 0,
       "open_issues": 28,
       "in_registry": true,
-      "health_score": 110.0,
+      "health_score": 110,
       "classification": "Core",
       "last_checked": "2026-05-09",
       "version": "0.6.5",
       "pkg_integrity": "sha512-sTqHMpAKKWL4IzAM2yjd5Q/VKnrHF0MxqidZpKoDhKBKvnOw6jAnb2nqgadY5wBA3kNv7JybCOu2h33A8eW6dw==",
       "trust": "verified",
-      "notes": "npm does not publish a repository.url field — source_url verified manually."
+      "notes": "npm does not publish a repository.url field — source_url verified manually.",
+      "license": "MIT"
     },
     {
       "name": "mongodb-mcp-server",
@@ -58,12 +61,13 @@
       "last_commit_days": 0,
       "open_issues": 36,
       "in_registry": true,
-      "health_score": 110.0,
+      "health_score": 110,
       "classification": "Core",
       "last_checked": "2026-05-09",
       "version": "1.10.0",
       "pkg_integrity": "sha512-ai4605IiaA6BMiVY2danIthgfZaQkyiRW9tNW+866iPcWtZfGHKxhiQoDw1lUDGa28wUoZf616ug8ChlW5e8Tg==",
-      "trust": "verified"
+      "trust": "verified",
+      "license": "Apache-2.0"
     },
     {
       "name": "mcp-clickhouse",
@@ -74,12 +78,13 @@
       "last_commit_days": 0,
       "open_issues": 48,
       "in_registry": false,
-      "health_score": 80.0,
+      "health_score": 80,
       "classification": "Recommended",
       "last_checked": "2026-05-09",
       "version": "0.3.0",
       "pkg_integrity": "sha256-4c38d5f6bed6b99c030b0db386f987b220e5b49be9ab44c95d4a588fd74fad5d",
-      "trust": "verified"
+      "trust": "verified",
+      "license": "Apache-2.0"
     },
     {
       "name": "supabase-mcp",
@@ -90,13 +95,14 @@
       "last_commit_days": 3,
       "open_issues": 90,
       "in_registry": false,
-      "health_score": 75.0,
+      "health_score": 75,
       "classification": "Recommended",
       "last_checked": "2026-05-09",
       "version": "0.4",
       "pkg_integrity": "sha256-f374b96e019ace4d793cd6bc22a8e500d7fc0c10659ba893f904497c66283fb2",
       "trust": "verified",
-      "notes": "PyPI publishes alexander-zuev/supabase-mcp-server, not supabase-community/supabase-mcp — community package, not the official Supabase one."
+      "notes": "PyPI publishes alexander-zuev/supabase-mcp-server, not supabase-community/supabase-mcp — community package, not the official Supabase one.",
+      "license": "Apache-2.0"
     },
     {
       "name": "mcp-server-everything",
@@ -107,13 +113,14 @@
       "last_commit_days": 20,
       "open_issues": 421,
       "in_registry": true,
-      "health_score": 105.0,
+      "health_score": 105,
       "classification": "Core",
       "last_checked": "2026-05-09",
       "notes": "Reference/demo server bundling all sample tools. open_issues counter is shared across the monorepo.",
       "version": "2026.1.26",
       "pkg_integrity": "sha512-RIEXAQuKZeXZqFzJMqLDlzmMmG5sjq2uhS/VqzF4HIZ3w1V73YcWf+UXkxJueJuHMBO3Z8ceBrQ5wI6o/plZ+Q==",
-      "trust": "verified"
+      "trust": "verified",
+      "license": "MIT"
     },
     {
       "name": "context7",
@@ -124,12 +131,13 @@
       "last_commit_days": 2,
       "open_issues": 154,
       "in_registry": true,
-      "health_score": 105.0,
+      "health_score": 105,
       "classification": "Core",
       "last_checked": "2026-05-09",
       "version": "2.2.4",
       "pkg_integrity": "sha512-6kpjAxif2w+HhxSPmyi+SUsVPgFKBi+xtFgKRc9f0fhLpZGTBX1QKWFmleAIZ4T69Ykynzxc4nHGEDrr219noA==",
-      "trust": "verified"
+      "trust": "verified",
+      "license": "MIT"
     },
     {
       "name": "notion-mcp-server",
@@ -140,12 +148,13 @@
       "last_commit_days": 51,
       "open_issues": 158,
       "in_registry": true,
-      "health_score": 85.0,
+      "health_score": 85,
       "classification": "Core",
       "last_checked": "2026-05-09",
       "version": "2.2.1",
       "pkg_integrity": "sha512-Fw3ErV73sEI+ZrnOycR+5Lk8Ig6hEBy3EuyMlIEpb+DS18i3X1sxTWeyIC4ph1RjPVfoDAPrAREhnmMMzlG/oQ==",
-      "trust": "verified"
+      "trust": "verified",
+      "license": "MIT"
     },
     {
       "name": "mcp-atlassian",
@@ -156,13 +165,14 @@
       "last_commit_days": 28,
       "open_issues": 291,
       "in_registry": false,
-      "health_score": 75.0,
+      "health_score": 75,
       "classification": "Recommended",
       "last_checked": "2026-05-09",
       "version": "0.21.1",
       "pkg_integrity": "sha256-dff6c81541506cb0cc80d7ac9900ffdcb246fec7808e41e8df73c09dd4a28074",
       "trust": "verified",
-      "notes": "PyPI declares no project_urls — source_url verified manually."
+      "notes": "PyPI declares no project_urls — source_url verified manually.",
+      "license": "MIT"
     },
     {
       "name": "mcp-server-filesystem",
@@ -173,13 +183,14 @@
       "last_commit_days": 20,
       "open_issues": 421,
       "in_registry": true,
-      "health_score": 105.0,
+      "health_score": 105,
       "classification": "Core",
       "last_checked": "2026-05-09",
       "notes": "open_issues counter is shared across the monorepo; per-server noise is much lower.",
       "version": "2026.1.14",
       "pkg_integrity": "sha512-bGAfu3fWRVeF10NxvPhFBDlRen6ExSx6YkKJzoVgQMNrbdVVV4okfGGQ3KBRu9ygXYfw5/N9ermHAJXA0uys+g==",
-      "trust": "verified"
+      "trust": "verified",
+      "license": "MIT"
     },
     {
       "name": "mcp-server-fetch",
@@ -190,13 +201,14 @@
       "last_commit_days": 20,
       "open_issues": 421,
       "in_registry": true,
-      "health_score": 105.0,
+      "health_score": 105,
       "classification": "Core",
       "last_checked": "2026-05-09",
       "notes": "open_issues counter is shared across the monorepo. PyPI declares no project_urls — source_url is the canonical monorepo path.",
       "version": "2025.4.7",
       "pkg_integrity": "sha256-56279e3c55cb1e506b958ca9bb23ed4413944a6f230bca21e044aee51734fe47",
-      "trust": "verified"
+      "trust": "verified",
+      "license": "MIT"
     },
     {
       "name": "mcp-server-aws",
@@ -207,13 +219,14 @@
       "last_commit_days": 0,
       "open_issues": 515,
       "in_registry": true,
-      "health_score": 105.0,
+      "health_score": 105,
       "classification": "Core",
       "last_checked": "2026-05-09",
       "version": "1.0.27",
       "pkg_integrity": "sha256-a75febfe46bf80b63c7e2530ace1bd915e283ce5eae9316c74a1e52f61047381",
       "trust": "verified",
-      "notes": "Original entry referenced awslabs.aws-mcp-server which does not exist on PyPI. Replaced with awslabs.core-mcp-server (the entry-point package for the awslabs MCP suite)."
+      "notes": "Original entry referenced awslabs.aws-mcp-server which does not exist on PyPI. Replaced with awslabs.core-mcp-server (the entry-point package for the awslabs MCP suite).",
+      "license": "Apache-2.0"
     },
     {
       "name": "mcp-server-cloudflare",
@@ -224,13 +237,14 @@
       "last_commit_days": 7,
       "open_issues": 57,
       "in_registry": true,
-      "health_score": 105.0,
+      "health_score": 105,
       "classification": "Core",
       "last_checked": "2026-05-09",
       "version": "0.2.0",
       "pkg_integrity": "sha512-506bCOY2ZI7AINJLULbqyDRLymLag2pRuKFGBPP1yFr9+wAfqHS9fk8UkDdUYCeU5MYdv8FUWHVhdg62cMXdXg==",
       "trust": "verified",
-      "notes": "npm does not publish a repository.url field — source_url verified manually."
+      "notes": "npm does not publish a repository.url field — source_url verified manually.",
+      "license": "Apache-2.0"
     },
     {
       "name": "mcp-server-kubernetes",
@@ -241,12 +255,13 @@
       "last_commit_days": 5,
       "open_issues": 11,
       "in_registry": false,
-      "health_score": 80.0,
+      "health_score": 80,
       "classification": "Recommended",
       "last_checked": "2026-05-09",
       "version": "3.5.1",
       "pkg_integrity": "sha512-4+KxkNRJ8RGjK9083Zy/FtmG6Oy0j9nDmVgePG41rLw5Fa6aB+elzJUxjcb7ctCvGo9gDPEFCEVTJztJDyU1sw==",
-      "trust": "verified"
+      "trust": "verified",
+      "license": "MIT"
     },
     {
       "name": "mcp-server-memory",
@@ -257,13 +272,14 @@
       "last_commit_days": 20,
       "open_issues": 421,
       "in_registry": true,
-      "health_score": 105.0,
+      "health_score": 105,
       "classification": "Core",
       "last_checked": "2026-05-09",
       "notes": "open_issues counter is shared across the monorepo; per-server noise is much lower.",
       "version": "2026.1.26",
       "pkg_integrity": "sha512-7F0hbaEB4lVqkYhNWmrC5jJjEWPCofgXd7OIk3h97HyvJL6aTAhlUNYaH8lCDxAzlK9sr2pLCkZEYI+m4HSOiA==",
-      "trust": "verified"
+      "trust": "verified",
+      "license": "MIT"
     },
     {
       "name": "mcp-installer",
@@ -274,13 +290,14 @@
       "last_commit_days": 527,
       "open_issues": 23,
       "in_registry": false,
-      "health_score": 40.0,
+      "health_score": 40,
       "classification": "Experimental",
       "last_checked": "2026-05-09",
       "version": "0.5.0",
       "pkg_integrity": "sha512-dSjBO7wmurLM58Dme/+SBJJxVTvh8zTkvGWgRVpWjn8QSeuUM89Ob4B5Ij5ZB8oHjyBdypvtkMw492ZTmAIXVw==",
       "trust": "verified",
-      "notes": "npm does not publish a repository.url field — source_url verified manually."
+      "notes": "npm does not publish a repository.url field — source_url verified manually.",
+      "license": "MIT"
     },
     {
       "name": "sentry-mcp",
@@ -291,12 +308,13 @@
       "last_commit_days": 0,
       "open_issues": 76,
       "in_registry": true,
-      "health_score": 105.0,
+      "health_score": 95,
       "classification": "Core",
       "last_checked": "2026-05-09",
       "version": "0.33.0",
       "pkg_integrity": "sha512-vVxmGXjVoMT/VebmRf7lHlx9UexGrrVW8a7GbeoFTh1tHbNI25FmrcsB1qMLI7BCaXEriKmbVQRN5ZAeE2DviA==",
-      "trust": "verified"
+      "trust": "verified",
+      "license": "FSL-1.1-ALv2"
     },
     {
       "name": "stripe-agent-toolkit",
@@ -307,13 +325,14 @@
       "last_commit_days": 0,
       "open_issues": 50,
       "in_registry": true,
-      "health_score": 105.0,
+      "health_score": 105,
       "classification": "Core",
       "last_checked": "2026-05-09",
       "version": "0.3.3",
       "pkg_integrity": "sha512-Ra7keWg5GKDQ7RUIDa8L3ClKMsmhsJVAXG2/rYeaICEHjyMHYhD9KL2BWVqOqr1IjQwhnA8qbf+Tnb4x09DLyQ==",
       "trust": "verified",
-      "notes": "Project moved from stripe/agent-toolkit to stripe/ai."
+      "notes": "Project moved from stripe/agent-toolkit to stripe/ai.",
+      "license": "MIT"
     },
     {
       "name": "linear-mcp-server",
@@ -324,13 +343,14 @@
       "last_commit_days": 371,
       "open_issues": 20,
       "in_registry": false,
-      "health_score": 40.0,
+      "health_score": 40,
       "classification": "Experimental",
       "last_checked": "2026-05-09",
       "version": "0.1.0",
       "pkg_integrity": "sha512-HNk4aB9VZzT/BYBYSe0NlbwTukJAp0PyreoQCqff+avNkaHllJq0hGuBO5W2Sk8zbBwwtj5E93b35/6gcvbp4A==",
       "trust": "verified",
-      "notes": "Package transferred from jerhadf/linear-mcp-server to modelcontextprotocol/linear-server."
+      "notes": "Package transferred from jerhadf/linear-mcp-server to modelcontextprotocol/linear-server.",
+      "license": "MIT"
     },
     {
       "name": "mcp-server-sequentialthinking",
@@ -341,13 +361,14 @@
       "last_commit_days": 20,
       "open_issues": 421,
       "in_registry": true,
-      "health_score": 105.0,
+      "health_score": 105,
       "classification": "Core",
       "last_checked": "2026-05-09",
       "notes": "open_issues counter is shared across the monorepo; per-server noise is much lower.",
       "version": "2025.12.18",
       "pkg_integrity": "sha512-eFR5I9Z9czXQhDn05wahetZU83YNPO+p1HLSEZZEM5q9U1CLF7zv9+TrmSBfRoPaksEAoM8pTWQ33lRCScSFeQ==",
-      "trust": "verified"
+      "trust": "verified",
+      "license": "MIT"
     },
     {
       "name": "brave-search-mcp",
@@ -358,13 +379,14 @@
       "last_commit_days": 1,
       "open_issues": 21,
       "in_registry": false,
-      "health_score": 80.0,
+      "health_score": 80,
       "classification": "Recommended",
       "last_checked": "2026-05-09",
       "version": "2.1.0",
       "pkg_integrity": "sha512-GoEfIa+jOIYQNvctyA67qRx4mX2ocdty0OYRsAoBvDpnX3wEqnscRumCkhOfdSOfwSjrw+Exo1BRCwZrVSLjNA==",
       "trust": "verified",
-      "notes": "Community package by mikechao — not the official Brave SDK. npm repo field confirmed against source_url."
+      "notes": "Community package by mikechao — not the official Brave SDK. npm repo field confirmed against source_url.",
+      "license": "GPL-3.0-or-later"
     },
     {
       "name": "duckduckgo-mcp-server",
@@ -375,12 +397,13 @@
       "last_commit_days": 2,
       "open_issues": 2,
       "in_registry": false,
-      "health_score": 80.0,
+      "health_score": 80,
       "classification": "Recommended",
       "last_checked": "2026-05-09",
       "version": "0.4.0",
       "pkg_integrity": "sha256-4338b05321bcc8809aadd3b1db808e42ebe7736c5dfa74981770e7d8acf07455",
-      "trust": "verified"
+      "trust": "verified",
+      "license": "MIT"
     },
     {
       "name": "exa-mcp-server",
@@ -391,12 +414,13 @@
       "last_commit_days": 0,
       "open_issues": 16,
       "in_registry": false,
-      "health_score": 80.0,
+      "health_score": 80,
       "classification": "Recommended",
       "last_checked": "2026-05-09",
       "version": "3.2.1",
       "pkg_integrity": "sha512-JUcqdfvOh/szKM8iZk//Bm2De4eDiNOud3tZqHSOBK8EgMKJQoXRcLKzWzHLroTwVEfxGL1aB9UdFUiXibV/5A==",
-      "trust": "verified"
+      "trust": "verified",
+      "license": "MIT"
     },
     {
       "name": "tavily-mcp",
@@ -407,12 +431,13 @@
       "last_commit_days": 0,
       "open_issues": 38,
       "in_registry": false,
-      "health_score": 80.0,
+      "health_score": 80,
       "classification": "Recommended",
       "last_checked": "2026-05-09",
       "version": "0.2.19",
       "pkg_integrity": "sha512-mn6koWMQJRhtDFZ6kjW/knD23gBjPufNKNxbPMqe/bbSOkvnlVQgJjg54fkqt7WA9UtVPcmSx/XbcgS7/diDDQ==",
-      "trust": "verified"
+      "trust": "verified",
+      "license": "MIT"
     },
     {
       "name": "mcp-server-time",
@@ -423,13 +448,14 @@
       "last_commit_days": 20,
       "open_issues": 421,
       "in_registry": true,
-      "health_score": 105.0,
+      "health_score": 105,
       "classification": "Core",
       "last_checked": "2026-05-09",
       "notes": "open_issues counter is shared across the monorepo. PyPI declares no project_urls — source_url is the canonical monorepo path.",
       "version": "2026.1.26",
       "pkg_integrity": "sha256-fcef6991e8d8480ed7d9be8016cb853f8c697d146322d3e698f45b586d86f1c1",
-      "trust": "verified"
+      "trust": "verified",
+      "license": "MIT"
     },
     {
       "name": "github-mcp-server",
@@ -440,13 +466,14 @@
       "last_commit_days": 0,
       "open_issues": 330,
       "in_registry": true,
-      "health_score": 105.0,
+      "health_score": 105,
       "classification": "Core",
       "last_checked": "2026-05-09",
       "version": "latest@2026-05-09",
       "pkg_integrity": "sha256-2ac27ef03461ef2b877031b838a7d1fd7f12b12d4ace7796d8cad91446d55959",
       "trust": "verified",
-      "notes": "Docker image pinned by digest. Refresh with: docker manifest inspect ghcr.io/github/github-mcp-server."
+      "notes": "Docker image pinned by digest. Refresh with: docker manifest inspect ghcr.io/github/github-mcp-server.",
+      "license": "MIT"
     },
     {
       "name": "mcp-server-git",
@@ -457,13 +484,14 @@
       "last_commit_days": 20,
       "open_issues": 421,
       "in_registry": true,
-      "health_score": 105.0,
+      "health_score": 105,
       "classification": "Core",
       "last_checked": "2026-05-09",
       "notes": "open_issues counter is shared across the monorepo. PyPI declares no project_urls — source_url is the canonical monorepo path.",
       "version": "2026.1.14",
       "pkg_integrity": "sha256-2cd74704c7b271ab1ed7be266120c20ae8ae7cc01e52dc6c549790402bad2b44",
-      "trust": "verified"
+      "trust": "verified",
+      "license": "MIT"
     },
     {
       "name": "gitlab-mcp",
@@ -474,13 +502,14 @@
       "last_commit_days": 1,
       "open_issues": 26,
       "in_registry": false,
-      "health_score": 80.0,
+      "health_score": 80,
       "classification": "Recommended",
       "last_checked": "2026-05-09",
       "version": "2.1.10",
       "pkg_integrity": "sha512-HHDxwge67zbyMREYOPTg821qBBe6ITlo1bs2sZg3UrBzmKORJSpS2yEgcdHDJc6tmjpDHLrz/p+EeeGUXkoxMg==",
       "trust": "verified",
-      "notes": "Comprehensive GitLab platform API (MRs, issues, pipelines, wiki, releases, tags, milestones); supports self-hosted instances and PAT/OAuth. Top community choice; gitlab-org/* has no equivalent open-source MCP."
+      "notes": "Comprehensive GitLab platform API (MRs, issues, pipelines, wiki, releases, tags, milestones); supports self-hosted instances and PAT/OAuth. Top community choice; gitlab-org/* has no equivalent open-source MCP.",
+      "license": "MIT"
     },
     {
       "name": "actors-mcp-server",
@@ -491,13 +520,14 @@
       "last_commit_days": 0,
       "open_issues": 114,
       "in_registry": false,
-      "health_score": 75.0,
+      "health_score": 75,
       "classification": "Recommended",
       "last_checked": "2026-05-09",
       "version": "0.10.1",
       "pkg_integrity": "sha512-pj5bN9KV5A+QN+K9eAOcP5t/z7WwTtw1qhtMgi4D7Rp98eeOFGBV8XWzE9NmjP9Myhbyj/O98fyp6g2fO898Ww==",
       "trust": "verified",
-      "notes": "GitHub repo is apify/apify-mcp-server (npm field); actors-mcp-server is the npm package name."
+      "notes": "GitHub repo is apify/apify-mcp-server (npm field); actors-mcp-server is the npm package name.",
+      "license": "MIT"
     },
     {
       "name": "firecrawl-mcp-server",
@@ -508,13 +538,14 @@
       "last_commit_days": 1,
       "open_issues": 108,
       "in_registry": false,
-      "health_score": 75.0,
+      "health_score": 75,
       "classification": "Recommended",
       "last_checked": "2026-05-09",
       "version": "3.15.0",
       "pkg_integrity": "sha512-JdPOrbywZrSFX2X84fCqOcx+cTUg5gqqEqbiRvD320UFVeulKeionr6C8P8bPNdCa7FmnISIiCMB0c85riU0oQ==",
       "trust": "verified",
-      "notes": "GitHub org renamed from mendableai to firecrawl."
+      "notes": "GitHub org renamed from mendableai to firecrawl.",
+      "license": "MIT"
     }
   ]
 }
