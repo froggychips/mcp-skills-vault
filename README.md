@@ -68,6 +68,7 @@ score = min(20, 10·log10(stars+1))   # popularity, capped
       + 30 if in_registry
       + 15 if install_cmd documented
       + 5  if open_issues/10 < 5
+      − 10 if license is non-OSI / source-available / Unknown
 ```
 
 Tier mapping (max 110):
@@ -104,6 +105,7 @@ Each entry schema:
   "version": "1.2.3",                  // pinned npm version
   "pkg_integrity": "sha512-…",         // npm dist.integrity
   "trust": "verified",                 // "verified" | "candidate"
+  "license": "MIT",                    // SPDX; non-OSI triggers -10 penalty
   "health_score": 105.0,
   "classification": "Core"
 }

@@ -7,15 +7,22 @@
  *                + 30 (if present in official registry)
  *                + 15 (if install command exists)
  *                + 5  (if critical issues < 5)
+ *                − 10 (if license is non-OSI / source-available / Unknown)
  *
  * Popularity is capped at 20 so that mega-repos (50k+ stars) cannot dominate the
- * score and crowd everything into the Core tier; max total = 110.
+ * score and crowd everything into the Core tier; max total = 110, min = -10.
  *
  * Recency bonus (graduated to reward freshness, not just a binary cutoff):
  *   40  – last commit < 30 days   (actively maintained)
  *   20  – last commit < 90 days   (recently maintained)
  *   10  – last commit < 180 days  (dormant but alive)
  *   0   – last commit >= 180 days (stale)
+ *
+ * License penalty applies for source-available / proprietary / unknown licenses
+ * (e.g. FSL-1.1, BSL, SSPL, Elastic-2.0, Commons Clause). OSI-approved licenses
+ * — both permissive (MIT/Apache/BSD/ISC/MPL) and copyleft (GPL/LGPL/AGPL) — get
+ * no penalty. The license argument is OPTIONAL for backward compatibility:
+ * callers that omit it skip the license adjustment entirely.
  *
  * Classification thresholds (out of 110):
  *   85+    → Core
@@ -24,11 +31,12 @@
  *   <40    → Deprecated
  *
  * Usage:
- *   node calculate_health.cjs <stars> <last_commit_days> <in_registry> <has_install_cmd> <critical_issues>
+ *   node calculate_health.cjs <stars> <last_commit_days> <in_registry> <has_install_cmd> <critical_issues> [license]
  *
  * Examples:
- *   node calculate_health.cjs 1200 15 true true 2
- *   node calculate_health.cjs 50 200 false true 10
+ *   node calculate_health.cjs 1200 15 true true 2 MIT
+ *   node calculate_health.cjs 50 200 false true 10 FSL-1.1-ALv2
+ *   node calculate_health.cjs 1200 15 true true 2            # license check skipped (back-compat)
  */
 
 const args = process.argv.slice(2);
@@ -36,14 +44,15 @@ const args = process.argv.slice(2);
 // Print help when requested
 if (args[0] === '--help' || args[0] === '-h') {
   console.log(
-    'Usage: node calculate_health.cjs <stars> <last_commit_days> <in_registry> <has_install_cmd> <critical_issues>\n' +
+    'Usage: node calculate_health.cjs <stars> <last_commit_days> <in_registry> <has_install_cmd> <critical_issues> [license]\n' +
     '\n' +
     'Arguments:\n' +
     '  stars            GitHub star count (integer >= 0)\n' +
     '  last_commit_days Days since last commit (integer >= 0)\n' +
     '  in_registry      true/1 if listed in official MCP registry\n' +
     '  has_install_cmd  true/1 if a clear install command is documented\n' +
-    '  critical_issues  Number of open critical issues (integer >= 0)\n'
+    '  critical_issues  Number of open critical issues (integer >= 0)\n' +
+    '  license          (optional) SPDX identifier; non-OSI licenses incur -10\n'
   );
   process.exit(0);
 }
@@ -64,6 +73,17 @@ const lastCommitDays = parseInt(args[1], 10);
 const inRegistry = args[2] === 'true' || args[2] === '1';
 const hasInstallCmd = args[3] === 'true' || args[3] === '1';
 const criticalIssues = parseInt(args[4], 10);
+const license = args[5];   // optional — undefined skips the license check
+
+// SPDX identifiers for OSI-approved licenses commonly seen on npm/PyPI.
+// Permissive + copyleft both count as OSI-approved (still open source).
+const OSI_APPROVED = new Set([
+  'MIT', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', 'Unlicense',
+  '0BSD', 'MPL-2.0', 'CC0-1.0', 'Zlib', 'Python-2.0', 'PostgreSQL',
+  'GPL-2.0-only', 'GPL-2.0-or-later', 'GPL-3.0-only', 'GPL-3.0-or-later',
+  'LGPL-2.1-only', 'LGPL-2.1-or-later', 'LGPL-3.0-only', 'LGPL-3.0-or-later',
+  'AGPL-3.0-only', 'AGPL-3.0-or-later',
+]);
 
 // Validate that numeric fields parsed correctly and are non-negative
 if (isNaN(stars) || stars < 0) {
@@ -108,7 +128,14 @@ const installBonus = hasInstallCmd ? 15 : 0;
 // Penalize tools with too many unresolved critical issues
 const issueBonus = criticalIssues < 5 ? 5 : 0;
 
-const score = popularityScore + recencyBonus + registryBonus + installBonus + issueBonus;
+// License penalty: -10 for source-available / proprietary / unknown licenses.
+// Skipped entirely when the license argument is omitted (back-compat).
+let licensePenalty = 0;
+if (license !== undefined) {
+  licensePenalty = OSI_APPROVED.has(license) ? 0 : -10;
+}
+
+const score = popularityScore + recencyBonus + registryBonus + installBonus + issueBonus + licensePenalty;
 
 // --- Classification --------------------------------------------------------
 
@@ -139,5 +166,6 @@ console.log(JSON.stringify({
     registry: registryBonus,
     install_cmd: installBonus,
     low_issues: issueBonus,
+    license: licensePenalty,
   },
 }, null, 2));
