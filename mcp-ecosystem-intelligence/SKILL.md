@@ -217,14 +217,22 @@ node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs
 # Exit 0 = all clear.  Exit 1 = ABORT — do not install until failures are resolved.
 ```
 
-Flags:
+**What it covers:**
+
+| Ecosystem | Integrity | Source URL | Hooks | Advisories |
+|---|---|---|---|---|
+| npm (`npx -y`) | sha512 SRI from npm | `repository.url` | `pre/post/install` + `prepare/prepack` | npm advisory bulk API |
+| PyPI (`uvx`) | sha256 of sdist | `project_urls` (Source/Homepage/…) | n/a | OSV.dev `/v1/querybatch` |
+| Docker (`docker run`) | image must be pinned by `@sha256:…` digest | n/a | n/a | n/a |
+| `uvx --from git+…` | not verifiable — SKIPPED | — | — | — |
+
+**Flags:**
 | Flag | Effect |
 |---|---|
 | *(default)* | integrity + advisory check + hook detection |
-| `--strict` | treat WARNs (hook, missing repo) as hard failures |
-| `--socket` | also run [socket.dev](https://socket.dev) deeper supply-chain scan |
-| `--no-audit` | skip advisory API (offline/air-gapped environments) |
-| `--update` | refresh `version` + `pkg_integrity` fields from npm |
+| `--strict` | treat WARNs (hook, repo mismatch, unpinned docker) as hard failures |
+| `--no-audit` | skip advisory APIs (offline/air-gapped environments) |
+| `--update` | refresh `version` + `pkg_integrity` fields from registries |
 
 **Interpreting output:**
 
@@ -232,38 +240,34 @@ Flags:
 |---|---|---|
 | `OK` | integrity hash matches, no CVEs | proceed |
 | `MISS` | no stored hash yet | run `--update` first |
-| `HOOK` | package has install-time scripts | review the script shown; `prepare: npm run build` is normal TypeScript compilation; postinstall doing network calls or writing outside the package dir is suspicious |
-| `WARN` | `repository.url` mismatch in npm vs `source_url` | check manually before installing; could be an org rename or a hijacked package name |
+| `HOOK` | npm package has install-time scripts | review the script shown; `prepare: npm run build` is normal TypeScript compilation; postinstall doing network calls or writing outside the package dir is suspicious |
+| `WARN` | source URL mismatch, unpinned docker digest, or other reviewable issue | check manually before installing |
+| `NOTE` | informational (e.g. registry has no source URL declared) | source verifiable manually only |
 | `CVE` | advisory found; high/critical = hard fail | do not install; look for a patched version or alternative |
-| `FAIL` | stored hash does not match npm tarball | hard abort — tarball has changed; investigate before proceeding |
-| `SOCK` | socket.dev flagged issues | review output; fail = do not install |
+| `FAIL` | stored hash does not match registry tarball | hard abort — tarball has changed; investigate before proceeding |
+| `SKIP` | install method not verifiable (e.g. `uvx --from git+…`) | source-pin manually before adding to DB |
 
 ### Step 2 — choose the install method
 
-**Prefer Docker where an official image exists.** Docker gives OS-level isolation even if the package is compromised post-install.
+**Prefer Docker where an official image exists, pinned by digest.** Use `@sha256:<digest>` rather than `:latest` — the verifier flags any unpinned image with `WARN` (or `FAIL` under `--strict`). Refresh digests with:
 
-Hardened Docker template (drop all capabilities, no privilege escalation, read-only root fs):
+```bash
+docker manifest inspect <image> | jq -r '.manifests[0].digest // .config.digest'
+```
+
+Hardened Docker template:
 
 ```bash
 docker run -i --rm \
   --cap-drop ALL \
   --security-opt no-new-privileges \
-  --read-only --tmpfs /tmp \
   -e SECRET_VAR \
-  ghcr.io/vendor/mcp-server
+  ghcr.io/vendor/mcp-server@sha256:<digest>
 ```
 
-For npm-only servers without a Docker image, wrap them in a generic node container:
+For npm/PyPI servers without an upstream image, the verifier still catches integrity drift via `pkg_integrity`. Whether to additionally wrap them in a generic container is an extra (manual) hardening step — `--read-only` breaks many servers that cache locally, so apply it case-by-case.
 
-```bash
-docker run -i --rm \
-  --cap-drop ALL \
-  --security-opt no-new-privileges \
-  node:22-alpine \
-  npx -y <pkg>@<version>
-```
-
-**Step 3 — write to `~/.claude.json`**
+### Step 3 — write to `~/.claude.json`
 
 Install by **directly editing `~/.claude.json`** rather than running `claude mcp add`. The CLI prints the bearer token to stdout, which leaks into transcripts and shell history; an in-place edit doesn't.
 
@@ -273,7 +277,7 @@ Pattern (Python so secrets never appear on the command line):
 TOKEN_ENV=GITHUB_TOKEN python3 - <<'PY'
 import json, os, pathlib, shutil, time
 cfg = pathlib.Path.home() / ".claude.json"
-shutil.copy(cfg, str(cfg) + f".bak.{int(time.time())}")   # backup first
+shutil.copy(cfg, str(cfg) + f".bak.{int(time.time())}")
 data = json.loads(cfg.read_text())
 data.setdefault("mcpServers", {})["github"] = {
     "command": "docker",
@@ -281,7 +285,7 @@ data.setdefault("mcpServers", {})["github"] = {
              "--cap-drop", "ALL",
              "--security-opt", "no-new-privileges",
              "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
-             "ghcr.io/github/github-mcp-server"],
+             "ghcr.io/github/github-mcp-server@sha256:2ac27ef03461ef2b877031b838a7d1fd7f12b12d4ace7796d8cad91446d55959"],
     "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": os.environ["GITHUB_TOKEN"]},
 }
 cfg.write_text(json.dumps(data, indent=2))

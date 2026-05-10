@@ -5,8 +5,6 @@ Claude Code skills for working with the Model Context Protocol (MCP) ecosystem �
 > [!NOTE]
 > Built for [Claude Code](https://claude.com/claude-code) skills. Drop a skill folder into `~/.claude/skills/` and Claude will auto-activate it when the user's prompt matches the skill description.
 
-[Русская документация →](./README.ru.md)
-
 ## What's in here
 
 | Skill | Purpose | Status |
@@ -40,30 +38,27 @@ The skill activates by description match. It will:
 
 ## Security
 
-Every npm-based MCP server is validated before installation with [`scripts/verify_integrity.cjs`](./mcp-ecosystem-intelligence/scripts/verify_integrity.cjs).
+Every entry is validated before installation with [`scripts/verify_integrity.cjs`](./mcp-ecosystem-intelligence/scripts/verify_integrity.cjs). Coverage spans all three install methods used in the database:
 
 ```bash
 node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs
 ```
 
-| Check | What it catches |
-|---|---|
-| **Integrity hash** | Tarball substitution — sha512 of the downloaded package must match the stored hash |
-| **Repository URL** | Package name hijacking — `npm repository.url` must match `source_url` in the DB |
-| **Install hooks** | `preinstall`/`postinstall` scripts that execute arbitrary code during `npx -y` |
-| **CVE advisories** | Known vulnerabilities via the npm advisory bulk API (no external deps) |
-| **socket.dev scan** | Deeper supply-chain analysis: obfuscation, malware signatures (`--socket` flag) |
+| Ecosystem | Integrity | Source URL | Install hooks | CVE / advisory |
+|---|---|---|---|---|
+| npm (`npx -y`) | sha512 SRI from npm | `repository.url` | `pre/post/install` + `prepare` | npm advisory bulk API |
+| PyPI (`uvx`) | sha256 of sdist tarball | `project_urls` | n/a | OSV.dev `/v1/querybatch` |
+| Docker (`docker run`) | image must be pinned by `@sha256:<digest>` | n/a | n/a | n/a |
 
 Flags:
 
 | Flag | Effect |
 |---|---|
-| `--update` | Refresh `version` + `pkg_integrity` from npm |
-| `--strict` | Treat WARNs (hooks, missing repo) as hard failures |
-| `--socket` | Add socket.dev deeper scan |
-| `--no-audit` | Skip advisory API (offline mode) |
+| `--update` | Refresh `version` + `pkg_integrity` from registries |
+| `--strict` | Treat WARNs (hooks, repo mismatch, unpinned docker) as hard failures |
+| `--no-audit` | Skip advisory APIs (offline mode) |
 
-All entries in `tools_database.json` carry pinned versions, sha512 hashes, and a `trust` field (`"verified"` for the seeded 30; `"candidate"` for anything added from live discovery). Docker installs use `--cap-drop ALL --security-opt no-new-privileges`.
+All entries in `tools_database.json` carry pinned versions, integrity hashes (sha512 for npm, sha256 for PyPI, sha256 digest for Docker), and a `trust` field (`"verified"` for the seeded 30; `"candidate"` for anything added from live discovery). Docker installs use `--cap-drop ALL --security-opt no-new-privileges` and pin the image by digest.
 
 ## Health Score formula
 
