@@ -339,18 +339,18 @@
       "name": "linear-mcp-server",
       "category": "pm",
       "install_cmd": "npx -y linear-mcp-server@0.1.0",
-      "source_url": "https://github.com/modelcontextprotocol/linear-server",
+      "source_url": "https://github.com/jerhadf/linear-mcp-server",
       "stars": 344,
-      "last_commit_days": 371,
+      "last_commit_days": 374,
       "open_issues": 20,
       "in_registry": false,
       "health_score": 40,
       "classification": "Experimental",
-      "last_checked": "2026-05-09",
+      "last_checked": "2026-05-10",
       "version": "0.1.0",
       "pkg_integrity": "sha512-HNk4aB9VZzT/BYBYSe0NlbwTukJAp0PyreoQCqff+avNkaHllJq0hGuBO5W2Sk8zbBwwtj5E93b35/6gcvbp4A==",
       "trust": "verified",
-      "notes": "Package transferred from jerhadf/linear-mcp-server to modelcontextprotocol/linear-server. Last commit 371 days ago; effectively unmaintained. Score 40 = Experimental floor (popular but stale).",
+      "notes": "npm repository.url points to modelcontextprotocol/linear-server (404 — repo deleted). Real source is jerhadf/linear-mcp-server (original author, 374 days stale). Verifier will WARN on repo mismatch — this is expected. Best available Linear MCP option but effectively unmaintained.",
       "license": "MIT"
     },
     {
@@ -386,7 +386,7 @@
       "version": "2.1.0",
       "pkg_integrity": "sha512-GoEfIa+jOIYQNvctyA67qRx4mX2ocdty0OYRsAoBvDpnX3wEqnscRumCkhOfdSOfwSjrw+Exo1BRCwZrVSLjNA==",
       "trust": "verified",
-      "notes": "Community package by mikechao — not the official Brave SDK. npm repo field confirmed against source_url.",
+      "notes": "Community package by mikechao — not the official Brave SDK. Star count dropped from ~994 to 116 (likely star-farming cleanup by GitHub). Functional but low-signal popularity; 40-day cadence.",
       "license": "GPL-3.0-or-later"
     },
     {
