@@ -9,7 +9,7 @@ Claude Code skills for working with the Model Context Protocol (MCP) ecosystem �
 
 | Skill | Purpose | Status |
 |---|---|---|
-| [`mcp-ecosystem-intelligence/`](./mcp-ecosystem-intelligence) | Find, score, and install MCP servers. Comes with a seeded **30-tool database** and a supply-chain security scanner. | Ready |
+| [`mcp-ecosystem-intelligence/`](./mcp-ecosystem-intelligence) | Find, score, and install MCP servers. Comes with a seeded **31-tool database** and a supply-chain security scanner. | Ready |
 | [`mcp-swift-synthesizer.skill`](./mcp-swift-synthesizer.skill) | Convert MCP server functions into native Swift binaries to cut RAM (Node 150–300 MB → Swift 1–10 MB). | Concept |
 
 ## Quick install (Ecosystem Intelligence)
@@ -29,7 +29,7 @@ Then ask Claude something like:
 The skill activates by description match. It will:
 
 1. Read your project's manifests (`package.json`, `pyproject.toml`, …) to detect stack.
-2. Look up the seeded `tools_database.json` first (30 vetted MCP servers across 14 categories).
+2. Look up the seeded `tools_database.json` first (31 vetted MCP servers across 14 categories).
 3. Fall back to `registry.modelcontextprotocol.io` → aggregators → `gh search` only on cache miss.
 4. Score candidates with [`scripts/calculate_health.cjs`](./mcp-ecosystem-intelligence/scripts/calculate_health.cjs).
 5. **Verify** candidates: integrity hash, repository URL, install hooks, CVE advisories.
@@ -81,7 +81,7 @@ Tier mapping (max 110):
 
 ## Seeded database
 
-`mcp-ecosystem-intelligence/assets/tools_database.json` — **30 entries** across 14 categories:
+`mcp-ecosystem-intelligence/assets/tools_database.json` — **31 entries** across 14 categories:
 
 ```
 browser  database  demo  docs   filesystem  http   infra
@@ -89,7 +89,7 @@ memory   meta      observability  payments  pm    reasoning
 search   utility   vcs   web-scraping
 ```
 
-Distribution: **18 Core / 10 Recommended / 2 Experimental**.
+Distribution: **18 Core / 11 Recommended / 2 Experimental**.
 
 Includes the seven official `modelcontextprotocol/servers` (filesystem, fetch, git, memory, sequentialthinking, time, everything) plus vendor-maintained servers (`github`, `microsoft/playwright`, `cloudflare`, `notion`, `sentry`, `stripe`, `neon`, `mongodb`, `redis`, `clickhouse`, `awslabs/mcp`, `context7`, …) and high-quality community entries (`mcp-atlassian`, `firecrawl`, `tavily`, `exa`, `brave`, `kubernetes`, `duckduckgo`, …).
 
