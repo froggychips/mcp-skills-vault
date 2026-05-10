@@ -171,7 +171,7 @@
       "version": "0.21.1",
       "pkg_integrity": "sha256-dff6c81541506cb0cc80d7ac9900ffdcb246fec7808e41e8df73c09dd4a28074",
       "trust": "verified",
-      "notes": "PyPI declares no project_urls — source_url verified manually.",
+      "notes": "PyPI declares no project_urls and no license metadata — both sourced manually from GitHub.",
       "license": "MIT"
     },
     {
@@ -403,6 +403,7 @@
       "version": "0.4.0",
       "pkg_integrity": "sha256-4338b05321bcc8809aadd3b1db808e42ebe7736c5dfa74981770e7d8acf07455",
       "trust": "verified",
+      "notes": "PyPI declares no license metadata; MIT sourced from GitHub repo.",
       "license": "MIT"
     },
     {
@@ -420,6 +421,7 @@
       "version": "3.2.1",
       "pkg_integrity": "sha512-JUcqdfvOh/szKM8iZk//Bm2De4eDiNOud3tZqHSOBK8EgMKJQoXRcLKzWzHLroTwVEfxGL1aB9UdFUiXibV/5A==",
       "trust": "verified",
+      "notes": "npm declares no license metadata; MIT sourced from GitHub repo.",
       "license": "MIT"
     },
     {

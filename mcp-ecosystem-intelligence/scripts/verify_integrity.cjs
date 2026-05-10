@@ -234,6 +234,12 @@ async function processNpm(tool, pkg, advisoriesByPkg, results) {
     if (STRICT) failures++;
   }
 
+  // License — NOTE when npm omits it but DB has a value (e.g. sourced from GitHub)
+  const npmLicense = meta.license || null;
+  if (!npmLicense && tool.license) {
+    lines.push(['NOTE', `npm declares no license; DB uses "${tool.license}" (verify against GitHub repo)`]);
+  }
+
   // Advisories
   const advs = (advisoriesByPkg[pkg] || []);
   for (const a of advs) {
@@ -288,6 +294,12 @@ async function processPypi(tool, pkg, osvByIndex, idx, results) {
   } else if (storedRepo && pyRepo.toLowerCase() !== storedRepo.toLowerCase() && !storedRepo.includes('/tree/')) {
     lines.push(['WARN', `repo mismatch\n        source_url: ${tool.source_url}\n        pypi src  : ${pySrc}`]);
     if (STRICT) failures++;
+  }
+
+  // License — NOTE when PyPI omits it but DB has a value (e.g. sourced from GitHub)
+  const pyLicense = meta.info.license;
+  if ((!pyLicense || pyLicense === 'UNKNOWN' || pyLicense === '') && tool.license) {
+    lines.push(['NOTE', `PyPI declares no license; DB uses "${tool.license}" (verify against GitHub repo)`]);
   }
 
   // OSV.dev advisories
