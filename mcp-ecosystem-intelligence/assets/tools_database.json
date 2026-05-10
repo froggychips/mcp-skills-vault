@@ -31,8 +31,9 @@
       "last_checked": "2026-05-09",
       "version": null,
       "pkg_integrity": null,
-      "trust": "verified",
-      "license": "MIT"
+      "trust": "candidate",
+      "license": "MIT",
+      "notes": "Installed via uvx --from git+... — pkg_integrity cannot be verified through PyPI; git commit SHA is not pinned. Downgraded to candidate until a PyPI release or pinned commit is available."
     },
     {
       "name": "mcp-server-neon",

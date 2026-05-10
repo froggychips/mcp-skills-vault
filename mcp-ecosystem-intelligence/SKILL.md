@@ -7,18 +7,20 @@ description: Find, evaluate, and install MCP servers for a project. Use when the
 
 Pragmatic discovery agent for the MCP ecosystem. Optimised for token efficiency: cache-first lookups, scripted scoring, terse output by default.
 
-## TL;DR runbook
+## Implementation status
+
+Steps marked **[scripted]** have a dedicated script you call via Bash. Steps marked **[Claude]** are executed by Claude using available tools (Read, Bash, WebFetch) — no standalone script exists yet.
 
 ```
-1. Detect stack         → from manifests in $CWD (package.json, pyproject.toml, …)
-2. Cache lookup         → assets/tools_database.json keyed by need
-3. Discovery (if miss)  → registry → vendor official → community
-4. Validate (5 checks)  → install cmd, MCP SDK, ListTools, recent commit, integrity
-5. Score                → node scripts/calculate_health.cjs <args>
-6. Reject heuristics    → 5-Minute Rule, Bloat, Duplication
-7. Recommend            → grouped by category, sorted by score
-8. Install (on consent) → verify integrity, then edit ~/.claude.json (NOT `claude mcp add`)
-9. Update DB            → append to assets/tools_database.json
+1. Detect stack         → [Claude]   Read manifests in $CWD
+2. Cache lookup         → [Claude]   Read assets/tools_database.json
+3. Discovery (if miss)  → [Claude]   WebFetch registry + Bash gh search
+4. Validate (5 checks)  → [scripted] node scripts/verify_integrity.cjs
+5. Score                → [scripted] node scripts/calculate_health.cjs <args>
+6. Reject heuristics    → [Claude]   apply 5-Minute / Bloat / Duplication rules
+7. Recommend            → [Claude]   format terse output grouped by category
+8. Install (on consent) → [scripted] verify_integrity.cjs exit 0, then edit ~/.claude.json
+9. Update DB            → [Claude]   append/update assets/tools_database.json
 ```
 
 Default output mode is **terse**. The user can ask for "verbose" / "explain" to flip into the long form.
@@ -27,17 +29,22 @@ Default output mode is **terse**. The user can ask for "verbose" / "explain" to 
 
 ## 1. Stack detection (fast scan)
 
-Read the project's manifest files only. Do not exhaustively walk source.
+Read the project's manifest files only. Do not exhaustively walk source. Use the Read tool for each file that exists in `$CWD`:
 
-| File                    | Signals                       |
-|-------------------------|-------------------------------|
-| `package.json`          | Node ecosystem, frameworks    |
-| `pyproject.toml`/`requirements.txt` | Python deps         |
-| `go.mod`, `Cargo.toml`  | Go / Rust                     |
-| `docker-compose.yml`    | DBs, queues, side services    |
-| `.env*`                 | Cloud providers, API surfaces |
+```
+package.json          → Node ecosystem, frameworks (next, express, remix, …)
+pyproject.toml        → Python deps
+requirements.txt      → Python deps (fallback)
+go.mod                → Go
+Cargo.toml            → Rust
+docker-compose.yml    → DBs, queues, side-services
+.env / .env.example   → Cloud providers, API surfaces (look for key prefixes)
+```
 
-Emit one line: `Stack: <langs> | DB: <dbs> | Infra: <cloud/k8s/…> | Needs: <inferred MCP categories>`.
+Emit one line before any further output:
+`Stack: <langs> | DB: <dbs> | Infra: <cloud/k8s/…> | Needs: <inferred MCP categories>`
+
+Skip files that do not exist — do not error if the directory has none of them.
 
 ## 2. Cache first
 
@@ -54,14 +61,32 @@ If a cached entry covers the user's need and `last_checked` is within 30 days, r
 
 Strict tier order. Stop at the first tier that yields a viable candidate.
 
-- **Tier 1 — official registry**: `https://registry.modelcontextprotocol.io`, the [`modelcontextprotocol/servers`](https://github.com/modelcontextprotocol/servers) monorepo, and vendor-maintained servers linked from there (github, microsoft/playwright, cloudflare, notion, sentry, …).
-- **Tier 2 — aggregators**: PulseMCP, Smithery, MetaMCP. Use only if Tier 1 has nothing.
-- **Tier 3 — fallback**: `gh search repos 'topic:mcp-server <keyword>'`, npm/PyPI search.
+**Tier 1 — official registry + known vendor servers**
+
+Fetch the registry index and scan for the keyword:
+
+```bash
+# registry index (returns JSON array of server objects)
+# Use WebFetch: https://registry.modelcontextprotocol.io/servers
+```
+
+Also check the [`modelcontextprotocol/servers`](https://github.com/modelcontextprotocol/servers) monorepo README and vendor-maintained servers linked from there (github, microsoft/playwright, cloudflare, notion, sentry, …). Use WebFetch on those pages if needed.
+
+**Tier 2 — aggregators** (only if Tier 1 empty)
+
+WebFetch PulseMCP (`https://www.pulsemcp.com/servers?search=<keyword>`) or Smithery. Extract name, repo URL, install command.
+
+**Tier 3 — fallback** (only if Tier 1 + 2 empty)
 
 ```bash
 gh search repos --topic mcp-server <keyword> --limit 10 \
   --json fullName,stargazersCount,pushedAt,description
+
+# Also try npm search
+npm search mcp-server-<keyword> --json | jq '.[0:5] | .[] | {name, description, links}'
 ```
+
+If all tiers return nothing, proceed to §8 (wrapper generation).
 
 ## 4. Validation (all five required)
 
@@ -129,13 +154,18 @@ Tier mapping (matches `classify()` in `scripts/calculate_health.cjs`):
 
 ## 6. Reject heuristics (taste, not just score)
 
-A high score isn't enough — also reject when:
+A high score isn't enough. Before recommending, apply these three rules in order:
 
-- **5-Minute Rule** — the tool wraps something the model can do natively in <5 min (e.g. `cat`/`grep`/HTTP GET).
-- **Bloat Check** — a 200MB framework is being pulled in to expose three trivial functions.
-- **Duplication Check** — already an accepted MCP in the same category with a higher score; keep the winner.
+**5-Minute Rule** — reject if the tool wraps something Claude can do natively in under 5 minutes with no external dependency. Examples that fail this rule: a server that only does HTTP GET (Claude has WebFetch), one that only runs `cat`/`grep`/`ls` (Claude has Bash + Read). Examples that pass: database drivers, browser automation, authenticated API wrappers with complex auth flows.
 
-Log every rejection with a one-line reason (used in the final output, see §9).
+**Bloat Check** — reject if the install pulls in a heavy runtime (>100 MB) to expose ≤3 trivial functions. Check with:
+```bash
+npm pack <pkg> --dry-run 2>/dev/null | grep 'package size'
+```
+
+**Duplication Check** — if two candidates cover the same category, keep the one with the higher health score and log the other as rejected with reason "covered by <winner>".
+
+Log every rejection as a one-line entry for the Skipped section of §9 output.
 
 ## 7. Database update
 

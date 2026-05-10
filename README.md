@@ -26,19 +26,13 @@ Then ask Claude something like:
 > _"Audit my MCP setup."_
 > _"What MCP tools should I install for a Next.js app on Cloudflare?"_
 
-The skill activates by description match. It will:
+---
 
-1. Read your project's manifests (`package.json`, `pyproject.toml`, …) to detect stack.
-2. Look up the seeded `tools_database.json` first (31 vetted MCP servers across 14 categories).
-3. Fall back to `registry.modelcontextprotocol.io` → aggregators → `gh search` only on cache miss.
-4. Score candidates with [`scripts/calculate_health.cjs`](./mcp-ecosystem-intelligence/scripts/calculate_health.cjs).
-5. **Verify** candidates: integrity hash, repository URL, install hooks, CVE advisories.
-6. Recommend the best per category, with a copy-pasteable install command.
-7. On your consent, **scan then install** by directly editing `~/.claude.json` (avoids `claude mcp add`, which prints bearer tokens to stdout).
+## What works today
 
-## Security
+### Supply-chain security scanner
 
-Every entry is validated before installation with [`scripts/verify_integrity.cjs`](./mcp-ecosystem-intelligence/scripts/verify_integrity.cjs). Coverage spans all three install methods used in the database:
+[`scripts/verify_integrity.cjs`](./mcp-ecosystem-intelligence/scripts/verify_integrity.cjs) — run before any install:
 
 ```bash
 node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs
@@ -58,9 +52,14 @@ Flags:
 | `--strict` | Treat WARNs (hooks, repo mismatch, unpinned docker) as hard failures |
 | `--no-audit` | Skip advisory APIs (offline mode) |
 
-All entries in `tools_database.json` carry pinned versions, integrity hashes (sha512 for npm, sha256 for PyPI, sha256 digest for Docker), and a `trust` field (`"verified"` for the seeded 30; `"candidate"` for anything added from live discovery). Docker installs use `--cap-drop ALL --security-opt no-new-privileges` and pin the image by digest.
+### Health scorer
 
-## Health Score formula
+[`scripts/calculate_health.cjs`](./mcp-ecosystem-intelligence/scripts/calculate_health.cjs) — score any MCP candidate:
+
+```bash
+node mcp-ecosystem-intelligence/scripts/calculate_health.cjs \
+  <stars> <last_commit_days> <in_registry> <has_install_cmd> <critical_issues> [license]
+```
 
 ```
 score = min(20, 10·log10(stars+1))   # popularity, capped
@@ -71,8 +70,6 @@ score = min(20, 10·log10(stars+1))   # popularity, capped
       − 10 if license is non-OSI / source-available / Unknown
 ```
 
-Tier mapping (max 110):
-
 | Score | Tier | Behaviour |
 |---|---|---|
 | 85+ | Core | recommend by default |
@@ -80,9 +77,9 @@ Tier mapping (max 110):
 | 40–64 | Experimental | mention only on ask |
 | < 40 | Deprecated | hide unless asked |
 
-## Seeded database
+### Vetted database
 
-`mcp-ecosystem-intelligence/assets/tools_database.json` — **31 entries** across 14 categories:
+`mcp-ecosystem-intelligence/assets/tools_database.json` — **31 entries** across 17 categories, all with pinned versions, integrity hashes, SPDX license, and `trust` field.
 
 ```
 browser  database  demo  docs   filesystem  http   infra
@@ -94,7 +91,7 @@ Distribution: **18 Core / 11 Recommended / 2 Experimental**.
 
 Includes the seven official `modelcontextprotocol/servers` (filesystem, fetch, git, memory, sequentialthinking, time, everything) plus vendor-maintained servers (`github`, `microsoft/playwright`, `cloudflare`, `notion`, `sentry`, `stripe`, `neon`, `mongodb`, `redis`, `clickhouse`, `awslabs/mcp`, `context7`, …) and high-quality community entries (`mcp-atlassian`, `firecrawl`, `tavily`, `exa`, `brave`, `kubernetes`, `duckduckgo`, …).
 
-Each entry schema:
+Entry schema:
 
 ```jsonc
 {
@@ -111,9 +108,33 @@ Each entry schema:
 }
 ```
 
+### CI
+
+`.github/workflows/security-scan.yml` runs on every push and weekly:
+
+- **smoke** — `verify_integrity.cjs --no-audit` on every PR / push to master (offline, fast)
+- **refresh-hashes** — weekly cron that opens a PR refreshing `version` + `pkg_integrity` from live registries, gated by human review before merge
+
+---
+
+## Roadmap
+
+The following are described in [`SKILL.md`](./mcp-ecosystem-intelligence/SKILL.md) as intended behaviour but are not yet scripted — Claude performs them interactively using available tools (Bash, WebFetch, Read) on each invocation:
+
+| Feature | Status |
+|---|---|
+| Stack detection from manifests (`package.json`, `pyproject.toml`, …) | Claude-executed, no dedicated script |
+| Registry / aggregator / `gh search` discovery pipeline | Claude-executed, no dedicated script |
+| Reject heuristics (5-Minute Rule, Bloat, Duplication) | Claude-executed judgment, no dedicated script |
+| Formatted recommendation output (terse / verbose) | Claude-generated, no dedicated formatter |
+| Direct `~/.claude.json` writer after install consent | Pattern documented in SKILL.md §10, no dedicated script |
+| Wrapper generator (CLI/API → MCP boilerplate) | Template exists in `assets/mcp-wrapper-template/`; generator not scripted |
+
+---
+
 ## Wrapping a CLI/API as MCP
 
-If discovery and scoring return nothing for a need, the skill generates a minimal wrapper from `mcp-ecosystem-intelligence/assets/mcp-wrapper-template/`:
+If discovery returns nothing for a need, use `mcp-ecosystem-intelligence/assets/mcp-wrapper-template/` as a starting point:
 
 ```
 mcp-wrapper-template/
@@ -122,6 +143,8 @@ mcp-wrapper-template/
 ```
 
 Replace `{{name}}` and `{{tool}}` placeholders, add tool definitions in the `ListTools` handler, drop the result into `~/.claude/skills/<your-tool>-mcp/` or publish to npm.
+
+---
 
 ## Topics
 
