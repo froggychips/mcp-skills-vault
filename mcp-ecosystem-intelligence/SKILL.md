@@ -1,6 +1,6 @@
 ---
 name: mcp-ecosystem-intelligence
-description: Find, evaluate, and install MCP servers for a project. Use when the user asks "is there an MCP for X", "what MCP tools should I use here", "add MCP server for Y", "audit my MCP setup", or wants to wrap an existing CLI/API as MCP. Combines a seeded local database, registry-first discovery, a Health Score script, and a concrete install path via direct edit of ~/.claude.json.
+description: Find, evaluate, and install MCP servers for a project. Use when the user asks "is there an MCP for X", "what MCP tools should I use here", "add MCP server for Y", "audit my MCP setup", "is package Z safe to install", or wants to wrap an existing CLI/API as MCP. Combines a seeded local database, registry-first discovery, a Health Score script, a supply-chain security scanner (sha512/sha256 integrity, install-hook detection, npm advisory + OSV.dev CVE check, Docker digest pinning) gating every install, and a concrete install path via direct edit of ~/.claude.json.
 ---
 
 # MCP Ecosystem Intelligence
@@ -135,7 +135,7 @@ Log every rejection with a one-line reason (used in the final output, see §9).
 
 ## 7. Database update
 
-`assets/tools_database.json` schema (the seeded file in this repo is the canonical example, 30 entries across 14 categories):
+`assets/tools_database.json` schema (the seeded file in this repo is the canonical example, 31 entries across 14 categories):
 
 ```json
 {
