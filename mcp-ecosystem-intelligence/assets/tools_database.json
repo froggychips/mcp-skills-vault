@@ -37,7 +37,7 @@
       "pkg_integrity": null,
       "trust": "candidate",
       "license": "MIT",
-      "notes": "Installed via uvx --from git+... — pkg_integrity cannot be verified through PyPI; git commit SHA is not pinned. Downgraded to candidate until a PyPI release or pinned commit is available."
+      "notes": "Installed via uvx --from git+... \u2014 pkg_integrity cannot be verified through PyPI; git commit SHA is not pinned. Downgraded to candidate until a PyPI release or pinned commit is available."
     },
     {
       "name": "mcp-server-neon",
@@ -56,7 +56,7 @@
       "version": "0.6.5",
       "pkg_integrity": "sha512-sTqHMpAKKWL4IzAM2yjd5Q/VKnrHF0MxqidZpKoDhKBKvnOw6jAnb2nqgadY5wBA3kNv7JybCOu2h33A8eW6dw==",
       "trust": "verified",
-      "notes": "npm does not publish a repository.url field — source_url verified manually.",
+      "notes": "npm does not publish a repository.url field \u2014 source_url verified manually.",
       "license": "MIT"
     },
     {
@@ -71,7 +71,7 @@
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": 42,
-      "toolsets": "disabledTools: [\"dropCollection\", …] in mcp_settings.json  # excludes named tools",
+      "toolsets": "disabledTools: [\"dropCollection\", \u2026] in mcp_settings.json  # excludes named tools",
       "last_checked": "2026-05-10",
       "version": "1.10.0",
       "pkg_integrity": "sha512-ai4605IiaA6BMiVY2danIthgfZaQkyiRW9tNW+866iPcWtZfGHKxhiQoDw1lUDGa28wUoZf616ug8ChlW5e8Tg==",
@@ -114,7 +114,7 @@
       "version": "0.4",
       "pkg_integrity": "sha256-f374b96e019ace4d793cd6bc22a8e500d7fc0c10659ba893f904497c66283fb2",
       "trust": "verified",
-      "notes": "PyPI publishes alexander-zuev/supabase-mcp-server, not supabase-community/supabase-mcp — community package, not the official Supabase one.",
+      "notes": "PyPI publishes alexander-zuev/supabase-mcp-server, not supabase-community/supabase-mcp \u2014 community package, not the official Supabase one.",
       "license": "Apache-2.0"
     },
     {
@@ -192,7 +192,7 @@
       "version": "0.21.1",
       "pkg_integrity": "sha256-dff6c81541506cb0cc80d7ac9900ffdcb246fec7808e41e8df73c09dd4a28074",
       "trust": "verified",
-      "notes": "PyPI declares no project_urls and no license metadata — both sourced manually from GitHub.",
+      "notes": "PyPI declares no project_urls and no license metadata \u2014 both sourced manually from GitHub.",
       "license": "MIT"
     },
     {
@@ -229,7 +229,7 @@
       "est_tools_count": 1,
       "toolsets": null,
       "last_checked": "2026-05-10",
-      "notes": "open_issues counter is shared across the monorepo. PyPI declares no project_urls — source_url is the canonical monorepo path.",
+      "notes": "open_issues counter is shared across the monorepo. PyPI declares no project_urls \u2014 source_url is the canonical monorepo path.",
       "version": "2025.4.7",
       "pkg_integrity": "sha256-56279e3c55cb1e506b958ca9bb23ed4413944a6f230bca21e044aee51734fe47",
       "trust": "verified",
@@ -272,7 +272,7 @@
       "version": "0.2.0",
       "pkg_integrity": "sha512-506bCOY2ZI7AINJLULbqyDRLymLag2pRuKFGBPP1yFr9+wAfqHS9fk8UkDdUYCeU5MYdv8FUWHVhdg62cMXdXg==",
       "trust": "verified",
-      "notes": "npm does not publish a repository.url field — source_url verified manually.",
+      "notes": "npm does not publish a repository.url field \u2014 source_url verified manually.",
       "license": "Apache-2.0"
     },
     {
@@ -331,7 +331,7 @@
       "version": "0.5.0",
       "pkg_integrity": "sha512-dSjBO7wmurLM58Dme/+SBJJxVTvh8zTkvGWgRVpWjn8QSeuUM89Ob4B5Ij5ZB8oHjyBdypvtkMw492ZTmAIXVw==",
       "trust": "verified",
-      "notes": "npm does not publish a repository.url field — source_url verified manually. Last commit 527 days ago; effectively unmaintained. Score 40 = Experimental floor (popular but stale).",
+      "notes": "npm does not publish a repository.url field \u2014 source_url verified manually. Last commit 527 days ago; effectively unmaintained. Score 40 = Experimental floor (popular but stale).",
       "license": "MIT"
     },
     {
@@ -390,7 +390,7 @@
       "version": "0.1.0",
       "pkg_integrity": "sha512-HNk4aB9VZzT/BYBYSe0NlbwTukJAp0PyreoQCqff+avNkaHllJq0hGuBO5W2Sk8zbBwwtj5E93b35/6gcvbp4A==",
       "trust": "verified",
-      "notes": "npm repository.url points to modelcontextprotocol/linear-server (404 — repo deleted). Real source is jerhadf/linear-mcp-server (original author, 374 days stale). Verifier will WARN on repo mismatch — this is expected. Best available Linear MCP option but effectively unmaintained.",
+      "notes": "npm repository.url points to modelcontextprotocol/linear-server (404 \u2014 repo deleted). Real source is jerhadf/linear-mcp-server (original author, 374 days stale). Verifier will WARN on repo mismatch \u2014 this is expected. Best available Linear MCP option but effectively unmaintained.",
       "license": "MIT"
     },
     {
@@ -430,7 +430,7 @@
       "version": "2.1.0",
       "pkg_integrity": "sha512-GoEfIa+jOIYQNvctyA67qRx4mX2ocdty0OYRsAoBvDpnX3wEqnscRumCkhOfdSOfwSjrw+Exo1BRCwZrVSLjNA==",
       "trust": "verified",
-      "notes": "Community package by mikechao — not the official Brave SDK. Star count dropped from ~994 to 116 (likely star-farming cleanup by GitHub). Functional but low-signal popularity; 40-day cadence.",
+      "notes": "Community package by mikechao \u2014 not the official Brave SDK. Star count dropped from ~994 to 116 (likely star-farming cleanup by GitHub). Functional but low-signal popularity; 40-day cadence.",
       "license": "GPL-3.0-or-later"
     },
     {
@@ -506,7 +506,7 @@
       "est_tools_count": 2,
       "toolsets": null,
       "last_checked": "2026-05-10",
-      "notes": "open_issues counter is shared across the monorepo. PyPI declares no project_urls — source_url is the canonical monorepo path.",
+      "notes": "open_issues counter is shared across the monorepo. PyPI declares no project_urls \u2014 source_url is the canonical monorepo path.",
       "version": "2026.1.26",
       "pkg_integrity": "sha256-fcef6991e8d8480ed7d9be8016cb853f8c697d146322d3e698f45b586d86f1c1",
       "trust": "verified",
@@ -546,7 +546,7 @@
       "est_tools_count": 9,
       "toolsets": null,
       "last_checked": "2026-05-10",
-      "notes": "open_issues counter is shared across the monorepo. PyPI declares no project_urls — source_url is the canonical monorepo path.",
+      "notes": "open_issues counter is shared across the monorepo. PyPI declares no project_urls \u2014 source_url is the canonical monorepo path.",
       "version": "2026.1.14",
       "pkg_integrity": "sha256-2cd74704c7b271ab1ed7be266120c20ae8ae7cc01e52dc6c549790402bad2b44",
       "trust": "verified",
@@ -625,7 +625,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Mapbox MCP server."
+      "notes": "Mapbox MCP server.\n\n[TRIAGE 2026-05-14] CANDIDATE: install hooks \u2014 `postinstall: patch-package` + `prepare: husky setup`. patch-package is legit OSS but executes on install; promoting needs a review of what it patches."
     },
     {
       "name": "@dynatrace-oss/dynatrace-mcp-server",
@@ -685,7 +685,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for interacting with Azure DevOps"
+      "notes": "MCP server for interacting with Azure DevOps\n\n[TRIAGE 2026-05-14] CANDIDATE: install hooks \u2014 `preinstall: npm config set registry` modifies the user's global npm config on install, `prepare: husky`. Promoting needs sandboxing or vendor confirmation that the registry override is intentional."
     },
     {
       "name": "@roychri/mcp-server-asana",
@@ -709,13 +709,13 @@
       "source_url": "https://github.com/eslint/rewrite",
       "version": "0.3.5",
       "pkg_integrity": "sha512-nozX03GqvCyxDJOYtv9jaL/fyVAYSOsG8sCcBEns3p+bvNAfSI8n3FUtswxg1er2HNEQVhPzDorAG9Byv/a4hA==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for ESLint"
+      "notes": "MCP server for ESLint\n\n[VERIFIED 2026-05-14] ESLint Foundation publisher, no install hooks, MIT."
     },
     {
       "name": "argocd-mcp",
@@ -739,13 +739,13 @@
       "source_url": "https://github.com/salesforcecli/mcp",
       "version": "0.30.9",
       "pkg_integrity": "sha512-HzkFeqtYT0nUz6Ra1ecInmMZqcYdfbMiz4ssRMXZfscD6b8rdgaLwbtxWqc2WSnuzcluwrGEu8+cshXML2mKmg==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP Server for interacting with Salesforce instances"
+      "notes": "MCP Server for interacting with Salesforce instances\n\n[VERIFIED 2026-05-14] Salesforce official publisher, no install hooks, MIT."
     },
     {
       "name": "@postman/postman-mcp-server",
@@ -760,7 +760,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "A simple MCP server to operate on the Postman API"
+      "notes": "A simple MCP server to operate on the Postman API\n\n[TRIAGE 2026-05-14] CANDIDATE: install hook \u2014 `preinstall: npx only-allow pnpm` forces pnpm and breaks `npx -y` install (which is our default install_cmd). Promotion needs install_cmd switched to `pnpm dlx` or vendor fixing the hook."
     },
     {
       "name": "@brave/brave-search-mcp-server",
@@ -1000,7 +1000,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for Obsidian vaults — read, write, search, and surgically edit notes, tags, and frontmatter via the Local REST API plugin. STDIO or Streamable HTTP."
+      "notes": "MCP server for Obsidian vaults \u2014 read, write, search, and surgically edit notes, tags, and frontmatter via the Local REST API plugin. STDIO or Streamable HTTP."
     },
     {
       "name": "@mondaydotcomorg/monday-api-mcp",
@@ -1744,13 +1744,13 @@
       "source_url": "https://github.com/Daghis/teamcity-mcp",
       "version": "2.12.1",
       "pkg_integrity": "sha512-co73JiDX829vVTciq/FBQjNJrRulHE9YI+2zGFdZ4JnFFDoFyqRBCiCSkFtsKZ5Cq9H8tT1PFJqhRtLoqCUgfw==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 65,
       "classification": "Recommended",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for JetBrains TeamCity — query builds, configurations, agents."
+      "notes": "MCP server for JetBrains TeamCity \u2014 query builds, configurations, agents.\n\n[VERIFIED 2026-05-14] No install hooks, MIT, repo URL matches npm registry."
     },
     {
       "name": "prometheus-mcp",
@@ -1759,13 +1759,13 @@
       "source_url": "https://github.com/idanfishman/prometheus-mcp",
       "version": "1.1.3",
       "pkg_integrity": "sha512-iln/dRdYhzrm8+YOc6yLuqcwWjtced370ME4XR79wAZkE5IpvZYdFHXSlEz0R2V0h1AvZ47R4n/iFL6eWgQeCA==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 60,
       "classification": "Experimental",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for Prometheus — run PromQL, fetch metrics, alerts."
+      "notes": "MCP server for Prometheus \u2014 run PromQL, fetch metrics, alerts.\n\n[VERIFIED 2026-05-14] No install hooks, MIT, repo URL matches npm registry."
     },
     {
       "name": "mcp-server-mysql",
@@ -1774,13 +1774,13 @@
       "source_url": "https://github.com/benborla/mcp-server-mysql",
       "version": "2.0.8",
       "pkg_integrity": "sha512-tlbpsncFO53D6hTYIjhVZM94Xyjbj+zjyWfF+fH7VjNUvue1WL4YZtaEh0rbHt0j1XihsiJwk4qtUr+PguZ1cA==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for MySQL/MariaDB — run read-only SQL, inspect schema."
+      "notes": "MCP server for MySQL/MariaDB \u2014 run read-only SQL, inspect schema.\n\n[VERIFIED 2026-05-14] Only `prepare: npm run build` (standard TypeScript build, not a security hook). 1650 stars, MIT. npm `repository.url` missing but source_url verified against the GitHub repo manually."
     },
     {
       "name": "datadog-mcp",
@@ -1789,13 +1789,13 @@
       "source_url": "https://github.com/winor30/mcp-server-datadog",
       "version": "1.7.0",
       "pkg_integrity": "sha512-TX2e2SjdNQEmL3ZVNf0KaKFo8PhaaaN6WiJpQbyU2xmlqpB55Iolj+YnLMvSyBKJABCL1mQtiJPx/ebc+8jl1g==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 105,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for Datadog — incidents, monitors, logs, dashboards."
+      "notes": "MCP server for Datadog \u2014 incidents, monitors, logs, dashboards.\n\n[VERIFIED 2026-05-14] No install hooks, Apache-2.0, repo URL matches npm registry."
     },
     {
       "name": "terraform-mcp-server",
@@ -1804,14 +1804,14 @@
       "source_url": "https://github.com/hashicorp/terraform-mcp-server",
       "version": "latest",
       "pkg_integrity": "sha256:67b4d3d39aa2c32c5ee280b21d67fb6513dab463af6c93c2ae0cdd4af09d4603",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MPL-2.0",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
       "tracked_tag": "latest",
-      "notes": "Official HashiCorp Terraform MCP server (1368+ stars). Terraform Registry queries, provider docs, module discovery. Docker-only."
+      "notes": "Official HashiCorp Terraform MCP server (1368+ stars). Terraform Registry queries, provider docs, module discovery. Docker-only.\n\n[VERIFIED 2026-05-14] Official HashiCorp Docker image, @sha256-pinned, MPL-2.0."
     },
     {
       "name": "kafka-mcp-server",
@@ -1820,14 +1820,14 @@
       "source_url": "https://github.com/tuannvm/kafka-mcp-server",
       "version": "latest",
       "pkg_integrity": "sha256:3ac9f77f81933b2be290fefc3d6e069f74751a4ac5c17ce1d0ab120f196ca9ac",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 65,
       "classification": "Recommended",
       "est_tools_count": null,
       "toolsets": null,
       "tracked_tag": "latest",
-      "notes": "Apache Kafka MCP server (Go, Homebrew/Docker). Topic management, message inspection, consumer-group ops."
+      "notes": "Apache Kafka MCP server (Go, Homebrew/Docker). Topic management, message inspection, consumer-group ops.\n\n[VERIFIED 2026-05-14] Docker image @sha256-pinned on ghcr.io, MIT."
     }
   ]
 }
