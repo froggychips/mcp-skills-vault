@@ -183,7 +183,7 @@ Log every rejection as a one-line entry for the Skipped section of §9 output.
 
 ## 7. Database update
 
-`assets/tools_database.json` schema (the seeded file in this repo is the canonical example, 31 entries across 17 categories):
+`assets/tools_database.json` schema (the seeded file in this repo is the canonical example, 106 entries across ~25 categories):
 
 ```json
 {

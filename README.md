@@ -184,11 +184,11 @@ The following are described in [`SKILL.md`](./mcp-ecosystem-intelligence/SKILL.m
 
 | Feature | Status |
 |---|---|
-| Stack detection from manifests (`package.json`, `pyproject.toml`, …) | Claude-executed, no dedicated script |
+| Stack detection from manifests (`package.json`, `pyproject.toml`, …) | [`orchestrate.cjs detectStack()`](./mcp-ecosystem-intelligence/scripts/orchestrate.cjs) — done |
 | Registry / aggregator / `gh search` discovery pipeline | [`scripts/discover.cjs`](./mcp-ecosystem-intelligence/scripts/discover.cjs) — done |
 | Reject heuristics (5-Minute Rule, Bloat, Duplication) | Claude-executed judgment, no dedicated script |
 | Formatted recommendation output (terse / verbose) | Claude-generated, no dedicated formatter |
-| Project-scoped `.mcp.json` install (default path) | Pattern documented in SKILL.md §10, no dedicated script |
+| Project-scoped `.mcp.json` install (default path) | [`orchestrate.cjs --install`](./mcp-ecosystem-intelligence/scripts/orchestrate.cjs) — done |
 | `allowedTools` per-project filtering for heavy servers | Pattern documented in SKILL.md §10, no dedicated script |
 | Wrapper generator (CLI/API → MCP boilerplate) | [`scripts/generate_wrapper.cjs`](./mcp-ecosystem-intelligence/scripts/generate_wrapper.cjs) — done |
 
