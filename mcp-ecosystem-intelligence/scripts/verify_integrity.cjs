@@ -157,8 +157,11 @@ function fetchOsvAdvisories(queries) {
 
 // GitHub Advisory Database (public REST). One request per (ecosystem, pkg).
 // Anonymous rate limit is 60/hr — adequate for a 30-entry DB; CI passes
-// GITHUB_TOKEN via env to raise to 5000/hr. Versionless query is fine:
-// we filter by exact version client-side from the `vulnerabilities` array.
+// GITHUB_TOKEN via env to raise to 5000/hr. Filters by `pkg@version` server-side
+// so we only get advisories that affect the *pinned* version — without this,
+// the endpoint returns every advisory in the package's history regardless of
+// whether the pinned version is patched (was the root cause of the false-
+// positive batch in the first GHSA rollout).
 //
 // OSV.dev already pulls GHSA, but with a lag (hours-to-days). Hitting GHSA
 // directly closes the window for freshly-disclosed advisories.
@@ -177,7 +180,11 @@ async function fetchGhsaAdvisories(queries) {
   for (const q of queries) {
     // GHSA ecosystem codes: "npm", "pip" (PyPI), "rubygems", "maven", "go", …
     const ecoCode = q.ecosystem === 'PyPI' ? 'pip' : q.ecosystem;
-    const url = `https://api.github.com/advisories?ecosystem=${encodeURIComponent(ecoCode)}&affects=${encodeURIComponent(q.name)}&per_page=20`;
+    // affects=pkg@version → server-side filter to only advisories that the
+    // pinned version is actually inside the vulnerable range of. If version
+    // is unknown, fall back to the pkg-wide query (caller's problem to triage).
+    const affects = q.version ? `${q.name}@${q.version}` : q.name;
+    const url = `https://api.github.com/advisories?ecosystem=${encodeURIComponent(ecoCode)}&affects=${encodeURIComponent(affects)}&per_page=20`;
     const advs = await httpsGetJson(url, 10000, headers);
     if (!Array.isArray(advs)) { out[`${ecoCode}:${q.name}`] = []; continue; }
     out[`${ecoCode}:${q.name}`] = advs.map((a) => ({
