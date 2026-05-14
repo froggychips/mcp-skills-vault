@@ -625,7 +625,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Mapbox MCP server.\n\n[TRIAGE 2026-05-14] CANDIDATE: install hooks \u2014 `postinstall: patch-package` + `prepare: husky setup`. patch-package is legit OSS but executes on install; promoting needs a review of what it patches."
+      "notes": "Mapbox MCP server.\n\n[TRIAGE 2026-05-14] CANDIDATE: install hooks \u2014 `postinstall: patch-package` + `prepare: husky setup`. patch-package is legit OSS but executes on install; promoting needs a review of what it patches.\n\n[TRIAGE 2026-05-14 \u2014 revert] postinstall: patch-package + prepare: husky setup-hooks. Executes on install \u2014 review patches before promote."
     },
     {
       "name": "@dynatrace-oss/dynatrace-mcp-server",
@@ -685,7 +685,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for interacting with Azure DevOps\n\n[TRIAGE 2026-05-14] CANDIDATE: install hooks \u2014 `preinstall: npm config set registry` modifies the user's global npm config on install, `prepare: husky`. Promoting needs sandboxing or vendor confirmation that the registry override is intentional."
+      "notes": "MCP server for interacting with Azure DevOps\n\n[TRIAGE 2026-05-14] CANDIDATE: install hooks \u2014 `preinstall: npm config set registry` modifies the user's global npm config on install, `prepare: husky`. Promoting needs sandboxing or vendor confirmation that the registry override is intentional.\n\n[TRIAGE 2026-05-14 \u2014 revert] preinstall: `npm config set registry` MUTATES global npm config on install; prepare: husky. Vendor confirmation needed."
     },
     {
       "name": "@roychri/mcp-server-asana",
@@ -694,13 +694,13 @@
       "source_url": "https://github.com/roychri/mcp-server-asana",
       "version": "1.8.0",
       "pkg_integrity": "sha512-qiEqfrrIjiLzD95A9zXrSGHcKx6S15i2mT9fHYyFPah8QgqdphERWUcEj98IAIRnYgGPh6deKEVr4msXXLGYgA==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP Server for Asana"
+      "notes": "MCP Server for Asana\n\n[VERIFIED 2026-05-14] no install hooks beyond `prepare: npm run build` (TS build), MIT, repo verified."
     },
     {
       "name": "@eslint/mcp",
@@ -760,7 +760,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "A simple MCP server to operate on the Postman API\n\n[TRIAGE 2026-05-14] CANDIDATE: install hook \u2014 `preinstall: npx only-allow pnpm` forces pnpm and breaks `npx -y` install (which is our default install_cmd). Promotion needs install_cmd switched to `pnpm dlx` or vendor fixing the hook."
+      "notes": "A simple MCP server to operate on the Postman API\n\n[TRIAGE 2026-05-14] CANDIDATE: install hook \u2014 `preinstall: npx only-allow pnpm` forces pnpm and breaks `npx -y` install (which is our default install_cmd). Promotion needs install_cmd switched to `pnpm dlx` or vendor fixing the hook.\n\n[TRIAGE 2026-05-14 \u2014 revert] preinstall: `npx only-allow pnpm` breaks `npx -y` install (our default install_cmd). Switch install_cmd to pnpm dlx or fix upstream."
     },
     {
       "name": "@brave/brave-search-mcp-server",
@@ -769,13 +769,13 @@
       "source_url": "https://github.com/brave/brave-search-mcp-server",
       "version": "2.0.80",
       "pkg_integrity": "sha512-GAPDWHU3PPsLsKUPWUZZOGksndRlfSizLhhoKTFOB9nI6lV94XQsMvOzgEzfy0GY+OY+tuONhrOIhnG9TjgkBQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Brave Search MCP Server: web results, images, videos, rich results, AI summaries, and more."
+      "notes": "Brave Search MCP Server: web results, images, videos, rich results, AI summaries, and more.\n\n[VERIFIED 2026-05-14] no install hooks beyond `prepare: npm run format && npm run build` (TS build), MIT."
     },
     {
       "name": "openapi-mcp-generator",
@@ -850,7 +850,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Bitwarden MCP Server"
+      "notes": "Bitwarden MCP Server\n\n[TRIAGE 2026-05-14 \u2014 revert] prepare: `husky` \u2014 git-hooks installer runs on every npm install. Review husky config before promote."
     },
     {
       "name": "@voltagent/mcp-server",
@@ -889,13 +889,13 @@
       "source_url": "https://github.com/tomyud1/godot-mcp",
       "version": "0.5.0",
       "pkg_integrity": "sha512-ZRYtA2fGytPZAdwKb1/JqIud3A/MUoKnlQpWnqpcKqybkY7hYHVo9r6nMuiIO33Ny/hqWaQZ8itTzZgaS8FjHw==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for Godot game engine integration"
+      "notes": "MCP server for Godot game engine integration\n\n[VERIFIED 2026-05-14] no install hooks beyond `prepare: npm run build` (TS build)."
     },
     {
       "name": "mcp-searxng",
@@ -970,7 +970,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "A secure and scalable Git MCP server enabling AI agents to perform comprehensive Git version control operations via STDIO and Streamable HTTP."
+      "notes": "A secure and scalable Git MCP server enabling AI agents to perform comprehensive Git version control operations via STDIO and Streamable HTTP.\n\n[TRIAGE 2026-05-14 \u2014 revert] prepare: `bunx husky` \u2014 installs husky via Bun on every npm install. Audit before promote."
     },
     {
       "name": "@socketsecurity/mcp",
@@ -1009,13 +1009,13 @@
       "source_url": "https://github.com/mondaycom/monday-ai",
       "version": "3.1.2",
       "pkg_integrity": "sha512-wIV7MAjswiuOU54L08dOflmah+InETFS2/zf6QEfn8Vf4zsMyfZTNfT1QtKXBBRiWg5j4WWEfw6XKQ2/u554jw==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for using the monday.com API"
+      "notes": "MCP server for using the monday.com API\n\n[VERIFIED 2026-05-14] no install hooks at all per `npm view scripts`."
     },
     {
       "name": "@drawio/mcp",
@@ -1030,7 +1030,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Official draw.io MCP server for LLMs - Open diagrams in draw.io editor"
+      "notes": "Official draw.io MCP server for LLMs - Open diagrams in draw.io editor\n\n[TRIAGE 2026-05-14 \u2014 revert] prepack: `npm run copy-shared` \u2014 runs build script on prepack, may execute arbitrary code. Audit copy-shared script."
     },
     {
       "name": "@google-cloud/observability-mcp",
@@ -1039,13 +1039,13 @@
       "source_url": "https://github.com/googleapis/gcloud-mcp",
       "version": "0.2.3",
       "pkg_integrity": "sha512-Pn7JNA2PF168jUp196Jj9xwSdTtfcIu43Cqeaxh2O4oLMBAcjjK45K6zWvimWBOMuifJaUvtoSt+cLnZIdYpgw==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP Server for GCP environment for interacting with various Observability APIs."
+      "notes": "MCP Server for GCP environment for interacting with various Observability APIs.\n\n[VERIFIED 2026-05-14] no install hooks beyond `prepare: npm run build` (TS build)."
     },
     {
       "name": "dataforseo-mcp-server",
@@ -1054,13 +1054,13 @@
       "source_url": "https://github.com/dataforseo/mcp-server-typescript",
       "version": "2.9.2",
       "pkg_integrity": "sha512-cyoYhdv8bzKM9T+kSuaWDFavXaVnsP9j5esOrWFeCy5jKkS/iHjXlPVadr+ACuCKWnAca9Q+TMnD3mAF3aQPWg==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "A Model Context Protocol (MCP) server for the DataForSEO API, enabling modular and extensible integration of DataForSEO endpoints with support for both HTTP and SSE transports."
+      "notes": "A Model Context Protocol (MCP) server for the DataForSEO API, enabling modular and extensible integration of DataForSEO endpoints with support for both HTTP and SSE transports.\n\n[VERIFIED 2026-05-14] no install hooks beyond `prepare: npm run build` (TS build)."
     },
     {
       "name": "ios-simulator-mcp",
@@ -1069,13 +1069,13 @@
       "source_url": "https://github.com/joshuayoes/ios-simulator-mcp",
       "version": "1.6.0",
       "pkg_integrity": "sha512-IwueCMUZDwu8XtKZWFQxfHIdzSgf07WgbaHLUOG/BZTuBcAzgDcspjWulUxiCNep7lgv/1cz/cRUfD48zi6ayA==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for interacting with the iOS simulator"
+      "notes": "MCP server for interacting with the iOS simulator\n\n[VERIFIED 2026-05-14] no install hooks beyond `prepare: npm run build` (TS build)."
     },
     {
       "name": "@instantdb/mcp",
@@ -1135,7 +1135,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Model Context Protocol (MCP) server for MediaWiki"
+      "notes": "Model Context Protocol (MCP) server for MediaWiki\n\n[TRIAGE 2026-05-14 \u2014 revert] prepare: `lefthook install` \u2014 installs lefthook git-hooks runner. Audit before promote."
     },
     {
       "name": "@ui5/mcp-server",
@@ -1150,7 +1150,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for SAPUI5/OpenUI5 development"
+      "notes": "MCP server for SAPUI5/OpenUI5 development\n\n[TRIAGE 2026-05-14 \u2014 revert] prepare: conditional `.husky/skip.js` execution. Audit `.husky/skip.js` source."
     },
     {
       "name": "@alchemy/mcp-server",
@@ -1195,7 +1195,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Heroku Platform MCP Server"
+      "notes": "Heroku Platform MCP Server\n\n[TRIAGE 2026-05-14 \u2014 revert] prepare: `husky` \u2014 git-hooks installer. Audit husky config."
     },
     {
       "name": "@transloadit/mcp-server",
@@ -1210,7 +1210,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Transloadit MCP server"
+      "notes": "Transloadit MCP server\n\n[TRIAGE 2026-05-14 \u2014 revert] prepack: `yarn build` \u2014 executes yarn on prepack, may pull additional packages. Audit."
     },
     {
       "name": "clinicaltrialsgov-mcp-server",
@@ -1225,7 +1225,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for the ClinicalTrials.gov v2 API. Search trials, retrieve study details and results, and match patients to eligible trials."
+      "notes": "MCP server for the ClinicalTrials.gov v2 API. Search trials, retrieve study details and results, and match patients to eligible trials.\n\n[TRIAGE 2026-05-14] CANDIDATE: prepare hook runs `bunx husky` \u2014 git-hook setup via husky on install. Likely safe in dev but executes a third-party CLI. Hold for vendor-confirmation."
     },
     {
       "name": "@tocharianou/mcp-server-kibana",
@@ -1234,13 +1234,13 @@
       "source_url": "https://github.com/TocharianOU/mcp-server-kibana",
       "version": "0.8.0",
       "pkg_integrity": "sha512-+uYVwK5euLVaz0yy0oYbJ+SDg+2nYv8X7aH662qM/TThWj1rf+rUrrxmhWVMfkPMsYKvUntDvVFIeutPpIPlFQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 108.1,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Kibana MCP Server"
+      "notes": "Kibana MCP Server\n\n[VERIFIED 2026-05-14] no install hooks beyond `prepare: npm run build` (TS build)."
     },
     {
       "name": "todoist-mcp",
@@ -1270,7 +1270,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Last9 MCP Server - Model Context Protocol server implementation for Last9"
+      "notes": "Last9 MCP Server - Model Context Protocol server implementation for Last9\n\n[TRIAGE 2026-05-14 \u2014 revert] CRITICAL: postinstall: `node bin/download-binary.js` \u2014 DOWNLOADS A BINARY on every install. Strong-hold until vendor explains origin + signature verification."
     },
     {
       "name": "@contentful/mcp-server",
@@ -1339,13 +1339,13 @@
       "source_url": "https://github.com/yoda-digital/mcp-gitlab-server",
       "version": null,
       "pkg_integrity": null,
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 107.1,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "GitLab MCP Server - A Model Context Protocol server for GitLab integration"
+      "notes": "GitLab MCP Server - A Model Context Protocol server for GitLab integration\n\n[VERIFIED 2026-05-14] no install hooks beyond `prepare: npm run build` (TS build)."
     },
     {
       "name": "@vapi-ai/mcp-server",
@@ -1354,13 +1354,13 @@
       "source_url": "https://github.com/VapiAI/mcp-server",
       "version": "0.0.9",
       "pkg_integrity": "sha512-AYGX79nIv3rHlryqIFQdr2p3Vs9ODJxIE+rIonHTYdoC1fu1sYVyfsgKTSu90IOoAbmYeyEzZ/9cuCxpHy1x8A==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 107,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Vapi MCP Server"
+      "notes": "Vapi MCP Server\n\n[VERIFIED 2026-05-14] no install hooks beyond `prepare: npm run build` (TS build)."
     },
     {
       "name": "@kintone/mcp-server",
@@ -1390,7 +1390,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Email MCP server with IMAP + SMTP support"
+      "notes": "Email MCP server with IMAP + SMTP support\n\n[TRIAGE 2026-05-14 \u2014 revert] prepare: `lefthook install || true` \u2014 git-hooks runner. Audit."
     },
     {
       "name": "@contextlint/mcp-server",
@@ -1420,7 +1420,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for Chrome DevTools"
+      "notes": "MCP server for Chrome DevTools\n\n[TRIAGE 2026-05-14] CANDIDATE: prepare hook runs `node --experimental-strip-types scripts/prepare.ts` \u2014 executes a custom TS script on install. Audit `scripts/prepare.ts` before promoting."
     },
     {
       "name": "@sap-ux/fiori-mcp-server",
@@ -1480,7 +1480,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Azure MCP Server - Model Context Protocol implementation for Azure"
+      "notes": "Azure MCP Server - Model Context Protocol implementation for Azure\n\n[TRIAGE 2026-05-14 \u2014 revert] postinstall: `node ./scripts/post-install-script.js` \u2014 executes custom script on install. Audit `scripts/post-install-script.js`."
     },
     {
       "name": "@penpot/mcp",
@@ -1540,7 +1540,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Official MCP server for Qase Test Management Platform"
+      "notes": "Official MCP server for Qase Test Management Platform\n\n[TRIAGE 2026-05-14 \u2014 revert] prepare: `husky || true` \u2014 husky git-hooks runner with fallback. Audit."
     },
     {
       "name": "linkup-mcp-server",
@@ -1555,7 +1555,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Linkup MCP server for web search"
+      "notes": "Linkup MCP server for web search\n\n[TRIAGE 2026-05-14] CANDIDATE: prepare + prepack \u2014 `node .husky/install.mjs` + `npm run build`. Husky install is a known pattern but the .mjs file should be audited."
     },
     {
       "name": "@tankpkg/mcp-server",
