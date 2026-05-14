@@ -34,6 +34,9 @@ const QUERY      = argVal('--query')   || null;
 const INSTALL    = argVal('--install') || null;
 const AS_JSON    = argv.includes('--json');
 const GLOBAL     = argv.includes('--global');
+// Skip the network-bound advisory feeds during install — useful for CI /
+// air-gapped runs / integration tests. Hash check still runs.
+const OFFLINE    = argv.includes('--offline');
 
 function argVal(flag) {
   const i = argv.indexOf(flag);
@@ -257,7 +260,8 @@ function getInstalled(cwd) {
 function installTool(tool, cwd, global_) {
   process.stderr.write(`\nRunning integrity scan for ${tool.name}…\n`);
 
-  const res = spawnSync('node', [VERIFY_CJS], { encoding: 'utf8' });
+  const verifyArgs = OFFLINE ? [VERIFY_CJS, '--no-audit'] : [VERIFY_CJS];
+  const res = spawnSync('node', verifyArgs, { encoding: 'utf8' });
   const out  = res.stdout + res.stderr;
 
   // Find this tool's line in the output
