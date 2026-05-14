@@ -1,30 +1,80 @@
 # mcp-skills-vault
 
-Supply-chain security scanner and vetted database for the MCP ecosystem — verify MCP server integrity before installing, score candidates by health, and get guided recommendations backed by 106 pre-audited entries.
+> **Make MCP boring.** A deterministic registry + integrity scanner for [Model Context Protocol](https://modelcontextprotocol.io) servers, so installing one stops feeling like `curl | bash`.
 
-> [!NOTE]
-> Built for [Claude Code](https://claude.com/claude-code) skills. Drop a skill folder into `~/.claude/skills/` and Claude will auto-activate it when the user's prompt matches the skill description.
+<!-- demo.gif placeholder — regenerate with: bash docs/demo-bootstrap.sh && vhs docs/demo.tape -->
 
-## What's in here
+```text
+$ node mcp-ecosystem-intelligence/scripts/orchestrate.cjs
+Stack: Langs: Node | DB: postgres | Infra: aws, teamcity, atlassian
+Needs: database, infra, ci-cd, pm
 
-| Skill | Purpose | Status |
+── Recommended ──────────────────────────────────────────────
+  Core         mcp-server-neon            10 tools  score 105
+  Core         mcp-server-aws             20 tools  score 105
+  Core         mcp-server-filesystem      10 tools  score 105
+  Core         mcp-server-memory           9 tools  score 105
+  Recommended  teamcity-mcp              null tools  score  65
+
+── Heavy — scope before global install ──────────────────────
+  Experimental mcp-atlassian             72 tools ⚠  score  55
+                 --toolsets jira,confluence
+
+$ node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --no-audit
+…
+110 entries checked — 0 failure(s)
+```
+
+## Without this vault vs. with it
+
+| | Without | With |
 |---|---|---|
-| [`mcp-ecosystem-intelligence/`](./mcp-ecosystem-intelligence) | Pipeline orchestrator + security scanner + vetted 106-tool database. Scans project stack, matches DB, verifies sha512/sha256/Docker digest integrity, checks advisory APIs, scores candidates by health, writes `.mcp.json`. | Ready |
-| [`concepts/`](./concepts/) | Unfinished sketches kept for reference (e.g. `mcp-swift-synthesizer.skill` — Node MCP → Swift binary RAM-cut idea). None of these ship or run in CI. | Not active |
+| **Discoverability** | search GitHub, hope the README isn't lying | curated DB of **112 entries** with health scores, license, category, est-tools-count |
+| **Trust** | unknown publisher, unknown last commit | `trust: verified` per entry, **94/112 (84%)** hand-vetted against a written checklist |
+| **Integrity** | `npx -y whatever@latest` runs whatever ships today | sha512/sha256/Docker `@sha256:` pinned + re-verified against the live registry on every check |
+| **Vulnerabilities** | `npm audit` after the fact, if you remember | 4 advisory feeds merged: npm bulk + OSV.dev + GHSA + Snyk† — checked *before* the install command is written |
+| **Stack matching** | manual reading of awesome-lists | detects 40+ env-key patterns + 14 file paths + docker-compose images → suggests what to install |
+| **Offline use** | doesn't | `--no-audit` skips network entirely; hash gate still runs; air-gapped same as networked |
+| **Telemetry** | varies | none. Ever. |
 
-## Quick install (Ecosystem Intelligence)
+† Snyk requires `SNYK_TOKEN` (no public anonymous API).
+
+## Quick install
 
 ```bash
+# As a Claude Code skill
 git clone https://github.com/froggychips/mcp-skills-vault.git
 mkdir -p ~/.claude/skills
 cp -r mcp-skills-vault/mcp-ecosystem-intelligence ~/.claude/skills/
+
+# As a CLI (no Claude required)
+node mcp-skills-vault/mcp-ecosystem-intelligence/scripts/orchestrate.cjs --cwd /path/to/project
 ```
 
-Then ask Claude something like:
+Zero runtime dependencies. Node built-ins only. One JSON file is the entire database.
+
+Ask Claude something like:
 
 > _"Is there an MCP server for ClickHouse I should add to this project?"_
 > _"Audit my MCP setup."_
 > _"What MCP tools should I install for a Next.js app on Cloudflare?"_
+
+## Five constraints that shape every decision
+
+- **Offline-first** — the gate the user cares about runs with no network
+- **Minimal** — zero runtime deps; supply-chain attack surface = Node's
+- **Inspectable** — every entry carries an audit trail; every output has `--json`
+- **Deterministic** — same DB, same commit → same recommendation, every time
+- **Boring** — supply-chain tooling should not be exciting
+
+Full rationale and the rules each constraint imposes: [PHILOSOPHY.md](./PHILOSOPHY.md).
+
+## What's in here
+
+| | Purpose | Status |
+|---|---|---|
+| [`mcp-ecosystem-intelligence/`](./mcp-ecosystem-intelligence) | The scanner + DB. Stack detection, integrity verification, advisory feeds, drift detection, candidate discovery, wrapper generator. | Ready |
+| [`concepts/`](./concepts/) | Unfinished sketches kept for reference. Nothing here ships or runs in CI. | Not active |
 
 ---
 
