@@ -10,7 +10,7 @@ Supply-chain security scanner and vetted database for the MCP ecosystem — veri
 | Skill | Purpose | Status |
 |---|---|---|
 | [`mcp-ecosystem-intelligence/`](./mcp-ecosystem-intelligence) | Pipeline orchestrator + security scanner + vetted 106-tool database. Scans project stack, matches DB, verifies sha512/sha256/Docker digest integrity, checks advisory APIs, scores candidates by health, writes `.mcp.json`. | Ready |
-| [`mcp-swift-synthesizer.skill`](./mcp-swift-synthesizer.skill) | Convert MCP server functions into native Swift binaries to cut RAM (Node 150–300 MB → Swift 1–10 MB). | Concept |
+| [`concepts/`](./concepts/) | Unfinished sketches kept for reference (e.g. `mcp-swift-synthesizer.skill` — Node MCP → Swift binary RAM-cut idea). None of these ship or run in CI. | Not active |
 
 ## Quick install (Ecosystem Intelligence)
 
