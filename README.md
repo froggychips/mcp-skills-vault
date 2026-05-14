@@ -255,6 +255,19 @@ Underlying template lives in `mcp-ecosystem-intelligence/assets/mcp-wrapper-temp
 
 ---
 
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the entry schema, reject criteria, the triage checklist for promoting `trust: candidate` to `trust: verified`, and the review process for changes to the integrity gate.
+
+Running the suite locally:
+
+```bash
+node --test tests/*.test.cjs                                              # unit tests (offline, < 1s)
+node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --no-audit   # DB smoke
+```
+
+---
+
 ## Topics
 
 `claude-code` · `claude-skill` · `mcp` · `model-context-protocol` · `mcp-server` · `mcp-tools` · `anthropic` · `ai-agents`
