@@ -58,9 +58,11 @@ node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs
 
 | Ecosystem | Integrity | Source URL | Install hooks | CVE / advisory |
 |---|---|---|---|---|
-| npm (`npx -y`) | sha512 SRI from npm | `repository.url` | `pre/post/install` + `prepare` | npm advisory bulk API |
-| PyPI (`uvx`) | sha256 of sdist tarball | `project_urls` | n/a | OSV.dev `/v1/querybatch` |
+| npm (`npx -y`) | sha512 SRI from npm | `repository.url` | `pre/post/install` + `prepare` | npm bulk + OSV.dev + GHSA + Snyk† |
+| PyPI (`uvx`) | sha256 of sdist tarball | `project_urls` | n/a | OSV.dev + GHSA + Snyk† |
 | Docker (`docker run`) | image must be pinned by `@sha256:<digest>` | n/a | n/a | n/a |
+
+† Snyk active only when `SNYK_TOKEN` env var is set (no public anonymous API). GHSA uses `GITHUB_TOKEN`/`GH_TOKEN` when present to raise its rate limit from 60→5000 req/hr; anonymous works at low volume. Advisories from all feeds are deduplicated by ID before flagging.
 
 Flags:
 

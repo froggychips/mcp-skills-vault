@@ -7,7 +7,12 @@
  *                       npm: sha512 SRI from registry; PyPI: sha256 of the sdist
  *   2. repository URL — registry's source field matches source_url (warn / --strict: fail)
  *   3. install hooks  — npm preinstall/install/postinstall/prepare/prepack scripts
- *   4. advisories     — npm advisory bulk API (npm) + OSV.dev query (PyPI)
+ *   4. advisories     — four feeds, merged and deduplicated:
+ *                         • npm advisory bulk API (npm)
+ *                         • OSV.dev /v1/querybatch (npm + PyPI)
+ *                         • GitHub Advisory Database REST (npm + PyPI; uses
+ *                           GITHUB_TOKEN if present, else 60 req/hr anon)
+ *                         • Snyk OSS (npm + PyPI; only when SNYK_TOKEN is set)
  *                       high/critical = hard fail; moderate/low = warn
  *
  * Docker entries are checked for digest pinning (image@sha256:...) — unpinned
@@ -106,14 +111,18 @@ function httpsPostJson(opts, payload, timeoutMs = 10000) {
   });
 }
 
-function httpsGetJson(url, timeoutMs = 10000) {
+function httpsGetJson(url, timeoutMs = 10000, headers = {}) {
   return new Promise((resolve) => {
-    const req = https.get(url, (res) => {
-      if (res.statusCode !== 200) { res.resume(); resolve(null); return; }
-      let data = '';
-      res.on('data', (c) => { data += c; });
-      res.on('end', () => { try { resolve(JSON.parse(data)); } catch { resolve(null); } });
-    });
+    const u = new URL(url);
+    const req = https.get(
+      { hostname: u.hostname, path: u.pathname + u.search, headers },
+      (res) => {
+        if (res.statusCode !== 200) { res.resume(); resolve(null); return; }
+        let data = '';
+        res.on('data', (c) => { data += c; });
+        res.on('end', () => { try { resolve(JSON.parse(data)); } catch { resolve(null); } });
+      },
+    );
     req.on('error', () => resolve(null));
     req.setTimeout(timeoutMs, () => { req.destroy(); resolve(null); });
   });
@@ -126,10 +135,13 @@ function fetchNpmAdvisories(pkgMap) {
   ).then((r) => r || {});
 }
 
-// OSV.dev batch query — covers PyPI (and many other ecosystems).
+// OSV.dev batch query — covers npm, PyPI, and ~30 other ecosystems.
+// Aggregates from GHSA, PyPA, RustSec, Go, OSS-Fuzz, etc. — but with a lag,
+// which is why we *also* call GHSA REST directly.
 // Input:  [{ ecosystem, name, version }, ...]
 // Output: parallel array of vuln-list objects.
 function fetchOsvAdvisories(queries) {
+  if (!queries.length) return Promise.resolve([]);
   const payload = {
     queries: queries.map((q) => ({
       package: { ecosystem: q.ecosystem, name: q.name },
@@ -141,6 +153,71 @@ function fetchOsvAdvisories(queries) {
     payload,
     15000,
   ).then((r) => (r && r.results) || []);
+}
+
+// GitHub Advisory Database (public REST). One request per (ecosystem, pkg).
+// Anonymous rate limit is 60/hr — adequate for a 30-entry DB; CI passes
+// GITHUB_TOKEN via env to raise to 5000/hr. Versionless query is fine:
+// we filter by exact version client-side from the `vulnerabilities` array.
+//
+// OSV.dev already pulls GHSA, but with a lag (hours-to-days). Hitting GHSA
+// directly closes the window for freshly-disclosed advisories.
+//
+// Returns: { "npm:pkg": [advisory, ...], "pip:pkg": [...] }
+async function fetchGhsaAdvisories(queries) {
+  if (!queries.length) return {};
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+  const headers = {
+    'User-Agent':           'mcp-skills-vault/verify_integrity.cjs',
+    'Accept':               'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+  };
+  const out = {};
+  for (const q of queries) {
+    // GHSA ecosystem codes: "npm", "pip" (PyPI), "rubygems", "maven", "go", …
+    const ecoCode = q.ecosystem === 'PyPI' ? 'pip' : q.ecosystem;
+    const url = `https://api.github.com/advisories?ecosystem=${encodeURIComponent(ecoCode)}&affects=${encodeURIComponent(q.name)}&per_page=20`;
+    const advs = await httpsGetJson(url, 10000, headers);
+    if (!Array.isArray(advs)) { out[`${ecoCode}:${q.name}`] = []; continue; }
+    out[`${ecoCode}:${q.name}`] = advs.map((a) => ({
+      id:       a.ghsa_id,
+      url:      a.html_url,
+      severity: (a.severity || '').toUpperCase(),
+      title:    a.summary,
+      source:   'GHSA',
+    }));
+  }
+  return out;
+}
+
+// Snyk does not expose a public anonymous API. With SNYK_TOKEN, query the
+// commercial endpoint. Without it, we return {} and surface a NOTE — the
+// hook is here so users with a paid plan get coverage; we don't pretend to
+// have it for free.
+async function fetchSnykAdvisories(queries) {
+  if (!queries.length) return {};
+  const token = process.env.SNYK_TOKEN;
+  if (!token) return { __skipped__: 'SNYK_TOKEN not set' };
+  const out = {};
+  const headers = {
+    'Authorization': `token ${token}`,
+    'User-Agent':    'mcp-skills-vault/verify_integrity.cjs',
+  };
+  for (const q of queries) {
+    const eco = q.ecosystem === 'PyPI' ? 'pip' : q.ecosystem;
+    const url = `https://api.snyk.io/v1/test/${encodeURIComponent(eco)}/${encodeURIComponent(q.name)}/${encodeURIComponent(q.version || '0.0.0')}`;
+    const data = await httpsGetJson(url, 10000, headers);
+    const vulns = (data?.issues?.vulnerabilities || []);
+    out[`${eco}:${q.name}`] = vulns.map((v) => ({
+      id:       v.id,
+      url:      v.url,
+      severity: (v.severity || '').toUpperCase(),
+      title:    v.title,
+      source:   'Snyk',
+    }));
+  }
+  return out;
 }
 
 function fetchPypiMeta(pkg, version) {
@@ -182,9 +259,44 @@ function osvSeverity(vuln) {
   return 'UNKNOWN';
 }
 
+// Merge advisories from npm + OSV + GHSA + Snyk into a unified array per
+// package, deduplicated by ID (GHSA shares IDs with OSV — keep one).
+// Unified shape: { id, severity, title, url, source }.
+function unifyAdvisories({ npmList, osvList, ghsaList, snykList }) {
+  const seen = new Set();
+  const out  = [];
+  const push = (a) => {
+    const key = a.id || `${a.source}:${a.title || a.url}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(a);
+  };
+  for (const a of (npmList || [])) {
+    push({
+      id:       a.id || a.url,
+      severity: (a.severity || '').toUpperCase(),
+      title:    a.title || a.url,
+      url:      a.url,
+      source:   'npm',
+    });
+  }
+  for (const v of (osvList || [])) {
+    push({
+      id:       v.id,
+      severity: osvSeverity(v),
+      title:    v.summary || v.id,
+      url:      v.id ? `https://osv.dev/vulnerability/${v.id}` : null,
+      source:   'OSV',
+    });
+  }
+  for (const a of (ghsaList || [])) push(a);
+  for (const a of (snykList || [])) push(a);
+  return out;
+}
+
 // ── per-tool processors ────────────────────────────────────────────────────
 
-async function processNpm(tool, pkg, advisoriesByPkg, results) {
+async function processNpm(tool, pkg, advisoriesForTool, results) {
   const versionSpec = tool.version ? `${pkg}@${tool.version}` : `${pkg}@latest`;
   let meta;
   try {
@@ -240,12 +352,11 @@ async function processNpm(tool, pkg, advisoriesByPkg, results) {
     lines.push(['NOTE', `npm declares no license; DB uses "${tool.license}" (verify against GitHub repo)`]);
   }
 
-  // Advisories
-  const advs = (advisoriesByPkg[pkg] || []);
-  for (const a of advs) {
-    lines.push(['CVE', `[${(a.severity || '').toUpperCase()}] ${a.title || a.url || a.id}`]);
+  // Advisories (merged: npm + OSV + GHSA + Snyk)
+  for (const a of advisoriesForTool) {
+    lines.push(['CVE', `[${a.severity}] (${a.source}) ${a.title || a.url || a.id}`]);
   }
-  if (advs.some((a) => severityIsHard(a.severity))) failures++;
+  if (advisoriesForTool.some((a) => severityIsHard(a.severity))) failures++;
 
   results.push({
     tool,
@@ -256,7 +367,7 @@ async function processNpm(tool, pkg, advisoriesByPkg, results) {
   });
 }
 
-async function processPypi(tool, pkg, osvByIndex, idx, results) {
+async function processPypi(tool, pkg, advisoriesForTool, results) {
   const meta = await fetchPypiMeta(pkg, tool.version);
   if (!meta) {
     results.push({ tool, status: 'SKIP', msg: `${pkg}: PyPI lookup failed` });
@@ -302,12 +413,11 @@ async function processPypi(tool, pkg, osvByIndex, idx, results) {
     lines.push(['NOTE', `PyPI declares no license; DB uses "${tool.license}" (verify against GitHub repo)`]);
   }
 
-  // OSV.dev advisories
-  const vulns = (osvByIndex[idx]?.vulns) || [];
-  for (const v of vulns) {
-    lines.push(['CVE', `[${osvSeverity(v)}] ${v.summary || v.id}`]);
+  // Advisories (merged: OSV + GHSA + Snyk; npm bulk doesn't cover PyPI)
+  for (const a of advisoriesForTool) {
+    lines.push(['CVE', `[${a.severity}] (${a.source}) ${a.title || a.url || a.id}`]);
   }
-  if (vulns.some((v) => severityIsHard(osvSeverity(v)))) failures++;
+  if (advisoriesForTool.some((a) => severityIsHard(a.severity))) failures++;
 
   results.push({
     tool,
@@ -367,34 +477,55 @@ async function main() {
     }
   }
 
-  // Batch advisories.
+  // Batch advisories across 4 feeds: npm bulk + OSV.dev + GHSA REST + Snyk.
+  // npm bulk covers npm only. OSV covers npm + PyPI. GHSA covers both directly
+  // (less lag than OSV's aggregation). Snyk requires SNYK_TOKEN (optional).
   let npmAdvisories = {};
-  let osvResults    = [];
+  let osvNpmResults = [];
+  let osvPypiResults = [];
+  let ghsaResults = {};
+  let snykResults = {};
   if (!UPDATE && !NO_AUDIT) {
     const npmMap = {};
-    for (const { pkg } of npmTools) npmMap[pkg] = [];   // versions resolved per-package below
-    process.stdout.write(`Querying npm advisory DB (${npmTools.length}) and OSV.dev (${pypiTools.length})... `);
-    // npm advisory bulk API requires version arrays — fill them after we have npm metadata,
-    // but we still want one HTTP round-trip. Workaround: include "" — npm tolerates an empty
-    // version list and returns advisories for any version. Good enough for surfacing issues.
-    for (const { pkg } of npmTools) npmMap[pkg] = [''];
-    [npmAdvisories, osvResults] = await Promise.all([
+    for (const { pkg } of npmTools) npmMap[pkg] = [''];   // npm tolerates empty version array
+    const npmQueries  = npmTools.map(({ pkg, tool })  => ({ ecosystem: 'npm',  name: pkg, version: tool.version || '0.0.0' }));
+    const pypiQueries = pypiTools.map(({ pkg, tool }) => ({ ecosystem: 'PyPI', name: pkg, version: tool.version || '0.0.0' }));
+    const allQueries  = [...npmQueries, ...pypiQueries];
+    process.stdout.write(`Querying npm bulk (${npmTools.length}), OSV.dev (${allQueries.length}), GHSA (${allQueries.length}), Snyk... `);
+    [npmAdvisories, osvNpmResults, osvPypiResults, ghsaResults, snykResults] = await Promise.all([
       fetchNpmAdvisories(npmMap),
-      fetchOsvAdvisories(pypiTools.map(({ pkg, tool }) => ({
-        ecosystem: 'PyPI', name: pkg, version: tool.version || '0.0.0',
-      }))),
+      fetchOsvAdvisories(npmQueries),
+      fetchOsvAdvisories(pypiQueries),
+      fetchGhsaAdvisories(allQueries),
+      fetchSnykAdvisories(allQueries),
     ]);
-    console.log('done.');
+    const sources = ['npm bulk', 'OSV.dev', 'GHSA'];
+    if (snykResults.__skipped__) sources.push(`Snyk skipped (${snykResults.__skipped__})`);
+    else                          sources.push('Snyk');
+    console.log(`done — sources: ${sources.join(', ')}.`);
   }
 
   // Process npm.
-  for (const { tool, pkg } of npmTools) {
-    await processNpm(tool, pkg, npmAdvisories, results);
+  for (let i = 0; i < npmTools.length; i++) {
+    const { tool, pkg } = npmTools[i];
+    const advs = unifyAdvisories({
+      npmList:  npmAdvisories[pkg] || [],
+      osvList:  osvNpmResults[i]?.vulns || [],
+      ghsaList: ghsaResults[`npm:${pkg}`] || [],
+      snykList: snykResults[`npm:${pkg}`] || [],
+    });
+    await processNpm(tool, pkg, advs, results);
   }
   // Process PyPI (sequentially — PyPI per-package metadata fetch).
   for (let i = 0; i < pypiTools.length; i++) {
     const { tool, pkg } = pypiTools[i];
-    await processPypi(tool, pkg, osvResults, i, results);
+    const advs = unifyAdvisories({
+      npmList:  [],
+      osvList:  osvPypiResults[i]?.vulns || [],
+      ghsaList: ghsaResults[`pip:${pkg}`] || [],
+      snykList: snykResults[`pip:${pkg}`] || [],
+    });
+    await processPypi(tool, pkg, advs, results);
   }
   // Process docker.
   for (const { tool } of dockerTools) processDocker(tool, results);
