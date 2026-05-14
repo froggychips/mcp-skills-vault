@@ -249,4 +249,12 @@ async function main() {
   process.exit(0);
 }
 
-main().catch((e) => { console.error(e.message); process.exit(1); });
+if (require.main === module) {
+  main().catch((e) => { console.error(e.message); process.exit(1); });
+}
+
+module.exports = {
+  dockerImageRef,
+  parseImageRef,
+  parseBearerChallenge,
+};
