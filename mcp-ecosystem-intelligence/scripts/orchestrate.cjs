@@ -107,6 +107,42 @@ function detectStack(cwd) {
     if (/image:\s*mongo/.test(txt))                  { dbs.add('mongodb');    cats.add('database'); }
     if (/image:\s*redis/.test(txt))                  { dbs.add('redis');      cats.add('database'); }
     if (/clickhouse/.test(txt))                      { dbs.add('clickhouse'); cats.add('database'); }
+    if (/image:\s*(confluentinc\/|bitnami\/kafka|apache\/kafka)/.test(txt)) { infra.add('kafka');      cats.add('streaming'); }
+    if (/image:\s*(prom\/prometheus|prometheus)/.test(txt))                 { infra.add('prometheus'); cats.add('observability'); }
+    if (/image:\s*grafana/.test(txt))                                       { infra.add('grafana');    cats.add('observability'); }
+    if (/image:\s*grafana\/loki/.test(txt))                                 { infra.add('loki');       cats.add('observability'); }
+    if (/image:\s*nginx/.test(txt))                                         { infra.add('nginx');      cats.add('infra'); }
+    if (/image:\s*hashicorp\/vault/.test(txt))                              { infra.add('vault');      cats.add('infra'); }
+  } catch {}
+
+  // Infra files at well-known paths (one-shot existence check, no content scan)
+  const fileSignals = [
+    [['.teamcity'],                       'teamcity', 'ci-cd'],
+    [['helm', 'charts'],                  'helm',     'infra'],
+    [['Chart.yaml'],                      'helm',     'infra'],
+    [['argocd', '.argocd'],               'argocd',   'infra'],
+    [['terraform', '.terraform'],         'terraform','infra'],
+    [['Pulumi.yaml'],                     'pulumi',   'infra'],
+    [['ansible', 'playbook.yml', 'playbook.yaml'], 'ansible', 'infra'],
+    [['prometheus.yml', 'prometheus.yaml'],'prometheus','observability'],
+    [['grafana', 'dashboards'],           'grafana',  'observability'],
+    [['.gitlab-ci.yml'],                  'gitlab',   'vcs'],
+    [['.circleci'],                       'circleci', 'ci-cd'],
+    [['.github/workflows'],               'github-actions', 'ci-cd'],
+    [['Jenkinsfile'],                     'jenkins',  'ci-cd'],
+    [['k8s', 'kubernetes', 'manifests'],  'kubernetes','infra'],
+    [['Dockerfile'],                      'docker',   'infra'],
+  ];
+  for (const [paths, signal, cat] of fileSignals) {
+    if (paths.some(p => fs.existsSync(path.join(cwd, p)))) {
+      infra.add(signal); cats.add(cat);
+    }
+  }
+
+  // Surface .tf files anywhere in the repo root as a terraform signal
+  // (covers projects that don't put them in a dedicated dir).
+  try {
+    if (fs.readdirSync(cwd).some(f => f.endsWith('.tf'))) { infra.add('terraform'); cats.add('infra'); }
   } catch {}
 
   // .env / .env.example / .env.local — key names only, never values
@@ -130,6 +166,31 @@ function detectStack(cwd) {
         if (/^MONGO/.test(k))                                { dbs.add('mongodb');      cats.add('database'); }
         if (/^CLICKHOUSE_/.test(k))                          { dbs.add('clickhouse');   cats.add('database'); }
         if (/^(KUBE_|KUBERNETES_)/.test(k))                  { infra.add('kubernetes'); cats.add('infra'); }
+        if (/^(MYSQL_|MARIADB_)/.test(k))                    { dbs.add('mysql');        cats.add('database'); }
+        if (/^(PG_|POSTGRES_|POSTGRESQL_)/.test(k))          { dbs.add('postgres');     cats.add('database'); }
+        if (/^(TEAMCITY_|TC_(URL|TOKEN|API))/.test(k))       { infra.add('teamcity');   cats.add('ci-cd'); }
+        if (/^(CIRCLECI_|CIRCLE_)/.test(k))                  { infra.add('circleci');   cats.add('ci-cd'); }
+        if (/^JENKINS_/.test(k))                             { infra.add('jenkins');    cats.add('ci-cd'); }
+        if (/^(ARGOCD_|ARGO_)/.test(k))                      { infra.add('argocd');     cats.add('infra'); }
+        if (/^HELM_/.test(k))                                { infra.add('helm');       cats.add('infra'); }
+        if (/^(TERRAFORM_|TF_(VAR|CLI))/.test(k))            { infra.add('terraform');  cats.add('infra'); }
+        if (/^VAULT_(ADDR|TOKEN|NAMESPACE)/.test(k))         { infra.add('vault');      cats.add('infra'); }
+        if (/^PROMETHEUS_/.test(k))                          { infra.add('prometheus'); cats.add('observability'); }
+        if (/^GRAFANA_/.test(k))                             { infra.add('grafana');    cats.add('observability'); }
+        if (/^LOKI_/.test(k))                                { infra.add('loki');       cats.add('observability'); }
+        if (/^DATADOG_/.test(k))                             { infra.add('datadog');    cats.add('observability'); }
+        if (/^DYNATRACE_/.test(k))                           { infra.add('dynatrace');  cats.add('observability'); }
+        if (/^NEWRELIC_/.test(k))                            { infra.add('newrelic');   cats.add('observability'); }
+        if (/^KAFKA_/.test(k))                               { infra.add('kafka');      cats.add('streaming'); }
+        if (/^(SALESFORCE_|SFDC_)/.test(k))                  { infra.add('salesforce'); cats.add('crm'); }
+        if (/^MAPBOX_/.test(k))                              { infra.add('mapbox');     cats.add('maps'); }
+        if (/^BROWSERSTACK_/.test(k))                        { infra.add('browserstack');cats.add('browser'); }
+        if (/^POSTMAN_/.test(k))                             { infra.add('postman');    cats.add('testing'); }
+        if (/^(AZURE_DEVOPS_|ADO_)/.test(k))                 { infra.add('azure-devops');cats.add('vcs'); }
+        if (/^(JIRA_|CONFLUENCE_|ATLASSIAN_)/.test(k))       { infra.add('atlassian');  cats.add('pm'); }
+        if (/^SLACK_/.test(k))                               { infra.add('slack');      cats.add('communication'); }
+        if (/^DISCORD_/.test(k))                             { infra.add('discord');    cats.add('communication'); }
+        if (/^(MAILGUN_|SENDGRID_|POSTMARK_)/.test(k))       { infra.add('email');      cats.add('communication'); }
       }
     } catch {}
   }
@@ -140,21 +201,40 @@ function detectStack(cwd) {
 // ── DB matching ─────────────────────────────────────────────────────────────
 
 const SIGNAL_TO_TOOLS = {
-  postgres:   ['mcp-server-neon'],
-  neon:       ['mcp-server-neon'],
-  supabase:   ['supabase-mcp'],
-  mongodb:    ['mongodb-mcp-server'],
-  redis:      ['mcp-redis'],
-  clickhouse: ['mcp-clickhouse'],
-  github:     ['github-mcp-server'],
-  gitlab:     ['gitlab-mcp'],
-  linear:     ['linear-mcp-server'],
-  notion:     ['notion-mcp-server'],
-  sentry:     ['sentry-mcp'],
-  stripe:     ['stripe-agent-toolkit'],
-  cloudflare: ['mcp-server-cloudflare'],
-  aws:        ['mcp-server-aws'],
-  kubernetes: ['mcp-server-kubernetes'],
+  // Databases
+  postgres:    ['mcp-server-neon'],
+  neon:        ['mcp-server-neon'],
+  supabase:    ['supabase-mcp'],
+  mongodb:     ['mongodb-mcp-server'],
+  redis:       ['mcp-redis'],
+  clickhouse:  ['mcp-clickhouse'],
+  // Infra
+  cloudflare:  ['mcp-server-cloudflare'],
+  aws:         ['mcp-server-aws'],
+  kubernetes:  ['mcp-server-kubernetes'],
+  argocd:      ['argocd-mcp'],
+  // VCS / project mgmt
+  github:      ['github-mcp-server'],
+  gitlab:      ['gitlab-mcp'],
+  'azure-devops': ['@azure-devops/mcp'],
+  linear:      ['linear-mcp-server'],
+  notion:      ['notion-mcp-server'],
+  atlassian:   ['mcp-atlassian'],
+  // Observability
+  sentry:      ['sentry-mcp'],
+  dynatrace:   ['@dynatrace-oss/dynatrace-mcp-server'],
+  // Payments / wallet
+  stripe:      ['stripe-agent-toolkit'],
+  phantom:     ['@phantom/mcp-server'],
+  // CRM / sales / maps / testing
+  salesforce:  ['@salesforce/mcp'],
+  mapbox:      ['@mapbox/mcp-server'],
+  browserstack:['@browserstack/mcp-server'],
+  postman:     ['@postman/postman-mcp-server'],
+  // CI / dev tools
+  circleci:    ['@circleci/mcp-server-circleci'],
+  // Communication
+  slack:       ['slack-mcp-server'],
 };
 
 // Always surface for any project (filesystem/memory/context7 are universally useful)

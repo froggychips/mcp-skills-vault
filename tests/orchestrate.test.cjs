@@ -30,20 +30,20 @@ test('unmappedSignals: flags signals without any mapping or fallback (mysql in e
 });
 
 test('unmappedSignals: signal resolved via fallback is marked fallback, not gap', () => {
-  // SIGNAL_TO_TOOLS has no entry for "mapbox" but @mapbox/mcp-server exists.
-  // Fallback substring scan should find it → record carries `fallback`,
-  // reason starts with "fallback →".
+  // Use a signal NOT in SIGNAL_TO_TOOLS (datadog isn't curated today)
+  // but with a matching tool name in the synthetic DB. Substring scan
+  // should classify this as a fallback hit, not a gap.
   const db = {
     tools: [
-      { name: '@mapbox/mcp-server', notes: 'Mapbox MCP server.', classification: 'Core' },
-      { name: 'noise', notes: 'unrelated', classification: 'Core' },
+      { name: 'datadog-mcp', notes: 'Datadog MCP server.', classification: 'Core' },
+      { name: 'noise',       notes: 'unrelated',           classification: 'Core' },
     ],
   };
-  const stack = stackWith({ infra: ['mapbox'] });
+  const stack = stackWith({ infra: ['datadog'] });
   const out = o.unmappedSignals(db, stack);
   assert.equal(out.length, 1);
-  assert.equal(out[0].signal, 'mapbox');
-  assert.deepEqual(out[0].fallback, ['@mapbox/mcp-server']);
+  assert.equal(out[0].signal, 'datadog');
+  assert.deepEqual(out[0].fallback, ['datadog-mcp']);
   assert.match(out[0].reason, /^fallback →/);
 });
 
@@ -60,19 +60,20 @@ test('fallbackBySignal: substring match against name+notes, skips Deprecated', (
 });
 
 test('matchDB: uses fallback when SIGNAL_TO_TOOLS has no mapping for the signal', () => {
-  // mapbox is not in SIGNAL_TO_TOOLS today; @mapbox/mcp-server is in DB.
+  // datadog is not in SIGNAL_TO_TOOLS today; datadog-mcp would be picked up
+  // via substring fallback. Synthetic DB to keep the test deterministic.
   const db = {
     tools: [
-      { name: '@mapbox/mcp-server', notes: 'Mapbox MCP server.', classification: 'Core', est_tools_count: 5 },
+      { name: 'datadog-mcp',           notes: 'Datadog MCP', classification: 'Core', est_tools_count: 5 },
       { name: 'mcp-server-filesystem', notes: '', classification: 'Core', est_tools_count: 10 },
       { name: 'mcp-server-memory',     notes: '', classification: 'Core', est_tools_count: 9 },
       { name: 'context7',              notes: '', classification: 'Core', est_tools_count: 4 },
     ],
   };
-  const stack = stackWith({ infra: ['mapbox'] });
+  const stack = stackWith({ infra: ['datadog'] });
   const matched = o.matchDB(db, stack, null);
   const names = matched.map(t => t.name);
-  assert.ok(names.includes('@mapbox/mcp-server'), `Expected mapbox match via fallback, got ${names}`);
+  assert.ok(names.includes('datadog-mcp'), `Expected datadog match via fallback, got ${names}`);
 });
 
 test('unmappedSignals: flags mappings whose referenced tool is missing in DB', () => {
@@ -125,4 +126,84 @@ test('UNIVERSAL_TOOLS members all exist in the seeded DB', () => {
   const dbNames = new Set(realDb.tools.map(t => t.name));
   const missing = [...o.UNIVERSAL_TOOLS].filter(n => !dbNames.has(n));
   assert.deepEqual(missing, [], `UNIVERSAL_TOOLS members missing from DB: ${missing}`);
+});
+
+// ── detectStack regression: new signals from the WO/infra expansion ─────────
+
+const fs   = require('node:fs');
+const os   = require('node:os');
+
+function envProject(envContent, files = {}) {
+  const dir = fs.mkdtempSync(`${os.tmpdir()}/orch-stack-`);
+  fs.writeFileSync(`${dir}/.env.example`, envContent);
+  for (const [name, body] of Object.entries(files)) {
+    const full = `${dir}/${name}`;
+    fs.mkdirSync(require('node:path').dirname(full), { recursive: true });
+    fs.writeFileSync(full, body);
+  }
+  return dir;
+}
+
+test('detectStack: TEAMCITY_URL env-key adds teamcity signal', () => {
+  const dir = envProject('TEAMCITY_URL=https://tc.example.com\n');
+  const stack = o.detectStack(dir);
+  assert.ok(stack.infra.has('teamcity'), `infra=${[...stack.infra]}`);
+  assert.ok(stack.cats.has('ci-cd'));
+});
+
+test('detectStack: .teamcity/ directory adds teamcity signal', () => {
+  const dir = envProject('', { '.teamcity/.keep': '' });
+  const stack = o.detectStack(dir);
+  assert.ok(stack.infra.has('teamcity'));
+});
+
+test('detectStack: SALESFORCE_TOKEN adds salesforce → @salesforce/mcp via SIGNAL_TO_TOOLS', () => {
+  const dir = envProject('SALESFORCE_TOKEN=x\n');
+  const stack = o.detectStack(dir);
+  assert.ok(stack.infra.has('salesforce'));
+  assert.deepEqual(o.SIGNAL_TO_TOOLS['salesforce'], ['@salesforce/mcp']);
+});
+
+test('detectStack: helm/Chart.yaml adds helm signal', () => {
+  const dir = envProject('', { 'helm/Chart.yaml': 'apiVersion: v2\n' });
+  const stack = o.detectStack(dir);
+  assert.ok(stack.infra.has('helm'));
+});
+
+test('detectStack: argocd directory adds argocd signal', () => {
+  const dir = envProject('', { 'argocd/.keep': '' });
+  const stack = o.detectStack(dir);
+  assert.ok(stack.infra.has('argocd'));
+});
+
+test('detectStack: top-level .tf file adds terraform signal', () => {
+  const dir = envProject('', { 'main.tf': 'terraform {}\n' });
+  const stack = o.detectStack(dir);
+  assert.ok(stack.infra.has('terraform'));
+});
+
+test('detectStack: docker-compose with kafka image adds kafka signal', () => {
+  const dir = envProject('', { 'docker-compose.yml': 'services:\n  kafka:\n    image: confluentinc/cp-kafka:7\n' });
+  const stack = o.detectStack(dir);
+  assert.ok(stack.infra.has('kafka'));
+});
+
+test('detectStack: PROMETHEUS_* env-key adds prometheus signal', () => {
+  const dir = envProject('PROMETHEUS_URL=http://p:9090\n');
+  const stack = o.detectStack(dir);
+  assert.ok(stack.infra.has('prometheus'));
+  assert.ok(stack.cats.has('observability'));
+});
+
+test('detectStack: ATLASSIAN_* env-key adds atlassian → mcp-atlassian via SIGNAL_TO_TOOLS', () => {
+  const dir = envProject('ATLASSIAN_URL=https://x.atlassian.net\n');
+  const stack = o.detectStack(dir);
+  assert.ok(stack.infra.has('atlassian'));
+  assert.deepEqual(o.SIGNAL_TO_TOOLS['atlassian'], ['mcp-atlassian']);
+});
+
+test('detectStack: PG_* env-key adds postgres signal', () => {
+  const dir = envProject('PG_HOST=db.example.com\n');
+  const stack = o.detectStack(dir);
+  assert.ok(stack.dbs.has('postgres'));
 });
