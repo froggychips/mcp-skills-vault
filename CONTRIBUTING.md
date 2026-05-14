@@ -1,0 +1,125 @@
+# Contributing
+
+Thanks for considering a contribution. This file covers the two things that come up most: **adding an entry to `tools_database.json`** and **promoting an entry from `trust: candidate` to `trust: verified`**.
+
+For security-sensitive changes (scripts in `mcp-ecosystem-intelligence/scripts/`, anything touching the integrity gate), read [SECURITY.md](./SECURITY.md) first — that file is the source of truth for what counts as a regression.
+
+---
+
+## Adding a new MCP server to the database
+
+### Quick path
+
+1. Run `node mcp-ecosystem-intelligence/scripts/discover.cjs --source npm --out /tmp/cands.json` and pick from the output. The script handles dedup against the DB, health scoring, and reject heuristics.
+2. Append the chosen entry to `mcp-ecosystem-intelligence/assets/tools_database.json` with `trust: "candidate"` (see schema below).
+3. Run `node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --update` — fills `version` + `pkg_integrity` from the live registry.
+4. Run `node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --no-audit` — must exit 0.
+5. Open a PR using the template at `.github/PULL_REQUEST_TEMPLATE/new-mcp-entry.md`.
+
+### Entry schema
+
+```jsonc
+{
+  "name":            "pkg-name",                       // npm / PyPI / docker image basename
+  "category":        "database",                       // see list below
+  "install_cmd":     "npx -y pkg-name@1.2.3",          // ALWAYS pinned to a version / digest
+  "source_url":      "https://github.com/owner/repo",  // canonical repo
+  "version":         "1.2.3",                          // filled by --update
+  "pkg_integrity":   "sha512-…",                       // filled by --update
+  "trust":           "candidate",                      // start here; see promotion below
+  "license":         "MIT",                            // SPDX identifier; "Unknown" if missing
+  "health_score":    105.0,                            // from calculate_health.cjs
+  "classification":  "Core",                           // Core / Recommended / Experimental / Deprecated
+  "est_tools_count": 10,                               // count from server's ListToolsRequestSchema
+  "toolsets":        "--toolsets repos,issues",        // how to reduce tool count, or null
+  "tracked_tag":     "latest",                         // docker only; default "latest"
+  "notes":           "One-line context for the reviewer"
+}
+```
+
+### Valid `category` values
+
+Current taxonomy in the DB (will grow):
+
+```
+ai · browser · ci-cd · cms · communication · crm · database · demo · docs ·
+filesystem · http · infra · maps · memory · meta · mobile · observability ·
+payments · pm · reasoning · search · testing · utility · vcs · web-scraping
+```
+
+`utility` is the catch-all — use a more specific category if one fits. Inventing a new category is fine if existing options genuinely don't fit; add it in the PR description so reviewers know it's intentional.
+
+### Reject criteria (the entry will not be merged)
+
+- `health_score < 40` (Deprecated tier) — unless there's a *very* good reason in the PR description
+- `<10` GitHub stars
+- `last_commit_days > 365`
+- Archived or fork of another repo
+- No license, or a non-OSI / source-available license, **and** the PR doesn't explain why
+- Install hook (`preinstall`, `install`, `postinstall`, `prepare`, `prepack`) without justification — these run on the user's machine
+- `install_cmd` not pinned to an explicit version / digest
+
+---
+
+## Promoting `trust: candidate` → `trust: verified`
+
+`candidate` means: "the integrity hash matches the artifact published to the registry." That's automatic.
+
+`verified` means: a human looked at the entry against the criteria below and signed off. It is **not** a stronger version of the integrity check — it's a separate, manual signal.
+
+### Triage checklist
+
+Promotion PR title format: `chore: promote <name> to trust:verified` — body must tick all of these.
+
+#### Publisher / repo provenance
+- [ ] `source_url` matches the `repository.url` from the registry (no monorepo subdirectory mismatch)
+- [ ] Publisher org on npm/PyPI matches what's in `source_url` (or vendor account is well-known: `@anthropic`, `@modelcontextprotocol`, `@github`, `@microsoft`, `@cloudflare`, …)
+- [ ] No recent owner transfer on the GitHub repo (check the repo's transfer log if it's a high-value entry)
+- [ ] Issue tracker is open and getting responses — not a dead repo with the npm version still ticking
+
+#### Install-time safety
+- [ ] No `preinstall` / `install` / `postinstall` / `prepack` hooks; `prepare` is allowed only if it's `npm run build` (verified by reading the published `package.json`)
+- [ ] No native binary downloads in install hooks
+- [ ] `est_tools_count` filled in by running the server once (`npx ... --help` or stdio handshake) and counting tools
+
+#### Operational fit
+- [ ] `category` is specific (not `utility`) — or there's a note explaining why utility is right
+- [ ] `toolsets` filled in if `est_tools_count >= 30` (heavy-server flag in `orchestrate.cjs`) — otherwise the entry gets shown with a `⚠` and no mitigation
+- [ ] Server runs and answers a ListTools request locally (smoke check)
+
+#### Advisory sweep
+- [ ] `verify_integrity.cjs` (full audit, no `--no-audit`) reports no HIGH/CRITICAL CVEs for the pinned version
+- [ ] Server doesn't ship known-bad transitive deps (best-effort; run `npm audit` against a fresh install if in doubt)
+
+### When to demote `verified` → `candidate`
+
+- Publisher org changes hands silently
+- A HIGH/CRITICAL CVE is published and no fix is out within 14 days
+- The repo gets archived
+- `discover.cjs` health score drops below 65 (Recommended tier) on the weekly refresh
+
+Demotion is also done via PR — same template, opposite direction. Include the trigger in the PR body.
+
+---
+
+## Modifying the integrity gate (`verify_integrity.cjs`)
+
+This file is the single most security-sensitive script in the repo. Changes require:
+
+1. Pass the existing self-checks in [SECURITY.md §`verify_integrity.cjs`](./SECURITY.md)
+2. Unit-test coverage for the change (see `tests/` directory if it exists; otherwise add it)
+3. CI smoke job must stay green on the same DB after the change
+4. PR description must call out *what specifically can no longer pass the gate* after this change — even if the answer is "nothing, this only adds a new check"
+
+A logic bug here is treated as Critical severity (48-hour patch SLA per SECURITY.md).
+
+---
+
+## Style / housekeeping
+
+- Commit messages: imperative mood, focused on *why* not *what*. Reviewers will read the diff for what.
+- Run `verify_integrity.cjs --no-audit` before every push if you touched `tools_database.json` or any script.
+- Don't add dependencies to the scripts — they intentionally use only Node built-ins so the supply-chain attack surface is the same as Node itself.
+- For UI / docs PRs, no need for triage checklist; just describe the change in plain English.
+
+If anything here looks wrong or out of date, open a PR — the doc itself follows the same review process.
