@@ -149,7 +149,7 @@ The following are described in [`SKILL.md`](./mcp-ecosystem-intelligence/SKILL.m
 | Formatted recommendation output (terse / verbose) | Claude-generated, no dedicated formatter |
 | Project-scoped `.mcp.json` install (default path) | Pattern documented in SKILL.md §10, no dedicated script |
 | `allowedTools` per-project filtering for heavy servers | Pattern documented in SKILL.md §10, no dedicated script |
-| Wrapper generator (CLI/API → MCP boilerplate) | Template exists in `assets/mcp-wrapper-template/`; generator not scripted |
+| Wrapper generator (CLI/API → MCP boilerplate) | [`scripts/generate_wrapper.cjs`](./mcp-ecosystem-intelligence/scripts/generate_wrapper.cjs) — done |
 
 ---
 
@@ -194,15 +194,23 @@ Reserve `~/.claude.json` for truly cross-project servers: `mcp-server-filesystem
 
 ## Wrapping a CLI/API as MCP
 
-If discovery returns nothing for a need, use `mcp-ecosystem-intelligence/assets/mcp-wrapper-template/` as a starting point:
+When the vendor server has no native filtering and exposes 50+ tools you don't need, generate a thin wrapper that exposes only the 3–5 tools you actually use. Saves ~200–500 tokens per dropped tool.
 
-```
-mcp-wrapper-template/
-  server.js       # @modelcontextprotocol/sdk + StdioServerTransport boilerplate
-  package.json    # pinned SDK major, node>=18, MIT
+```bash
+# Skeleton wrapper, no tools yet
+node mcp-ecosystem-intelligence/scripts/generate_wrapper.cjs \
+  --name my-cli-mcp --tool "My CLI" --out ./my-cli-mcp
+
+# Pre-populated with tool definitions from a JSON spec
+node mcp-ecosystem-intelligence/scripts/generate_wrapper.cjs \
+  --name warehouse-mcp --tool "Internal Warehouse" \
+  --tools-file ./tools.json \
+  --out ./warehouse-mcp
 ```
 
-Replace `{{name}}` and `{{tool}}` placeholders, add tool definitions in the `ListTools` handler, drop the result into `~/.claude/skills/<your-tool>-mcp/` or publish to npm.
+`tools.json` is an array of MCP tool defs (`name` / `description` / `inputSchema`); the generator emits `ListToolsRequestSchema` entries plus `switch`-cases with `required`-arg validation, runs Node's `--check` on the result, and writes a `.mcp.json`-ready README.
+
+Underlying template lives in `mcp-ecosystem-intelligence/assets/mcp-wrapper-template/` if you'd rather edit by hand.
 
 ---
 
