@@ -634,13 +634,13 @@
       "source_url": "https://github.com/dynatrace-oss/dynatrace-mcp",
       "version": "1.8.5",
       "pkg_integrity": "sha512-HXaNyjyf7MY5PYE+KkK0SH0dpeiDgQNXM8IEIBiKJNeXwMfkZQCzfd81smmeZs872PmW/IgGn7QWVyarHltn0g==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Model Context Protocol (MCP) server for Dynatrace"
+      "notes": "Model Context Protocol (MCP) server for Dynatrace\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@browserstack/mcp-server",
@@ -649,13 +649,13 @@
       "source_url": "https://github.com/browserstack/mcp-server",
       "version": "1.2.16",
       "pkg_integrity": "sha512-aGENep9N3jgXoYSC8IilmuwqeU/eAJYTd1teFZp6ynAOijK7f7yRxYoV6z7ViOqWD5QKAKgfOtqThZhzeh7xQg==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "AGPL-3.0",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "BrowserStack's Official MCP Server"
+      "notes": "BrowserStack's Official MCP Server\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@phantom/mcp-server",
@@ -664,13 +664,13 @@
       "source_url": "https://github.com/phantom/phantom-connect-sdk",
       "version": "1.2.7",
       "pkg_integrity": "sha512-NEgBOobF4u+eLjLkoZc3vC8Jm1agfzReQuitKUQA3mpSE1i0MnFjAWUYVbEhIaIDaT1VdPVIQdqe40JyIVMMew==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP Server for Phantom Wallet"
+      "notes": "MCP Server for Phantom Wallet\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@azure-devops/mcp",
@@ -724,13 +724,13 @@
       "source_url": "https://github.com/argoproj-labs/mcp-for-argocd",
       "version": "0.7.0",
       "pkg_integrity": "sha512-IvUcLpNe4wBroXEQZRqNZFP+A2NRvPpS8izSN67o8MmYEqO1K9TzLMDqy/OmSVedCqTGVjHX2FArPc6OOoUdmw==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Argo CD MCP Server"
+      "notes": "Argo CD MCP Server\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@salesforce/mcp",
@@ -784,13 +784,13 @@
       "source_url": "https://github.com/harsha-iiiv/openapi-mcp-generator",
       "version": "3.3.0",
       "pkg_integrity": "sha512-RXS0QjqtgmNiq9DA/euPA+LFVwg5dRkyhOEYxf4WFGOhgfyoeDKdUsTA8PKJYWTB0lkmUkl5/9dqK+Lhn94LjQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Generates MCP server code from OpenAPI specifications"
+      "notes": "Generates MCP server code from OpenAPI specifications\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@softeria/ms-365-mcp-server",
@@ -799,13 +799,13 @@
       "source_url": "https://github.com/softeria/ms-365-mcp-server",
       "version": "0.107.2",
       "pkg_integrity": "sha512-OqrK8xmhfOskJ2xLZJvmKk/gEh5CZDJjJjC1bp7EGGV3wDFou8Eha2ClHNs3UIJ38Io8gI2KrYj2DhvzpArlww==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "A Model Context Protocol (MCP) server for interacting with Microsoft 365 and Office services through the Graph API"
+      "notes": "A Model Context Protocol (MCP) server for interacting with Microsoft 365 and Office services through the Graph API\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@regle/mcp-server",
@@ -814,13 +814,13 @@
       "source_url": "https://github.com/victorgarciaesgi/regle",
       "version": "1.25.2",
       "pkg_integrity": "sha512-XnF4qlPwPoKIsX+FsRrfViLkDUXhh7vqRIreRgU6cjp78NvkvYoURtAm7WpoDIguw9YSiMlwfaCqIGaoJIGMLQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP Server for Regle"
+      "notes": "MCP Server for Regle\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@vibeframe/mcp-server",
@@ -829,13 +829,13 @@
       "source_url": "https://github.com/vericontext/vibeframe",
       "version": "0.104.3",
       "pkg_integrity": "sha512-OO6mRhUlYMJYMqJ0VUgJu45iyyb2wK+WBNRIW9mWHzFWzFl6pnCQb/xi/5sp8AxVgqmzVudLYM7I1kq5ptvtwA==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "VibeFrame MCP Server - AI-native video editing via Model Context Protocol"
+      "notes": "VibeFrame MCP Server - AI-native video editing via Model Context Protocol\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@bitwarden/mcp-server",
@@ -859,13 +859,13 @@
       "source_url": "https://github.com/VoltAgent/voltagent",
       "version": "2.0.2",
       "pkg_integrity": "sha512-rU2jkcj5wE8y0LX9GAcxzE/4jZNiZT18vPzNJlKoIGx3lV290sZgmDq7eSZTsaSQei/KmO37CyUi+6hryJ5zTQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "VoltAgent MCP server implementation for exposing agents, tools, and workflows via the Model Context Protocol."
+      "notes": "VoltAgent MCP server implementation for exposing agents, tools, and workflows via the Model Context Protocol.\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@delorenj/mcp-server-trello",
@@ -874,13 +874,13 @@
       "source_url": "https://github.com/delorenj/mcp-server-trello",
       "version": "1.7.1",
       "pkg_integrity": "sha512-PPHQGeQsiXypw5e321oGp5Rz+lmdPV82Fm0HCCnI9abpZQNmKoK6FJk9y4O5i1aydbalhgzwIw/AiNuhK+BTdg==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "An MCP server for Trello boards, powered by Bun for maximum performance."
+      "notes": "An MCP server for Trello boards, powered by Bun for maximum performance.\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "godot-mcp-server",
@@ -904,13 +904,13 @@
       "source_url": "https://github.com/ihor-sokoliuk/mcp-searxng",
       "version": "1.0.3",
       "pkg_integrity": "sha512-lX7YeZyuzax28s5IR0AgEWqDhm+O6ah9+CKFlQzSs/WeDQ+yTWiQGvy4C4Jia6VEpm7n0Vllo7tnrhu0LBpUmg==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for SearXNG integration"
+      "notes": "MCP server for SearXNG integration\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "deepl-mcp-server",
@@ -919,13 +919,13 @@
       "source_url": "https://github.com/DeepLcom/deepl-mcp-server",
       "version": "1.1.0",
       "pkg_integrity": "sha512-IouBSs0qDDwaUeMGPJQCN52PkhwCmHTkRiGlncEPIZIq2rNysmCM3GTuGok+5iwmdELUsE1td0JRq1HXWlkqUg==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for DeepL translation API"
+      "notes": "MCP server for DeepL translation API\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@knip/mcp",
@@ -934,13 +934,13 @@
       "source_url": "https://github.com/webpro-nl/knip",
       "version": "0.0.28",
       "pkg_integrity": "sha512-eYuvs6TovPtf0r2XTR84H/iETrmPmVaG5I26lCtPXetWOnvPBjjKIQ8h4mJGm7JbQEozIMvDvn5/bl5Tpo10rQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "ISC",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Knip MCP Server"
+      "notes": "Knip MCP Server\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@pandacss/mcp",
@@ -949,13 +949,13 @@
       "source_url": "https://github.com/chakra-ui/panda",
       "version": "1.11.1",
       "pkg_integrity": "sha512-sfAewHwDy+XWk9SFRSNVtTEwKb9KMLlzM0MDgzio/ZBxZK6MZiSskrRSqSeHWJOdw52IdQWQlFLGPakV5p30Zw==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for Panda CSS AI assistants"
+      "notes": "MCP server for Panda CSS AI assistants\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@cyanheads/git-mcp-server",
@@ -979,13 +979,13 @@
       "source_url": "https://github.com/SocketDev/socket-mcp",
       "version": "0.0.17",
       "pkg_integrity": "sha512-hhdZL1m/Y20m05ysPV9AC+WOmIxIdUDQB/Eeeu1IK1g/Ju23yT/VHIOec+WJ6YR1TPZjwY65M1pjwafpn451uA==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Socket MCP server for scanning dependencies"
+      "notes": "Socket MCP server for scanning dependencies\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "obsidian-mcp-server",
@@ -994,13 +994,13 @@
       "source_url": "https://github.com/cyanheads/obsidian-mcp-server",
       "version": "3.1.9",
       "pkg_integrity": "sha512-sx/dn3C6brhEXeLtoHJI5Qzgah8su9SMIryD4tfWGOwUSQqSWUjiywe5hqZ62S9FYMeGGxaRSZXq9NboXIsq4Q==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for Obsidian vaults \u2014 read, write, search, and surgically edit notes, tags, and frontmatter via the Local REST API plugin. STDIO or Streamable HTTP."
+      "notes": "MCP server for Obsidian vaults \u2014 read, write, search, and surgically edit notes, tags, and frontmatter via the Local REST API plugin. STDIO or Streamable HTTP.\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@mondaydotcomorg/monday-api-mcp",
@@ -1084,13 +1084,13 @@
       "source_url": "https://github.com/instantdb/instant",
       "version": "1.0.32",
       "pkg_integrity": "sha512-c04bT5QARTHACZtYlAhqnAgatDlFa/ULETfwL1RBdIVR7ty1eZfmC3NbRKFsDweebg2uav54eKVB2LgB3dpgkg==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 110,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Model Context Protocol (MCP) server for managing Instant apps, schemas, and permissions!"
+      "notes": "Model Context Protocol (MCP) server for managing Instant apps, schemas, and permissions!\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@cap-js/mcp-server",
@@ -1099,13 +1099,13 @@
       "source_url": "https://github.com/cap-js/mcp-server",
       "version": "0.0.5",
       "pkg_integrity": "sha512-77kswa8aJPxJ5gypFPKlp19opr1Ex7VcA1BkphbixyVPAZ7t+mz8EyGuKTAwN5LlmSGaGTijboHc3jklsQ2qUw==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 109.9,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Model Context Protocol (MCP) server for AI-assisted development of CAP applications."
+      "notes": "Model Context Protocol (MCP) server for AI-assisted development of CAP applications.\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "hostinger-api-mcp",
@@ -1114,13 +1114,13 @@
       "source_url": "https://github.com/hostinger/api-mcp-server",
       "version": "0.1.43",
       "pkg_integrity": "sha512-8vd7L5hKvDWpcsXMQQXQ1vM0agXi4+fGqoo4BUj42C62RGRiItX+Tkn1aefSAHVyodittpzLmyrlZWXJEFo4iQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 109.6,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for Hostinger API"
+      "notes": "MCP server for Hostinger API\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@professional-wiki/mediawiki-mcp-server",
@@ -1159,13 +1159,13 @@
       "source_url": "https://github.com/alchemyplatform/alchemy-mcp-server",
       "version": "0.3.0",
       "pkg_integrity": "sha512-guoaOkFctJHeexcwqHkjsd02zKQdoaaV4aZHQ2UCFkG7KMzkYfSuR6TGkLEf+DYhb8bhd/S9n+gELa3gcdiv3A==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 109.3,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for using Alchemy APIs"
+      "notes": "MCP server for using Alchemy APIs\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@translated/lara-mcp",
@@ -1174,13 +1174,13 @@
       "source_url": "https://github.com/translated/lara-mcp",
       "version": "1.0.2",
       "pkg_integrity": "sha512-qGM93ZRss0IeW1Z1gE5oOv/aYusbLOk0Ij5XdsSjIZP+Gsa6XHmxs0EMImbXezcwwLHtKTRx3RjLf41b2g7NqQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 109.3,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Lara API official MCP server"
+      "notes": "Lara API official MCP server\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@heroku/mcp-server",
@@ -1249,13 +1249,13 @@
       "source_url": "https://github.com/stanislavlysenko0912/todoist-mcp-server",
       "version": "1.3.4",
       "pkg_integrity": "sha512-S5anBdEUEvfhNGT3jiirwRA6g0nmioIirkk1R4GsgY+/jNYN5Bvu1udt2tQ01DNk9Ms2EuBJvXxWUYk5iEugTQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 108.1,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Todoist MCP Server"
+      "notes": "Todoist MCP Server\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@last9/mcp-server",
@@ -1279,13 +1279,13 @@
       "source_url": "https://github.com/contentful/contentful-mcp-server",
       "version": "1.7.15",
       "pkg_integrity": "sha512-lNC8ybethkCVKoIS1nQZ52uFV1X7phkWf5Air7mOagDZTqoyXyFSHm5VUPqUaM6M0tLdfqHmW5EAYQZoAsyIBQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 107.4,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Contentful MCP Server - Model Context Protocol server for Contentful"
+      "notes": "Contentful MCP Server - Model Context Protocol server for Contentful\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@esaio/esa-mcp-server",
@@ -1294,13 +1294,13 @@
       "source_url": "https://github.com/esaio/esa-mcp-server",
       "version": "0.7.5",
       "pkg_integrity": "sha512-TJZkreKCYFl/vjodW+XDVGLZO5uEE2nNkH3d55lS7zIXBFLNt3dTv2Rz0S2ZTxuEPWBg9bVS2bANcQYyI2TQjw==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 107.3,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Official MCP server for esa.io - STDIO transport version"
+      "notes": "Official MCP server for esa.io - STDIO transport version\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@upstash/mcp-server",
@@ -1309,13 +1309,13 @@
       "source_url": "https://github.com/upstash/mcp-server",
       "version": "0.2.3",
       "pkg_integrity": "sha512-KV8s7O0aYsyvHxEsDZ9DU14Eiuxr4ocHfELO/HUjtOJwfE4U6QJ0lSBFfg9HTopo56Hh9mFUToIptZpY0E63ZQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 107.3,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for Upstash"
+      "notes": "MCP server for Upstash\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@renseiai/agentfactory-mcp-server",
@@ -1324,13 +1324,13 @@
       "source_url": "https://github.com/RenseiAI/agentfactory",
       "version": "0.9.0",
       "pkg_integrity": "sha512-k7koBni2uRTBHV19FxRd3EP3m6dSZcCyio+SulNN3HQ6GBVFdlVgXxHbg1RanMnwrnbaVbvAvRHe/fNI/b7kVw==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 107.2,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server exposing AgentFactory fleet capabilities to MCP-aware clients"
+      "notes": "MCP server exposing AgentFactory fleet capabilities to MCP-aware clients\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@yoda.digital/gitlab-mcp-server",
@@ -1369,13 +1369,13 @@
       "source_url": "https://github.com/kintone/mcp-server",
       "version": "1.3.12",
       "pkg_integrity": "sha512-a/L1au1LvVtZpQcktrg/ETYJIVsy69DncVzmYF25qluuIP7Z8QVzcY3CIbREIHaI6/OaawKT03KNs0z07uUcyw==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 106.4,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "The official MCP Server for kintone"
+      "notes": "The official MCP Server for kintone\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@diskd-ai/email-mcp",
@@ -1399,13 +1399,13 @@
       "source_url": "https://github.com/nozomi-koborinai/contextlint",
       "version": "1.1.1",
       "pkg_integrity": "sha512-Z3NcgWQGOFKBPaaUjVZkSHrv8jm6SsqAP0xp6f1nliaXYSfdO6QG4W6GdVbe+qgkU3v6z/YojilNxSMLaajz0A==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 105.2,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for contextlint"
+      "notes": "MCP server for contextlint\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "chrome-devtools-mcp",
@@ -1429,13 +1429,13 @@
       "source_url": "https://github.com/SAP/open-ux-tools",
       "version": "0.6.58",
       "pkg_integrity": "sha512-zC43mo+TcOQafbcZtlL+R5UG2oKMDmEEJftgdhgYi7z8SjGnTVMkiAmHbwH4BTbFWfwZqxvN+GAPFZKPvm5frA==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 105,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "SAP Fiori - Model Context Protocol (MCP) server"
+      "notes": "SAP Fiori - Model Context Protocol (MCP) server\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@supabase/mcp-server-supabase",
@@ -1444,13 +1444,13 @@
       "source_url": "https://github.com/supabase-community/supabase-mcp",
       "version": "0.8.1",
       "pkg_integrity": "sha512-MNf/Yc6JNITWAwTSD6KbyAPO1ZeZFhC6qQZlH+lECceDhXisd6oeM15aXXGwuLmUybutq+DXN49j7yuylS0ekw==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 105,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for interacting with Supabase"
+      "notes": "MCP server for interacting with Supabase\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "kubernetes-mcp-server",
@@ -1459,13 +1459,13 @@
       "source_url": "https://github.com/containers/kubernetes-mcp-server",
       "version": "0.0.62",
       "pkg_integrity": "sha512-zYuieO6w/IxlBtzWKQajpuLlCaiBOGbljvjjsGP/COZQjzFcLMZ/FDTXINvz6yUYdKFgDIy+Tg99+4AgRY1s2g==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 105,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Model Context Protocol (MCP) server for Kubernetes and OpenShift"
+      "notes": "Model Context Protocol (MCP) server for Kubernetes and OpenShift\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@azure/mcp",
@@ -1489,13 +1489,13 @@
       "source_url": "https://github.com/penpot/penpot",
       "version": "2.15.0",
       "pkg_integrity": "sha512-x+PoE5Urf3HBKot5cp1gRvvWE/3Gn15estTk8emMkr5WQOsY9FMLUiYTS59y57qGOC3YnkuROiF/1OiYR+YQNw==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MPL-2.0",
       "health_score": 105,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for Penpot integration"
+      "notes": "MCP server for Penpot integration\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@agent-infra/mcp-server-browser",
@@ -1504,13 +1504,13 @@
       "source_url": "https://github.com/bytedance/UI-TARS-desktop",
       "version": "1.2.29",
       "pkg_integrity": "sha512-z2PVFQ4+w5NV/esYZs/JyesyPPX7ombcA0mPZFSpMXqOoM20oENTH48XzLnKqW53pU7DiDlfv7fg1zdi4bga9A==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 105,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for browser use access"
+      "notes": "MCP server for browser use access\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "slack-mcp-server",
@@ -1519,13 +1519,13 @@
       "source_url": "https://github.com/korotovsky/slack-mcp-server",
       "version": "1.2.3",
       "pkg_integrity": "sha512-R2RR+Z6YyQpIvD9m3eLsxQLFYJ3nqujNu9FLlv+H+9+ovwevKLN4EJmq3hT2G3t5mmnArcPNHHOc5t2Dv/QTKA==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 105,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Model Context Protocol (MCP) server for Slack Workspaces. This integration supports both Stdio and SSE transports, proxy settings and does not require any permissions or bots being created or approved by Workspace admins"
+      "notes": "Model Context Protocol (MCP) server for Slack Workspaces. This integration supports both Stdio and SSE transports, proxy settings and does not require any permissions or bots being created or approved by Workspace admins\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@qase/mcp-server",
@@ -1564,13 +1564,13 @@
       "source_url": "https://github.com/tankpkg/tank",
       "version": "0.15.7",
       "pkg_integrity": "sha512-iOsAr4MnqZAWdOdvylXpqqFW5W2t7wEKv8zctA3b5xgpTWEraGmRPWlkc9vJ/hOH1zRUIylZ4PYDcyN+W8hxbg==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 104.6,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for Tank - scan and publish AI agent skills from your editor"
+      "notes": "MCP server for Tank - scan and publish AI agent skills from your editor\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@growthbook/mcp",
@@ -1579,13 +1579,13 @@
       "source_url": "https://github.com/growthbook/growthbook-mcp",
       "version": "1.8.1",
       "pkg_integrity": "sha512-jwplJWY6X7Rd2K1wDI5XfvRBbHPo/zLAGcCZDOhzfUi73MHydHGFhyqI/Ivgy33cS0nI6bqXRrXk8HFfh0MklQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 103.6,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP Server for interacting with GrowthBook"
+      "notes": "MCP Server for interacting with GrowthBook\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@nexus2520/bitbucket-mcp-server",
@@ -1594,13 +1594,13 @@
       "source_url": "https://github.com/pdogra1299/bitbucket-mcp-server",
       "version": "2.1.0",
       "pkg_integrity": "sha512-2Mm6MKtKxAmWEXru9GsNTEjMBA18zpTjRix+UOCvcHKnJML5tw2XqYmUi1r/m9OCu/h32GQpm/h/G4Zuwxmq7A==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 103.2,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for Bitbucket API integration - supports both Cloud and Server"
+      "notes": "MCP server for Bitbucket API integration - supports both Cloud and Server\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@currents/mcp",
@@ -1609,13 +1609,13 @@
       "source_url": "https://github.com/currents-dev/currents-mcp",
       "version": "2.2.18",
       "pkg_integrity": "sha512-7jyKyzc1m+RNL9nkTbqMV4qrFlz/M7RUn4nOUUKZ+VhUNp0AB8oXKAPz7aC9S5DUdBFy2wP22Adk3Lqsh5jHsg==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 102.3,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Currents MCP server"
+      "notes": "Currents MCP server\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "lsp-mcp-server",
@@ -1624,13 +1624,13 @@
       "source_url": "https://github.com/ProfessioneIT/lsp-mcp-server",
       "version": "1.1.17",
       "pkg_integrity": "sha512-2t/9YtmZ14do9k1G2+JgeWSrzik53XOcEvQaNt1P1arV/G0Z7mTlts4r+ySvXPbCvr5gIIIOQVQ4qzPaJ+sNCg==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 101.8,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server bridging Claude Code to Language Server Protocol servers"
+      "notes": "MCP server bridging Claude Code to Language Server Protocol servers\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "codex-mcp-server",
@@ -1639,13 +1639,13 @@
       "source_url": "https://github.com/tuannvm/codex-mcp-server",
       "version": "1.4.10",
       "pkg_integrity": "sha512-F/GDVSvs26z74OpsnyQsseao8xcW3ym76UmgT/5DRd5u7Ep0yO9mKLKmtCMPwwv557wGQfYWLWOBDpKmHAgJww==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Unknown",
       "health_score": 100,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server wrapper for OpenAI Codex CLI"
+      "notes": "MCP server wrapper for OpenAI Codex CLI\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@circleci/mcp-server-circleci",
@@ -1654,13 +1654,13 @@
       "source_url": "https://github.com/CircleCI-Public/mcp-server-circleci",
       "version": "0.15.1",
       "pkg_integrity": "sha512-Bwmk+Cr4SwEjiQRPqxVkB/Inf7spbDKBZXix9nINAXmWf6p52CMx7fH2xVlsZpaLWyqQhNRR+UhnmczouG6lZw==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "NOASSERTION",
       "health_score": 99.2,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "A Model Context Protocol (MCP) server implementation for CircleCI, enabling natural language interactions with CircleCI functionality through MCP-enabled clients"
+      "notes": "A Model Context Protocol (MCP) server implementation for CircleCI, enabling natural language interactions with CircleCI functionality through MCP-enabled clients\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@memberjunction/ai-mcp-server",
@@ -1669,13 +1669,13 @@
       "source_url": "https://github.com/MemberJunction/MJ",
       "version": "5.34.0",
       "pkg_integrity": "sha512-Hwm3+/hru10hR5vQFEkgrLvK0ZAMhBLHBey/qWo6xBTHW6G/cZPX6S/BiAV9K/o0Ts0dK68Ivm58PEcUFP3i2g==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "ISC",
       "health_score": 98.4,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MemberJunction: Model Context Protocol (MCP) - Server Implementation"
+      "notes": "MemberJunction: Model Context Protocol (MCP) - Server Implementation\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "fsb-mcp-server",
@@ -1684,13 +1684,13 @@
       "source_url": "https://github.com/lakshmanturlapati/FSB",
       "version": "0.9.0",
       "pkg_integrity": "sha512-w/+joT2EiNkf6ueeCkihViaqtWwVpQo2n1erJsNe6n9IHvVzIPDLjULPOrqTx9Kp17t35ksju7MJ52vHGj6Pvw==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "NOASSERTION",
       "health_score": 97.8,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "FSB Browser Automation MCP Server"
+      "notes": "FSB Browser Automation MCP Server\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@skillsmith/mcp-server",
@@ -1699,13 +1699,13 @@
       "source_url": "https://github.com/smith-horn/skillsmith",
       "version": "0.5.1",
       "pkg_integrity": "sha512-MRtsEuPWqG7MIYlrWFKUDCNGJh5MNQ07PKSK0kO/pBupz5W2M9L2Pkfsn3r0YPddTzDHJmlrJDtRY1k8aKwdtQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "NOASSERTION",
       "health_score": 97.5,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for Skillsmith skill discovery"
+      "notes": "MCP server for Skillsmith skill discovery\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@taazkareem/clickup-mcp-server",
@@ -1714,13 +1714,13 @@
       "source_url": "https://github.com/taazkareem/clickup-mcp-server",
       "version": "0.14.4",
       "pkg_integrity": "sha512-66ti6ENoiQYcC+bUka7trnOhrIYDs0FYz+aiAT+/RllPJX2NsRVTnrxcuXC80sQyFOvpCuWPPhd+U8TWzo6olQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "NOASSERTION",
       "health_score": 96,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "ClickUp MCP Server - Powering AI Agents with full ClickUp task, document, and chat management capabilities."
+      "notes": "ClickUp MCP Server - Powering AI Agents with full ClickUp task, document, and chat management capabilities.\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "@theia/ai-mcp-server",
@@ -1729,13 +1729,13 @@
       "source_url": "https://github.com/eclipse-theia/theia",
       "version": "1.71.1",
       "pkg_integrity": "sha512-2dcbtKbHAh/6UdoY492yl07QRTgS7m/La7E3jQz7Hr2OcXMwfvRDMPBHIOgTRxzZoGvWOl0L7QTtge0x4lX/0g==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "EPL-2.0",
       "health_score": 95,
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Theia - MCP Server"
+      "notes": "Theia - MCP Server\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\"."
     },
     {
       "name": "teamcity-mcp",
