@@ -17,33 +17,33 @@ test('unmappedSignals: returns [] when every signal maps to a present tool', () 
   assert.deepEqual(o.unmappedSignals(db, stack), []);
 });
 
-test('unmappedSignals: flags signals without any mapping or fallback (mysql in empty DB)', () => {
-  // mysql is detected by orchestrate.detectStack but absent from SIGNAL_TO_TOOLS
-  // AND no tool name/notes contains "mysql" — true gap.
+test('unmappedSignals: flags signals without any mapping or fallback (ansible in empty DB)', () => {
+  // ansible is detected by detectStack but absent from SIGNAL_TO_TOOLS
+  // AND no tool name/notes contains "ansible" — true gap.
   const db    = dbWith('mcp-server-neon');
-  const stack = stackWith({ dbs: ['mysql'] });
+  const stack = stackWith({ infra: ['ansible'] });
   const out   = o.unmappedSignals(db, stack);
   assert.equal(out.length, 1);
-  assert.equal(out[0].signal, 'mysql');
+  assert.equal(out[0].signal, 'ansible');
   assert.equal(out[0].reason, 'no mapping');
   assert.equal(out[0].fallback, undefined);
 });
 
 test('unmappedSignals: signal resolved via fallback is marked fallback, not gap', () => {
-  // Use a signal NOT in SIGNAL_TO_TOOLS (datadog isn't curated today)
+  // Use a signal NOT in SIGNAL_TO_TOOLS (loki isn't curated today)
   // but with a matching tool name in the synthetic DB. Substring scan
   // should classify this as a fallback hit, not a gap.
   const db = {
     tools: [
-      { name: 'datadog-mcp', notes: 'Datadog MCP server.', classification: 'Core' },
-      { name: 'noise',       notes: 'unrelated',           classification: 'Core' },
+      { name: 'loki-mcp', notes: 'Grafana Loki MCP server.', classification: 'Core' },
+      { name: 'noise',    notes: 'unrelated',                 classification: 'Core' },
     ],
   };
-  const stack = stackWith({ infra: ['datadog'] });
+  const stack = stackWith({ infra: ['loki'] });
   const out = o.unmappedSignals(db, stack);
   assert.equal(out.length, 1);
-  assert.equal(out[0].signal, 'datadog');
-  assert.deepEqual(out[0].fallback, ['datadog-mcp']);
+  assert.equal(out[0].signal, 'loki');
+  assert.deepEqual(out[0].fallback, ['loki-mcp']);
   assert.match(out[0].reason, /^fallback →/);
 });
 
@@ -60,20 +60,20 @@ test('fallbackBySignal: substring match against name+notes, skips Deprecated', (
 });
 
 test('matchDB: uses fallback when SIGNAL_TO_TOOLS has no mapping for the signal', () => {
-  // datadog is not in SIGNAL_TO_TOOLS today; datadog-mcp would be picked up
+  // loki is not in SIGNAL_TO_TOOLS today; loki-mcp would be picked up
   // via substring fallback. Synthetic DB to keep the test deterministic.
   const db = {
     tools: [
-      { name: 'datadog-mcp',           notes: 'Datadog MCP', classification: 'Core', est_tools_count: 5 },
+      { name: 'loki-mcp',              notes: 'Grafana Loki MCP', classification: 'Core', est_tools_count: 5 },
       { name: 'mcp-server-filesystem', notes: '', classification: 'Core', est_tools_count: 10 },
       { name: 'mcp-server-memory',     notes: '', classification: 'Core', est_tools_count: 9 },
       { name: 'context7',              notes: '', classification: 'Core', est_tools_count: 4 },
     ],
   };
-  const stack = stackWith({ infra: ['datadog'] });
+  const stack = stackWith({ infra: ['loki'] });
   const matched = o.matchDB(db, stack, null);
   const names = matched.map(t => t.name);
-  assert.ok(names.includes('datadog-mcp'), `Expected datadog match via fallback, got ${names}`);
+  assert.ok(names.includes('loki-mcp'), `Expected loki match via fallback, got ${names}`);
 });
 
 test('unmappedSignals: flags mappings whose referenced tool is missing in DB', () => {

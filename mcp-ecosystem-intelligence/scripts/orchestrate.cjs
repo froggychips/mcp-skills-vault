@@ -235,6 +235,16 @@ const SIGNAL_TO_TOOLS = {
   circleci:    ['@circleci/mcp-server-circleci'],
   // Communication
   slack:       ['slack-mcp-server'],
+  // Newly imported in PR #22 — WO/infra stack gaps closed via discover.cjs
+  teamcity:    ['teamcity-mcp'],
+  prometheus:  ['prometheus-mcp'],
+  datadog:     ['datadog-mcp'],
+  terraform:   ['terraform-mcp-server'],
+  kafka:       ['kafka-mcp-server'],
+  mysql:       ['mcp-server-mysql'],
+  // jenkins, helm, argocd-server, vault, loki, ansible, airflow — left
+  // intentionally unmapped: no public MCP server passed the quality bar
+  // (low stars, archived, or doesn't exist yet). Surfaced via discover hint.
 };
 
 // Always surface for any project (filesystem/memory/context7 are universally useful)
