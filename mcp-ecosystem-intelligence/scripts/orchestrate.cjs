@@ -175,6 +175,29 @@ function matchDB(db, stack, query) {
   return db.tools.filter(t => names.has(t.name) && t.classification !== 'Deprecated');
 }
 
+// For every stack signal, decide whether the DB actually had something
+// specific to offer. Two failure modes:
+//   1. signal not in SIGNAL_TO_TOOLS at all       → reason: "no mapping"
+//   2. mapped, but referenced tool missing in DB  → reason: "mapping references unknown DB entry"
+// Returns one record per unmapped signal so the reporter can suggest
+// `discover.cjs --query <signal>` per gap.
+function unmappedSignals(db, stack) {
+  const dbNames = new Set(db.tools.map(t => t.name));
+  const out     = [];
+  for (const signal of [...stack.dbs, ...stack.infra]) {
+    const mapped = SIGNAL_TO_TOOLS[signal] || [];
+    if (mapped.length === 0) {
+      out.push({ signal, reason: 'no mapping' });
+      continue;
+    }
+    const present = mapped.filter(n => dbNames.has(n));
+    if (present.length === 0) {
+      out.push({ signal, reason: `mapping → ${mapped.join(', ')} (not in DB)` });
+    }
+  }
+  return out;
+}
+
 // ── Installed servers ───────────────────────────────────────────────────────
 
 function getInstalled(cwd) {
@@ -320,7 +343,7 @@ function printTool(t) {
   }
 }
 
-function printReport(stack, matched, installed, db) {
+function printReport(stack, matched, installed, db, unmapped) {
   // Stack line
   const parts = [];
   if (stack.langs.size)  parts.push(`Langs: ${[...stack.langs].join('/')}`);
@@ -368,20 +391,34 @@ function printReport(stack, matched, installed, db) {
   process.stdout.write(`\n  DB last refreshed: ${oldest}\n`);
   process.stdout.write(`  ${DM}Full scan: node scripts/verify_integrity.cjs${RS}\n\n`);
 
-  if (!normal.length && !heavy.length && !Object.keys(installed).length) {
-    process.stdout.write(`No DB matches for detected stack.\n`);
-    process.stdout.write(`Try: node scripts/orchestrate.cjs --query <keyword>\n`);
-    process.stdout.write(`Or discover live: WebFetch https://registry.modelcontextprotocol.io/v0/servers\n\n`);
-  } else {
-    process.stdout.write(`${DM}Install: node scripts/orchestrate.cjs --install <name> [--global]${RS}\n\n`);
+  // Coverage gaps: stack signals the DB has nothing specific for. UNIVERSAL_TOOLS
+  // are always added by matchDB, so a non-empty `matched` doesn't imply we
+  // actually answered the user's stack — we may have silently fallen back to
+  // universals. Surface that explicitly so the user knows whether to trust
+  // the recommendation or escape into discovery.
+  const matchedSpecific = matched.filter(t => !UNIVERSAL_TOOLS.has(t.name) && !installedNames.has(t.name));
+  if (unmapped.length) {
+    process.stdout.write(`${B}── Stack signals without a specific DB match ${HR.slice(45)}${RS}\n`);
+    for (const u of unmapped) {
+      process.stdout.write(`  ${YL}·${RS} ${u.signal.padEnd(14)} ${DM}${u.reason}${RS}\n`);
+      process.stdout.write(`    ${DM}→ try: node scripts/discover.cjs --source npm --query ${u.signal}${RS}\n`);
+    }
+    if (matchedSpecific.length === 0) {
+      process.stdout.write(`\n  ${YL}Note:${RS} the entries above under "Recommended" are general-purpose universals,\n`);
+      process.stdout.write(`  not stack-specific matches. Run discover.cjs to fill the gap.\n`);
+    }
+    process.stdout.write('\n');
   }
+
+  process.stdout.write(`${DM}Install: node scripts/orchestrate.cjs --install <name> [--global]${RS}\n\n`);
 }
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
-const db      = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
-const stack   = detectStack(CWD);
-const matched = matchDB(db, stack, QUERY);
+const db        = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+const stack     = detectStack(CWD);
+const matched   = matchDB(db, stack, QUERY);
+const unmapped  = unmappedSignals(db, stack);
 const installed = getInstalled(CWD);
 
 // -- install mode --
@@ -405,6 +442,7 @@ if (AS_JSON) {
       infra:      [...stack.infra],
       categories: [...stack.cats],
       keys:       stack.keys.slice(0, 20),
+      unmapped_signals: unmapped,
     },
     recommended: matched.filter(t => t.est_tools_count < HEAVY).map(slim),
     heavy:       matched.filter(t => t.est_tools_count >= HEAVY).map(slim),
@@ -415,7 +453,7 @@ if (AS_JSON) {
 }
 
 // -- default: human-readable report --
-printReport(stack, matched, installed, db);
+printReport(stack, matched, installed, db, unmapped);
 
 function slim(t) {
   return {
