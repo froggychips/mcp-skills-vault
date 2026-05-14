@@ -82,6 +82,28 @@ node mcp-ecosystem-intelligence/scripts/check_docker_drift.cjs --strict  # exit 
 
 Drift = upstream rebuilt the tag under a new digest. The weekly CI job (`docker-drift`) fails on any drift so a maintainer reviews the upstream change *before* refreshing the pin — a routine rebuild and a registry hijack look identical from here.
 
+### Discovery pipeline
+
+[`scripts/discover.cjs`](./mcp-ecosystem-intelligence/scripts/discover.cjs) — harvest MCP server candidates from three sources, deduplicate by repo URL, annotate with health metrics from GitHub, score, and emit a candidates JSON ready for manual cherry-pick into `tools_database.json`.
+
+```bash
+# Default: all three sources, top-50 candidates, capped at 200 gh api calls
+node mcp-ecosystem-intelligence/scripts/discover.cjs --out candidates.json
+
+# Single source / smaller limit
+node mcp-ecosystem-intelligence/scripts/discover.cjs --source npm --limit 20 --out candidates.json
+```
+
+Sources:
+
+| Source | Endpoint | Notes |
+|---|---|---|
+| `readme` | `modelcontextprotocol/servers` README | Curated. No `gh` calls. |
+| `gh`     | `gh search repos --topic mcp-server / modelcontextprotocol` | Requires `gh auth login`. Topic-tags catch non-MCP projects, filtered out by name/description heuristic. |
+| `npm`    | `npm search mcp-server` | Filters to packages with a GitHub `repository` field. |
+
+Annotation uses `gh api repos/<owner>/<repo>` for stars, last commit, license, archive/fork status. Reject heuristics: `<10 stars`, `last_commit > 365 days`, archived, fork, doesn't look like an MCP server in `name`/`description`. Surviving candidates are scored with the same formula as `calculate_health.cjs` and emitted with the same shape as `tools_database.json` entries (minus `pkg_integrity`, which `verify_integrity.cjs --update` fills after manual merge).
+
 ### Health scorer
 
 [`scripts/calculate_health.cjs`](./mcp-ecosystem-intelligence/scripts/calculate_health.cjs) — score any MCP candidate:
@@ -156,7 +178,7 @@ The following are described in [`SKILL.md`](./mcp-ecosystem-intelligence/SKILL.m
 | Feature | Status |
 |---|---|
 | Stack detection from manifests (`package.json`, `pyproject.toml`, …) | Claude-executed, no dedicated script |
-| Registry / aggregator / `gh search` discovery pipeline | Claude-executed, no dedicated script |
+| Registry / aggregator / `gh search` discovery pipeline | [`scripts/discover.cjs`](./mcp-ecosystem-intelligence/scripts/discover.cjs) — done |
 | Reject heuristics (5-Minute Rule, Bloat, Duplication) | Claude-executed judgment, no dedicated script |
 | Formatted recommendation output (terse / verbose) | Claude-generated, no dedicated formatter |
 | Project-scoped `.mcp.json` install (default path) | Pattern documented in SKILL.md §10, no dedicated script |
