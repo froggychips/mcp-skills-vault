@@ -1,0 +1,38 @@
+
+Stack: Langs: Node | DB: postgres | Infra: aws, teamcity, atlassian | Keys: TEAMCITY_URL, ATLASSIAN_URL
+Needs: database, infra, ci-cd, pm
+
+── Recommended ──────────────────────────────────────────────
+  Core          mcp-server-neon            29 tools  score 110
+                 npx -y @neondatabase/mcp-server-neon@0.6.5
+  Core          context7                   4 tools  score 105
+                 npx -y @upstash/context7-mcp@2.2.4
+  Core          mcp-server-filesystem      10 tools  score 105
+                 npx -y @modelcontextprotocol/server-filesystem@2026.1.14 <path>
+  Core          mcp-server-aws             20 tools  score 105
+                 uvx awslabs.core-mcp-server==1.0.27
+  Core          mcp-server-memory          9 tools  score 105
+                 npx -y @modelcontextprotocol/server-memory@2026.1.26
+  Recommended   teamcity-mcp               null tools  score 65
+                 npx -y @daghis/teamcity-mcp
+
+── Heavy — scope before global install ──────────────────────
+  Experimental  mcp-atlassian              72 tools ⚠  score 55
+                 uvx mcp-atlassian==0.21.1
+
+── Already installed ────────────────────────────────────────
+  ✓ teamcity                     global (~/.claude.json)
+  ✓ wo-tools                     global (~/.claude.json)
+  ✓ hostinger                    global (~/.claude.json)
+  ✓ github                       global (~/.claude.json)
+  ✓ froggy                       global (~/.claude.json)
+  ✓ froggy-sre                   global (~/.claude.json)
+  ✓ wo-context                   global (~/.claude.json)
+
+── Integrity (DB snapshot) ──────────────────────────────────
+  Matched: 7 verified
+  DB last refreshed: 2026-05-10
+  Full scan: node scripts/verify_integrity.cjs
+
+Install: node scripts/orchestrate.cjs --install <name> [--global]
+
