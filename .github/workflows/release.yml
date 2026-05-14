@@ -1,0 +1,88 @@
+name: release
+
+# Two paths into this workflow:
+#
+#   1. Conventional Commits → automatic version bump + draft PR
+#      release-please reads commits on master, infers semver bump
+#      (feat → minor, fix → patch, BREAKING CHANGE → major), opens
+#      a "chore(release): vX.Y.Z" PR with auto-generated CHANGELOG.
+#      Merging that PR creates the git tag + GitHub release.
+#
+#   2. Manual override via workflow_dispatch
+#      Cut a release at the current master HEAD with a chosen tag.
+#      Useful for ad-hoc patches or backfilling a missed release.
+#
+# Why release-please over `gh release create` scripted manually:
+#   - CHANGELOG.md kept in repo (not just GitHub release body)
+#   - Conventional Commit messages already used in this repo
+#     (PR titles like feat/fix/chore/docs are reviewed → consistent input)
+#   - PR-gated: human still approves the release before it ships,
+#     matching the same policy as refresh-hashes in security-scan.yml
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to create (e.g. v0.3.1). Leave empty for release-please flow.'
+        required: false
+        type: string
+      notes:
+        description: 'Release notes body. Markdown. Leave empty to auto-generate from commits.'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # Automatic flow: scans commits, opens/updates the release PR.
+  release-please:
+    name: release-please (auto)
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.tag == '')
+    runs-on: self-hosted
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          release-type: simple
+          # `simple` = no language-specific version files, just CHANGELOG.md
+          # + the tag. Right fit for a repo that's a collection of skills +
+          # JSON DB rather than a single package.
+          config-file: .github/release-please-config.json
+          manifest-file: .github/.release-please-manifest.json
+
+  # Manual flow: tag the current master HEAD immediately.
+  manual-tag:
+    name: Manual tag (workflow_dispatch)
+    if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0   # need full history for `gh release create --generate-notes`
+      - name: Create tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          set -euo pipefail
+          # Sanity: tag must match semver vX.Y.Z(-pre)?
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]; then
+            echo "::error::Tag '$TAG' is not semver (vX.Y.Z[-pre])" >&2
+            exit 1
+          fi
+          # Don't overwrite an existing tag
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::error::Tag $TAG already exists" >&2
+            exit 1
+          fi
+
+          if [[ -n "$NOTES" ]]; then
+            printf "%s" "$NOTES" > /tmp/release-notes.md
+            gh release create "$TAG" --target master --title "$TAG" --notes-file /tmp/release-notes.md
+          else
+            gh release create "$TAG" --target master --title "$TAG" --generate-notes
+          fi
