@@ -1,6 +1,6 @@
 # mcp-skills-vault
 
-Supply-chain security scanner and vetted database for the MCP ecosystem — verify MCP server integrity before installing, score candidates by health, and get guided recommendations backed by 31 pre-audited entries.
+Supply-chain security scanner and vetted database for the MCP ecosystem — verify MCP server integrity before installing, score candidates by health, and get guided recommendations backed by 106 pre-audited entries.
 
 > [!NOTE]
 > Built for [Claude Code](https://claude.com/claude-code) skills. Drop a skill folder into `~/.claude/skills/` and Claude will auto-activate it when the user's prompt matches the skill description.
@@ -9,7 +9,7 @@ Supply-chain security scanner and vetted database for the MCP ecosystem — veri
 
 | Skill | Purpose | Status |
 |---|---|---|
-| [`mcp-ecosystem-intelligence/`](./mcp-ecosystem-intelligence) | Pipeline orchestrator + security scanner + vetted 31-tool database. Scans project stack, matches DB, verifies sha512/sha256/Docker digest integrity, checks advisory APIs, scores candidates by health, writes `.mcp.json`. | Ready |
+| [`mcp-ecosystem-intelligence/`](./mcp-ecosystem-intelligence) | Pipeline orchestrator + security scanner + vetted 106-tool database. Scans project stack, matches DB, verifies sha512/sha256/Docker digest integrity, checks advisory APIs, scores candidates by health, writes `.mcp.json`. | Ready |
 | [`mcp-swift-synthesizer.skill`](./mcp-swift-synthesizer.skill) | Convert MCP server functions into native Swift binaries to cut RAM (Node 150–300 MB → Swift 1–10 MB). | Concept |
 
 ## Quick install (Ecosystem Intelligence)
@@ -131,17 +131,20 @@ score = min(20, 10·log10(stars+1))   # popularity, capped
 
 ### Vetted database
 
-`mcp-ecosystem-intelligence/assets/tools_database.json` — **31 entries** across 17 categories, all with pinned versions, integrity hashes, SPDX license, and `trust` field.
+`mcp-ecosystem-intelligence/assets/tools_database.json` — **106 entries** across ~25 categories, all with pinned versions, integrity hashes (npm sha512 / PyPI sha256 / Docker @sha256), SPDX license, and `trust` field.
 
 ```
-browser  database  demo  docs   filesystem  http   infra
-memory   meta      observability  payments  pm    reasoning
-search   utility   vcs   web-scraping
+ai        browser   ci-cd      cms       communication   crm
+database  demo      docs       filesystem http            infra
+maps      memory    meta       mobile     observability   payments
+pm        reasoning search     testing    utility         vcs       web-scraping
 ```
 
-Distribution: **18 Core / 11 Recommended / 2 Experimental**.
+Distribution: **93 Core / 9 Recommended / 4 Experimental**.
 
-Includes the seven official `modelcontextprotocol/servers` (filesystem, fetch, git, memory, sequentialthinking, time, everything) plus vendor-maintained servers (`github`, `microsoft/playwright`, `cloudflare`, `notion`, `sentry`, `stripe`, `neon`, `mongodb`, `redis`, `clickhouse`, `awslabs/mcp`, `context7`, …) and high-quality community entries (`mcp-atlassian`, `firecrawl`, `tavily`, `exa`, `brave`, `kubernetes`, `duckduckgo`, …).
+**Verified hand-curated core** (the original 30): the seven official `modelcontextprotocol/servers` (filesystem, fetch, git, memory, sequentialthinking, time, everything) plus vendor-maintained servers (`github`, `microsoft/playwright`, `cloudflare`, `notion`, `sentry`, `stripe`, `neon`, `mongodb`, `redis`, `clickhouse`, `awslabs/mcp`, `context7`, …) and high-quality community entries (`mcp-atlassian`, `firecrawl`, `tavily`, `exa`, `brave`, `kubernetes`, `duckduckgo`, …).
+
+**Candidate batch** (75, added 2026-05): vendor servers harvested via `discover.cjs` from npm + the official servers README, all with `trust: "candidate"` pending human-vetting on usage patterns. Highlights: `@mapbox/mcp-server`, `@azure-devops/mcp`, `@dynatrace-oss/dynatrace-mcp-server`, `@browserstack/mcp-server`, `@salesforce/mcp`, `@postman/postman-mcp-server`, `@eslint/mcp`, `@circleci/mcp-server-circleci`, `argocd-mcp`, …
 
 Entry schema:
 
@@ -189,7 +192,7 @@ The following are described in [`SKILL.md`](./mcp-ecosystem-intelligence/SKILL.m
 
 ## Token cost management
 
-Every active MCP server injects its full tool list into Claude's system prompt (~200–500 tokens per tool). With 31 servers in the DB the spread is wide: `mcp-server-fetch` = 1 tool vs. `gitlab-mcp` = 153 tools.
+Every active MCP server injects its full tool list into Claude's system prompt (~200–500 tokens per tool). With 106 servers in the DB the spread is wide: `mcp-server-fetch` = 1 tool vs. `gitlab-mcp` = 153 tools.
 
 Three levers, in order of preference:
 
