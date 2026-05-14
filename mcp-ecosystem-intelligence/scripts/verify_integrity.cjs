@@ -558,4 +558,16 @@ async function main() {
   process.exit(totalFails > 0 ? 1 : 0);
 }
 
-main().catch((e) => { console.error(e.message); process.exit(1); });
+if (require.main === module) {
+  main().catch((e) => { console.error(e.message); process.exit(1); });
+}
+
+module.exports = {
+  normalizeGitUrl,
+  npmPkgName,
+  pypiPkgName,
+  dockerImageRef,
+  severityIsHard,
+  osvSeverity,
+  unifyAdvisories,
+};

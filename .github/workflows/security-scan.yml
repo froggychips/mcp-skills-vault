@@ -25,9 +25,21 @@ permissions:
   contents: read
 
 jobs:
+  unit-tests:
+    name: Unit tests (node:test)
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: node --test
+        run: node --test 'tests/*.test.cjs'
+
   smoke:
     name: Verify seeded DB (offline)
     runs-on: self-hosted
+    needs: unit-tests
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

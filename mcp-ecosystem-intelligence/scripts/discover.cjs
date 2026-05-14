@@ -383,4 +383,15 @@ async function main() {
   process.exit(top.length ? 0 : 1);
 }
 
-main().catch((e) => { console.error(e.message); process.exit(1); });
+if (require.main === module) {
+  main().catch((e) => { console.error(e.message); process.exit(1); });
+}
+
+module.exports = {
+  normalizeRepoUrl,
+  ownerRepoFromUrl,
+  scoreHealth,
+  classifyScore,
+  looksLikeMcpServer,
+  rejectReason,
+};

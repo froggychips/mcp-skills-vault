@@ -415,45 +415,55 @@ function printReport(stack, matched, installed, db, unmapped) {
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
-const db        = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
-const stack     = detectStack(CWD);
-const matched   = matchDB(db, stack, QUERY);
-const unmapped  = unmappedSignals(db, stack);
-const installed = getInstalled(CWD);
+if (require.main === module) {
+  const db        = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+  const stack     = detectStack(CWD);
+  const matched   = matchDB(db, stack, QUERY);
+  const unmapped  = unmappedSignals(db, stack);
+  const installed = getInstalled(CWD);
 
-// -- install mode --
-if (INSTALL) {
-  const tool = db.tools.find(t => t.name === INSTALL);
-  if (!tool) {
-    process.stderr.write(`${RD}Tool not found in DB: "${INSTALL}"${RS}\n`);
-    process.stderr.write(`Known names: ${db.tools.map(t => t.name).join(', ')}\n`);
-    process.exit(2);
+  // -- install mode --
+  if (INSTALL) {
+    const tool = db.tools.find(t => t.name === INSTALL);
+    if (!tool) {
+      process.stderr.write(`${RD}Tool not found in DB: "${INSTALL}"${RS}\n`);
+      process.stderr.write(`Known names: ${db.tools.map(t => t.name).join(', ')}\n`);
+      process.exit(2);
+    }
+    installTool(tool, CWD, GLOBAL);
+    process.exit(0);
   }
-  installTool(tool, CWD, GLOBAL);
-  process.exit(0);
+
+  // -- json mode --
+  if (AS_JSON) {
+    process.stdout.write(JSON.stringify({
+      stack: {
+        langs:      [...stack.langs],
+        dbs:        [...stack.dbs],
+        infra:      [...stack.infra],
+        categories: [...stack.cats],
+        keys:       stack.keys.slice(0, 20),
+        unmapped_signals: unmapped,
+      },
+      recommended: matched.filter(t => t.est_tools_count < HEAVY).map(slim),
+      heavy:       matched.filter(t => t.est_tools_count >= HEAVY).map(slim),
+      installed,
+      db_entry_count: db.tools.length,
+    }, null, 2) + '\n');
+    process.exit(0);
+  }
+
+  // -- default: human-readable report --
+  printReport(stack, matched, installed, db, unmapped);
 }
 
-// -- json mode --
-if (AS_JSON) {
-  process.stdout.write(JSON.stringify({
-    stack: {
-      langs:      [...stack.langs],
-      dbs:        [...stack.dbs],
-      infra:      [...stack.infra],
-      categories: [...stack.cats],
-      keys:       stack.keys.slice(0, 20),
-      unmapped_signals: unmapped,
-    },
-    recommended: matched.filter(t => t.est_tools_count < HEAVY).map(slim),
-    heavy:       matched.filter(t => t.est_tools_count >= HEAVY).map(slim),
-    installed,
-    db_entry_count: db.tools.length,
-  }, null, 2) + '\n');
-  process.exit(0);
-}
-
-// -- default: human-readable report --
-printReport(stack, matched, installed, db, unmapped);
+module.exports = {
+  detectStack,
+  matchDB,
+  unmappedSignals,
+  SIGNAL_TO_TOOLS,
+  UNIVERSAL_TOOLS,
+};
 
 function slim(t) {
   return {
