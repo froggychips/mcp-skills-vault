@@ -157,11 +157,33 @@ const SIGNAL_TO_TOOLS = {
 // Always surface for any project (filesystem/memory/context7 are universally useful)
 const UNIVERSAL_TOOLS = new Set(['mcp-server-filesystem', 'mcp-server-memory', 'context7']);
 
+// SIGNAL_TO_TOOLS is hand-curated. As the DB grows, the map lags: new vendor
+// servers (e.g. @mapbox/mcp-server, @salesforce/mcp) ship without anyone
+// updating the map, and the matcher silently misses them. Fall back to a
+// substring scan over name+notes when the map has nothing for a signal —
+// covers the common case where the vendor's name is the signal.
+function fallbackBySignal(db, signal) {
+  const sig = signal.toLowerCase();
+  const hits = [];
+  for (const t of db.tools) {
+    if (t.classification === 'Deprecated') continue;
+    const hay = `${t.name} ${t.notes || ''}`.toLowerCase();
+    if (hay.includes(sig)) hits.push(t.name);
+  }
+  return hits;
+}
+
 function matchDB(db, stack, query) {
   const names = new Set(UNIVERSAL_TOOLS);
 
   for (const signal of [...stack.dbs, ...stack.infra]) {
-    for (const name of (SIGNAL_TO_TOOLS[signal] || [])) names.add(name);
+    const mapped = SIGNAL_TO_TOOLS[signal] || [];
+    if (mapped.length) {
+      for (const name of mapped) names.add(name);
+    } else {
+      // Curated map said nothing — try semantic fallback.
+      for (const name of fallbackBySignal(db, signal)) names.add(name);
+    }
   }
 
   if (query) {
@@ -176,18 +198,27 @@ function matchDB(db, stack, query) {
 }
 
 // For every stack signal, decide whether the DB actually had something
-// specific to offer. Two failure modes:
-//   1. signal not in SIGNAL_TO_TOOLS at all       → reason: "no mapping"
-//   2. mapped, but referenced tool missing in DB  → reason: "mapping references unknown DB entry"
-// Returns one record per unmapped signal so the reporter can suggest
-// `discover.cjs --query <signal>` per gap.
+// specific to offer. Three failure modes:
+//   1. signal in neither SIGNAL_TO_TOOLS nor fallback hits → "no mapping"
+//   2. signal mapped, but referenced tool absent in DB     → "mapping → X (not in DB)"
+//   3. signal in fallback (not curated map) → not unmapped, but
+//      surfaced as a "fallback" record so a reviewer can promote it to
+//      SIGNAL_TO_TOOLS if the heuristic is reliable.
+// Returns one record per gap so the reporter can suggest
+// `discover.cjs --query <signal>` per gap, and so JSON consumers can
+// distinguish fallback-hit signals from curated ones.
 function unmappedSignals(db, stack) {
   const dbNames = new Set(db.tools.map(t => t.name));
   const out     = [];
   for (const signal of [...stack.dbs, ...stack.infra]) {
     const mapped = SIGNAL_TO_TOOLS[signal] || [];
     if (mapped.length === 0) {
-      out.push({ signal, reason: 'no mapping' });
+      const fb = fallbackBySignal(db, signal);
+      if (fb.length === 0) {
+        out.push({ signal, reason: 'no mapping' });
+      } else {
+        out.push({ signal, reason: `fallback → ${fb.join(', ')}`, fallback: fb });
+      }
       continue;
     }
     const present = mapped.filter(n => dbNames.has(n));
@@ -397,9 +428,20 @@ function printReport(stack, matched, installed, db, unmapped) {
   // universals. Surface that explicitly so the user knows whether to trust
   // the recommendation or escape into discovery.
   const matchedSpecific = matched.filter(t => !UNIVERSAL_TOOLS.has(t.name) && !installedNames.has(t.name));
-  if (unmapped.length) {
+  const fallbackHits = unmapped.filter(u => u.fallback);
+  const trueGaps     = unmapped.filter(u => !u.fallback);
+
+  if (fallbackHits.length) {
+    process.stdout.write(`${B}── Signals matched via fallback (curated map missing) ${HR.slice(53)}${RS}\n`);
+    for (const u of fallbackHits) {
+      process.stdout.write(`  ${DM}·${RS} ${u.signal.padEnd(14)} ${DM}→ ${u.fallback.join(', ')}${RS}\n`);
+    }
+    process.stdout.write(`  ${DM}Promote to SIGNAL_TO_TOOLS if reliable; surfaced here so curated overrides stay honest.${RS}\n\n`);
+  }
+
+  if (trueGaps.length) {
     process.stdout.write(`${B}── Stack signals without a specific DB match ${HR.slice(45)}${RS}\n`);
-    for (const u of unmapped) {
+    for (const u of trueGaps) {
       process.stdout.write(`  ${YL}·${RS} ${u.signal.padEnd(14)} ${DM}${u.reason}${RS}\n`);
       process.stdout.write(`    ${DM}→ try: node scripts/discover.cjs --source npm --query ${u.signal}${RS}\n`);
     }
@@ -461,6 +503,7 @@ module.exports = {
   detectStack,
   matchDB,
   unmappedSignals,
+  fallbackBySignal,
   SIGNAL_TO_TOOLS,
   UNIVERSAL_TOOLS,
 };

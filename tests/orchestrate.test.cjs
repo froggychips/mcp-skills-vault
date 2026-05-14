@@ -17,14 +17,62 @@ test('unmappedSignals: returns [] when every signal maps to a present tool', () 
   assert.deepEqual(o.unmappedSignals(db, stack), []);
 });
 
-test('unmappedSignals: flags signals without any mapping (mysql today)', () => {
-  // mysql is detected by orchestrate.detectStack but absent from SIGNAL_TO_TOOLS.
+test('unmappedSignals: flags signals without any mapping or fallback (mysql in empty DB)', () => {
+  // mysql is detected by orchestrate.detectStack but absent from SIGNAL_TO_TOOLS
+  // AND no tool name/notes contains "mysql" — true gap.
   const db    = dbWith('mcp-server-neon');
   const stack = stackWith({ dbs: ['mysql'] });
   const out   = o.unmappedSignals(db, stack);
   assert.equal(out.length, 1);
   assert.equal(out[0].signal, 'mysql');
   assert.equal(out[0].reason, 'no mapping');
+  assert.equal(out[0].fallback, undefined);
+});
+
+test('unmappedSignals: signal resolved via fallback is marked fallback, not gap', () => {
+  // SIGNAL_TO_TOOLS has no entry for "mapbox" but @mapbox/mcp-server exists.
+  // Fallback substring scan should find it → record carries `fallback`,
+  // reason starts with "fallback →".
+  const db = {
+    tools: [
+      { name: '@mapbox/mcp-server', notes: 'Mapbox MCP server.', classification: 'Core' },
+      { name: 'noise', notes: 'unrelated', classification: 'Core' },
+    ],
+  };
+  const stack = stackWith({ infra: ['mapbox'] });
+  const out = o.unmappedSignals(db, stack);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].signal, 'mapbox');
+  assert.deepEqual(out[0].fallback, ['@mapbox/mcp-server']);
+  assert.match(out[0].reason, /^fallback →/);
+});
+
+test('fallbackBySignal: substring match against name+notes, skips Deprecated', () => {
+  const db = {
+    tools: [
+      { name: '@salesforce/mcp', notes: 'CRM server', classification: 'Core' },
+      { name: 'salesforce-legacy', notes: '', classification: 'Deprecated' },
+      { name: 'irrelevant', notes: 'no match', classification: 'Core' },
+    ],
+  };
+  const hits = o.fallbackBySignal(db, 'salesforce');
+  assert.deepEqual(hits, ['@salesforce/mcp']); // Deprecated filtered out
+});
+
+test('matchDB: uses fallback when SIGNAL_TO_TOOLS has no mapping for the signal', () => {
+  // mapbox is not in SIGNAL_TO_TOOLS today; @mapbox/mcp-server is in DB.
+  const db = {
+    tools: [
+      { name: '@mapbox/mcp-server', notes: 'Mapbox MCP server.', classification: 'Core', est_tools_count: 5 },
+      { name: 'mcp-server-filesystem', notes: '', classification: 'Core', est_tools_count: 10 },
+      { name: 'mcp-server-memory',     notes: '', classification: 'Core', est_tools_count: 9 },
+      { name: 'context7',              notes: '', classification: 'Core', est_tools_count: 4 },
+    ],
+  };
+  const stack = stackWith({ infra: ['mapbox'] });
+  const matched = o.matchDB(db, stack, null);
+  const names = matched.map(t => t.name);
+  assert.ok(names.includes('@mapbox/mcp-server'), `Expected mapbox match via fallback, got ${names}`);
 });
 
 test('unmappedSignals: flags mappings whose referenced tool is missing in DB', () => {
