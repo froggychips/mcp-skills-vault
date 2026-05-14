@@ -34,7 +34,9 @@ jobs:
         with:
           node-version: '20'
       - name: node --test
-        run: node --test 'tests/*.test.cjs'
+        # Bash expands the glob into a file list before node sees it;
+        # node --test in Node 20 doesn't glob-expand quoted patterns itself.
+        run: node --test tests/*.test.cjs
 
   smoke:
     name: Verify seeded DB (offline)
