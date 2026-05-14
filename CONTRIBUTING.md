@@ -117,9 +117,22 @@ A logic bug here is treated as Critical severity (48-hour patch SLA per SECURITY
 
 ## Style / housekeeping
 
-- Commit messages: imperative mood, focused on *why* not *what*. Reviewers will read the diff for what.
+- Commit messages: [Conventional Commits](https://www.conventionalcommits.org). `feat:` → minor version bump, `fix:` → patch, `BREAKING CHANGE:` → major. PR titles are read by `release-please` to drive the next version.
+- Imperative mood, focused on *why* not *what*. Reviewers will read the diff for what.
 - Run `verify_integrity.cjs --no-audit` before every push if you touched `tools_database.json` or any script.
 - Don't add dependencies to the scripts — they intentionally use only Node built-ins so the supply-chain attack surface is the same as Node itself.
 - For UI / docs PRs, no need for triage checklist; just describe the change in plain English.
+
+---
+
+## Releasing
+
+Two paths, both gated by human review:
+
+**Automatic** (default). `release-please` watches `master`, parses Conventional Commit types since the last tag, opens a `chore(release): vX.Y.Z` PR with the auto-generated CHANGELOG section. Merge the PR → release-please creates the git tag and GitHub release. No manual `gh release create` needed.
+
+**Manual** (override). For ad-hoc patches or backfilling: GitHub → Actions → `release` workflow → *Run workflow*, fill in `tag` (e.g. `v0.3.1`) and optional `notes`. The job validates the tag against semver, refuses to overwrite existing tags, and uses `gh release create --generate-notes` when notes are blank.
+
+Both paths use the same `release` workflow; see `.github/workflows/release.yml`.
 
 If anything here looks wrong or out of date, open a PR — the doc itself follows the same review process.
