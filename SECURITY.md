@@ -8,6 +8,7 @@
 | `scripts/verify_integrity.cjs` (current) | ✅ |
 | `scripts/orchestrate.cjs` (current) | ✅ |
 | `scripts/refresh_scores.cjs` (current) | ✅ |
+| `scripts/check_docker_drift.cjs` (current) | ✅ |
 | Pinned `version` entries in DB | ✅ integrity-gated |
 
 Older commits are not patched — update to `HEAD` of `master`.
@@ -70,6 +71,14 @@ Current implementation: uses `spawnSync` with an explicit args array — no shel
 `refresh-hashes` job runs `verify_integrity.cjs --update` + `refresh_scores.cjs --write`, then opens a PR via `peter-evans/create-pull-request`. This is the **only** automated mutation of `tools_database.json`.
 
 Risk surface: a compromised GitHub Actions token or a misconfigured workflow could auto-merge. The branch protection rule requiring human review is the control; removing it would be a security regression.
+
+### Docker `@sha256` drift
+
+Docker entries pin the image by digest (`image@sha256:…`). The digest is immutable in the registry, so the pin itself cannot be bypassed by an upstream rebuild. But the pin can become **stale** — the maintainer rebuilds the same tag (e.g. `:latest`) under a new digest, leaving us pointing at an older version that may be missing a security fix.
+
+`scripts/check_docker_drift.cjs` follows the OCI Distribution Spec (anonymous bearer auth) to fetch the current digest for the tracked tag (default `latest`, overridable via `tracked_tag` in the entry) and reports drift. The weekly CI job fails on any drift so a maintainer reviews the upstream change before refreshing the DB.
+
+Drift is not, by itself, a hijack signal — it most often means a routine rebuild. But it **could** be a hijack of the registry namespace; do not auto-refresh the pin without checking the upstream repo's release notes / commit signing.
 
 ### `--no-audit` mode
 

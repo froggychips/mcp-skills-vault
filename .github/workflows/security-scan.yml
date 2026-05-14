@@ -80,3 +80,40 @@ jobs:
           delete-branch: true
           add-paths: |
             mcp-ecosystem-intelligence/assets/tools_database.json
+
+  docker-drift:
+    name: Docker @sha256 drift
+    # Drift = upstream rebuilt the tracked tag under a new digest. May be a
+    # routine rebuild, may be a hijack — surface and let a human decide.
+    # Not part of `smoke` because it hits the network; runs alongside the
+    # weekly refresh and on manual dispatch.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: smoke
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: check_docker_drift
+        id: drift
+        run: |
+          set -o pipefail
+          node mcp-ecosystem-intelligence/scripts/check_docker_drift.cjs --json | tee drift.json
+          drifts=$(node -e "console.log(JSON.parse(require('fs').readFileSync('drift.json','utf8')).drifts)")
+          echo "drifts=$drifts" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Docker drift check"
+            echo
+            echo "Drifts: **$drifts**"
+            echo
+            echo '```json'
+            cat drift.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Fail if drift detected
+        if: steps.drift.outputs.drifts != '0'
+        run: |
+          echo "Upstream digest differs from pinned digest for at least one image."
+          echo "Review the change in the registry, then run verify_integrity.cjs --update locally."
+          exit 1
