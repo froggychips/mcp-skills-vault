@@ -70,6 +70,18 @@ Flags:
 | `--strict` | Treat WARNs (hooks, repo mismatch, unpinned docker) as hard failures |
 | `--no-audit` | Skip advisory APIs (offline mode) |
 
+### Docker `@sha256` drift detection
+
+[`scripts/check_docker_drift.cjs`](./mcp-ecosystem-intelligence/scripts/check_docker_drift.cjs) — for every Docker entry, fetches the registry digest for the tracked tag (`tracked_tag` in the entry, default `latest`) via the OCI Distribution Spec and reports drift against the pinned `@sha256:` digest.
+
+```bash
+node mcp-ecosystem-intelligence/scripts/check_docker_drift.cjs           # human-readable
+node mcp-ecosystem-intelligence/scripts/check_docker_drift.cjs --json    # machine-readable
+node mcp-ecosystem-intelligence/scripts/check_docker_drift.cjs --strict  # exit 1 on any drift
+```
+
+Drift = upstream rebuilt the tag under a new digest. The weekly CI job (`docker-drift`) fails on any drift so a maintainer reviews the upstream change *before* refreshing the pin — a routine rebuild and a registry hijack look identical from here.
+
 ### Health scorer
 
 [`scripts/calculate_health.cjs`](./mcp-ecosystem-intelligence/scripts/calculate_health.cjs) — score any MCP candidate:
