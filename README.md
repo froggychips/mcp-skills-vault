@@ -169,10 +169,12 @@ Entry schema:
 
 ### CI
 
-`.github/workflows/security-scan.yml` runs on every push and weekly:
+`.github/workflows/security-scan.yml` runs four jobs across PRs, pushes, and a weekly cron:
 
-- **smoke** — `verify_integrity.cjs --no-audit` on every PR / push to master (offline, fast)
-- **refresh-hashes** — weekly cron that opens a PR refreshing `version` + `pkg_integrity` from live registries, gated by human review before merge
+- **unit-tests** — `node --test tests/*.test.cjs` on every PR / push (fast, no network). Covers parser helpers, advisory dedup, drift parsing, signal mapping. Smoke depends on this.
+- **smoke** — `verify_integrity.cjs --no-audit` on every PR / push to master (offline, fast).
+- **refresh-hashes** — weekly cron that opens a PR refreshing `version` + `pkg_integrity` from live registries, gated by human review before merge.
+- **docker-drift** — weekly + manual dispatch. Compares each Docker entry's pinned `@sha256:` against the upstream registry digest for the tracked tag; fails the job on any drift so a maintainer reviews before refreshing the pin.
 
 ---
 
@@ -250,6 +252,19 @@ node mcp-ecosystem-intelligence/scripts/generate_wrapper.cjs \
 `tools.json` is an array of MCP tool defs (`name` / `description` / `inputSchema`); the generator emits `ListToolsRequestSchema` entries plus `switch`-cases with `required`-arg validation, runs Node's `--check` on the result, and writes a `.mcp.json`-ready README.
 
 Underlying template lives in `mcp-ecosystem-intelligence/assets/mcp-wrapper-template/` if you'd rather edit by hand.
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the entry schema, reject criteria, the triage checklist for promoting `trust: candidate` to `trust: verified`, and the review process for changes to the integrity gate.
+
+Running the suite locally:
+
+```bash
+node --test tests/*.test.cjs                                              # unit tests (offline, < 1s)
+node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --no-audit   # DB smoke
+```
 
 ---
 
