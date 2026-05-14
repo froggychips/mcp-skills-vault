@@ -169,10 +169,12 @@ Entry schema:
 
 ### CI
 
-`.github/workflows/security-scan.yml` runs on every push and weekly:
+`.github/workflows/security-scan.yml` runs four jobs across PRs, pushes, and a weekly cron:
 
-- **smoke** — `verify_integrity.cjs --no-audit` on every PR / push to master (offline, fast)
-- **refresh-hashes** — weekly cron that opens a PR refreshing `version` + `pkg_integrity` from live registries, gated by human review before merge
+- **unit-tests** — `node --test tests/*.test.cjs` on every PR / push (fast, no network). Covers parser helpers, advisory dedup, drift parsing, signal mapping. Smoke depends on this.
+- **smoke** — `verify_integrity.cjs --no-audit` on every PR / push to master (offline, fast).
+- **refresh-hashes** — weekly cron that opens a PR refreshing `version` + `pkg_integrity` from live registries, gated by human review before merge.
+- **docker-drift** — weekly + manual dispatch. Compares each Docker entry's pinned `@sha256:` against the upstream registry digest for the tracked tag; fails the job on any drift so a maintainer reviews before refreshing the pin.
 
 ---
 
