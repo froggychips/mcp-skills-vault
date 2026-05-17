@@ -1,0 +1,139 @@
+# Issue Form for proposing a new MCP server entry.
+#
+# Use this when you don't want to (or can't) open a PR yourself but want a
+# server added to tools_database.json. A maintainer will run the integrity
+# gate and either open the PR or close the issue with a reason.
+#
+# For changes to scripts/, philosophy, or anything beyond a DB entry, open a
+# regular issue or a draft PR instead — this form is too narrow.
+
+name: New MCP server proposal
+description: Suggest an MCP server to add to tools_database.json
+title: "proposal: <pkg-name>"
+labels: ["mcp-proposal", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion. Before filing, please confirm:
+
+        - the server is **not already in** [`tools_database.json`](../blob/master/mcp-ecosystem-intelligence/assets/tools_database.json) (search by name or `source_url`);
+        - it has a working `install_cmd` (npm/PyPI/Docker — never `git+https://`);
+        - the upstream repo isn't archived/fork and the last commit is within 365 days.
+
+        These are the same hard rejects `discover.cjs` applies, so checking now saves us a round trip.
+
+  - type: input
+    id: name
+    attributes:
+      label: Package name
+      description: npm package, PyPI package, or Docker image basename (e.g. `@vendor/mcp-server`, `mcp-server-foo`, `ghcr.io/vendor/mcp`)
+      placeholder: "@vendor/mcp-server"
+    validations:
+      required: true
+
+  - type: input
+    id: source_url
+    attributes:
+      label: Source repository URL
+      description: Canonical GitHub URL of the server's source code. Must match `repository.url` in the registry.
+      placeholder: "https://github.com/owner/repo"
+    validations:
+      required: true
+
+  - type: input
+    id: install_cmd
+    attributes:
+      label: Install command
+      description: Pinned to a specific version (`@1.2.3`) or Docker digest (`@sha256:…`). `@latest` is rejected.
+      placeholder: "npx -y @vendor/mcp-server@1.2.3"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: Pick the closest match. See [CONTRIBUTING.md](../blob/master/CONTRIBUTING.md#valid-category-values) if unsure. Suggest a new category in "Notes" only if nothing fits.
+      options:
+        - ai
+        - browser
+        - ci-cd
+        - cms
+        - communication
+        - crm
+        - database
+        - demo
+        - docs
+        - filesystem
+        - http
+        - infra
+        - maps
+        - memory
+        - meta
+        - mobile
+        - observability
+        - payments
+        - pm
+        - reasoning
+        - search
+        - testing
+        - utility
+        - vcs
+        - web-scraping
+    validations:
+      required: true
+
+  - type: input
+    id: license
+    attributes:
+      label: License (SPDX)
+      description: e.g. `MIT`, `Apache-2.0`, `BSD-3-Clause`. Non-OSI licenses incur a -10 score penalty (see PHILOSOPHY.md §3).
+      placeholder: "MIT"
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why this server
+      description: What gap in the DB does it fill? Why this server vs alternatives in the same category? One paragraph is fine.
+      placeholder: |
+        - Fills the X gap (DB currently has no MCP for Y).
+        - Better than Z because …
+    validations:
+      required: true
+
+  - type: textarea
+    id: health
+    attributes:
+      label: Health snapshot (optional but helpful)
+      description: |
+        If you have it: stars, last commit (days ago), open issues, estimated tools count. The maintainer will re-run `calculate_health.cjs` regardless, but a snapshot helps triage. Leave blank if unsure.
+      placeholder: |
+        - Stars: 1234
+        - Last commit: 5 days ago
+        - Open issues: 12
+        - est_tools_count: 8
+        - Toolsets / filtering: --toolsets repos,issues (or "none — bloat risk")
+
+  - type: textarea
+    id: concerns
+    attributes:
+      label: Reviewer-visible concerns
+      description: Anything that should make a reviewer slow down — install hooks, non-OSI license, unfamiliar publisher, paid-only features, large `est_tools_count` without filtering.
+      placeholder: |
+        - `postinstall` hook compiles a native binary — looks legitimate
+        - Vendor org is new; first npm publish was 3 weeks ago
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Sanity checks
+      options:
+        - label: I searched `tools_database.json` and this server is not already listed (neither by name nor `source_url`).
+          required: true
+        - label: The `install_cmd` is pinned to an explicit version or Docker digest — not `@latest`, not a git URL.
+          required: true
+        - label: The source repo is not archived and not a fork; last commit is within 365 days.
+          required: true
