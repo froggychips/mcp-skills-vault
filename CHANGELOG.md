@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/froggychips/mcp-skills-vault/compare/v0.4.0...v0.5.0) (2026-05-17)
+
+
+### Features
+
+* issue template for new MCP server proposals ([#30](https://github.com/froggychips/mcp-skills-vault/issues/30)) ([6a47c5c](https://github.com/froggychips/mcp-skills-vault/commit/6a47c5c31f2214848922cdec6b80824e451b544b))
+
 ## [0.4.0](https://github.com/froggychips/mcp-skills-vault/compare/v0.3.0...v0.4.0) (2026-05-14)
 
 
