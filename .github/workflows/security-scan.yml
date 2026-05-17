@@ -1,13 +1,17 @@
 name: security-scan
 
-# Three responsibilities:
-#   smoke           — fast offline check on every PR / push to master
-#   refresh-hashes  — weekly cron that opens a PR with:
-#                       1. refreshed integrity hashes (verify_integrity --update)
-#                       2. refreshed GitHub metrics + recalculated health scores
-#                          (refresh_scores --write)
-#                     Requires human review before merging — version bumps may
-#                     carry CVE fixes OR a freshly compromised release.
+# Four responsibilities:
+#   smoke               — fast offline check on every PR / push to master
+#   refresh-hashes      — weekly cron, opens PR with:
+#                           1. refreshed integrity hashes (verify_integrity --update)
+#                           2. refreshed GitHub metrics + recalculated health scores
+#                              (refresh_scores --write)
+#                         Human review — version bumps may carry CVE fixes OR a
+#                         freshly compromised release.
+#   docker-drift        — weekly + manual, fails on any pinned-digest drift.
+#   discover-candidates — weekly cron, opens PR with fresh
+#                         assets/discovery/candidates.json. Pure inbox for triage;
+#                         the DB stays the deterministic source of truth.
 
 on:
   pull_request:
@@ -18,7 +22,8 @@ on:
   push:
     branches: [master]
   schedule:
-    - cron: '17 6 * * 1'   # Mondays 06:17 UTC — odd minute to avoid the top-of-hour stampede
+    - cron: '17 6 * * 1'   # refresh-hashes + docker-drift — Mondays 06:17 UTC
+    - cron: '23 6 * * 4'   # discover-candidates — Thursdays 06:23 UTC (separate day from Monday jobs)
   workflow_dispatch: {}
 
 permissions:
@@ -52,7 +57,9 @@ jobs:
 
   refresh-hashes:
     name: Weekly hash refresh PR
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    # Run on Monday's cron and on manual dispatch — but NOT on Thursday's
+    # discover-candidates cron (same workflow, different schedule).
+    if: (github.event_name == 'schedule' && github.event.schedule == '17 6 * * 1') || github.event_name == 'workflow_dispatch'
     needs: smoke
     runs-on: self-hosted
     permissions:
@@ -100,8 +107,8 @@ jobs:
     # Drift = upstream rebuilt the tracked tag under a new digest. May be a
     # routine rebuild, may be a hijack — surface and let a human decide.
     # Not part of `smoke` because it hits the network; runs alongside the
-    # weekly refresh and on manual dispatch.
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    # Monday refresh and on manual dispatch.
+    if: (github.event_name == 'schedule' && github.event.schedule == '17 6 * * 1') || github.event_name == 'workflow_dispatch'
     needs: smoke
     runs-on: self-hosted
     steps:
@@ -131,3 +138,80 @@ jobs:
           echo "Upstream digest differs from pinned digest for at least one image."
           echo "Review the change in the registry, then run verify_integrity.cjs --update locally."
           exit 1
+
+  discover-candidates:
+    name: Weekly candidates PR
+    # Pure inbox refresh: re-runs discover.cjs against modelcontextprotocol/servers
+    # README + npm search + gh topic search, deduplicates against the live DB,
+    # writes assets/discovery/candidates.json. Opens a PR so a human can cherry-pick
+    # entries into tools_database.json with `trust: candidate`. Never auto-merges —
+    # discover.cjs has no taste filter.
+    if: (github.event_name == 'schedule' && github.event.schedule == '23 6 * * 4') || github.event_name == 'workflow_dispatch'
+    needs: smoke
+    runs-on: self-hosted
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - name: discover.cjs (readme + npm + gh)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p mcp-ecosystem-intelligence/assets/discovery
+          node mcp-ecosystem-intelligence/scripts/discover.cjs \
+            --source readme,npm,gh \
+            --limit 50 \
+            --max-health-checks 200 \
+            --out mcp-ecosystem-intelligence/assets/discovery/candidates.json
+      - name: Summary
+        run: |
+          {
+            echo "## Discovery summary"
+            echo
+            node -e "
+              const j = require('./mcp-ecosystem-intelligence/assets/discovery/candidates.json');
+              console.log('- generated_at: ' + j.generated_at);
+              console.log('- sources: ' + j.sources.join(', '));
+              console.log('- raw_count: ' + j.raw_count);
+              console.log('- kept_count: ' + j.kept_count);
+              console.log('- rejected_count: ' + j.rejected_count);
+              console.log();
+              console.log('### Top 10');
+              console.log();
+              console.log('| name | score | tier | license |');
+              console.log('|---|---|---|---|');
+              for (const c of j.candidates.slice(0, 10)) {
+                console.log(\`| \${c.name} | \${c.health_score} | \${c.classification} | \${c.license} |\`);
+              }
+            "
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Open PR if anything changed
+        uses: peter-evans/create-pull-request@v8
+        with:
+          commit-message: 'chore(discovery): weekly candidates refresh'
+          title: 'chore(discovery): weekly candidates refresh'
+          body: |
+            Automated weekly refresh of `assets/discovery/candidates.json` via
+            `discover.cjs --source readme,npm,gh`.
+
+            This file is an **inbox**, not part of the DB. Nothing here is trusted
+            until a human cherry-picks it into `tools_database.json` with
+            `trust: "candidate"` and the next `verify_integrity.cjs --update` run
+            populates `version` + `pkg_integrity`.
+
+            ## Reviewer checklist
+            - [ ] Skim top entries — anything that obviously isn't an MCP server (SDK, CLI, demo)
+            - [ ] Cross-check duplicates that may differ by repo URL only
+            - [ ] For high-score (≥85) entries: open the repo, confirm it ships a `ListTools` handler
+            - [ ] Add `category` and `est_tools_count` when promoting to `tools_database.json`
+            - [ ] Apply §6 reject heuristics (5-Minute Rule, Bloat, Duplication) — discover.cjs has no taste
+
+            > Living artifact. Never auto-merge — DB stays the deterministic source of truth.
+          branch: chore/discover-candidates
+          delete-branch: true
+          add-paths: |
+            mcp-ecosystem-intelligence/assets/discovery/candidates.json

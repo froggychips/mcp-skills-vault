@@ -1,0 +1,714 @@
+{
+  "generated_at": "2026-05-17T04:54:29.590Z",
+  "sources": [
+    "readme",
+    "npm"
+  ],
+  "raw_count": 214,
+  "kept_count": 30,
+  "rejected_count": 10,
+  "candidates": [
+    {
+      "name": "@railway/mcp-server",
+      "category": null,
+      "install_cmd": "npx -y @railway/mcp-server",
+      "source_url": "https://github.com/railwayapp/railway-mcp-server",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 110,
+      "classification": "Core",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "Official Railway MCP server",
+      "_discovery": {
+        "source": "npm-search",
+        "stars": 190,
+        "last_commit_days": 1,
+        "open_issues": 14
+      }
+    },
+    {
+      "name": "@mantine/mcp-server",
+      "category": null,
+      "install_cmd": "npx -y @mantine/mcp-server",
+      "source_url": "https://github.com/mantinedev/mantine",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 110,
+      "classification": "Core",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "MCP server for Mantine documentation",
+      "_discovery": {
+        "source": "npm-search",
+        "stars": 31138,
+        "last_commit_days": 2,
+        "open_issues": 33
+      }
+    },
+    {
+      "name": "@storybook/mcp",
+      "category": null,
+      "install_cmd": "npx -y @storybook/mcp",
+      "source_url": "https://github.com/storybookjs/mcp",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 110,
+      "classification": "Core",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "MCP server that serves knowledge about your components based on your Storybook stories and documentation",
+      "_discovery": {
+        "source": "npm-search",
+        "stars": 237,
+        "last_commit_days": 16,
+        "open_issues": 24
+      }
+    },
+    {
+      "name": "@microsoft/workiq",
+      "category": null,
+      "install_cmd": "npx -y @microsoft/workiq",
+      "source_url": "https://github.com/microsoft/work-iq",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "NOASSERTION",
+      "health_score": 95,
+      "classification": "Core",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "MCP server for Microsoft 365 Copilot",
+      "_discovery": {
+        "source": "npm-search",
+        "stars": 807,
+        "last_commit_days": 1,
+        "open_issues": 59
+      }
+    },
+    {
+      "name": "@ivotoby/openapi-mcp-server",
+      "category": null,
+      "install_cmd": "npx -y @ivotoby/openapi-mcp-server",
+      "source_url": "https://github.com/ivo-toby/mcp-openapi-server",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 90,
+      "classification": "Core",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "An MCP server that exposes OpenAPI endpoints as resources",
+      "_discovery": {
+        "source": "npm-search",
+        "stars": 260,
+        "last_commit_days": 66,
+        "open_issues": 11
+      }
+    },
+    {
+      "name": "@microsoft/clarity-mcp-server",
+      "category": null,
+      "install_cmd": "npx -y @microsoft/clarity-mcp-server",
+      "source_url": "https://github.com/microsoft/clarity-mcp-server",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 89.2,
+      "classification": "Core",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "MCP Server for Microsoft Clarity based on data export API",
+      "_discovery": {
+        "source": "npm-search",
+        "stars": 83,
+        "last_commit_days": 81,
+        "open_issues": 11
+      }
+    },
+    {
+      "name": "@onozaty/redmine-mcp-server",
+      "category": null,
+      "install_cmd": "npx -y @onozaty/redmine-mcp-server",
+      "source_url": "https://github.com/onozaty/redmine-mcp-server",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 82.8,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "MCP server for Redmine",
+      "_discovery": {
+        "source": "npm-search",
+        "stars": 18,
+        "last_commit_days": 51,
+        "open_issues": 4
+      }
+    },
+    {
+      "name": "mcp-server-code-runner",
+      "category": null,
+      "install_cmd": "npx -y mcp-server-code-runner",
+      "source_url": "https://github.com/formulahendry/mcp-server-code-runner",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 80,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "Code Runner MCP Server",
+      "_discovery": {
+        "source": "npm-search",
+        "stars": 241,
+        "last_commit_days": 100,
+        "open_issues": 16
+      }
+    },
+    {
+      "name": "next-devtools-mcp",
+      "category": null,
+      "install_cmd": "npx -y next-devtools-mcp",
+      "source_url": "https://github.com/vercel/next-devtools-mcp",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "Unknown",
+      "health_score": 80,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "Next.js development tools MCP server with stdio transport",
+      "_discovery": {
+        "source": "npm-search",
+        "stars": 749,
+        "last_commit_days": 54,
+        "open_issues": 14
+      }
+    },
+    {
+      "name": "datadog-mcp-server",
+      "category": null,
+      "install_cmd": "npx -y datadog-mcp-server",
+      "source_url": "https://github.com/GeLi2001/datadog-mcp-server",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 78.3,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "MCP Server for Datadog API",
+      "_discovery": {
+        "source": "npm-search",
+        "stars": 66,
+        "last_commit_days": 140,
+        "open_issues": 5
+      }
+    },
+    {
+      "name": "@firefly-iii-mcp/server",
+      "category": null,
+      "install_cmd": "npx -y @firefly-iii-mcp/server",
+      "source_url": "https://github.com/etnperlong/firefly-iii-mcp",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 68.6,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "Host Firefly III MCP server as a service.",
+      "_discovery": {
+        "source": "npm-search",
+        "stars": 71,
+        "last_commit_days": 338,
+        "open_issues": 5
+      }
+    },
+    {
+      "name": "Awesome MCP Servers by wong2",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/wong2/awesome-mcp-servers",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": null,
+      "_discovery": {
+        "source": "mcp-servers-readme",
+        "stars": 4069,
+        "last_commit_days": 16,
+        "open_issues": 39
+      }
+    },
+    {
+      "name": "mcp-cli",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/wong2/mcp-cli",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "GPL-3.0",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": null,
+      "_discovery": {
+        "source": "mcp-servers-readme",
+        "stars": 432,
+        "last_commit_days": 4,
+        "open_issues": 9
+      }
+    },
+    {
+      "name": "MCP Linker",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/milisp/mcp-linker",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "AGPL-3.0",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": null,
+      "_discovery": {
+        "source": "mcp-servers-readme",
+        "stars": 311,
+        "last_commit_days": 15,
+        "open_issues": 9
+      }
+    },
+    {
+      "name": "mcpm",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/pathintegral-institute/mcpm.sh",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": null,
+      "_discovery": {
+        "source": "mcp-servers-readme",
+        "stars": 950,
+        "last_commit_days": 22,
+        "open_issues": 44
+      }
+    },
+    {
+      "name": "MCPWatch",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/kapilduraphe/mcp-watch",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": null,
+      "_discovery": {
+        "source": "mcp-servers-readme",
+        "stars": 128,
+        "last_commit_days": 4,
+        "open_issues": 11
+      }
+    },
+    {
+      "name": "mcp-hello-world",
+      "category": null,
+      "install_cmd": "npx -y mcp-hello-world",
+      "source_url": "https://github.com/lobehub/mcp-hello-world",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 63.6,
+      "classification": "Experimental",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "A simple Hello World MCP server",
+      "_discovery": {
+        "source": "npm-search",
+        "stars": 22,
+        "last_commit_days": 330,
+        "open_issues": 0
+      }
+    },
+    {
+      "name": "storybook-mcp-server",
+      "category": null,
+      "install_cmd": "npx -y storybook-mcp-server",
+      "source_url": "https://github.com/stefanoamorelli/storybook-mcp-server",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "AGPL-3.0",
+      "health_score": 61.5,
+      "classification": "Experimental",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "MCP server for Storybook - provides AI assistants access to components, stories, properties and screenshots",
+      "_discovery": {
+        "source": "npm-search",
+        "stars": 13,
+        "last_commit_days": 244,
+        "open_issues": 0
+      }
+    },
+    {
+      "name": "Java MCP SDK",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/modelcontextprotocol/java-sdk",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 60,
+      "classification": "Experimental",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": null,
+      "_discovery": {
+        "source": "mcp-servers-readme",
+        "stars": 3420,
+        "last_commit_days": 3,
+        "open_issues": 298
+      }
+    },
+    {
+      "name": "Python MCP SDK",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/modelcontextprotocol/python-sdk",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 60,
+      "classification": "Experimental",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": null,
+      "_discovery": {
+        "source": "mcp-servers-readme",
+        "stars": 23029,
+        "last_commit_days": 2,
+        "open_issues": 533
+      }
+    },
+    {
+      "name": "Awesome MCP Servers by punkpeye",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/punkpeye/awesome-mcp-servers",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 60,
+      "classification": "Experimental",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": null,
+      "_discovery": {
+        "source": "mcp-servers-readme",
+        "stars": 87004,
+        "last_commit_days": 14,
+        "open_issues": 1456
+      }
+    },
+    {
+      "name": "Awesome Remote MCP Servers by JAW9C",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/jaw9c/awesome-remote-mcp-servers",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 60,
+      "classification": "Experimental",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": null,
+      "_discovery": {
+        "source": "mcp-servers-readme",
+        "stars": 1058,
+        "last_commit_days": 7,
+        "open_issues": 150
+      }
+    },
+    {
+      "name": "ToolHive",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/StacklokLabs/toolhive",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "Apache-2.0",
+      "health_score": 60,
+      "classification": "Experimental",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": null,
+      "_discovery": {
+        "source": "mcp-servers-readme",
+        "stars": 1803,
+        "last_commit_days": 0,
+        "open_issues": 274
+      }
+    },
+    {
+      "name": "PHP MCP SDK",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/modelcontextprotocol/php-sdk",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "NOASSERTION",
+      "health_score": 55,
+      "classification": "Experimental",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": null,
+      "_discovery": {
+        "source": "mcp-servers-readme",
+        "stars": 1486,
+        "last_commit_days": 1,
+        "open_issues": 36
+      }
+    },
+    {
+      "name": "Ruby MCP SDK",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/modelcontextprotocol/ruby-sdk",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "NOASSERTION",
+      "health_score": 55,
+      "classification": "Experimental",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": null,
+      "_discovery": {
+        "source": "mcp-servers-readme",
+        "stars": 817,
+        "last_commit_days": 2,
+        "open_issues": 11
+      }
+    },
+    {
+      "name": "Rust MCP SDK",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/modelcontextprotocol/rust-sdk",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "NOASSERTION",
+      "health_score": 55,
+      "classification": "Experimental",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": null,
+      "_discovery": {
+        "source": "mcp-servers-readme",
+        "stars": 3427,
+        "last_commit_days": 2,
+        "open_issues": 22
+      }
+    },
+    {
+      "name": "MCP Servers Hub",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/apappascs/mcp-servers-hub",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "Unknown",
+      "health_score": 55,
+      "classification": "Experimental",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": null,
+      "_discovery": {
+        "source": "mcp-servers-readme",
+        "stars": 322,
+        "last_commit_days": 0,
+        "open_issues": 17
+      }
+    },
+    {
+      "name": "C# MCP SDK",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/modelcontextprotocol/csharp-sdk",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "NOASSERTION",
+      "health_score": 50,
+      "classification": "Experimental",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": null,
+      "_discovery": {
+        "source": "mcp-servers-readme",
+        "stars": 4264,
+        "last_commit_days": 2,
+        "open_issues": 182
+      }
+    },
+    {
+      "name": "Go MCP SDK",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/modelcontextprotocol/go-sdk",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "NOASSERTION",
+      "health_score": 50,
+      "classification": "Experimental",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": null,
+      "_discovery": {
+        "source": "mcp-servers-readme",
+        "stars": 4553,
+        "last_commit_days": 1,
+        "open_issues": 56
+      }
+    },
+    {
+      "name": "Kotlin MCP SDK",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/modelcontextprotocol/kotlin-sdk",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "NOASSERTION",
+      "health_score": 50,
+      "classification": "Experimental",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": null,
+      "_discovery": {
+        "source": "mcp-servers-readme",
+        "stars": 1361,
+        "last_commit_days": 1,
+        "open_issues": 77
+      }
+    }
+  ],
+  "rejected": [
+    {
+      "name": "Awesome Crypto MCP Servers by badkk",
+      "source_url": "https://github.com/badkk/awesome-crypto-mcp-servers",
+      "reason": "unmaintained",
+      "stars": 134,
+      "last_commit_days": 416
+    },
+    {
+      "name": "MCP Badges",
+      "source_url": "https://github.com/mcpx-dev/mcp-badges",
+      "reason": "unmaintained",
+      "stars": 29,
+      "last_commit_days": 499
+    },
+    {
+      "name": "MCPHub",
+      "source_url": "https://github.com/Jeamee/MCPHub-Desktop",
+      "reason": "unmaintained",
+      "stars": 149,
+      "last_commit_days": 503
+    },
+    {
+      "name": "MCP Servers Search",
+      "source_url": "https://github.com/atonomus/mcp-servers-search",
+      "reason": "low-stars",
+      "stars": 2,
+      "last_commit_days": 321
+    },
+    {
+      "name": "Search MCP Server",
+      "source_url": "https://github.com/krzysztofkucmierz/search-mcp-server",
+      "reason": "low-stars",
+      "stars": 1,
+      "last_commit_days": 253
+    },
+    {
+      "name": "Open-Sourced MCP Servers Directory",
+      "source_url": "https://github.com/chatmcp/mcp-directory",
+      "reason": "unmaintained",
+      "stars": 2009,
+      "last_commit_days": 416
+    },
+    {
+      "name": "mcp-server",
+      "source_url": "https://github.com/sandy-mount/mcp-server",
+      "reason": "low-stars",
+      "stars": 4,
+      "last_commit_days": 464
+    },
+    {
+      "name": "@transcend-io/mcp-server-admin",
+      "source_url": "https://github.com/transcend-io/tools",
+      "reason": "low-stars",
+      "stars": 2,
+      "last_commit_days": 0
+    },
+    {
+      "name": "mcp-server-docker",
+      "source_url": "https://github.com/adamdude828/mcp-server-docker",
+      "reason": "low-stars",
+      "stars": 0,
+      "last_commit_days": 335
+    },
+    {
+      "name": "shadcn-ui-mcp-server",
+      "source_url": "https://github.com/ymadd/shadcn-ui-mcp-server",
+      "reason": "unmaintained",
+      "stars": 59,
+      "last_commit_days": 397
+    }
+  ]
+}
