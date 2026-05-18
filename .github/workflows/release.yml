@@ -44,7 +44,7 @@ jobs:
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.tag == '')
     runs-on: self-hosted
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@v5
         with:
           release-type: simple
           # `simple` = no language-specific version files, just CHANGELOG.md
