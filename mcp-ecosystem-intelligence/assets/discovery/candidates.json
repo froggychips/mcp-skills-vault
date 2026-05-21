@@ -1,81 +1,19 @@
 {
-  "generated_at": "2026-05-17T04:54:29.590Z",
+  "generated_at": "2026-05-21T10:20:31.413Z",
   "sources": [
     "readme",
-    "npm"
+    "npm",
+    "gh"
   ],
-  "raw_count": 214,
-  "kept_count": 30,
-  "rejected_count": 10,
+  "raw_count": 385,
+  "kept_count": 50,
+  "rejected_count": 56,
   "candidates": [
     {
-      "name": "@railway/mcp-server",
+      "name": "@modelcontextprotocol/server-pdf",
       "category": null,
-      "install_cmd": "npx -y @railway/mcp-server",
-      "source_url": "https://github.com/railwayapp/railway-mcp-server",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "candidate",
-      "license": "MIT",
-      "health_score": 110,
-      "classification": "Core",
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": "Official Railway MCP server",
-      "_discovery": {
-        "source": "npm-search",
-        "stars": 190,
-        "last_commit_days": 1,
-        "open_issues": 14
-      }
-    },
-    {
-      "name": "@mantine/mcp-server",
-      "category": null,
-      "install_cmd": "npx -y @mantine/mcp-server",
-      "source_url": "https://github.com/mantinedev/mantine",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "candidate",
-      "license": "MIT",
-      "health_score": 110,
-      "classification": "Core",
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": "MCP server for Mantine documentation",
-      "_discovery": {
-        "source": "npm-search",
-        "stars": 31138,
-        "last_commit_days": 2,
-        "open_issues": 33
-      }
-    },
-    {
-      "name": "@storybook/mcp",
-      "category": null,
-      "install_cmd": "npx -y @storybook/mcp",
-      "source_url": "https://github.com/storybookjs/mcp",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "candidate",
-      "license": "MIT",
-      "health_score": 110,
-      "classification": "Core",
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": "MCP server that serves knowledge about your components based on your Storybook stories and documentation",
-      "_discovery": {
-        "source": "npm-search",
-        "stars": 237,
-        "last_commit_days": 16,
-        "open_issues": 24
-      }
-    },
-    {
-      "name": "@microsoft/workiq",
-      "category": null,
-      "install_cmd": "npx -y @microsoft/workiq",
-      "source_url": "https://github.com/microsoft/work-iq",
+      "install_cmd": "npx -y @modelcontextprotocol/server-pdf",
+      "source_url": "https://github.com/modelcontextprotocol/ext-apps",
       "version": null,
       "pkg_integrity": null,
       "trust": "candidate",
@@ -84,159 +22,957 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for Microsoft 365 Copilot",
+      "notes": "Official repo for spec & SDK of MCP Apps protocol - standard for UIs embedded AI chatbots, served by MCP servers",
       "_discovery": {
-        "source": "npm-search",
-        "stars": 807,
-        "last_commit_days": 1,
-        "open_issues": 59
+        "source": "gh-topic+npm-search",
+        "stars": 2289,
+        "last_commit_days": 0,
+        "open_issues": 143
       }
     },
     {
-      "name": "@ivotoby/openapi-mcp-server",
+      "name": "TrendRadar",
       "category": null,
-      "install_cmd": "npx -y @ivotoby/openapi-mcp-server",
-      "source_url": "https://github.com/ivo-toby/mcp-openapi-server",
+      "install_cmd": null,
+      "source_url": "https://github.com/sansan0/TrendRadar",
       "version": null,
       "pkg_integrity": null,
       "trust": "candidate",
-      "license": "MIT",
-      "health_score": 90,
-      "classification": "Core",
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": "An MCP server that exposes OpenAPI endpoints as resources",
-      "_discovery": {
-        "source": "npm-search",
-        "stars": 260,
-        "last_commit_days": 66,
-        "open_issues": 11
-      }
-    },
-    {
-      "name": "@microsoft/clarity-mcp-server",
-      "category": null,
-      "install_cmd": "npx -y @microsoft/clarity-mcp-server",
-      "source_url": "https://github.com/microsoft/clarity-mcp-server",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "candidate",
-      "license": "MIT",
-      "health_score": 89.2,
-      "classification": "Core",
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": "MCP Server for Microsoft Clarity based on data export API",
-      "_discovery": {
-        "source": "npm-search",
-        "stars": 83,
-        "last_commit_days": 81,
-        "open_issues": 11
-      }
-    },
-    {
-      "name": "@onozaty/redmine-mcp-server",
-      "category": null,
-      "install_cmd": "npx -y @onozaty/redmine-mcp-server",
-      "source_url": "https://github.com/onozaty/redmine-mcp-server",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "candidate",
-      "license": "MIT",
-      "health_score": 82.8,
+      "license": "GPL-3.0",
+      "health_score": 65,
       "classification": "Recommended",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for Redmine",
+      "notes": "⭐AI-driven public opinion & trend monitor with multi-platform aggregation, RSS, and smart alerts.🎯 告别信息过载，你的 AI 舆情监控助手与热点筛选工具！聚合多平台热点 +  RSS 订阅，支持关键词精准筛选。AI 智能筛选新闻 + AI 翻译 +  AI 分析简报直推手机，也支持接入 MCP 架构，赋能 AI 自然语言对话分析、情感洞察与趋势预测等。支持 Docker ，数据本地/云端自持。集成微信/飞书/钉钉/Telegram/邮件/ntfy/bark/slack 等渠道智能推送。",
       "_discovery": {
-        "source": "npm-search",
-        "stars": 18,
-        "last_commit_days": 51,
+        "source": "gh-topic",
+        "stars": 57976,
+        "last_commit_days": 0,
+        "open_issues": 34
+      }
+    },
+    {
+      "name": "mcp-for-beginners",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/microsoft/mcp-for-beginners",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "This open-source curriculum introduces the fundamentals of Model Context Protocol (MCP) through real-world, cross-language examples in .NET, Java, TypeScript, JavaScript, Rust and Python. Designed for developers, it focuses on practical techniques for building modular, scalable, and secure AI workflows from session setup to service orchestration.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 16157,
+        "last_commit_days": 1,
+        "open_issues": 6
+      }
+    },
+    {
+      "name": "ida-pro-mcp",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/mrexodia/ida-pro-mcp",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "AI-powered reverse engineering assistant that bridges IDA Pro with language models through MCP.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 8707,
+        "last_commit_days": 0,
+        "open_issues": 44
+      }
+    },
+    {
+      "name": "XcodeBuildMCP",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/getsentry/XcodeBuildMCP",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "A Model Context Protocol (MCP) server and CLI that provides tools for agent use when working on iOS and macOS projects.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 5694,
+        "last_commit_days": 0,
+        "open_issues": 26
+      }
+    },
+    {
+      "name": "deep-research",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/u14app/deep-research",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "Use any LLMs (Large Language Models) for Deep Research. Support SSE API and MCP server.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 4587,
+        "last_commit_days": 29,
+        "open_issues": 36
+      }
+    },
+    {
+      "name": "mcpo",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/open-webui/mcpo",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "A simple, secure MCP-to-OpenAPI proxy server",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 4208,
+        "last_commit_days": 3,
+        "open_issues": 45
+      }
+    },
+    {
+      "name": "mcp-server-chart",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/antvis/mcp-server-chart",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "🤖 A visualization mcp & skills contains 25+ visual charts using @antvis. Using for chart generation and data analysis.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 4080,
+        "last_commit_days": 15,
+        "open_issues": 7
+      }
+    },
+    {
+      "name": "fast-agent",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/evalstate/fast-agent",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "Apache-2.0",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "Code, Build and Evaluate agents - excellent Model and Skills/MCP/ACP Support",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 3787,
+        "last_commit_days": 0,
+        "open_issues": 23
+      }
+    },
+    {
+      "name": "metorial",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/metorial/metorial",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "Apache-2.0",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "Connect any AI model to 1200+ integrations (MCP, CLI, API)",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 3285,
+        "last_commit_days": 0,
+        "open_issues": 1
+      }
+    },
+    {
+      "name": "design-extract",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/Manavarya09/design-extract",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "Extract any website's complete design system with one command. DTCG tokens, semantic+primitive+composite, MCP server for Claude Code/Cursor/Windsurf, multi-platform emitters (iOS SwiftUI, Android Compose, Flutter, WordPress), Tailwind v4, Figma variables, shadcn/ui, CSS health audit, WCAG remediation, Chrome extension. MIT, Playwright, Node 20+.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 2853,
+        "last_commit_days": 3,
+        "open_issues": 19
+      }
+    },
+    {
+      "name": "Unity-MCP",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/IvanMurzak/Unity-MCP",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "Apache-2.0",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "AI Skills, MCP Tools, and CLI for Unity Engine. Full AI develop and test loop. Use cli for quick setup. Efficient token usage, advanced tools. Any C# method may be turned into a tool by a single line. Works with Claude Code, Gemini, Copilot, Cursor and any other absolutely for free.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 2824,
+        "last_commit_days": 0,
+        "open_issues": 42
+      }
+    },
+    {
+      "name": "dbhub",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/bytebase/dbhub",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "Zero-dependency, token-efficient database MCP server for Postgres, MySQL, SQL Server, MariaDB, SQLite.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 2802,
+        "last_commit_days": 29,
+        "open_issues": 11
+      }
+    },
+    {
+      "name": "tradingview-mcp",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/atilaahmettaner/tradingview-mcp",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "Real-time crypto & stock screening, advanced technical indicators, Bollinger Bands intelligence, candlestick patterns + native Claude Desktop integration. Multi-exchange (Binance, KuCoin, Bybit+). Open-source AI trading infrastructure.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 2775,
+        "last_commit_days": 3,
+        "open_issues": 10
+      }
+    },
+    {
+      "name": "shadcn-ui-mcp-server",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/Jpisnice/shadcn-ui-mcp-server",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "A mcp server to allow LLMS gain context about shadcn ui component structure,usage and installation,compaitable with react,svelte 5,vue & React Native",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 2770,
+        "last_commit_days": 4,
+        "open_issues": 3
+      }
+    },
+    {
+      "name": "arxiv-mcp-server",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/blazickjp/arxiv-mcp-server",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "Apache-2.0",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "A Model Context Protocol server for searching and analyzing arXiv papers",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 2757,
+        "last_commit_days": 2,
+        "open_issues": 6
+      }
+    },
+    {
+      "name": "fli",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/punitarani/fli",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "Google Flights MCP, CLI and Python Library",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 2602,
+        "last_commit_days": 0,
+        "open_issues": 18
+      }
+    },
+    {
+      "name": "mcp-proxy",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/sparfenyuk/mcp-proxy",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "A bridge between Streamable HTTP and stdio MCP transports",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 2535,
+        "last_commit_days": 2,
+        "open_issues": 43
+      }
+    },
+    {
+      "name": "agent-scan",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/snyk/agent-scan",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "Apache-2.0",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "Security scanner for AI agents, MCP servers and agent skills.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 2440,
+        "last_commit_days": 0,
+        "open_issues": 23
+      }
+    },
+    {
+      "name": "mcphub",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/samanhappy/mcphub",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "Apache-2.0",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "A unified hub for centrally managing and dynamically orchestrating multiple MCP servers/APIs into separate endpoints with flexible routing strategies.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 2093,
+        "last_commit_days": 0,
+        "open_issues": 34
+      }
+    },
+    {
+      "name": "lean-ctx",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/yvgude/lean-ctx",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "Apache-2.0",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "Lean Cortex -- the cognitive context layer for agentic systems. 51+ MCP tools, 10 read modes, 95+ shell patterns. Up to 99% token savings. Works with Cursor, Claude Code, Copilot, Windsurf, Codex, Gemini.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 2021,
+        "last_commit_days": 0,
+        "open_issues": 7
+      }
+    },
+    {
+      "name": "contextplus",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/forloopcodes/contextplus",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "Semantic Intelligence for Large-Scale Engineering. Context+ is an MCP server designed for developers who demand 99% accuracy. By combining RAG, Tree-sitter AST, Spectral Clustering, and Obsidian-style linking, Context+ turns a massive codebase into a searchable, hierarchical feature graph.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 1902,
+        "last_commit_days": 19,
+        "open_issues": 7
+      }
+    },
+    {
+      "name": "mcp-memory-service",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/doobidoo/mcp-memory-service",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "Apache-2.0",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "Open-source persistent memory for AI agent pipelines (LangGraph, CrewAI, AutoGen) and Claude. REST API + knowledge graph + autonomous consolidation.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 1866,
+        "last_commit_days": 0,
+        "open_issues": 8
+      }
+    },
+    {
+      "name": "korean-law-mcp",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/chrisryugj/korean-law-mcp",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "국가법령정보MCP v4.0 | 법제처 41개 API → 17개 MCP 도구. 법령·판례·조례 검색 + LLM 환각 방지 인용검증 + 조문 영향 그래프(impact_map) + 시점 비교 자동 diff(time_travel) + 시민 5단계 실행 가이드(action_plan) | 41 Korean legal APIs → 17 MCP tools",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 1793,
+        "last_commit_days": 1,
         "open_issues": 4
       }
     },
     {
-      "name": "mcp-server-code-runner",
+      "name": "pg-aiguide",
       "category": null,
-      "install_cmd": "npx -y mcp-server-code-runner",
-      "source_url": "https://github.com/formulahendry/mcp-server-code-runner",
+      "install_cmd": null,
+      "source_url": "https://github.com/timescale/pg-aiguide",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "Apache-2.0",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "MCP server and Claude plugin for Postgres skills and documentation. Helps AI coding tools generate better PostgreSQL code.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 1736,
+        "last_commit_days": 8,
+        "open_issues": 26
+      }
+    },
+    {
+      "name": "mcp-brasil",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/Mcp-Brasil/mcp-brasil",
       "version": null,
       "pkg_integrity": null,
       "trust": "candidate",
       "license": "MIT",
-      "health_score": 80,
+      "health_score": 65,
       "classification": "Recommended",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Code Runner MCP Server",
+      "notes": "MCP Server para 70 APIs públicas brasileiras",
       "_discovery": {
-        "source": "npm-search",
-        "stars": 241,
-        "last_commit_days": 100,
-        "open_issues": 16
+        "source": "gh-topic",
+        "stars": 1568,
+        "last_commit_days": 24,
+        "open_issues": 9
       }
     },
     {
-      "name": "next-devtools-mcp",
+      "name": "paper-search-mcp",
       "category": null,
-      "install_cmd": "npx -y next-devtools-mcp",
-      "source_url": "https://github.com/vercel/next-devtools-mcp",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "candidate",
-      "license": "Unknown",
-      "health_score": 80,
-      "classification": "Recommended",
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": "Next.js development tools MCP server with stdio transport",
-      "_discovery": {
-        "source": "npm-search",
-        "stars": 749,
-        "last_commit_days": 54,
-        "open_issues": 14
-      }
-    },
-    {
-      "name": "datadog-mcp-server",
-      "category": null,
-      "install_cmd": "npx -y datadog-mcp-server",
-      "source_url": "https://github.com/GeLi2001/datadog-mcp-server",
+      "install_cmd": null,
+      "source_url": "https://github.com/openags/paper-search-mcp",
       "version": null,
       "pkg_integrity": null,
       "trust": "candidate",
       "license": "MIT",
-      "health_score": 78.3,
+      "health_score": 65,
       "classification": "Recommended",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP Server for Datadog API",
+      "notes": "MCP, CLI, Skills for searching and downloading academic papers from multiple sources like arXiv, PubMed, bioRxiv, etc.",
       "_discovery": {
-        "source": "npm-search",
-        "stars": 66,
-        "last_commit_days": 140,
-        "open_issues": 5
+        "source": "gh-topic",
+        "stars": 1514,
+        "last_commit_days": 3,
+        "open_issues": 40
       }
     },
     {
-      "name": "@firefly-iii-mcp/server",
+      "name": "xmcp",
       "category": null,
-      "install_cmd": "npx -y @firefly-iii-mcp/server",
-      "source_url": "https://github.com/etnperlong/firefly-iii-mcp",
+      "install_cmd": null,
+      "source_url": "https://github.com/basementstudio/xmcp",
       "version": null,
       "pkg_integrity": null,
       "trust": "candidate",
       "license": "MIT",
-      "health_score": 68.6,
+      "health_score": 65,
       "classification": "Recommended",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Host Firefly III MCP server as a service.",
+      "notes": "The TypeScript MCP framework",
       "_discovery": {
-        "source": "npm-search",
-        "stars": 71,
-        "last_commit_days": 338,
-        "open_issues": 5
+        "source": "gh-topic",
+        "stars": 1253,
+        "last_commit_days": 0,
+        "open_issues": 18
+      }
+    },
+    {
+      "name": "ros-mcp-server",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/robotmcp/ros-mcp-server",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "Apache-2.0",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "Connect AI models like Claude & GPT with robots using MCP and ROS.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 1238,
+        "last_commit_days": 0,
+        "open_issues": 40
+      }
+    },
+    {
+      "name": "skybridge",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/alpic-ai/skybridge",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "Skybridge is a full-stack TypeScript framework for MCP Apps and ChatGPT Apps. Type-safe. React-powered. Platform-agnostic.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 1142,
+        "last_commit_days": 0,
+        "open_issues": 49
+      }
+    },
+    {
+      "name": "Octocode",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/bgauryy/Octocode",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "MCP server for semantic code research and context generation on real-time using LLM patterns | Search naturally across public & private repos based on your permissions | Transform any accessible codebase/s into AI-optimized knowledge on simple and complex flows | Find real implementations and live docs from anywhere",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 844,
+        "last_commit_days": 2,
+        "open_issues": 4
+      }
+    },
+    {
+      "name": "MCP-Nest",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/rekog-labs/MCP-Nest",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "A NestJS module to effortlessly create Model Context Protocol (MCP) servers for exposing AI tools, resources, and prompts.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 649,
+        "last_commit_days": 1,
+        "open_issues": 25
+      }
+    },
+    {
+      "name": "mcp-sequentialthinking-tools",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/spences10/mcp-sequentialthinking-tools",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "🧠 An adaptation of the MCP Sequential Thinking Server to guide tool usage. This server provides recommendations for which MCP tools would be most effective at each stage.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 584,
+        "last_commit_days": 1,
+        "open_issues": 11
+      }
+    },
+    {
+      "name": "copilot-mcp",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/VikashLoomba/copilot-mcp",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "GPL-3.0",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "A VSCode extension that lets you find and install Agent Skills and MCP Apps to use with GitHub Copilot, Claude Code, and Codex CLI.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 490,
+        "last_commit_days": 6,
+        "open_issues": 2
+      }
+    },
+    {
+      "name": "anytype-mcp",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/anyproto/anytype-mcp",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "An MCP server enabling AI assistants to interact with Anytype - your encrypted, local and collaborative wiki - to organize objects, lists, and more through natural language.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 422,
+        "last_commit_days": 2,
+        "open_issues": 13
+      }
+    },
+    {
+      "name": "one-mcp",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/burugo/one-mcp",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "A centralized reverse-proxy platform for MCP servers — manage, group, and export as Skills from a single endpoint.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 392,
+        "last_commit_days": 16,
+        "open_issues": 0
+      }
+    },
+    {
+      "name": "solon-ai",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/opensolon/solon-ai",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "Apache-2.0",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "Java AI application development framework (supports LLM-tool,skill; RAG; MCP; Agent-ReAct,Team-Agent). Compatible with java8 ~ java25. It can also be embedded in SpringBoot, jFinal, Vert.x, Quarkus, and other frameworks.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 387,
+        "last_commit_days": 0,
+        "open_issues": 7
+      }
+    },
+    {
+      "name": "mcp",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/IBM/mcp",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "Apache-2.0",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "A collection of Model Context Protocol (MCP) servers, clients and developer tools by IBM.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 378,
+        "last_commit_days": 16,
+        "open_issues": 3
+      }
+    },
+    {
+      "name": "tableau-mcp",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/tableau/tableau-mcp",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "Apache-2.0",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "Tableau's official MCP Server. Helping Agents see and understand data.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 275,
+        "last_commit_days": 0,
+        "open_issues": 31
+      }
+    },
+    {
+      "name": "opik-mcp",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/comet-ml/opik-mcp",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "Apache-2.0",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "Model Context Protocol (MCP) implementation for Opik enabling seamless IDE integration and unified access to prompts, projects, traces, and metrics. ",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 204,
+        "last_commit_days": 0,
+        "open_issues": 25
+      }
+    },
+    {
+      "name": "mcp-3D-printer-server",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/DMontgomery40/mcp-3D-printer-server",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "GPL-2.0",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "Connects MCP to major 3D printer APIs (Orca, FULU's Orca/Bambu, OctoPrint, Klipper, Duet, Repetier, Prusa, Creality). Control prints, monitor status, and perform advanced STL operations like scaling, rotation, sectional editing, and base extension. Includes slicing and visualization.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 192,
+        "last_commit_days": 6,
+        "open_issues": 0
+      }
+    },
+    {
+      "name": "ghost-mcp",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/MFYDev/ghost-mcp",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "A Model Context Protocol (MCP) server for interacting with Ghost CMS through LLM interfaces like Claude. Allow you to control your Ghost blog by simply asking Claude etc.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 189,
+        "last_commit_days": 24,
+        "open_issues": 4
+      }
+    },
+    {
+      "name": "skunit",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/mehrandvd/skunit",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "skUnit is a testing tool for AI units, such as IChatClient, MCP Servers and agents.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 177,
+        "last_commit_days": 24,
+        "open_issues": 4
+      }
+    },
+    {
+      "name": "mcp-auth-proxy",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/sigbit/mcp-auth-proxy",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "MCP Auth Proxy is a secure OAuth 2.1 authentication proxy for Model Context Protocol (MCP) servers",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 119,
+        "last_commit_days": 12,
+        "open_issues": 9
+      }
+    },
+    {
+      "name": "fhir-mcp-server",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/wso2/fhir-mcp-server",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "Apache-2.0",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "FHIR MCP Server – helping you expose any FHIR Server or API as a MCP Server.",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 119,
+        "last_commit_days": 0,
+        "open_issues": 3
+      }
+    },
+    {
+      "name": "askimo",
+      "category": null,
+      "install_cmd": null,
+      "source_url": "https://github.com/askimo-ai/askimo",
+      "version": null,
+      "pkg_integrity": null,
+      "trust": "candidate",
+      "license": "AGPL-3.0",
+      "health_score": 65,
+      "classification": "Recommended",
+      "est_tools_count": null,
+      "toolsets": null,
+      "notes": "Local-first AI agent platform for desktop and CLI. Chat, RAG search, multi-step Plans workflows, MCP tools, and Agents integration. Supports OpenAI, Claude, Gemini, Grok, Ollama, LM Studio and more",
+      "_discovery": {
+        "source": "gh-topic",
+        "stars": 113,
+        "last_commit_days": 0,
+        "open_issues": 17
       }
     },
     {
@@ -255,8 +991,8 @@
       "notes": null,
       "_discovery": {
         "source": "mcp-servers-readme",
-        "stars": 4069,
-        "last_commit_days": 16,
+        "stars": 4092,
+        "last_commit_days": 20,
         "open_issues": 39
       }
     },
@@ -277,7 +1013,7 @@
       "_discovery": {
         "source": "mcp-servers-readme",
         "stars": 432,
-        "last_commit_days": 4,
+        "last_commit_days": 9,
         "open_issues": 9
       }
     },
@@ -298,8 +1034,8 @@
       "_discovery": {
         "source": "mcp-servers-readme",
         "stars": 311,
-        "last_commit_days": 15,
-        "open_issues": 9
+        "last_commit_days": 3,
+        "open_issues": 8
       }
     },
     {
@@ -318,397 +1054,362 @@
       "notes": null,
       "_discovery": {
         "source": "mcp-servers-readme",
-        "stars": 950,
-        "last_commit_days": 22,
-        "open_issues": 44
-      }
-    },
-    {
-      "name": "MCPWatch",
-      "category": null,
-      "install_cmd": null,
-      "source_url": "https://github.com/kapilduraphe/mcp-watch",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "candidate",
-      "license": "MIT",
-      "health_score": 65,
-      "classification": "Recommended",
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": null,
-      "_discovery": {
-        "source": "mcp-servers-readme",
-        "stars": 128,
-        "last_commit_days": 4,
-        "open_issues": 11
-      }
-    },
-    {
-      "name": "mcp-hello-world",
-      "category": null,
-      "install_cmd": "npx -y mcp-hello-world",
-      "source_url": "https://github.com/lobehub/mcp-hello-world",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "candidate",
-      "license": "MIT",
-      "health_score": 63.6,
-      "classification": "Experimental",
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": "A simple Hello World MCP server",
-      "_discovery": {
-        "source": "npm-search",
-        "stars": 22,
-        "last_commit_days": 330,
-        "open_issues": 0
-      }
-    },
-    {
-      "name": "storybook-mcp-server",
-      "category": null,
-      "install_cmd": "npx -y storybook-mcp-server",
-      "source_url": "https://github.com/stefanoamorelli/storybook-mcp-server",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "candidate",
-      "license": "AGPL-3.0",
-      "health_score": 61.5,
-      "classification": "Experimental",
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": "MCP server for Storybook - provides AI assistants access to components, stories, properties and screenshots",
-      "_discovery": {
-        "source": "npm-search",
-        "stars": 13,
-        "last_commit_days": 244,
-        "open_issues": 0
-      }
-    },
-    {
-      "name": "Java MCP SDK",
-      "category": null,
-      "install_cmd": null,
-      "source_url": "https://github.com/modelcontextprotocol/java-sdk",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "candidate",
-      "license": "MIT",
-      "health_score": 60,
-      "classification": "Experimental",
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": null,
-      "_discovery": {
-        "source": "mcp-servers-readme",
-        "stars": 3420,
-        "last_commit_days": 3,
-        "open_issues": 298
-      }
-    },
-    {
-      "name": "Python MCP SDK",
-      "category": null,
-      "install_cmd": null,
-      "source_url": "https://github.com/modelcontextprotocol/python-sdk",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "candidate",
-      "license": "MIT",
-      "health_score": 60,
-      "classification": "Experimental",
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": null,
-      "_discovery": {
-        "source": "mcp-servers-readme",
-        "stars": 23029,
-        "last_commit_days": 2,
-        "open_issues": 533
-      }
-    },
-    {
-      "name": "Awesome MCP Servers by punkpeye",
-      "category": null,
-      "install_cmd": null,
-      "source_url": "https://github.com/punkpeye/awesome-mcp-servers",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "candidate",
-      "license": "MIT",
-      "health_score": 60,
-      "classification": "Experimental",
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": null,
-      "_discovery": {
-        "source": "mcp-servers-readme",
-        "stars": 87004,
-        "last_commit_days": 14,
-        "open_issues": 1456
-      }
-    },
-    {
-      "name": "Awesome Remote MCP Servers by JAW9C",
-      "category": null,
-      "install_cmd": null,
-      "source_url": "https://github.com/jaw9c/awesome-remote-mcp-servers",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "candidate",
-      "license": "MIT",
-      "health_score": 60,
-      "classification": "Experimental",
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": null,
-      "_discovery": {
-        "source": "mcp-servers-readme",
-        "stars": 1058,
-        "last_commit_days": 7,
-        "open_issues": 150
-      }
-    },
-    {
-      "name": "ToolHive",
-      "category": null,
-      "install_cmd": null,
-      "source_url": "https://github.com/StacklokLabs/toolhive",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "candidate",
-      "license": "Apache-2.0",
-      "health_score": 60,
-      "classification": "Experimental",
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": null,
-      "_discovery": {
-        "source": "mcp-servers-readme",
-        "stars": 1803,
+        "stars": 949,
         "last_commit_days": 0,
-        "open_issues": 274
-      }
-    },
-    {
-      "name": "PHP MCP SDK",
-      "category": null,
-      "install_cmd": null,
-      "source_url": "https://github.com/modelcontextprotocol/php-sdk",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "candidate",
-      "license": "NOASSERTION",
-      "health_score": 55,
-      "classification": "Experimental",
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": null,
-      "_discovery": {
-        "source": "mcp-servers-readme",
-        "stars": 1486,
-        "last_commit_days": 1,
-        "open_issues": 36
-      }
-    },
-    {
-      "name": "Ruby MCP SDK",
-      "category": null,
-      "install_cmd": null,
-      "source_url": "https://github.com/modelcontextprotocol/ruby-sdk",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "candidate",
-      "license": "NOASSERTION",
-      "health_score": 55,
-      "classification": "Experimental",
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": null,
-      "_discovery": {
-        "source": "mcp-servers-readme",
-        "stars": 817,
-        "last_commit_days": 2,
-        "open_issues": 11
-      }
-    },
-    {
-      "name": "Rust MCP SDK",
-      "category": null,
-      "install_cmd": null,
-      "source_url": "https://github.com/modelcontextprotocol/rust-sdk",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "candidate",
-      "license": "NOASSERTION",
-      "health_score": 55,
-      "classification": "Experimental",
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": null,
-      "_discovery": {
-        "source": "mcp-servers-readme",
-        "stars": 3427,
-        "last_commit_days": 2,
-        "open_issues": 22
-      }
-    },
-    {
-      "name": "MCP Servers Hub",
-      "category": null,
-      "install_cmd": null,
-      "source_url": "https://github.com/apappascs/mcp-servers-hub",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "candidate",
-      "license": "Unknown",
-      "health_score": 55,
-      "classification": "Experimental",
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": null,
-      "_discovery": {
-        "source": "mcp-servers-readme",
-        "stars": 322,
-        "last_commit_days": 0,
-        "open_issues": 17
-      }
-    },
-    {
-      "name": "C# MCP SDK",
-      "category": null,
-      "install_cmd": null,
-      "source_url": "https://github.com/modelcontextprotocol/csharp-sdk",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "candidate",
-      "license": "NOASSERTION",
-      "health_score": 50,
-      "classification": "Experimental",
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": null,
-      "_discovery": {
-        "source": "mcp-servers-readme",
-        "stars": 4264,
-        "last_commit_days": 2,
-        "open_issues": 182
-      }
-    },
-    {
-      "name": "Go MCP SDK",
-      "category": null,
-      "install_cmd": null,
-      "source_url": "https://github.com/modelcontextprotocol/go-sdk",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "candidate",
-      "license": "NOASSERTION",
-      "health_score": 50,
-      "classification": "Experimental",
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": null,
-      "_discovery": {
-        "source": "mcp-servers-readme",
-        "stars": 4553,
-        "last_commit_days": 1,
-        "open_issues": 56
-      }
-    },
-    {
-      "name": "Kotlin MCP SDK",
-      "category": null,
-      "install_cmd": null,
-      "source_url": "https://github.com/modelcontextprotocol/kotlin-sdk",
-      "version": null,
-      "pkg_integrity": null,
-      "trust": "candidate",
-      "license": "NOASSERTION",
-      "health_score": 50,
-      "classification": "Experimental",
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": null,
-      "_discovery": {
-        "source": "mcp-servers-readme",
-        "stars": 1361,
-        "last_commit_days": 1,
-        "open_issues": 77
+        "open_issues": 48
       }
     }
   ],
   "rejected": [
     {
-      "name": "Awesome Crypto MCP Servers by badkk",
-      "source_url": "https://github.com/badkk/awesome-crypto-mcp-servers",
-      "reason": "unmaintained",
-      "stars": 134,
-      "last_commit_days": 416
-    },
-    {
-      "name": "MCP Badges",
-      "source_url": "https://github.com/mcpx-dev/mcp-badges",
-      "reason": "unmaintained",
-      "stars": 29,
-      "last_commit_days": 499
-    },
-    {
-      "name": "MCPHub",
-      "source_url": "https://github.com/Jeamee/MCPHub-Desktop",
-      "reason": "unmaintained",
-      "stars": 149,
-      "last_commit_days": 503
-    },
-    {
-      "name": "MCP Servers Search",
-      "source_url": "https://github.com/atonomus/mcp-servers-search",
-      "reason": "low-stars",
-      "stars": 2,
-      "last_commit_days": 321
-    },
-    {
-      "name": "Search MCP Server",
-      "source_url": "https://github.com/krzysztofkucmierz/search-mcp-server",
-      "reason": "low-stars",
-      "stars": 1,
-      "last_commit_days": 253
-    },
-    {
-      "name": "Open-Sourced MCP Servers Directory",
-      "source_url": "https://github.com/chatmcp/mcp-directory",
-      "reason": "unmaintained",
-      "stars": 2009,
-      "last_commit_days": 416
-    },
-    {
-      "name": "mcp-server",
-      "source_url": "https://github.com/sandy-mount/mcp-server",
-      "reason": "low-stars",
-      "stars": 4,
-      "last_commit_days": 464
-    },
-    {
-      "name": "@transcend-io/mcp-server-admin",
-      "source_url": "https://github.com/transcend-io/tools",
-      "reason": "low-stars",
-      "stars": 2,
+      "name": "n8n",
+      "source_url": "https://github.com/n8n-io/n8n",
+      "reason": "not-mcp-server",
+      "stars": 188961,
       "last_commit_days": 0
     },
     {
-      "name": "mcp-server-docker",
-      "source_url": "https://github.com/adamdude828/mcp-server-docker",
-      "reason": "low-stars",
-      "stars": 0,
-      "last_commit_days": 335
+      "name": "gemini-cli",
+      "source_url": "https://github.com/google-gemini/gemini-cli",
+      "reason": "not-mcp-server",
+      "stars": 104419,
+      "last_commit_days": 0
     },
     {
-      "name": "shadcn-ui-mcp-server",
-      "source_url": "https://github.com/ymadd/shadcn-ui-mcp-server",
+      "name": "ruflo",
+      "source_url": "https://github.com/ruvnet/ruflo",
+      "reason": "not-mcp-server",
+      "stars": 53722,
+      "last_commit_days": 0
+    },
+    {
+      "name": "Scrapling",
+      "source_url": "https://github.com/D4Vinci/Scrapling",
+      "reason": "not-mcp-server",
+      "stars": 52258,
+      "last_commit_days": 2
+    },
+    {
+      "name": "gpt-researcher",
+      "source_url": "https://github.com/assafelovic/gpt-researcher",
+      "reason": "not-mcp-server",
+      "stars": 27200,
+      "last_commit_days": 34
+    },
+    {
+      "name": "MaxKB",
+      "source_url": "https://github.com/1Panel-dev/MaxKB",
+      "reason": "not-mcp-server",
+      "stars": 21011,
+      "last_commit_days": 0
+    },
+    {
+      "name": "nuclear",
+      "source_url": "https://github.com/nukeop/nuclear",
+      "reason": "not-mcp-server",
+      "stars": 17660,
+      "last_commit_days": 0
+    },
+    {
+      "name": "context-mode",
+      "source_url": "https://github.com/mksglu/context-mode",
+      "reason": "not-mcp-server",
+      "stars": 15306,
+      "last_commit_days": 0
+    },
+    {
+      "name": "trigger.dev",
+      "source_url": "https://github.com/triggerdotdev/trigger.dev",
+      "reason": "not-mcp-server",
+      "stars": 15012,
+      "last_commit_days": 0
+    },
+    {
+      "name": "OpenMetadata",
+      "source_url": "https://github.com/open-metadata/OpenMetadata",
+      "reason": "not-mcp-server",
+      "stars": 13972,
+      "last_commit_days": 0
+    },
+    {
+      "name": "Skill_Seekers",
+      "source_url": "https://github.com/yusufkaraaslan/Skill_Seekers",
+      "reason": "not-mcp-server",
+      "stars": 13675,
+      "last_commit_days": 3
+    },
+    {
+      "name": "XHS-Downloader",
+      "source_url": "https://github.com/JoeanAmier/XHS-Downloader",
+      "reason": "not-mcp-server",
+      "stars": 11218,
+      "last_commit_days": 1
+    },
+    {
+      "name": "nginx-ui",
+      "source_url": "https://github.com/0xJacky/nginx-ui",
+      "reason": "not-mcp-server",
+      "stars": 11161,
+      "last_commit_days": 0
+    },
+    {
+      "name": "Auto-claude-code-research-in-sleep",
+      "source_url": "https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep",
+      "reason": "not-mcp-server",
+      "stars": 10242,
+      "last_commit_days": 0
+    },
+    {
+      "name": "xiaozhi-esp32-server",
+      "source_url": "https://github.com/xinnan-tech/xiaozhi-esp32-server",
+      "reason": "not-mcp-server",
+      "stars": 9603,
+      "last_commit_days": 1
+    },
+    {
+      "name": "lamda",
+      "source_url": "https://github.com/firerpa/lamda",
+      "reason": "not-mcp-server",
+      "stars": 7800,
+      "last_commit_days": 58
+    },
+    {
+      "name": "mcp",
+      "source_url": "https://github.com/BrowserMCP/mcp",
       "reason": "unmaintained",
-      "stars": 59,
-      "last_commit_days": 397
+      "stars": 6532,
+      "last_commit_days": 391
+    },
+    {
+      "name": "QuantDinger",
+      "source_url": "https://github.com/brokermr810/QuantDinger",
+      "reason": "not-mcp-server",
+      "stars": 6105,
+      "last_commit_days": 1
+    },
+    {
+      "name": "osaurus",
+      "source_url": "https://github.com/osaurus-ai/osaurus",
+      "reason": "not-mcp-server",
+      "stars": 5477,
+      "last_commit_days": 0
+    },
+    {
+      "name": "bifrost",
+      "source_url": "https://github.com/maximhq/bifrost",
+      "reason": "not-mcp-server",
+      "stars": 5105,
+      "last_commit_days": 0
+    },
+    {
+      "name": "Viper",
+      "source_url": "https://github.com/FunnyWolf/Viper",
+      "reason": "not-mcp-server",
+      "stars": 5044,
+      "last_commit_days": 50
+    },
+    {
+      "name": "httprunner",
+      "source_url": "https://github.com/httprunner/httprunner",
+      "reason": "not-mcp-server",
+      "stars": 4277,
+      "last_commit_days": 160
+    },
+    {
+      "name": "kubefwd",
+      "source_url": "https://github.com/txn2/kubefwd",
+      "reason": "not-mcp-server",
+      "stars": 4108,
+      "last_commit_days": 1
+    },
+    {
+      "name": "lemonade",
+      "source_url": "https://github.com/lemonade-sdk/lemonade",
+      "reason": "not-mcp-server",
+      "stars": 4076,
+      "last_commit_days": 0
+    },
+    {
+      "name": "MCP-Chinese-Getting-Started-Guide",
+      "source_url": "https://github.com/liaokongVFX/MCP-Chinese-Getting-Started-Guide",
+      "reason": "unmaintained",
+      "stars": 3498,
+      "last_commit_days": 392
+    },
+    {
+      "name": "semble",
+      "source_url": "https://github.com/MinishLab/semble",
+      "reason": "not-mcp-server",
+      "stars": 3458,
+      "last_commit_days": 0
+    },
+    {
+      "name": "py-xiaozhi",
+      "source_url": "https://github.com/huangjunsen0406/py-xiaozhi",
+      "reason": "not-mcp-server",
+      "stars": 3322,
+      "last_commit_days": 3
+    },
+    {
+      "name": "buildwithclaude",
+      "source_url": "https://github.com/davepoon/buildwithclaude",
+      "reason": "not-mcp-server",
+      "stars": 2959,
+      "last_commit_days": 3
+    },
+    {
+      "name": "solon",
+      "source_url": "https://github.com/opensolon/solon",
+      "reason": "not-mcp-server",
+      "stars": 2737,
+      "last_commit_days": 1
+    },
+    {
+      "name": "ddgs",
+      "source_url": "https://github.com/deedy5/ddgs",
+      "reason": "not-mcp-server",
+      "stars": 2655,
+      "last_commit_days": 4
+    },
+    {
+      "name": "slackdump",
+      "source_url": "https://github.com/rusq/slackdump",
+      "reason": "not-mcp-server",
+      "stars": 2601,
+      "last_commit_days": 7
+    },
+    {
+      "name": "nunu",
+      "source_url": "https://github.com/go-nunu/nunu",
+      "reason": "not-mcp-server",
+      "stars": 2565,
+      "last_commit_days": 24
+    },
+    {
+      "name": "shippie",
+      "source_url": "https://github.com/mattzcarey/shippie",
+      "reason": "not-mcp-server",
+      "stars": 2359,
+      "last_commit_days": 177
+    },
+    {
+      "name": "md2wechat-skill",
+      "source_url": "https://github.com/geekjourneyx/md2wechat-skill",
+      "reason": "not-mcp-server",
+      "stars": 2286,
+      "last_commit_days": 0
+    },
+    {
+      "name": "carbon",
+      "source_url": "https://github.com/crbnos/carbon",
+      "reason": "not-mcp-server",
+      "stars": 2108,
+      "last_commit_days": 0
+    },
+    {
+      "name": "fusio",
+      "source_url": "https://github.com/apioo/fusio",
+      "reason": "not-mcp-server",
+      "stars": 2092,
+      "last_commit_days": 0
+    },
+    {
+      "name": "radar",
+      "source_url": "https://github.com/skyhook-io/radar",
+      "reason": "not-mcp-server",
+      "stars": 2056,
+      "last_commit_days": 0
+    },
+    {
+      "name": "esp32_nat_router",
+      "source_url": "https://github.com/martin-ger/esp32_nat_router",
+      "reason": "not-mcp-server",
+      "stars": 1963,
+      "last_commit_days": 0
+    },
+    {
+      "name": "unreal-mcp",
+      "source_url": "https://github.com/chongdashu/unreal-mcp",
+      "reason": "unmaintained",
+      "stars": 1895,
+      "last_commit_days": 394
+    },
+    {
+      "name": "paperbanana",
+      "source_url": "https://github.com/llmsresearch/paperbanana",
+      "reason": "not-mcp-server",
+      "stars": 1686,
+      "last_commit_days": 1
+    },
+    {
+      "name": "zenfeed",
+      "source_url": "https://github.com/glidea/zenfeed",
+      "reason": "not-mcp-server",
+      "stars": 1679,
+      "last_commit_days": 50
+    },
+    {
+      "name": "PrismerCloud",
+      "source_url": "https://github.com/Prismer-AI/PrismerCloud",
+      "reason": "not-mcp-server",
+      "stars": 1540,
+      "last_commit_days": 3
+    },
+    {
+      "name": "dexto",
+      "source_url": "https://github.com/truffle-ai/dexto",
+      "reason": "not-mcp-server",
+      "stars": 623,
+      "last_commit_days": 0
+    },
+    {
+      "name": "docfork",
+      "source_url": "https://github.com/docfork/docfork",
+      "reason": "not-mcp-server",
+      "stars": 478,
+      "last_commit_days": 2
+    },
+    {
+      "name": "mcp-rb",
+      "source_url": "https://github.com/funwarioisii/mcp-rb",
+      "reason": "unmaintained",
+      "stars": 205,
+      "last_commit_days": 410
+    },
+    {
+      "name": "mkinf",
+      "source_url": "https://github.com/mkinf-io/mkinf",
+      "reason": "unmaintained",
+      "stars": 134,
+      "last_commit_days": 429
+    },
+    {
+      "name": "protocol-launcher",
+      "source_url": "https://github.com/zhensherlock/protocol-launcher",
+      "reason": "not-mcp-server",
+      "stars": 117,
+      "last_commit_days": 0
+    },
+    {
+      "name": "chat.md",
+      "source_url": "https://github.com/rusiaaman/chat.md",
+      "reason": "not-mcp-server",
+      "stars": 105,
+      "last_commit_days": 11
+    },
+    {
+      "name": "mcp-dbutils",
+      "source_url": "https://github.com/donghao1393/mcp-dbutils",
+      "reason": "unmaintained",
+      "stars": 88,
+      "last_commit_days": 373
+    },
+    {
+      "name": "unitree-go2-mcp-server",
+      "source_url": "https://github.com/lpigeon/unitree-go2-mcp-server",
+      "reason": "unmaintained",
+      "stars": 78,
+      "last_commit_days": 374
     }
   ]
 }
