@@ -62,9 +62,11 @@ test('classifyScore: tier boundaries', () => {
   assert.equal(d.classifyScore(39),  'Deprecated');
 });
 
-test('looksLikeMcpServer: npm + readme sources pass unconditionally', () => {
+test('looksLikeMcpServer: curated sources pass unconditionally', () => {
   assert.equal(d.looksLikeMcpServer({ source: 'npm-search', name: 'random' }), true);
   assert.equal(d.looksLikeMcpServer({ source: 'mcp-servers-readme', name: 'foo' }), true);
+  assert.equal(d.looksLikeMcpServer({ source: 'mcp-registry', name: 'random' }), true);
+  assert.equal(d.looksLikeMcpServer({ source: 'pypi',         name: 'random' }), true);
 });
 
 test('looksLikeMcpServer: gh-topic candidates need "mcp" in name/description', () => {
@@ -84,4 +86,204 @@ test('rejectReason: low-stars / unmaintained / non-mcp / passing', () => {
   // gh-topic without MCP marker
   const ghOff = { source: 'gh-topic', name: 'random', description: 'thing', stars: 100, last_commit_days: 30 };
   assert.equal(d.rejectReason(ghOff), 'not-mcp-server');
+});
+
+// ── MCP registry parser ────────────────────────────────────────────────────
+
+test('parseRegistryPage: extracts name, description, repo URL, install_cmd from npm package', () => {
+  const fixture = {
+    servers: [{
+      server: {
+        name:        'io.github.foo/bar',
+        title:       'Foo Bar Server',
+        description: 'A test MCP server',
+        repository:  { url: 'https://github.com/foo/bar.git', source: 'github' },
+        packages:    [{ registryType: 'npm', identifier: '@foo/bar-mcp', version: '1.2.3' }],
+      },
+      _meta: {},
+    }],
+    metadata: { nextCursor: 'cur-2', count: 1 },
+  };
+  const { entries, nextCursor } = d.parseRegistryPage(fixture);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].name,         'Foo Bar Server');
+  assert.equal(entries[0].registry_id,  'io.github.foo/bar');
+  assert.equal(entries[0].description,  'A test MCP server');
+  assert.equal(entries[0].source_url,   'https://github.com/foo/bar');
+  assert.equal(entries[0].install_cmd,  'npx -y @foo/bar-mcp@1.2.3');
+  assert.equal(entries[0].npm_package,  '@foo/bar-mcp');
+  assert.equal(entries[0].pypi_package, null);
+  assert.equal(entries[0].source,       'mcp-registry');
+  assert.equal(nextCursor, 'cur-2');
+});
+
+test('parseRegistryPage: pypi package → uvx install_cmd, oci → docker run', () => {
+  const fixture = {
+    servers: [
+      { server: { name: 'a/x', description: 'py', packages: [{ registryType: 'pypi', identifier: 'pkg-x', version: '0.9.0' }] } },
+      { server: { name: 'a/y', description: 'docker', packages: [{ registryType: 'oci', identifier: 'docker.io/foo/y:1.0' }] } },
+    ],
+    metadata: { count: 2 },
+  };
+  const { entries, nextCursor } = d.parseRegistryPage(fixture);
+  assert.equal(entries[0].install_cmd,  'uvx pkg-x==0.9.0');
+  assert.equal(entries[0].pypi_package, 'pkg-x');
+  assert.equal(entries[1].install_cmd,  'docker run --rm -i docker.io/foo/y:1.0');
+  assert.equal(nextCursor, null);
+});
+
+test('parseRegistryPage: tolerates missing fields without crashing', () => {
+  assert.deepEqual(d.parseRegistryPage(null),            { entries: [], nextCursor: null });
+  assert.deepEqual(d.parseRegistryPage({}),              { entries: [], nextCursor: null });
+  assert.deepEqual(d.parseRegistryPage({ servers: [] }), { entries: [], nextCursor: null });
+  // Server with no name is skipped silently.
+  const r = d.parseRegistryPage({ servers: [{ server: {} }, { server: { name: 'ok/x' } }] });
+  assert.equal(r.entries.length, 1);
+  assert.equal(r.entries[0].registry_id, 'ok/x');
+});
+
+test('fromMcpRegistry: follows nextCursor, dedupes by registry_id', async () => {
+  // Stub fetcher: two pages, second has a duplicate of page-1 entry plus a new one.
+  const pages = {
+    'https://example/v0/servers': {
+      servers: [{ server: { name: 'a/1', description: 'first', repository: { url: 'https://github.com/a/one' } } }],
+      metadata: { nextCursor: 'c2', count: 1 },
+    },
+    'https://example/v0/servers?cursor=c2': {
+      servers: [
+        { server: { name: 'a/1', description: 'first (v2)' } },   // duplicate
+        { server: { name: 'a/2', description: 'second' } },
+      ],
+      metadata: { count: 2 },
+    },
+  };
+  const calls = [];
+  const fetcher = async (url) => { calls.push(url); return pages[url] || null; };
+  const out = await d.fromMcpRegistry({ fetcher, base: 'https://example/v0/servers', maxPages: 5 });
+  assert.equal(calls.length, 2);
+  assert.equal(out.length, 2);                          // dedup worked
+  assert.deepEqual(out.map(e => e.registry_id), ['a/1', 'a/2']);
+  assert.equal(out[0].source_url, 'https://github.com/a/one');
+});
+
+test('fromMcpRegistry: fetcher returning null stops pagination without crashing', async () => {
+  const fetcher = async () => null;
+  const out = await d.fromMcpRegistry({ fetcher, base: 'https://example/x', maxPages: 5 });
+  assert.deepEqual(out, []);
+});
+
+// ── PyPI parsers ───────────────────────────────────────────────────────────
+
+test('parsePypiSimpleIndex: extracts mcp-prefixed names, filters unrelated', () => {
+  const html = `
+    <html><body>
+      <a href="/simple/mcp-server-git/">mcp-server-git</a>
+      <a href="/simple/mcp-atlassian/">mcp-atlassian</a>
+      <a href="/simple/mcp/">mcp</a>
+      <a href="/simple/numpy/">numpy</a>
+      <a href="/simple/foo-mcp-server/">foo-mcp-server</a>
+      <a href="/simple/requests/">requests</a>
+    </body></html>
+  `;
+  const names = d.parsePypiSimpleIndex(html);
+  assert.ok(names.includes('mcp-server-git'));
+  assert.ok(names.includes('mcp-atlassian'));
+  assert.ok(names.includes('foo-mcp-server'));
+  assert.ok(!names.includes('numpy'));
+  assert.ok(!names.includes('requests'));
+  // Bare "mcp" (no separator) should NOT match.
+  assert.ok(!names.includes('mcp'));
+});
+
+test('parsePypiSimpleIndex: empty or non-string input returns []', () => {
+  assert.deepEqual(d.parsePypiSimpleIndex(''),   []);
+  assert.deepEqual(d.parsePypiSimpleIndex(null), []);
+  assert.deepEqual(d.parsePypiSimpleIndex(42),   []);
+});
+
+test('parsePypiJson: extracts repo URL from project_urls.Source/Repository/Homepage', () => {
+  const repoTop = d.parsePypiJson({
+    info: {
+      name: 'mcp-server-git', version: '0.5.0', summary: 'Git MCP server',
+      project_urls: { Repository: 'https://github.com/modelcontextprotocol/servers' },
+    },
+  });
+  assert.equal(repoTop.source_url,   'https://github.com/modelcontextprotocol/servers');
+  assert.equal(repoTop.install_cmd,  'uvx mcp-server-git==0.5.0');
+  assert.equal(repoTop.pypi_package, 'mcp-server-git');
+  assert.equal(repoTop.source,       'pypi');
+
+  // Falls back to Homepage when Repository is missing.
+  const fromHomepage = d.parsePypiJson({
+    info: { name: 'x', version: '1.0', project_urls: { Homepage: 'https://github.com/foo/x' } },
+  });
+  assert.equal(fromHomepage.source_url, 'https://github.com/foo/x');
+
+  // No github URL anywhere → source_url is null but candidate is still returned.
+  const noRepo = d.parsePypiJson({
+    info: { name: 'y', version: '2', summary: 'no repo', project_urls: { Homepage: 'https://example.com' } },
+  });
+  assert.equal(noRepo.source_url, null);
+  assert.equal(noRepo.install_cmd, 'uvx y==2');
+
+  // Garbage in → null out, not a crash.
+  assert.equal(d.parsePypiJson(null),                  null);
+  assert.equal(d.parsePypiJson({}),                    null);
+  assert.equal(d.parsePypiJson({ info: 'not-object' }), null);
+});
+
+test('fromPyPI: dependency-injected fetchers; honors probeLimit', async () => {
+  const html = `
+    <a>mcp-server-foo</a>
+    <a>mcp-bar</a>
+    <a>not-a-server</a>
+  `;
+  const jsonByName = {
+    'mcp-server-foo': { info: { name: 'mcp-server-foo', version: '1.0', summary: 'foo',
+                                project_urls: { Repository: 'https://github.com/a/foo' } } },
+    'mcp-bar':        { info: { name: 'mcp-bar',        version: '2.0', summary: 'bar',
+                                project_urls: { Repository: 'https://github.com/a/bar' } } },
+  };
+  const probed = [];
+  const fetcherText = async () => html;
+  const fetcherJson = async (url) => {
+    const m = url.match(/\/pypi\/([^/]+)\/json/);
+    if (!m) return null;
+    const name = decodeURIComponent(m[1]);
+    probed.push(name);
+    return jsonByName[name] || null;
+  };
+  const out = await d.fromPyPI({ fetcherText, fetcherJson, base: 'https://example', probeLimit: 10 });
+  // Both mcp-* names should be probed, and the mcp-server-* one comes first
+  // (pre-rank). Order of probed[] reflects that.
+  assert.equal(probed[0], 'mcp-server-foo');
+  assert.equal(out.length, 2);
+  assert.equal(out.find(c => c.pypi_package === 'mcp-server-foo').source_url, 'https://github.com/a/foo');
+
+  // probeLimit caps probes.
+  probed.length = 0;
+  await d.fromPyPI({ fetcherText, fetcherJson, base: 'https://example', probeLimit: 1 });
+  assert.equal(probed.length, 1);
+});
+
+test('fromPyPI: empty index → no crash, empty result', async () => {
+  const out = await d.fromPyPI({
+    fetcherText: async () => '',
+    fetcherJson: async () => null,
+    base:        'https://example',
+  });
+  assert.deepEqual(out, []);
+});
+
+// ── Cross-source dedup smoke test ──────────────────────────────────────────
+
+test('normalizeRepoUrl: registry and npm sources yield matching keys for the same repo', () => {
+  // The merge step in main() dedupes by normalizeRepoUrl(source_url). Confirm
+  // that a registry entry (`https://github.com/foo/bar.git` with subfolder
+  // implied by the registry, normalized to bare repo) and an npm-search entry
+  // (`git+https://github.com/foo/bar.git`) collapse to the same key.
+  assert.equal(
+    d.normalizeRepoUrl('https://github.com/foo/bar.git'),
+    d.normalizeRepoUrl('git+https://github.com/foo/bar.git'),
+  );
 });
