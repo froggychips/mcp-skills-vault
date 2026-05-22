@@ -67,6 +67,25 @@ node mcp-ecosystem-intelligence/scripts/orchestrate.cjs --install <name> --globa
 
 If orchestrate.cjs reports a cache miss (no matches) or the user asks about something not in the DB, proceed to step 3 (live discovery). If it prints recommendations, skip steps 3–6 and go straight to user consent → step 8.
 
+### 2a. Audit the installed setup (when the user asks "audit my MCP setup")
+
+For the audit/inspection workflow — "is my current setup drifted, untrusted, or unbounded?" — run the dedicated script instead of walking the DB by hand:
+
+```bash
+# Human-readable, grouped by finding category
+node mcp-ecosystem-intelligence/scripts/audit_setup.cjs --cwd $CWD
+
+# Machine-readable findings array (for further processing or CI gates)
+node mcp-ecosystem-intelligence/scripts/audit_setup.cjs --cwd $CWD --json
+
+# Hard-fail on drift / untrusted / heavy-unbounded — CI-friendly
+node mcp-ecosystem-intelligence/scripts/audit_setup.cjs --cwd $CWD --strict
+```
+
+Diffs `<cwd>/.mcp.json` and the `mcpServers` key of `~/.claude.json` (NEVER any other key — auth tokens live elsewhere in that file) against `tools_database.json`. Emits findings in five categories: `drift` (version mismatch), `untrusted` (DB candidate in active use), `heavy-unbounded` (≥15 tools with no `--toolsets`/`--caps`/`allowedTools`/`enabledMcpjsonServers` scoping), `unknown` (custom server, informational), and `scope` (vcs/ci-cd/pm/infra category installed globally — usually belongs in project `.mcp.json`).
+
+Exit codes: `0` clean or info-only · `1` strict-mode triggered · `2` bad invocation.
+
 ## 3. Discovery (only on cache miss)
 
 Strict tier order. Stop at the first tier that yields a viable candidate.
