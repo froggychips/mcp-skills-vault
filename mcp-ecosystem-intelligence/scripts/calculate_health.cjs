@@ -45,12 +45,19 @@
 // Permissive + copyleft both count as OSI-approved (still open source).
 // Exported so other scripts (check_license_drift.cjs) can reuse the same
 // classifier — single source of truth for what counts as "OSI".
+//
+// The bare GPL/LGPL/AGPL forms (e.g. "GPL-3.0") are what `gh api .license.spdx_id`
+// returns; the "-only" / "-or-later" forms are the canonical SPDX variants used
+// by npm/PyPI metadata. Both must resolve to OSI so callers don't have to
+// normalize before scoring.
 const OSI_APPROVED = new Set([
   'MIT', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', 'Unlicense',
   '0BSD', 'MPL-2.0', 'CC0-1.0', 'Zlib', 'Python-2.0', 'PostgreSQL',
-  'GPL-2.0-only', 'GPL-2.0-or-later', 'GPL-3.0-only', 'GPL-3.0-or-later',
-  'LGPL-2.1-only', 'LGPL-2.1-or-later', 'LGPL-3.0-only', 'LGPL-3.0-or-later',
-  'AGPL-3.0-only', 'AGPL-3.0-or-later',
+  'GPL-2.0', 'GPL-2.0-only', 'GPL-2.0-or-later',
+  'GPL-3.0', 'GPL-3.0-only', 'GPL-3.0-or-later',
+  'LGPL-2.1', 'LGPL-2.1-only', 'LGPL-2.1-or-later',
+  'LGPL-3.0', 'LGPL-3.0-only', 'LGPL-3.0-or-later',
+  'AGPL-3.0', 'AGPL-3.0-only', 'AGPL-3.0-or-later',
 ]);
 
 // --- Pure scoring components -------------------------------------------
