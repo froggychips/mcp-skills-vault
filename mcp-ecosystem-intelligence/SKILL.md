@@ -92,16 +92,44 @@ Strict tier order. Stop at the first tier that yields a viable candidate.
 
 **Tier 1 — official registry + known vendor servers**
 
-Fetch all registry entries and filter client-side (no server-side search; only ~30–300 entries, pagination via cursor):
+Fetch all registry entries and filter client-side (no server-side search; ~30–300 entries, pagination via `metadata.nextCursor`):
 
 ```bash
 # Page 1 — returns {servers: [...], metadata: {nextCursor, count}}
 # Use WebFetch: https://registry.modelcontextprotocol.io/v0/servers
-# If metadata.nextCursor exists, fetch next page:
+# Next page (when nextCursor present):
 # https://registry.modelcontextprotocol.io/v0/servers?cursor=<nextCursor>
 ```
 
-Filter by keyword in `server.title`, `server.description`, `server.name`. Extract `server.packages[0].installCommand` for the install command.
+Each list item wraps the real entry in `server`. The shape (verified live, 2026-05) is:
+
+```json
+{
+  "server": {
+    "name": "io.github.owner/repo",
+    "title": "Human-readable title",
+    "description": "...",
+    "repository": { "url": "https://github.com/owner/repo", "source": "github" },
+    "packages": [
+      {
+        "registryType": "npm" | "pypi" | "oci",
+        "identifier": "@scope/package" | "pypi-name" | "ghcr.io/owner/img",
+        "version": "1.2.3"
+      }
+    ]
+  }
+}
+```
+
+There is **no** `installCommand` field — synthesize it from `packages[0]`:
+
+- `npm`  → `npx -y <identifier>@<version>`
+- `pypi` → `uvx <identifier>==<version>`
+- `oci`  → `docker run --rm -i <identifier>` (version baked into the tag/digest by the publisher)
+
+If `version` is absent, drop the `@<version>` / `==<version>` suffix. Filter by keyword in `server.title`, `server.description`, `server.name`. Pull the repo URL from `server.repository.url` for downstream `gh api` annotation.
+
+The reference implementation is `scripts/discover.cjs::fromMcpRegistry()` (`parseRegistryPage` does the actual field extraction and synthesis).
 
 Also check the [`modelcontextprotocol/servers`](https://github.com/modelcontextprotocol/servers) monorepo README and vendor-maintained servers linked from there (github, microsoft/playwright, cloudflare, notion, sentry, …). Use WebFetch on those pages if needed.
 
