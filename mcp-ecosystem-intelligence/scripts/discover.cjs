@@ -2,14 +2,18 @@
 /**
  * MCP server discovery pipeline.
  *
- * Three sources, deduplicated by repo URL:
+ * Five sources, deduplicated by repo URL (or name when repo unknown):
  *   1. modelcontextprotocol/servers README — official curated list
  *   2. GitHub topic search — `topic:mcp-server`, `topic:mcp`, popular orgs
  *   3. npm search — keyword "mcp-server"
+ *   4. MCP registry — registry.modelcontextprotocol.io/v0/servers (paginated)
+ *   5. PyPI — `uvx`-installable servers (probe by name from /simple/ index)
  *
  * For each candidate:
  *   - skip if already in tools_database.json (matched by source_url or name)
  *   - fetch stars / last_commit_days / open_issues / license via `gh api`
+ *     (only when source_url is a github.com repo; pypi/registry-only
+ *     entries without a repo URL fall through to the reject filter)
  *   - apply the same scoring formula as calculate_health.cjs
  *   - apply reject heuristics:
  *       <10 stars              → reject (low signal)
@@ -24,9 +28,12 @@
  *
  * Usage:
  *   node scripts/discover.cjs --limit 50 [--out candidates.json]
- *                              [--source readme,gh,npm]   default: all
- *                              [--include-existing]       don't skip DB matches
- *                              [--max-health-checks N]    cap gh api calls
+ *                              [--source readme,gh,npm,registry,pypi | all]
+ *                                                          default: readme,gh,npm
+ *                              [--include-existing]        don't skip DB matches
+ *                              [--max-health-checks N]     cap gh api calls
+ *                              [--pypi-probe-limit N]      cap PyPI /json probes
+ *                                                          (default 80)
  *
  * Prerequisites:
  *   - `gh` CLI authenticated (`gh auth login`); rate limits are higher
@@ -56,9 +63,18 @@ const ARG  = (flag, def) => {
 
 const LIMIT         = parseInt(ARG('--limit', '50'), 10);
 const MAX_HEALTH    = parseInt(ARG('--max-health-checks', '200'), 10);
+const PYPI_PROBES   = parseInt(ARG('--pypi-probe-limit', '80'), 10);
 const OUT           = ARG('--out', null);
-const SOURCES       = (ARG('--source', 'readme,gh,npm') || '').split(',').map(s => s.trim()).filter(Boolean);
+const SOURCES_RAW   = ARG('--source', 'readme,gh,npm') || '';
+const SOURCES       = SOURCES_RAW === 'all'
+  ? ['readme', 'gh', 'npm', 'registry', 'pypi']
+  : SOURCES_RAW.split(',').map(s => s.trim()).filter(Boolean);
 const INCL_EXISTING = argv.includes('--include-existing');
+
+// URLs are env-overridable so tests can stub them without monkey-patching.
+const REGISTRY_BASE = process.env.MCP_DISCOVER_REGISTRY_URL
+  || 'https://registry.modelcontextprotocol.io/v0/servers';
+const PYPI_BASE     = process.env.MCP_DISCOVER_PYPI_URL || 'https://pypi.org';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -157,6 +173,175 @@ function fromGhSearch() {
   return out;
 }
 
+// ── MCP registry (registry.modelcontextprotocol.io) ────────────────────────
+//
+// Parses one /v0/servers page into our candidate shape. Pure function — given
+// a parsed JSON body, returns candidates + nextCursor. Network-free so tests
+// hit it with a fixture.
+//
+// Real registry shape (verified 2026-05): each entry is
+//   { server: { name, title?, description?, repository?: {url,source,subfolder?},
+//               packages?: [{ registryType, identifier, version, ... }],
+//               remotes?: [...] }, _meta: {...} }
+// SKILL.md's documented `packages[].installCommand` field isn't actually
+// present on live responses — we synthesize the install_cmd from registryType
+// + identifier + version below.
+function parseRegistryPage(body) {
+  if (!body || !Array.isArray(body.servers)) return { entries: [], nextCursor: null };
+  const entries = [];
+  for (const item of body.servers) {
+    const srv = item && item.server;
+    if (!srv || !srv.name) continue;
+    const repoRaw = srv.repository && srv.repository.url;
+    const repo    = repoRaw ? normalizeRepoUrl(repoRaw) : null;
+    const pkg     = Array.isArray(srv.packages) && srv.packages[0];
+    let install   = null;
+    let npmPkg    = null;
+    let pypiPkg   = null;
+    if (pkg && pkg.identifier) {
+      const ver = pkg.version ? `@${pkg.version}` : '';
+      if (pkg.registryType === 'npm') {
+        install = `npx -y ${pkg.identifier}${ver}`;
+        npmPkg  = pkg.identifier;
+      } else if (pkg.registryType === 'pypi') {
+        install = `uvx ${pkg.identifier}${pkg.version ? `==${pkg.version}` : ''}`;
+        pypiPkg = pkg.identifier;
+      } else if (pkg.registryType === 'oci') {
+        install = `docker run --rm -i ${pkg.identifier}`;
+      }
+    }
+    entries.push({
+      name:         srv.title || srv.name,
+      registry_id:  srv.name,
+      description:  srv.description || null,
+      source_url:   repo,
+      install_cmd:  install,
+      npm_package:  npmPkg,
+      pypi_package: pypiPkg,
+      source:       'mcp-registry',
+    });
+  }
+  const nextCursor = body.metadata && body.metadata.nextCursor;
+  return { entries, nextCursor: nextCursor || null };
+}
+
+async function fromMcpRegistry(opts = {}) {
+  const fetcher   = opts.fetcher || (async (url) => {
+    const raw = await httpsGet(url);
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  });
+  const maxPages  = opts.maxPages != null ? opts.maxPages : 20;   // ~600 entries cap
+  const base      = opts.base || REGISTRY_BASE;
+  const out       = [];
+  const seen      = new Set();   // dedupe registry-internal duplicates (versions)
+  let cursor      = null;
+  for (let i = 0; i < maxPages; i++) {
+    const url = cursor
+      ? `${base}?cursor=${encodeURIComponent(cursor)}`
+      : base;
+    const body = await fetcher(url);
+    if (!body) break;
+    const { entries, nextCursor } = parseRegistryPage(body);
+    for (const e of entries) {
+      // Dedupe by registry name (multiple versions appear as separate entries).
+      if (seen.has(e.registry_id)) continue;
+      seen.add(e.registry_id);
+      out.push(e);
+    }
+    if (!nextCursor || nextCursor === cursor) break;
+    cursor = nextCursor;
+  }
+  return out;
+}
+
+// ── PyPI (uvx-installable servers) ─────────────────────────────────────────
+//
+// PyPI deprecated its JSON search endpoint and the HTML /search/ now returns
+// a bot-challenge page (verified 2026-05). Strategy: pull the /simple/ index
+// (one HTML page listing every package on PyPI, ~6MB, no auth, cacheable),
+// regex out names matching MCP-server prefixes, then probe per-package
+// /pypi/<name>/json for description + repo URL.
+//
+// Limitations:
+//   - prefix-based ⇒ misses packages that don't start with "mcp-" or
+//     "*-mcp-server" (rare in practice; the convention is strong).
+//   - capped to --pypi-probe-limit to avoid hammering /pypi/<>/json.
+// If PyPI changes the /simple/ format the regex just stops returning
+// candidates — the source silently degrades rather than crashing.
+function parsePypiSimpleIndex(html) {
+  if (typeof html !== 'string' || !html) return [];
+  const names = new Set();
+  // /simple/ entries look like: <a href="/simple/mcp-foo/">mcp-foo</a>
+  // Match either the anchor text or the href to be robust to format tweaks.
+  const re = /<a[^>]*>([a-z0-9][a-z0-9._-]*)<\/a>/gi;
+  let m;
+  while ((m = re.exec(html)) !== null) {
+    const n = m[1].toLowerCase();
+    // Accept either prefix; later filtering keeps real MCP servers.
+    if (/^mcp[-_.]/.test(n) || /[-_.]mcp[-_.]?server/.test(n)) names.add(n);
+  }
+  return [...names].sort();
+}
+
+function parsePypiJson(body) {
+  if (!body || typeof body !== 'object') return null;
+  const info = body.info;
+  if (!info || typeof info !== 'object' || !info.name) return null;
+  const urls = info.project_urls || {};
+  // Common keys in the wild: Source, Repository, Homepage, Source Code, Code.
+  const repoCandidates = [
+    urls.Source, urls.Repository, urls['Source Code'], urls.Code,
+    urls.Homepage, info.home_page,
+  ].filter(Boolean);
+  let repo = null;
+  for (const u of repoCandidates) {
+    if (typeof u === 'string' && /github\.com/.test(u)) {
+      repo = normalizeRepoUrl(u);
+      break;
+    }
+  }
+  return {
+    name:         info.name,
+    description:  info.summary || null,
+    version:      info.version || null,
+    source_url:   repo,
+    install_cmd:  info.version ? `uvx ${info.name}==${info.version}` : `uvx ${info.name}`,
+    pypi_package: info.name,
+    source:       'pypi',
+  };
+}
+
+async function fromPyPI(opts = {}) {
+  const fetcherText = opts.fetcherText || ((url) => httpsGet(url));
+  const fetcherJson = opts.fetcherJson || (async (url) => {
+    const raw = await httpsGet(url);
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  });
+  const probeLimit  = opts.probeLimit != null ? opts.probeLimit : PYPI_PROBES;
+  const base        = opts.base || PYPI_BASE;
+
+  const html  = await fetcherText(`${base}/simple/`);
+  const names = parsePypiSimpleIndex(html);
+  // Pre-rank: names containing "mcp-server-" probably are servers; bare "mcp-"
+  // mixes in SDKs/utilities. Probe servers first so probe cap hits high-signal
+  // entries before noise.
+  names.sort((a, b) => {
+    const aServer = /mcp[-_]server/.test(a) ? 0 : 1;
+    const bServer = /mcp[-_]server/.test(b) ? 0 : 1;
+    return aServer - bServer || a.localeCompare(b);
+  });
+  const toProbe = names.slice(0, probeLimit);
+  const out = [];
+  for (const n of toProbe) {
+    const body = await fetcherJson(`${base}/pypi/${encodeURIComponent(n)}/json`);
+    const cand = parsePypiJson(body);
+    if (cand) out.push(cand);
+  }
+  return out;
+}
+
 function fromNpmSearch() {
   let raw;
   try {
@@ -238,6 +423,8 @@ function classifyScore(score) {
 function looksLikeMcpServer(cand) {
   if (cand.source && cand.source.includes('mcp-servers-readme')) return true;
   if (cand.source && cand.source.includes('npm-search'))         return true;
+  if (cand.source && cand.source.includes('mcp-registry'))       return true;
+  if (cand.source && cand.source.includes('pypi'))               return true;
   const hay = `${cand.name || ''} ${cand.description || ''}`.toLowerCase();
   return /\bmcp\b/.test(hay)
       || /model[\s-]context[\s-]protocol/.test(hay)
@@ -264,21 +451,27 @@ async function main() {
   process.stderr.write(`Sources: ${SOURCES.join(', ')}\n`);
 
   const seedLists = [];
-  if (SOURCES.includes('readme')) seedLists.push(await fromMcpServersReadme());
-  if (SOURCES.includes('gh'))     seedLists.push(fromGhSearch());
-  if (SOURCES.includes('npm'))    seedLists.push(fromNpmSearch());
+  if (SOURCES.includes('readme'))   seedLists.push(await fromMcpServersReadme());
+  if (SOURCES.includes('gh'))       seedLists.push(fromGhSearch());
+  if (SOURCES.includes('npm'))      seedLists.push(fromNpmSearch());
+  if (SOURCES.includes('registry')) seedLists.push(await fromMcpRegistry());
+  if (SOURCES.includes('pypi'))     seedLists.push(await fromPyPI());
 
-  // Merge and dedupe by repo URL.
+  // Merge and dedupe by repo URL when known, else by name+source-tag. Entries
+  // from registry/pypi without a github repo still flow downstream so the
+  // human reviewer sees them (annotateHealthFromGh just returns null for
+  // those, and the reject filter handles the rest).
   const merged = new Map();
   for (const list of seedLists) {
     for (const c of list) {
-      const key = c.source_url;
-      if (!key) continue;
+      const key = c.source_url || `noref::${c.source}::${(c.name || '').toLowerCase()}`;
       if (merged.has(key)) {
         const prev = merged.get(key);
         prev.source = `${prev.source}+${c.source}`;
-        if (!prev.description && c.description) prev.description = c.description;
+        if (!prev.description  && c.description)  prev.description  = c.description;
         if (!prev.npm_package  && c.npm_package)  prev.npm_package  = c.npm_package;
+        if (!prev.pypi_package && c.pypi_package) prev.pypi_package = c.pypi_package;
+        if (!prev.install_cmd  && c.install_cmd)  prev.install_cmd  = c.install_cmd;
         continue;
       }
       merged.set(key, { ...c });
@@ -290,7 +483,13 @@ async function main() {
   // Skip already-in-DB.
   let kept = [...merged.values()];
   if (!INCL_EXISTING) {
-    kept = kept.filter(c => !existing.has(c.source_url) && !existing.has(c.name.toLowerCase()));
+    kept = kept.filter(c => {
+      if (c.source_url && existing.has(c.source_url)) return false;
+      if (c.name && existing.has(c.name.toLowerCase())) return false;
+      if (c.npm_package && existing.has(c.npm_package.toLowerCase())) return false;
+      if (c.pypi_package && existing.has(c.pypi_package.toLowerCase())) return false;
+      return true;
+    });
     process.stderr.write(`After dropping existing DB entries:    ${kept.length}\n`);
   }
 
@@ -311,8 +510,13 @@ async function main() {
     const score = scoreHealth({
       stars:            cand.stars,
       last_commit_days: cand.last_commit_days,
-      has_install_cmd: !!cand.npm_package,              // we know it ships on npm
-      in_registry:     !!cand.npm_package,
+      // registry/pypi entries already carry install_cmd; npm-search implies one.
+      has_install_cmd: !!(cand.install_cmd || cand.npm_package || cand.pypi_package),
+      // True if the candidate is published in the official registry, or if it
+      // ships through any package registry we already trust.
+      in_registry:     !!(cand.source && cand.source.includes('mcp-registry'))
+                       || !!cand.npm_package
+                       || !!cand.pypi_package,
       open_issues:     cand.open_issues,
       license:         cand.license,
     });
@@ -338,9 +542,11 @@ async function main() {
   // Shape into tools_database.json schema. install_cmd is best-effort —
   // verify_integrity.cjs --update will refresh version + pkg_integrity.
   const shaped = top.map(c => ({
-    name:            c.npm_package || c.name,
+    name:            c.npm_package || c.pypi_package || c.name,
     category:        null,                              // human picks category at merge time
-    install_cmd:     c.npm_package ? `npx -y ${c.npm_package}` : null,
+    install_cmd:     c.install_cmd
+                       || (c.npm_package  ? `npx -y ${c.npm_package}` : null)
+                       || (c.pypi_package ? `uvx ${c.pypi_package}`   : null),
     source_url:      c.source_url,
     version:         null,                              // filled by --update
     pkg_integrity:   null,                              // filled by --update
@@ -356,6 +562,7 @@ async function main() {
       stars:            c.stars,
       last_commit_days: c.last_commit_days,
       open_issues:      c.open_issues,
+      registry_id:      c.registry_id || null,
     },
   }));
 
@@ -394,4 +601,9 @@ module.exports = {
   classifyScore,
   looksLikeMcpServer,
   rejectReason,
+  parseRegistryPage,
+  fromMcpRegistry,
+  parsePypiSimpleIndex,
+  parsePypiJson,
+  fromPyPI,
 };
