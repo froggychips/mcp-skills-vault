@@ -37,7 +37,7 @@
       "pkg_integrity": null,
       "trust": "candidate",
       "license": "MIT",
-      "notes": "Installed via uvx --from git+... \u2014 pkg_integrity cannot be verified through PyPI; git commit SHA is not pinned. Downgraded to candidate until a PyPI release or pinned commit is available."
+      "notes": "Installed via uvx --from git+... \u2014 pkg_integrity cannot be verified through PyPI; git commit SHA is not pinned. Downgraded to candidate until a PyPI release or pinned commit is available.\n\n[HOLD 2026-05-22] Still installed via uvx --from git+... (no PyPI release / no pinned commit SHA). pkg_integrity unverifiable \u2014 pre-existing hold continues."
     },
     {
       "name": "mcp-server-neon",
@@ -625,7 +625,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Mapbox MCP server.\n\n[TRIAGE 2026-05-14] CANDIDATE: install hooks \u2014 `postinstall: patch-package` + `prepare: husky setup`. patch-package is legit OSS but executes on install; promoting needs a review of what it patches.\n\n[TRIAGE 2026-05-14 \u2014 revert] postinstall: patch-package + prepare: husky setup-hooks. Executes on install \u2014 review patches before promote."
+      "notes": "Mapbox MCP server.\n\n[TRIAGE 2026-05-14] CANDIDATE: install hooks \u2014 `postinstall: patch-package` + `prepare: husky setup`. patch-package is legit OSS but executes on install; promoting needs a review of what it patches.\n\n[TRIAGE 2026-05-14 \u2014 revert] postinstall: patch-package + prepare: husky setup-hooks. Executes on install \u2014 review patches before promote.\n\n[HOLD 2026-05-22] npm view 2026-05-22 confirms postinstall still runs `patch-package || ...` and prepare conditionally execs `husky && node .husky/setup-hooks.js`. Vendor-owned (@mapbox) but install hooks unchanged."
     },
     {
       "name": "@dynatrace-oss/dynatrace-mcp-server",
@@ -685,7 +685,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for interacting with Azure DevOps\n\n[TRIAGE 2026-05-14] CANDIDATE: install hooks \u2014 `preinstall: npm config set registry` modifies the user's global npm config on install, `prepare: husky`. Promoting needs sandboxing or vendor confirmation that the registry override is intentional.\n\n[TRIAGE 2026-05-14 \u2014 revert] preinstall: `npm config set registry` MUTATES global npm config on install; prepare: husky. Vendor confirmation needed."
+      "notes": "MCP server for interacting with Azure DevOps\n\n[TRIAGE 2026-05-14] CANDIDATE: install hooks \u2014 `preinstall: npm config set registry` modifies the user's global npm config on install, `prepare: husky`. Promoting needs sandboxing or vendor confirmation that the registry override is intentional.\n\n[TRIAGE 2026-05-14 \u2014 revert] preinstall: `npm config set registry` MUTATES global npm config on install; prepare: husky. Vendor confirmation needed.\n\n[HOLD 2026-05-22] npm view 2026-05-22 confirms `prepare: npm run build && husky`. Husky setup runs on install. Earlier preinstall `npm config set registry` no longer present \u2014 improved, but husky alone still blocks strict-clean."
     },
     {
       "name": "@roychri/mcp-server-asana",
@@ -760,7 +760,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "A simple MCP server to operate on the Postman API\n\n[TRIAGE 2026-05-14] CANDIDATE: install hook \u2014 `preinstall: npx only-allow pnpm` forces pnpm and breaks `npx -y` install (which is our default install_cmd). Promotion needs install_cmd switched to `pnpm dlx` or vendor fixing the hook.\n\n[TRIAGE 2026-05-14 \u2014 revert] preinstall: `npx only-allow pnpm` breaks `npx -y` install (our default install_cmd). Switch install_cmd to pnpm dlx or fix upstream."
+      "notes": "A simple MCP server to operate on the Postman API\n\n[TRIAGE 2026-05-14] CANDIDATE: install hook \u2014 `preinstall: npx only-allow pnpm` forces pnpm and breaks `npx -y` install (which is our default install_cmd). Promotion needs install_cmd switched to `pnpm dlx` or vendor fixing the hook.\n\n[TRIAGE 2026-05-14 \u2014 revert] preinstall: `npx only-allow pnpm` breaks `npx -y` install (our default install_cmd). Switch install_cmd to pnpm dlx or fix upstream.\n\n[HOLD 2026-05-22] npm view 2026-05-22 confirms `preinstall: npx only-allow pnpm` is unchanged \u2014 breaks `npx -y` default install_cmd. Promotion blocked until vendor drops the hook or DB switches install_cmd to pnpm dlx."
     },
     {
       "name": "@brave/brave-search-mcp-server",
@@ -850,7 +850,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Bitwarden MCP Server\n\n[TRIAGE 2026-05-14 \u2014 revert] prepare: `husky` \u2014 git-hooks installer runs on every npm install. Review husky config before promote."
+      "notes": "Bitwarden MCP Server\n\n[TRIAGE 2026-05-14 \u2014 revert] prepare: `husky` \u2014 git-hooks installer runs on every npm install. Review husky config before promote.\n\n[HOLD 2026-05-22] npm view 2026-05-22 confirms `prepare: husky` unchanged. Vendor-owned but install hook stays."
     },
     {
       "name": "@voltagent/mcp-server",
@@ -970,7 +970,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "A secure and scalable Git MCP server enabling AI agents to perform comprehensive Git version control operations via STDIO and Streamable HTTP.\n\n[TRIAGE 2026-05-14 \u2014 revert] prepare: `bunx husky` \u2014 installs husky via Bun on every npm install. Audit before promote."
+      "notes": "A secure and scalable Git MCP server enabling AI agents to perform comprehensive Git version control operations via STDIO and Streamable HTTP.\n\n[TRIAGE 2026-05-14 \u2014 revert] prepare: `bunx husky` \u2014 installs husky via Bun on every npm install. Audit before promote.\n\n[HOLD 2026-05-22] npm view 2026-05-22 confirms `prepare: bunx husky` unchanged. Hook executes Bun + husky on every install."
     },
     {
       "name": "@socketsecurity/mcp",
@@ -1030,7 +1030,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Official draw.io MCP server for LLMs - Open diagrams in draw.io editor\n\n[TRIAGE 2026-05-14 \u2014 revert] prepack: `npm run copy-shared` \u2014 runs build script on prepack, may execute arbitrary code. Audit copy-shared script."
+      "notes": "Official draw.io MCP server for LLMs - Open diagrams in draw.io editor\n\n[TRIAGE 2026-05-14 \u2014 revert] prepack: `npm run copy-shared` \u2014 runs build script on prepack, may execute arbitrary code. Audit copy-shared script.\n\n[HOLD 2026-05-22] npm view 2026-05-22 confirms `prepack: npm run copy-shared` unchanged. Prepack does not run on `npm install` from registry \u2014 but kept as candidate per batch 3 audit-trail consistency until prepack semantics are explicitly OK'd in the triage checklist."
     },
     {
       "name": "@google-cloud/observability-mcp",
@@ -1135,7 +1135,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Model Context Protocol (MCP) server for MediaWiki\n\n[TRIAGE 2026-05-14 \u2014 revert] prepare: `lefthook install` \u2014 installs lefthook git-hooks runner. Audit before promote."
+      "notes": "Model Context Protocol (MCP) server for MediaWiki\n\n[TRIAGE 2026-05-14 \u2014 revert] prepare: `lefthook install` \u2014 installs lefthook git-hooks runner. Audit before promote.\n\n[HOLD 2026-05-22] npm view 2026-05-22 confirms `prepare: lefthook install` unchanged. Git-hooks installer runs on every install."
     },
     {
       "name": "@ui5/mcp-server",
@@ -1150,7 +1150,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for SAPUI5/OpenUI5 development\n\n[TRIAGE 2026-05-14 \u2014 revert] prepare: conditional `.husky/skip.js` execution. Audit `.husky/skip.js` source."
+      "notes": "MCP server for SAPUI5/OpenUI5 development\n\n[TRIAGE 2026-05-14 \u2014 revert] prepare: conditional `.husky/skip.js` execution. Audit `.husky/skip.js` source.\n\n[HOLD 2026-05-22] npm view 2026-05-22 confirms `prepare` still execs `.husky/skip.js` then `husky`. Conditional but still arbitrary install-time code."
     },
     {
       "name": "@alchemy/mcp-server",
@@ -1195,7 +1195,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Heroku Platform MCP Server\n\n[TRIAGE 2026-05-14 \u2014 revert] prepare: `husky` \u2014 git-hooks installer. Audit husky config."
+      "notes": "Heroku Platform MCP Server\n\n[TRIAGE 2026-05-14 \u2014 revert] prepare: `husky` \u2014 git-hooks installer. Audit husky config.\n\n[HOLD 2026-05-22] npm view 2026-05-22 confirms `prepare: husky` unchanged."
     },
     {
       "name": "@transloadit/mcp-server",
@@ -1210,7 +1210,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Transloadit MCP server\n\n[TRIAGE 2026-05-14 \u2014 revert] prepack: `yarn build` \u2014 executes yarn on prepack, may pull additional packages. Audit."
+      "notes": "Transloadit MCP server\n\n[TRIAGE 2026-05-14 \u2014 revert] prepack: `yarn build` \u2014 executes yarn on prepack, may pull additional packages. Audit.\n\n[HOLD 2026-05-22] npm view 2026-05-22 confirms `prepack: yarn build` unchanged. Same prepack-semantics caveat as @drawio/mcp."
     },
     {
       "name": "clinicaltrialsgov-mcp-server",
@@ -1225,7 +1225,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for the ClinicalTrials.gov v2 API. Search trials, retrieve study details and results, and match patients to eligible trials.\n\n[TRIAGE 2026-05-14] CANDIDATE: prepare hook runs `bunx husky` \u2014 git-hook setup via husky on install. Likely safe in dev but executes a third-party CLI. Hold for vendor-confirmation."
+      "notes": "MCP server for the ClinicalTrials.gov v2 API. Search trials, retrieve study details and results, and match patients to eligible trials.\n\n[TRIAGE 2026-05-14] CANDIDATE: prepare hook runs `bunx husky` \u2014 git-hook setup via husky on install. Likely safe in dev but executes a third-party CLI. Hold for vendor-confirmation.\n\n[HOLD 2026-05-22] npm view 2026-05-22 confirms `prepare: bunx husky` unchanged."
     },
     {
       "name": "@tocharianou/mcp-server-kibana",
@@ -1270,7 +1270,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Last9 MCP Server - Model Context Protocol server implementation for Last9\n\n[TRIAGE 2026-05-14 \u2014 revert] CRITICAL: postinstall: `node bin/download-binary.js` \u2014 DOWNLOADS A BINARY on every install. Strong-hold until vendor explains origin + signature verification."
+      "notes": "Last9 MCP Server - Model Context Protocol server implementation for Last9\n\n[TRIAGE 2026-05-14 \u2014 revert] CRITICAL: postinstall: `node bin/download-binary.js` \u2014 DOWNLOADS A BINARY on every install. Strong-hold until vendor explains origin + signature verification.\n\n[HOLD 2026-05-22] npm view 2026-05-22 confirms `postinstall: node bin/download-binary.js` STILL DOWNLOADS A BINARY on install. Strong-hold continues."
     },
     {
       "name": "@contentful/mcp-server",
@@ -1390,7 +1390,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Email MCP server with IMAP + SMTP support\n\n[TRIAGE 2026-05-14 \u2014 revert] prepare: `lefthook install || true` \u2014 git-hooks runner. Audit."
+      "notes": "Email MCP server with IMAP + SMTP support\n\n[TRIAGE 2026-05-14 \u2014 revert] prepare: `lefthook install || true` \u2014 git-hooks runner. Audit.\n\n[HOLD 2026-05-22] npm view 2026-05-22 confirms `prepare: lefthook install || true` unchanged."
     },
     {
       "name": "@contextlint/mcp-server",
@@ -1420,7 +1420,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for Chrome DevTools\n\n[TRIAGE 2026-05-14] CANDIDATE: prepare hook runs `node --experimental-strip-types scripts/prepare.ts` \u2014 executes a custom TS script on install. Audit `scripts/prepare.ts` before promoting."
+      "notes": "MCP server for Chrome DevTools\n\n[TRIAGE 2026-05-14] CANDIDATE: prepare hook runs `node --experimental-strip-types scripts/prepare.ts` \u2014 executes a custom TS script on install. Audit `scripts/prepare.ts` before promoting.\n\n[HOLD 2026-05-22] npm view 2026-05-22 confirms `prepare: node --experimental-strip-types scripts/prepare.ts` unchanged. Vendor-owned (@ChromeDevTools) but the custom TS prepare script still needs audit before promote."
     },
     {
       "name": "@sap-ux/fiori-mcp-server",
@@ -1480,7 +1480,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Azure MCP Server - Model Context Protocol implementation for Azure\n\n[TRIAGE 2026-05-14 \u2014 revert] postinstall: `node ./scripts/post-install-script.js` \u2014 executes custom script on install. Audit `scripts/post-install-script.js`."
+      "notes": "Azure MCP Server - Model Context Protocol implementation for Azure\n\n[TRIAGE 2026-05-14 \u2014 revert] postinstall: `node ./scripts/post-install-script.js` \u2014 executes custom script on install. Audit `scripts/post-install-script.js`.\n\n[HOLD 2026-05-22] npm view 2026-05-22 confirms `postinstall: node ./scripts/post-install-script.js` unchanged. Vendor-owned but install-time custom code blocks strict-clean."
     },
     {
       "name": "@penpot/mcp",
@@ -1540,7 +1540,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Official MCP server for Qase Test Management Platform\n\n[TRIAGE 2026-05-14 \u2014 revert] prepare: `husky || true` \u2014 husky git-hooks runner with fallback. Audit."
+      "notes": "Official MCP server for Qase Test Management Platform\n\n[TRIAGE 2026-05-14 \u2014 revert] prepare: `husky || true` \u2014 husky git-hooks runner with fallback. Audit.\n\n[HOLD 2026-05-22] npm view 2026-05-22 confirms `prepare: husky || true` unchanged."
     },
     {
       "name": "linkup-mcp-server",
@@ -1555,7 +1555,7 @@
       "classification": "Core",
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Linkup MCP server for web search\n\n[TRIAGE 2026-05-14] CANDIDATE: prepare + prepack \u2014 `node .husky/install.mjs` + `npm run build`. Husky install is a known pattern but the .mjs file should be audited."
+      "notes": "Linkup MCP server for web search\n\n[TRIAGE 2026-05-14] CANDIDATE: prepare + prepack \u2014 `node .husky/install.mjs` + `npm run build`. Husky install is a known pattern but the .mjs file should be audited.\n\n[HOLD 2026-05-22] npm view 2026-05-22 confirms `prepare: node .husky/install.mjs` + `prepack: npm run build` unchanged."
     },
     {
       "name": "@tankpkg/mcp-server",
