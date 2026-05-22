@@ -108,7 +108,9 @@ for (const lic of NON_OSI) {
   });
 }
 
-const OSI = ['MIT', 'Apache-2.0', 'BSD-3-Clause', 'MPL-2.0', 'ISC', 'GPL-3.0-or-later', 'AGPL-3.0-or-later'];
+const OSI = ['MIT', 'Apache-2.0', 'BSD-3-Clause', 'MPL-2.0', 'ISC',
+             'GPL-3.0-or-later', 'AGPL-3.0-or-later',
+             'GPL-3.0', 'LGPL-3.0', 'AGPL-3.0'];  // bare GitHub-short forms now recognized
 for (const lic of OSI) {
   test(`license: OSI "${lic}" → 0 penalty`, () => {
     assert.equal(h.licensePenaltyOf(lic), 0);
@@ -125,10 +127,11 @@ test('license: empty string is non-OSI → -10', () => {
   assert.equal(h.licensePenaltyOf(''), -10);
 });
 
-test('license: bare "GPL-3.0" (GitHub short SPDX) is NOT in OSI set', () => {
-  // OSI set only contains the canonical "-only"/"-or-later" variants;
-  // callers must normalize via refresh_scores GITHUB_SPDX_MAP first.
-  assert.equal(h.licensePenaltyOf('GPL-3.0'), -10);
+test('license: bare "GPL-3.0" (GitHub short SPDX) is OSI', () => {
+  // OSI set now includes bare GitHub-short copyleft forms — gh api
+  // returns them without -only/-or-later, and the README documents
+  // copyleft (GPL/LGPL/AGPL) as having no penalty.
+  assert.equal(h.licensePenaltyOf('GPL-3.0'), 0);
 });
 
 // ── classify tier mapping (boundaries) ─────────────────────────────────────
