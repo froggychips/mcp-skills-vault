@@ -30,7 +30,7 @@ $ node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --no-audit
 | | Without | With |
 |---|---|---|
 | **Discoverability** | search GitHub, hope the README isn't lying | curated DB of **112 entries** with health scores, license, category, est-tools-count |
-| **Trust** | unknown publisher, unknown last commit | `trust: verified` per entry, **94/112 (84%)** hand-vetted against a written checklist |
+| **Trust** | unknown publisher, unknown last commit | `trust: verified` per entry, **94/112 (84%)** hand-vetted against a written checklist; the remaining 18 are `trust: "candidate"` held by upstream install hooks (see [Install-Hook Policy](./CONTRIBUTING.md#install-hook-policy)) |
 | **Integrity** | `npx -y whatever@latest` runs whatever ships today | sha512/sha256/Docker `@sha256:` pinned + re-verified against the live registry on every check |
 | **Vulnerabilities** | `npm audit` after the fact, if you remember | 4 advisory feeds merged: npm bulk + OSV.dev + GHSA + Snyk† — checked *before* the install command is written |
 | **Stack matching** | manual reading of awesome-lists | detects 40+ env-key patterns + 14 file paths + docker-compose images → suggests what to install |
@@ -224,7 +224,7 @@ score = min(20, 10·log10(stars+1))   # popularity, capped
 
 ### Vetted database
 
-`mcp-ecosystem-intelligence/assets/tools_database.json` — **106 entries** across ~25 categories, all with pinned versions, integrity hashes (npm sha512 / PyPI sha256 / Docker @sha256), SPDX license, and `trust` field.
+`mcp-ecosystem-intelligence/assets/tools_database.json` — **112 entries** across ~25 categories, all with pinned versions, integrity hashes (npm sha512 / PyPI sha256 / Docker @sha256), SPDX license, and `trust` field.
 
 ```
 ai        browser   ci-cd      cms       communication   crm
@@ -233,7 +233,7 @@ maps      memory    meta       mobile     observability   payments
 pm        reasoning search     testing    utility         vcs       web-scraping
 ```
 
-Distribution: **93 Core / 9 Recommended / 4 Experimental**.
+Distribution: **96 Core / 11 Recommended / 5 Experimental**.
 
 **Verified hand-curated core** (the original 30): the seven official `modelcontextprotocol/servers` (filesystem, fetch, git, memory, sequentialthinking, time, everything) plus vendor-maintained servers (`github`, `microsoft/playwright`, `cloudflare`, `notion`, `sentry`, `stripe`, `neon`, `mongodb`, `redis`, `clickhouse`, `awslabs/mcp`, `context7`, …) and high-quality community entries (`mcp-atlassian`, `firecrawl`, `tavily`, `exa`, `brave`, `kubernetes`, `duckduckgo`, …).
 
@@ -290,7 +290,7 @@ The following are described in [`SKILL.md`](./mcp-ecosystem-intelligence/SKILL.m
 
 ## Token cost management
 
-Every active MCP server injects its full tool list into Claude's system prompt (~200–500 tokens per tool). With 106 servers in the DB the spread is wide: `mcp-server-fetch` = 1 tool vs. `gitlab-mcp` = 153 tools.
+Every active MCP server injects its full tool list into Claude's system prompt (~200–500 tokens per tool). With 112 servers in the DB the spread is wide: `mcp-server-fetch` = 1 tool vs. `gitlab-mcp` = 153 tools.
 
 Three levers, in order of preference:
 
