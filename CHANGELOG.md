@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/froggychips/mcp-skills-vault/compare/v0.5.0...v0.6.0) (2026-05-22)
+
+
+### Features
+
+* mcp_eval.cjs — behavioural smoke (handshake + tools/list + schema lint) ([#35](https://github.com/froggychips/mcp-skills-vault/issues/35)) ([1f87364](https://github.com/froggychips/mcp-skills-vault/commit/1f873646c2142acb0eeb35c716b1fbee1fe8a88f))
+
 ## [0.5.0](https://github.com/froggychips/mcp-skills-vault/compare/v0.4.0...v0.5.0) (2026-05-17)
 
 
