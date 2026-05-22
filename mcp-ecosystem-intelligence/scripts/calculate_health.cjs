@@ -39,8 +39,12 @@
  *   node calculate_health.cjs 1200 15 true true 2            # license check skipped (back-compat)
  */
 
+'use strict';
+
 // SPDX identifiers for OSI-approved licenses commonly seen on npm/PyPI.
 // Permissive + copyleft both count as OSI-approved (still open source).
+// Exported so other scripts (check_license_drift.cjs) can reuse the same
+// classifier — single source of truth for what counts as "OSI".
 const OSI_APPROVED = new Set([
   'MIT', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', 'Unlicense',
   '0BSD', 'MPL-2.0', 'CC0-1.0', 'Zlib', 'Python-2.0', 'PostgreSQL',
@@ -73,17 +77,36 @@ function recencyBonusOf(lastCommitDays) {
 }
 
 /**
+ * Classify an SPDX-like license string as one of:
+ *   'osi'         — OSI-approved (MIT/Apache/BSD/ISC/MPL/GPL/LGPL/AGPL/…)
+ *   'restrictive' — source-available / proprietary (BSL/SSPL/FSL/Elastic/Commons Clause/…)
+ *   'unknown'     — null, undefined, empty, "Unknown", "NOASSERTION", or unrecognised
+ *
+ * Single source of truth for "is this license OSI?" — imported by both
+ * licensePenaltyOf below and check_license_drift.cjs.
+ */
+function classifyLicense(license) {
+  if (license === null || license === undefined) return 'unknown';
+  const s = String(license).trim();
+  if (s === '' || s === 'Unknown' || s === 'NOASSERTION' || s === 'UNKNOWN') return 'unknown';
+  if (OSI_APPROVED.has(s)) return 'osi';
+  // Everything else that's a real string but not on the OSI list — treat as
+  // restrictive. This catches BSL-1.1, SSPL-1.0, Elastic-2.0, FSL-1.1-ALv2,
+  // FSL-1.1-MIT, Commons-Clause, ELv2, and any future relicensing token.
+  return 'restrictive';
+}
+
+/**
  * License penalty: -10 for source-available / proprietary / unknown licenses.
  * Returns 0 when license is omitted (back-compat) or is OSI-approved.
  */
 function licensePenaltyOf(license) {
   if (license === undefined) return 0;
-  return OSI_APPROVED.has(license) ? 0 : -10;
+  return classifyLicense(license) === 'osi' ? 0 : -10;
 }
 
 /**
  * Map a raw health score to a human-readable tier label.
- * @param {number} s - The calculated health score
  * @returns {'Core'|'Recommended'|'Experimental'|'Deprecated'}
  */
 function classify(s) {
@@ -112,7 +135,6 @@ function calculateHealth({ stars, lastCommitDays, inRegistry, hasInstallCmd, cri
   return {
     health_score: healthScore,
     classification: classify(healthScore),
-    // Score breakdown helps callers understand which factors drive the result
     breakdown: {
       popularity: Math.round(popularityScore * 100) / 100,
       recency: recencyBonus,
@@ -129,7 +151,6 @@ function calculateHealth({ stars, lastCommitDays, inRegistry, hasInstallCmd, cri
 function main() {
   const args = process.argv.slice(2);
 
-  // Print help when requested
   if (args[0] === '--help' || args[0] === '-h') {
     console.log(
       'Usage: node calculate_health.cjs <stars> <last_commit_days> <in_registry> <has_install_cmd> <critical_issues> [license]\n' +
@@ -145,7 +166,6 @@ function main() {
     process.exit(0);
   }
 
-  // Require exactly 5 positional arguments
   if (args.length < 5) {
     console.error(
       'Usage: node calculate_health.cjs <stars> <last_commit_days> <in_registry> <has_install_cmd> <critical_issues>\n' +
@@ -154,16 +174,13 @@ function main() {
     process.exit(1);
   }
 
-  // --- Input parsing & validation ----------------------------------------
-
-  const stars = parseInt(args[0], 10);
+  const stars          = parseInt(args[0], 10);
   const lastCommitDays = parseInt(args[1], 10);
-  const inRegistry = args[2] === 'true' || args[2] === '1';
-  const hasInstallCmd = args[3] === 'true' || args[3] === '1';
+  const inRegistry     = args[2] === 'true' || args[2] === '1';
+  const hasInstallCmd  = args[3] === 'true' || args[3] === '1';
   const criticalIssues = parseInt(args[4], 10);
-  const license = args[5];   // optional — undefined skips the license check
+  const license        = args[5];   // optional — undefined skips the license check
 
-  // Validate that numeric fields parsed correctly and are non-negative
   if (isNaN(stars) || stars < 0) {
     console.error('Error: <stars> must be a non-negative integer.');
     process.exit(1);
@@ -181,7 +198,6 @@ function main() {
   console.log(JSON.stringify(result, null, 2));
 }
 
-// Only run CLI when invoked directly, so tests can require() this module.
 if (require.main === module) {
   main();
 }
@@ -190,7 +206,10 @@ module.exports = {
   OSI_APPROVED,
   popularityScoreOf,
   recencyBonusOf,
+  classifyLicense,
   licensePenaltyOf,
   classify,
   calculateHealth,
+  // legacy alias for callers written against an earlier C2 draft
+  computeHealth: calculateHealth,
 };
