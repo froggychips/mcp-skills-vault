@@ -158,6 +158,26 @@ Annotation uses `gh api repos/<owner>/<repo>` for stars, last commit, license, a
 
 The weekly `discover-candidates` CI job runs this script every Thursday and opens a PR refreshing `mcp-ecosystem-intelligence/assets/discovery/candidates.json`. That file is a living *inbox* — never auto-merged into the DB; a human cherry-picks entries with `trust: "candidate"`.
 
+### Audit installed setup
+
+[`scripts/audit_setup.cjs`](./mcp-ecosystem-intelligence/scripts/audit_setup.cjs) — diff the user's installed MCP servers against the DB. Reads `<cwd>/.mcp.json`, the `mcpServers` key of `~/.claude.json` (and *only* that key — auth tokens live elsewhere in the file), and `<cwd>/.claude/settings.json` (`enabledMcpjsonServers`, `permissions.allow`):
+
+```bash
+node mcp-ecosystem-intelligence/scripts/audit_setup.cjs            # human-readable
+node mcp-ecosystem-intelligence/scripts/audit_setup.cjs --json     # machine-readable findings
+node mcp-ecosystem-intelligence/scripts/audit_setup.cjs --strict   # exit 1 on drift/untrusted/heavy
+```
+
+| Finding | Trigger |
+|---|---|
+| `drift` | installed version differs from DB-pinned version |
+| `untrusted` | DB `trust: "candidate"` but actively installed |
+| `heavy-unbounded` | `est_tools_count > 15` (or unknown) and no `--toolsets`/`--caps`/`allowedTools`/`enabledMcpjsonServers` scoping |
+| `unknown` | installed but not in DB (legitimate custom servers ok — informational) |
+| `scope` | global install of a typically project-scoped category (`vcs`/`ci-cd`/`pm`/`infra`) |
+
+Exit codes: `0` clean / info-only · `1` `--strict` triggered · `2` bad invocation. Closes the "Audit my MCP setup" use case without an LLM in the critical path.
+
 ### Health scorer
 
 [`scripts/calculate_health.cjs`](./mcp-ecosystem-intelligence/scripts/calculate_health.cjs) — score any MCP candidate:
@@ -242,7 +262,8 @@ The following are described in [`SKILL.md`](./mcp-ecosystem-intelligence/SKILL.m
 | Reject heuristics (5-Minute Rule, Bloat, Duplication) | Claude-executed judgment, no dedicated script |
 | Formatted recommendation output (terse / verbose) | Claude-generated, no dedicated formatter |
 | Project-scoped `.mcp.json` install (default path) | [`orchestrate.cjs --install`](./mcp-ecosystem-intelligence/scripts/orchestrate.cjs) — done |
-| `allowedTools` per-project filtering for heavy servers | Pattern documented in SKILL.md §10, no dedicated script |
+| `allowedTools` per-project filtering for heavy servers | Pattern documented in SKILL.md §10; [`audit_setup.cjs`](./mcp-ecosystem-intelligence/scripts/audit_setup.cjs) flags unscoped heavy servers |
+| Audit installed setup (drift / untrusted / heavy / scope) | [`scripts/audit_setup.cjs`](./mcp-ecosystem-intelligence/scripts/audit_setup.cjs) — done |
 | Wrapper generator (CLI/API → MCP boilerplate) | [`scripts/generate_wrapper.cjs`](./mcp-ecosystem-intelligence/scripts/generate_wrapper.cjs) — done |
 
 ---
