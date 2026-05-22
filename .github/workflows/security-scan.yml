@@ -143,6 +143,40 @@ jobs:
           echo "Review the change in the registry, then run verify_integrity.cjs --update locally."
           exit 1
 
+  license-drift:
+    name: Weekly license-drift check
+    # OSI → source-available relicensing (HashiCorp/Elastic/MongoDB/Redis pattern).
+    # The existing health-score updater quietly drops -10 for non-OSI licenses,
+    # which is the wrong volume for a relicensing event — we want a loud CI
+    # failure that forces a human to acknowledge.
+    #
+    # Network-bound (npm view + pypi.org + gh api); skip on PRs to avoid
+    # rate-limit churn, run on Monday's cron + manual dispatch alongside
+    # the other weekly jobs. Failure is the signal — no auto-PR.
+    if: (github.event_name == 'schedule' && github.event.schedule == '17 6 * * 1') || github.event_name == 'workflow_dispatch'
+    needs: smoke
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - name: check_license_drift --strict
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -o pipefail
+          node mcp-ecosystem-intelligence/scripts/check_license_drift.cjs --json | tee license-drift.json
+          {
+            echo "## License-drift check"
+            echo
+            echo '```json'
+            cat license-drift.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          # --strict separately so the JSON dump above always lands in the summary
+          node mcp-ecosystem-intelligence/scripts/check_license_drift.cjs --strict
+
   discover-candidates:
     name: Weekly candidates PR
     # Pure inbox refresh: re-runs discover.cjs against modelcontextprotocol/servers
