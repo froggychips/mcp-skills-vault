@@ -20,6 +20,7 @@
 const { execSync } = require('child_process');
 const fs   = require('fs');
 const path = require('path');
+const { writeDb } = require('./lib/db_io.cjs');
 
 const DB_PATH  = path.resolve(__dirname, '../assets/tools_database.json');
 const CALC     = path.resolve(__dirname, 'calculate_health.cjs');
@@ -157,7 +158,7 @@ function main({ write, today } = {}) {
 
   if (changed.length > 0) {
     if (WRITE) {
-      fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2) + '\n');
+      writeDb(DB_PATH, db);
       console.log(`Wrote ${DB_PATH}`);
     } else {
       console.log('Dry-run — pass --write to apply changes');

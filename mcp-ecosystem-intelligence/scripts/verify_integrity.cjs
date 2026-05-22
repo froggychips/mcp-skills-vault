@@ -35,6 +35,7 @@ const { execSync } = require('child_process');
 const https       = require('https');
 const fs          = require('fs');
 const path        = require('path');
+const { writeDb } = require('./lib/db_io.cjs');
 
 const DB_PATH   = path.resolve(__dirname, '../assets/tools_database.json');
 const UPDATE    = process.argv.includes('--update');
@@ -554,7 +555,7 @@ async function main() {
   }
 
   if (UPDATE && updated > 0) {
-    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2) + '\n');
+    writeDb(DB_PATH, db);
     console.log(`\nWrote ${updated} updated entries to ${DB_PATH}`);
   } else if (!UPDATE) {
     const checked = npmTools.length + pypiTools.length + dockerTools.length;

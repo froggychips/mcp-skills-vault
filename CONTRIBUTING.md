@@ -120,6 +120,7 @@ A logic bug here is treated as Critical severity (48-hour patch SLA per SECURITY
 - Commit messages: [Conventional Commits](https://www.conventionalcommits.org). `feat:` → minor version bump, `fix:` → patch, `BREAKING CHANGE:` → major. PR titles are read by `release-please` to drive the next version.
 - Imperative mood, focused on *why* not *what*. Reviewers will read the diff for what.
 - Run `verify_integrity.cjs --no-audit` before every push if you touched `tools_database.json` or any script.
+- When editing `tools_database.json` programmatically, use `mcp-ecosystem-intelligence/scripts/lib/db_io.cjs::writeDb()` — it preserves the file's `\uXXXX` escape convention for non-ASCII characters. A regression test in `tests/db_io.test.cjs` enforces this.
 - Don't add dependencies to the scripts — they intentionally use only Node built-ins so the supply-chain attack surface is the same as Node itself.
 - For UI / docs PRs, no need for triage checklist; just describe the change in plain English.
 
