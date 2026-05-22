@@ -39,42 +39,6 @@
  *   node calculate_health.cjs 1200 15 true true 2            # license check skipped (back-compat)
  */
 
-const args = process.argv.slice(2);
-
-// Print help when requested
-if (args[0] === '--help' || args[0] === '-h') {
-  console.log(
-    'Usage: node calculate_health.cjs <stars> <last_commit_days> <in_registry> <has_install_cmd> <critical_issues> [license]\n' +
-    '\n' +
-    'Arguments:\n' +
-    '  stars            GitHub star count (integer >= 0)\n' +
-    '  last_commit_days Days since last commit (integer >= 0)\n' +
-    '  in_registry      true/1 if listed in official MCP registry\n' +
-    '  has_install_cmd  true/1 if a clear install command is documented\n' +
-    '  critical_issues  Number of open critical issues (integer >= 0)\n' +
-    '  license          (optional) SPDX identifier; non-OSI licenses incur -10\n'
-  );
-  process.exit(0);
-}
-
-// Require exactly 5 positional arguments
-if (args.length < 5) {
-  console.error(
-    'Usage: node calculate_health.cjs <stars> <last_commit_days> <in_registry> <has_install_cmd> <critical_issues>\n' +
-    'Run with --help for details.'
-  );
-  process.exit(1);
-}
-
-// --- Input parsing & validation ----------------------------------------
-
-const stars = parseInt(args[0], 10);
-const lastCommitDays = parseInt(args[1], 10);
-const inRegistry = args[2] === 'true' || args[2] === '1';
-const hasInstallCmd = args[3] === 'true' || args[3] === '1';
-const criticalIssues = parseInt(args[4], 10);
-const license = args[5];   // optional — undefined skips the license check
-
 // SPDX identifiers for OSI-approved licenses commonly seen on npm/PyPI.
 // Permissive + copyleft both count as OSI-approved (still open source).
 const OSI_APPROVED = new Set([
@@ -85,59 +49,37 @@ const OSI_APPROVED = new Set([
   'AGPL-3.0-only', 'AGPL-3.0-or-later',
 ]);
 
-// Validate that numeric fields parsed correctly and are non-negative
-if (isNaN(stars) || stars < 0) {
-  console.error('Error: <stars> must be a non-negative integer.');
-  process.exit(1);
-}
-if (isNaN(lastCommitDays) || lastCommitDays < 0) {
-  console.error('Error: <last_commit_days> must be a non-negative integer.');
-  process.exit(1);
-}
-if (isNaN(criticalIssues) || criticalIssues < 0) {
-  console.error('Error: <critical_issues> must be a non-negative integer.');
-  process.exit(1);
+// --- Pure scoring components -------------------------------------------
+
+/**
+ * Popularity component: logarithmic so large star counts don't dominate the score.
+ * Adding 1 to stars avoids log10(0) = -Infinity for tools with zero stars.
+ * Capped at 20 so that mega-repos can't single-handedly push every entry into the
+ * Core tier (without the cap, an 85k-star monorepo scores 49+ on popularity alone).
+ */
+function popularityScoreOf(stars) {
+  return Math.min(20, 10 * Math.log10(stars + 1));
 }
 
-// --- Scoring ---------------------------------------------------------------
-
-// Popularity component: logarithmic so large star counts don't dominate the score.
-// Adding 1 to stars avoids log10(0) = -Infinity for tools with zero stars.
-// Capped at 20 so that mega-repos can't single-handedly push every entry into the
-// Core tier (without the cap, an 85k-star monorepo scores 49+ on popularity alone).
-const popularityScore = Math.min(20, 10 * Math.log10(stars + 1));
-
-// Graduated recency bonus rewards freshly-maintained tools over stale ones
-// while still giving partial credit for repos that were active within 6 months.
-let recencyBonus = 0;
-if (lastCommitDays < 30) {
-  recencyBonus = 40; // Actively maintained
-} else if (lastCommitDays < 90) {
-  recencyBonus = 20; // Recently maintained
-} else if (lastCommitDays < 180) {
-  recencyBonus = 10; // Dormant but not dead
-}
-// >= 180 days: recencyBonus stays 0 (stale)
-
-// Registry membership confirms the tool is vetted by the MCP project itself
-const registryBonus = inRegistry ? 30 : 0;
-
-// An install command is required for the tool to be usable in practice
-const installBonus = hasInstallCmd ? 15 : 0;
-
-// Penalize tools with too many unresolved critical issues
-const issueBonus = criticalIssues < 5 ? 5 : 0;
-
-// License penalty: -10 for source-available / proprietary / unknown licenses.
-// Skipped entirely when the license argument is omitted (back-compat).
-let licensePenalty = 0;
-if (license !== undefined) {
-  licensePenalty = OSI_APPROVED.has(license) ? 0 : -10;
+/**
+ * Graduated recency bonus rewards freshly-maintained tools over stale ones
+ * while still giving partial credit for repos that were active within 6 months.
+ */
+function recencyBonusOf(lastCommitDays) {
+  if (lastCommitDays < 30)  return 40; // Actively maintained
+  if (lastCommitDays < 90)  return 20; // Recently maintained
+  if (lastCommitDays < 180) return 10; // Dormant but not dead
+  return 0;                            // Stale
 }
 
-const score = popularityScore + recencyBonus + registryBonus + installBonus + issueBonus + licensePenalty;
-
-// --- Classification --------------------------------------------------------
+/**
+ * License penalty: -10 for source-available / proprietary / unknown licenses.
+ * Returns 0 when license is omitted (back-compat) or is OSI-approved.
+ */
+function licensePenaltyOf(license) {
+  if (license === undefined) return 0;
+  return OSI_APPROVED.has(license) ? 0 : -10;
+}
 
 /**
  * Map a raw health score to a human-readable tier label.
@@ -151,21 +93,104 @@ function classify(s) {
   return 'Deprecated';
 }
 
-// --- Output ----------------------------------------------------------------
+/**
+ * Full health-score computation. Pure function — no I/O.
+ * @returns {{health_score:number, classification:string, breakdown:object}}
+ */
+function calculateHealth({ stars, lastCommitDays, inRegistry, hasInstallCmd, criticalIssues, license }) {
+  const popularityScore = popularityScoreOf(stars);
+  const recencyBonus    = recencyBonusOf(lastCommitDays);
+  const registryBonus   = inRegistry ? 30 : 0;
+  const installBonus    = hasInstallCmd ? 15 : 0;
+  const issueBonus      = criticalIssues < 5 ? 5 : 0;
+  const licensePenalty  = licensePenaltyOf(license);
 
-// Round to 2 decimal places for stable, readable output
-const healthScore = Math.round(score * 100) / 100;
+  const score = popularityScore + recencyBonus + registryBonus + installBonus + issueBonus + licensePenalty;
+  // Round to 2 decimal places for stable, readable output
+  const healthScore = Math.round(score * 100) / 100;
 
-console.log(JSON.stringify({
-  health_score: healthScore,
-  classification: classify(healthScore),
-  // Score breakdown helps callers understand which factors drive the result
-  breakdown: {
-    popularity: Math.round(popularityScore * 100) / 100,
-    recency: recencyBonus,
-    registry: registryBonus,
-    install_cmd: installBonus,
-    low_issues: issueBonus,
-    license: licensePenalty,
-  },
-}, null, 2));
+  return {
+    health_score: healthScore,
+    classification: classify(healthScore),
+    // Score breakdown helps callers understand which factors drive the result
+    breakdown: {
+      popularity: Math.round(popularityScore * 100) / 100,
+      recency: recencyBonus,
+      registry: registryBonus,
+      install_cmd: installBonus,
+      low_issues: issueBonus,
+      license: licensePenalty,
+    },
+  };
+}
+
+// --- CLI entry point -------------------------------------------------------
+
+function main() {
+  const args = process.argv.slice(2);
+
+  // Print help when requested
+  if (args[0] === '--help' || args[0] === '-h') {
+    console.log(
+      'Usage: node calculate_health.cjs <stars> <last_commit_days> <in_registry> <has_install_cmd> <critical_issues> [license]\n' +
+      '\n' +
+      'Arguments:\n' +
+      '  stars            GitHub star count (integer >= 0)\n' +
+      '  last_commit_days Days since last commit (integer >= 0)\n' +
+      '  in_registry      true/1 if listed in official MCP registry\n' +
+      '  has_install_cmd  true/1 if a clear install command is documented\n' +
+      '  critical_issues  Number of open critical issues (integer >= 0)\n' +
+      '  license          (optional) SPDX identifier; non-OSI licenses incur -10\n'
+    );
+    process.exit(0);
+  }
+
+  // Require exactly 5 positional arguments
+  if (args.length < 5) {
+    console.error(
+      'Usage: node calculate_health.cjs <stars> <last_commit_days> <in_registry> <has_install_cmd> <critical_issues>\n' +
+      'Run with --help for details.'
+    );
+    process.exit(1);
+  }
+
+  // --- Input parsing & validation ----------------------------------------
+
+  const stars = parseInt(args[0], 10);
+  const lastCommitDays = parseInt(args[1], 10);
+  const inRegistry = args[2] === 'true' || args[2] === '1';
+  const hasInstallCmd = args[3] === 'true' || args[3] === '1';
+  const criticalIssues = parseInt(args[4], 10);
+  const license = args[5];   // optional — undefined skips the license check
+
+  // Validate that numeric fields parsed correctly and are non-negative
+  if (isNaN(stars) || stars < 0) {
+    console.error('Error: <stars> must be a non-negative integer.');
+    process.exit(1);
+  }
+  if (isNaN(lastCommitDays) || lastCommitDays < 0) {
+    console.error('Error: <last_commit_days> must be a non-negative integer.');
+    process.exit(1);
+  }
+  if (isNaN(criticalIssues) || criticalIssues < 0) {
+    console.error('Error: <critical_issues> must be a non-negative integer.');
+    process.exit(1);
+  }
+
+  const result = calculateHealth({ stars, lastCommitDays, inRegistry, hasInstallCmd, criticalIssues, license });
+  console.log(JSON.stringify(result, null, 2));
+}
+
+// Only run CLI when invoked directly, so tests can require() this module.
+if (require.main === module) {
+  main();
+}
+
+module.exports = {
+  OSI_APPROVED,
+  popularityScoreOf,
+  recencyBonusOf,
+  licensePenaltyOf,
+  classify,
+  calculateHealth,
+};

@@ -23,8 +23,6 @@ const path = require('path');
 
 const DB_PATH  = path.resolve(__dirname, '../assets/tools_database.json');
 const CALC     = path.resolve(__dirname, 'calculate_health.cjs');
-const WRITE    = process.argv.includes('--write');
-const TODAY    = new Date().toISOString().slice(0, 10);
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -80,84 +78,103 @@ function daysSince(isoDate) {
 
 // ── main ───────────────────────────────────────────────────────────────────
 
-// Verify gh is available and authenticated.
-try {
-  execSync('gh auth status', { stdio: 'pipe' });
-} catch {
-  console.error('gh CLI not found or not authenticated. Run: gh auth login');
-  process.exit(1);
+function main({ write, today } = {}) {
+  const WRITE = write ?? process.argv.includes('--write');
+  const TODAY = today ?? new Date().toISOString().slice(0, 10);
+
+  // Verify gh is available and authenticated.
+  try {
+    execSync('gh auth status', { stdio: 'pipe' });
+  } catch {
+    console.error('gh CLI not found or not authenticated. Run: gh auth login');
+    process.exit(1);
+  }
+
+  const db      = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+  const changed = [];
+  let   skipped = 0;
+
+  for (const tool of db.tools) {
+    const repo = githubOwnerRepo(tool.source_url);
+    if (!repo) {
+      console.log(`SKIP  ${tool.name}: no github.com source_url`);
+      skipped++;
+      continue;
+    }
+
+    process.stdout.write(`FETCH ${repo} ... `);
+    const meta = ghApi(`repos/${repo}`);
+    if (!meta) {
+      console.log('FAIL (gh api error)');
+      skipped++;
+      continue;
+    }
+
+    const stars    = meta.stargazers_count ?? tool.stars;
+    const days     = daysSince(meta.pushed_at);
+    const issues   = meta.open_issues_count ?? tool.open_issues;
+    const critIss  = Math.floor(issues / 10);
+    const license  = normalizeLicense(meta.license?.spdx_id, tool.license);
+
+    const result = calcScore(stars, days, tool.in_registry, true, critIss, license);
+    if (!result) {
+      console.log('FAIL (score calc error)');
+      skipped++;
+      continue;
+    }
+
+    const prev = {
+      stars:            tool.stars,
+      last_commit_days: tool.last_commit_days,
+      open_issues:      tool.open_issues,
+      health_score:     tool.health_score,
+      classification:   tool.classification,
+    };
+
+    tool.stars            = stars;
+    tool.last_commit_days = days;
+    tool.open_issues      = issues;
+    tool.health_score     = result.health_score;
+    tool.classification   = result.classification;
+    tool.last_checked     = TODAY;
+
+    const diff = [];
+    if (prev.stars            !== stars)                   diff.push(`stars ${prev.stars}→${stars}`);
+    if (prev.last_commit_days !== days)                    diff.push(`days ${prev.last_commit_days}→${days}`);
+    if (prev.open_issues      !== issues)                  diff.push(`issues ${prev.open_issues}→${issues}`);
+    if (prev.health_score     !== result.health_score)     diff.push(`score ${prev.health_score}→${result.health_score}`);
+    if (prev.classification   !== result.classification)   diff.push(`tier ${prev.classification}→${result.classification}`);
+
+    if (diff.length > 0) {
+      console.log(diff.join(', '));
+      changed.push(tool.name);
+    } else {
+      console.log('no change');
+    }
+  }
+
+  console.log(`\n${changed.length} changed, ${skipped} skipped`);
+
+  if (changed.length > 0) {
+    if (WRITE) {
+      fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2) + '\n');
+      console.log(`Wrote ${DB_PATH}`);
+    } else {
+      console.log('Dry-run — pass --write to apply changes');
+    }
+  }
 }
 
-const db      = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
-const changed = [];
-let   skipped = 0;
-
-for (const tool of db.tools) {
-  const repo = githubOwnerRepo(tool.source_url);
-  if (!repo) {
-    console.log(`SKIP  ${tool.name}: no github.com source_url`);
-    skipped++;
-    continue;
-  }
-
-  process.stdout.write(`FETCH ${repo} ... `);
-  const meta = ghApi(`repos/${repo}`);
-  if (!meta) {
-    console.log('FAIL (gh api error)');
-    skipped++;
-    continue;
-  }
-
-  const stars    = meta.stargazers_count ?? tool.stars;
-  const days     = daysSince(meta.pushed_at);
-  const issues   = meta.open_issues_count ?? tool.open_issues;
-  const critIss  = Math.floor(issues / 10);
-  const license  = normalizeLicense(meta.license?.spdx_id, tool.license);
-
-  const result = calcScore(stars, days, tool.in_registry, true, critIss, license);
-  if (!result) {
-    console.log('FAIL (score calc error)');
-    skipped++;
-    continue;
-  }
-
-  const prev = {
-    stars:            tool.stars,
-    last_commit_days: tool.last_commit_days,
-    open_issues:      tool.open_issues,
-    health_score:     tool.health_score,
-    classification:   tool.classification,
-  };
-
-  tool.stars            = stars;
-  tool.last_commit_days = days;
-  tool.open_issues      = issues;
-  tool.health_score     = result.health_score;
-  tool.classification   = result.classification;
-  tool.last_checked     = TODAY;
-
-  const diff = [];
-  if (prev.stars            !== stars)                   diff.push(`stars ${prev.stars}→${stars}`);
-  if (prev.last_commit_days !== days)                    diff.push(`days ${prev.last_commit_days}→${days}`);
-  if (prev.open_issues      !== issues)                  diff.push(`issues ${prev.open_issues}→${issues}`);
-  if (prev.health_score     !== result.health_score)     diff.push(`score ${prev.health_score}→${result.health_score}`);
-  if (prev.classification   !== result.classification)   diff.push(`tier ${prev.classification}→${result.classification}`);
-
-  if (diff.length > 0) {
-    console.log(diff.join(', '));
-    changed.push(tool.name);
-  } else {
-    console.log('no change');
-  }
+// Only run CLI when invoked directly. Tests can require() helpers without
+// triggering gh-auth / I/O. The body above is CLI-only (no offline hooks);
+// to expand coverage, expose pure helpers via module.exports below.
+if (require.main === module) {
+  main();
 }
 
-console.log(`\n${changed.length} changed, ${skipped} skipped`);
-
-if (changed.length > 0) {
-  if (WRITE) {
-    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2) + '\n');
-    console.log(`Wrote ${DB_PATH}`);
-  } else {
-    console.log('Dry-run — pass --write to apply changes');
-  }
-}
+module.exports = {
+  GITHUB_SPDX_MAP,
+  normalizeLicense,
+  githubOwnerRepo,
+  daysSince,
+};
