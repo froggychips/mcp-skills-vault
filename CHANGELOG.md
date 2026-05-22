@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.7.0](https://github.com/froggychips/mcp-skills-vault/compare/v0.6.0...v0.7.0) (2026-05-22)
+
+
+### Features
+
+* audit_setup.cjs — diff installed MCP servers against DB ([#43](https://github.com/froggychips/mcp-skills-vault/issues/43)) ([d4c110b](https://github.com/froggychips/mcp-skills-vault/commit/d4c110be277cbc14d78dcb80a585bd981084fada))
+* check_license_drift.cjs — flag MIT→BSL/SSPL relicensing ([#46](https://github.com/froggychips/mcp-skills-vault/issues/46)) ([73b0a04](https://github.com/froggychips/mcp-skills-vault/commit/73b0a042ca98988e529ec5c309deed4acb3e0366))
+* **detectStack:** Swift/JVM/Ruby/PHP/.NET manifests + Jira/Atlassian env signals ([#45](https://github.com/froggychips/mcp-skills-vault/issues/45)) ([4513aff](https://github.com/froggychips/mcp-skills-vault/commit/4513aff52c8d057eed1e586e79442c1c0960d10e))
+* **discover:** MCP registry + PyPI candidate sources ([#42](https://github.com/froggychips/mcp-skills-vault/issues/42)) ([7bd16f7](https://github.com/froggychips/mcp-skills-vault/commit/7bd16f7bb1b905fa204414bdc87f790d3cb9ccff))
+
 ## [0.6.0](https://github.com/froggychips/mcp-skills-vault/compare/v0.5.0...v0.6.0) (2026-05-22)
 
 
