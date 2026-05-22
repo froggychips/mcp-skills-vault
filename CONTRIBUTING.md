@@ -102,6 +102,30 @@ Demotion is also done via PR — same template, opposite direction. Include the 
 
 ---
 
+## Install-Hook Policy
+
+A `trust: "candidate"` entry stays at candidate (does **not** auto-promote to `verified`) if its upstream package ships any of these npm scripts:
+
+- `preinstall`, `install`, `postinstall` — runs arbitrary code during `npm install` / `npx -y`
+- `prepare` — runs in dev installs; harmless in most cases, but flagged for review
+- `prepack`, `prepublish`, `prepublishOnly` — package-author hooks; usually fine but inspected
+
+This is a deliberate ceiling, not a backlog. The hooks may be perfectly legitimate (build native binaries, download a CLI shim, enforce a package manager) — but `npx -y` runs them automatically, and the integrity gate's hash check covers the tarball, not the side effects of executing arbitrary install scripts. As of the last triage pass, the 18 candidate entries are all held here: `@last9/mcp-server` ships `postinstall: node bin/download-binary.js`, `@azure/mcp` ships `postinstall: node ./scripts/post-install-script.js`, `@postman/postman-mcp-server` ships `preinstall: …` that enforces pnpm, and so on.
+
+To promote a hooked candidate to `verified`, a maintainer must:
+
+1. Read the actual hook script in the published package — e.g. `npm view <pkg>@<ver> dist.tarball`, unpack, inspect.
+2. Document in the entry's `notes` field: `[VERIFIED <date>] hook reviewed: <one-line description of what it does>`.
+3. Open a PR that explains *why* this specific hook is acceptable. The promotion is opt-in per entry, not a class-wide carve-out. (Implementation detail TBD: either run `verify_integrity.cjs --strict` with a per-entry waiver, or add a `hook_review: "approved"` field that the gate reads.)
+
+PyPI (`uvx`) and Docker (`docker run`) entries are not subject to this policy because they have no equivalent automatic-execution surface at install time — `uvx` runs the entrypoint, not arbitrary build scripts; Docker images execute only their `CMD`/`ENTRYPOINT`.
+
+### Current hook-blocked candidates
+
+See [`mcp-ecosystem-intelligence/assets/triage_notes.md`](./mcp-ecosystem-intelligence/assets/triage_notes.md) for the running list of why each candidate is held (created by the batch-4 triage pass).
+
+---
+
 ## Modifying the integrity gate (`verify_integrity.cjs`)
 
 This file is the single most security-sensitive script in the repo. Changes require:
