@@ -207,3 +207,115 @@ test('detectStack: PG_* env-key adds postgres signal', () => {
   const stack = o.detectStack(dir);
   assert.ok(stack.dbs.has('postgres'));
 });
+
+// ── detectStack: Swift/JVM/Ruby/PHP/.NET/Elixir manifests ───────────────────
+
+test('detectStack: Package.swift adds swift lang', () => {
+  const dir = envProject('', { 'Package.swift': '// swift-tools-version:5.9\n' });
+  const stack = o.detectStack(dir);
+  assert.ok(stack.langs.has('swift'), `langs=${[...stack.langs]}`);
+});
+
+test('detectStack: Project.swift (Tuist) adds swift lang', () => {
+  const dir = envProject('', { 'Project.swift': 'import ProjectDescription\n' });
+  const stack = o.detectStack(dir);
+  assert.ok(stack.langs.has('swift'));
+});
+
+test('detectStack: Gemfile with pg gem adds ruby + postgres', () => {
+  const dir = envProject('', { 'Gemfile': 'source "https://rubygems.org"\ngem "rails"\ngem "pg"\n' });
+  const stack = o.detectStack(dir);
+  assert.ok(stack.langs.has('ruby'), `langs=${[...stack.langs]}`);
+  assert.ok(stack.dbs.has('postgres'), `dbs=${[...stack.dbs]}`);
+  assert.ok(stack.cats.has('database'));
+});
+
+test('detectStack: Gemfile.lock fallback when no Gemfile present', () => {
+  const dir = envProject('', { 'Gemfile.lock': '  specs:\n    pg (1.5.4)\n    redis (5.0.0)\n' });
+  const stack = o.detectStack(dir);
+  assert.ok(stack.langs.has('ruby'));
+  assert.ok(stack.dbs.has('postgres'));
+  assert.ok(stack.dbs.has('redis'));
+});
+
+test('detectStack: composer.json with mongodb/mongodb adds php + mongodb', () => {
+  const body = JSON.stringify({
+    name: 'acme/x',
+    require: { 'php': '^8.2', 'mongodb/mongodb': '^1.17' },
+  });
+  const dir = envProject('', { 'composer.json': body });
+  const stack = o.detectStack(dir);
+  assert.ok(stack.langs.has('php'), `langs=${[...stack.langs]}`);
+  assert.ok(stack.dbs.has('mongodb'), `dbs=${[...stack.dbs]}`);
+});
+
+test('detectStack: composer.json with predis/predis adds redis', () => {
+  const body = JSON.stringify({ require: { 'predis/predis': '^2.2' } });
+  const dir = envProject('', { 'composer.json': body });
+  const stack = o.detectStack(dir);
+  assert.ok(stack.langs.has('php'));
+  assert.ok(stack.dbs.has('redis'));
+});
+
+test('detectStack: pom.xml present adds jvm lang', () => {
+  const dir = envProject('', { 'pom.xml': '<?xml version="1.0"?><project/>' });
+  const stack = o.detectStack(dir);
+  assert.ok(stack.langs.has('jvm'), `langs=${[...stack.langs]}`);
+});
+
+test('detectStack: build.gradle adds jvm lang', () => {
+  const dir = envProject('', { 'build.gradle': 'plugins { id "java" }\n' });
+  const stack = o.detectStack(dir);
+  assert.ok(stack.langs.has('jvm'));
+});
+
+test('detectStack: build.gradle.kts adds jvm lang', () => {
+  const dir = envProject('', { 'build.gradle.kts': 'plugins { kotlin("jvm") }\n' });
+  const stack = o.detectStack(dir);
+  assert.ok(stack.langs.has('jvm'));
+});
+
+test('detectStack: .csproj file adds dotnet lang', () => {
+  const dir = envProject('', { 'App.csproj': '<Project Sdk="Microsoft.NET.Sdk"/>' });
+  const stack = o.detectStack(dir);
+  assert.ok(stack.langs.has('dotnet'), `langs=${[...stack.langs]}`);
+});
+
+test('detectStack: .sln file adds dotnet lang', () => {
+  const dir = envProject('', { 'App.sln': 'Microsoft Visual Studio Solution File\n' });
+  const stack = o.detectStack(dir);
+  assert.ok(stack.langs.has('dotnet'));
+});
+
+test('detectStack: mix.exs adds elixir lang', () => {
+  const dir = envProject('', { 'mix.exs': 'defmodule App.MixProject do\nend\n' });
+  const stack = o.detectStack(dir);
+  assert.ok(stack.langs.has('elixir'));
+});
+
+// ── detectStack: jira / atlassian / seq env signals ─────────────────────────
+
+test('detectStack: JIRA_URL env-key adds jira signal + docs category', () => {
+  const dir = envProject('JIRA_URL=https://x.atlassian.net\n');
+  const stack = o.detectStack(dir);
+  assert.ok(stack.infra.has('jira'), `infra=${[...stack.infra]}`);
+  assert.ok(stack.cats.has('docs'));
+});
+
+test('detectStack: ATLASSIAN_TOKEN adds jira signal', () => {
+  const dir = envProject('ATLASSIAN_TOKEN=secret\n');
+  const stack = o.detectStack(dir);
+  assert.ok(stack.infra.has('jira'));
+  assert.ok(stack.cats.has('docs'));
+});
+
+test('SIGNAL_TO_TOOLS: jira maps to mcp-atlassian (Jira/Confluence share the server)', () => {
+  assert.deepEqual(o.SIGNAL_TO_TOOLS['jira'], ['mcp-atlassian']);
+});
+
+test('detectStack: SEQ_API_KEY env-key adds seq signal + observability category', () => {
+  const dir = envProject('SEQ_API_KEY=x\n');
+  const stack = o.detectStack(dir);
+  assert.ok(stack.infra.has('seq'), `infra=${[...stack.infra]}`);
+  assert.ok(stack.cats.has('observability'));
+});

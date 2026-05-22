@@ -99,6 +99,56 @@ function detectStack(cwd) {
   if (fs.existsSync(path.join(cwd, 'go.mod')))    langs.add('Go');
   if (fs.existsSync(path.join(cwd, 'Cargo.toml'))) langs.add('Rust');
 
+  // Swift — Package.swift (SwiftPM) or Project.swift (Tuist)
+  if (fs.existsSync(path.join(cwd, 'Package.swift')))  langs.add('swift');
+  if (fs.existsSync(path.join(cwd, 'Project.swift')))  langs.add('swift');
+
+  // JVM — pom.xml / build.gradle / build.gradle.kts. Dep parsing skipped:
+  // pom.xml is XML, build.gradle is Groovy/Kotlin DSL — out of scope here.
+  if (fs.existsSync(path.join(cwd, 'pom.xml')))             langs.add('jvm');
+  if (fs.existsSync(path.join(cwd, 'build.gradle')))        langs.add('jvm');
+  if (fs.existsSync(path.join(cwd, 'build.gradle.kts')))    langs.add('jvm');
+
+  // Ruby — Gemfile (preferred) with line-by-line gem scan; Gemfile.lock fallback.
+  for (const f of ['Gemfile', 'Gemfile.lock']) {
+    try {
+      const txt = fs.readFileSync(path.join(cwd, f), 'utf8');
+      langs.add('ruby');
+      // Simple string-contains lookup — no real parser. Matches both
+      // `gem "pg"` and Gemfile.lock dependency lines.
+      if (/\bpg\b/.test(txt))         { dbs.add('postgres');   cats.add('database'); }
+      if (/\bmysql2\b/.test(txt))     { dbs.add('mysql');      cats.add('database'); }
+      if (/\bredis\b/.test(txt))      { dbs.add('redis');      cats.add('database'); }
+      if (/\bmongo\b/.test(txt))      { dbs.add('mongodb');    cats.add('database'); }
+      if (/\bdalli\b/.test(txt))      { infra.add('memcached'); cats.add('database'); }
+      if (/\baws-sdk\b/.test(txt))    { infra.add('aws');      cats.add('infra'); }
+      break; // Gemfile wins over Gemfile.lock — don't double-scan.
+    } catch {}
+  }
+
+  // PHP — composer.json with JSON `require` map scan.
+  try {
+    const composer = JSON.parse(fs.readFileSync(path.join(cwd, 'composer.json'), 'utf8'));
+    langs.add('php');
+    const req = { ...(composer.require || {}), ...(composer['require-dev'] || {}) };
+    const reqKeys = Object.keys(req);
+    if (reqKeys.some(k => k === 'mongodb/mongodb' || k.startsWith('mongodb/')))    { dbs.add('mongodb');  cats.add('database'); }
+    if (reqKeys.some(k => k === 'predis/predis' || k.startsWith('predis/')))       { dbs.add('redis');    cats.add('database'); }
+    if (reqKeys.some(k => k.startsWith('aws/aws-sdk-php')))                         { infra.add('aws');    cats.add('infra'); }
+    if (reqKeys.some(k => k === 'firebase/php-jwt'))                                { /* auth dep, no MCP signal */ }
+    if (reqKeys.some(k => k.startsWith('stripe/')))                                 { infra.add('stripe'); cats.add('payments'); }
+    if (reqKeys.some(k => k.startsWith('sentry/')))                                 { infra.add('sentry'); cats.add('observability'); }
+  } catch { /* no composer.json or invalid JSON */ }
+
+  // .NET — *.csproj / *.sln. Skip parsing; flag the language only.
+  try {
+    const entries = fs.readdirSync(cwd);
+    if (entries.some(f => f.endsWith('.csproj') || f.endsWith('.sln'))) langs.add('dotnet');
+  } catch {}
+
+  // Elixir — mix.exs. Skip dep parsing (Elixir DSL).
+  if (fs.existsSync(path.join(cwd, 'mix.exs'))) langs.add('elixir');
+
   // docker-compose.yml
   try {
     const txt = fs.readFileSync(path.join(cwd, 'docker-compose.yml'), 'utf8').toLowerCase();
@@ -188,6 +238,12 @@ function detectStack(cwd) {
         if (/^POSTMAN_/.test(k))                             { infra.add('postman');    cats.add('testing'); }
         if (/^(AZURE_DEVOPS_|ADO_)/.test(k))                 { infra.add('azure-devops');cats.add('vcs'); }
         if (/^(JIRA_|CONFLUENCE_|ATLASSIAN_)/.test(k))       { infra.add('atlassian');  cats.add('pm'); }
+        // Jira/Confluence are both served by mcp-atlassian. Keep the
+        // 'atlassian' signal above for back-compat and add 'jira' →
+        // 'docs' so docs-oriented callers find the same server.
+        if (/^JIRA_/.test(k) || k === 'ATLASSIAN_TOKEN')     { infra.add('jira');       cats.add('docs'); }
+        if (/^ATLASSIAN_/.test(k))                           { infra.add('jira');       cats.add('docs'); }
+        if (/^SEQ_/.test(k))                                 { infra.add('seq');        cats.add('observability'); }
         if (/^SLACK_/.test(k))                               { infra.add('slack');      cats.add('communication'); }
         if (/^DISCORD_/.test(k))                             { infra.add('discord');    cats.add('communication'); }
         if (/^(MAILGUN_|SENDGRID_|POSTMARK_)/.test(k))       { infra.add('email');      cats.add('communication'); }
@@ -220,6 +276,9 @@ const SIGNAL_TO_TOOLS = {
   linear:      ['linear-mcp-server'],
   notion:      ['notion-mcp-server'],
   atlassian:   ['mcp-atlassian'],
+  jira:        ['mcp-atlassian'],
+  // TODO: no DB entry for discord — skip mapping
+  // TODO: no DB entry for seq — skip mapping
   // Observability
   sentry:      ['sentry-mcp'],
   dynatrace:   ['@dynatrace-oss/dynatrace-mcp-server'],
