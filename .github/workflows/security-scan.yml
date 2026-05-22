@@ -1,6 +1,6 @@
 name: security-scan
 
-# Four responsibilities:
+# Five responsibilities:
 #   smoke               — fast offline check on every PR / push to master
 #   refresh-hashes      — weekly cron, opens PR with:
 #                           1. refreshed integrity hashes (verify_integrity --update)
@@ -12,6 +12,10 @@ name: security-scan
 #   discover-candidates — weekly cron, opens PR with fresh
 #                         assets/discovery/candidates.json. Pure inbox for triage;
 #                         the DB stays the deterministic source of truth.
+#   mcp-eval-smoke      — weekly + manual, spawns each DB entry's MCP server,
+#                         runs handshake + tools/list + schema lint, uploads
+#                         eval_results.json as an artifact (no auto-commit).
+#                         Needs network (npx/uvx package fetch) so cron-only.
 
 on:
   pull_request:
@@ -215,3 +219,61 @@ jobs:
           delete-branch: true
           add-paths: |
             mcp-ecosystem-intelligence/assets/discovery/candidates.json
+
+  mcp-eval-smoke:
+    name: MCP eval smoke (behavioural)
+    # Spawns each DB entry, runs initialize → tools/list, lints schemas.
+    # Needs network to fetch npx packages / uvx wheels / docker images,
+    # so PR triggers are explicitly excluded — cron only. The eval
+    # results.json is uploaded as an artifact; humans review and decide
+    # whether to update the DB. Nothing here writes to the DB.
+    if: github.event_name != 'pull_request' && ((github.event_name == 'schedule' && github.event.schedule == '17 6 * * 1') || github.event_name == 'workflow_dispatch')
+    needs: unit-tests
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - name: Install uv (for uvx)
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: mcp_eval --json
+        # Long timeout per entry — npx cold-fetches can take 20–30s in CI;
+        # the script's per-entry timeout (default 30s) is the inner gate.
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --json > eval_results_run.json
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## MCP eval smoke"
+            echo
+            node -e "
+              const j = require('./eval_results_run.json');
+              console.log('- checked: ' + j.checked);
+              console.log('- pass:    ' + j.pass);
+              console.log('- fail:    ' + j.fail);
+              console.log('- skip:    ' + j.skip);
+              console.log();
+              const fails = (j.results || []).filter(r => r.status === 'fail');
+              if (fails.length) {
+                console.log('### Failures');
+                console.log();
+                for (const r of fails) console.log('- ' + r.name + ' — ' + (r.error_code || 'unknown'));
+              }
+              const drifts = (j.results || []).filter(r => r.tool_count_drift);
+              if (drifts.length) {
+                console.log();
+                console.log('### Tool-count drift');
+                console.log();
+                for (const r of drifts) console.log('- ' + r.name + ': DB=' + r.tool_count_db + ', server=' + r.tool_count);
+              }
+            "
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload eval results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: eval_results_run.json

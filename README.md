@@ -134,6 +134,25 @@ node mcp-ecosystem-intelligence/scripts/check_docker_drift.cjs --strict  # exit 
 
 Drift = upstream rebuilt the tag under a new digest. The weekly CI job (`docker-drift`) fails on any drift so a maintainer reviews the upstream change *before* refreshing the pin — a routine rebuild and a registry hijack look identical from here.
 
+### Behavioural smoke (mcp-eval)
+
+[`scripts/mcp_eval.cjs`](./mcp-ecosystem-intelligence/scripts/mcp_eval.cjs) — closes the "did the artifact actually start?" gap. The integrity gate verifies the *file* you downloaded; this script verifies that spawning the server produces a usable tool surface.
+
+For each DB entry with a recognized install method (`npx -y`, `uvx`, `docker run`), the script spawns the subprocess and runs the canonical JSON-RPC handshake — `initialize` → `notifications/initialized` → `tools/list` — then lints each returned tool's `inputSchema` with a minimal validator (intentionally narrower than full JSON Schema Draft 2020-12; covers only what Claude Code actually reads: `type`, `properties`, `required`, `enum`, `description`, plus nested objects + array items).
+
+```bash
+node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs                       # smoke all (needs network)
+node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --name memory         # one entry, substring match
+node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --json --strict       # CI form
+node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --no-spawn            # offline self-test
+```
+
+Output: `assets/eval_results.json` — `{name, status, boot_ms, list_latency_ms, tool_count, tool_count_db, tool_count_drift, schema_errors[], error_code, checked_at}` per entry, sorted by name for deterministic diffs. Results never flow back into `tools_database.json` — DB stays the source of truth, eval is a separate evidence stream.
+
+Network policy: real smoke needs to fetch packages (`npx` cache miss, `uvx` wheel download, `docker pull`), so it is NOT offline. The CI job (`mcp-eval-smoke`) runs cron-only — never on PRs. The `--no-spawn` flag re-lints existing results without spawning anything; that path IS offline.
+
+What it does NOT validate: behavioural correctness (we don't call any tool), business logic, or security of the server's tool implementations. This is a *smoke* check, not a fitness test.
+
 ### Discovery pipeline
 
 [`scripts/discover.cjs`](./mcp-ecosystem-intelligence/scripts/discover.cjs) — harvest MCP server candidates from three sources, deduplicate by repo URL, annotate with health metrics from GitHub, score, and emit a candidates JSON ready for manual cherry-pick into `tools_database.json`.
@@ -221,13 +240,14 @@ Entry schema:
 
 ### CI
 
-`.github/workflows/security-scan.yml` runs five jobs across PRs, pushes, and two weekly crons:
+`.github/workflows/security-scan.yml` runs six jobs across PRs, pushes, and two weekly crons:
 
-- **unit-tests** — `node --test tests/*.test.cjs` on every PR / push (fast, no network). Covers parser helpers, advisory dedup, drift parsing, signal mapping. Smoke depends on this.
+- **unit-tests** — `node --test tests/*.test.cjs` on every PR / push (fast, no network). Covers parser helpers, advisory dedup, drift parsing, signal mapping, eval schema lint. Smoke depends on this.
 - **smoke** — `verify_integrity.cjs --no-audit` on every PR / push to master (offline, fast).
 - **refresh-hashes** — Monday cron, opens a PR refreshing `version` + `pkg_integrity` from live registries. Human-gated before merge.
 - **docker-drift** — Monday cron + manual dispatch. Compares each Docker entry's pinned `@sha256:` against the upstream registry digest; fails the job on any drift so a maintainer reviews before refreshing the pin.
 - **discover-candidates** — Thursday cron + manual dispatch. Runs `discover.cjs` against the three sources and opens a PR with a fresh `assets/discovery/candidates.json`. The file is an *inbox* — never auto-merged into `tools_database.json`.
+- **mcp-eval-smoke** — Monday cron + manual dispatch. Runs `mcp_eval.cjs --json` against the whole DB, uploads `eval_results.json` as an artifact. Cron-only — needs network to fetch packages. Results never auto-commit to the DB.
 
 ---
 

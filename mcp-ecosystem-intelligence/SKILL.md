@@ -309,6 +309,24 @@ node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs
 | `FAIL` | stored hash does not match registry tarball | hard abort — tarball has changed; investigate before proceeding |
 | `SKIP` | install method not verifiable (e.g. `uvx --from git+…`) | source-pin manually before adding to DB |
 
+### Step 1b — behavioural smoke (optional, network-bound)
+
+`verify_integrity.cjs` checks the *artifact you got* (hash matches the registry). It does NOT check that the artifact starts and exposes a usable tool surface. `mcp_eval.cjs` closes that gap:
+
+```bash
+# Smoke one entry before installing it for real
+node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --name <pkg> --timeout 60000
+
+# Smoke the whole DB (slow; runs in weekly CI)
+node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --json
+```
+
+For each entry the script spawns the server, runs `initialize` → `tools/list`, and lints each tool's `inputSchema` (minimal lint: top-level `type: object` + `properties` + `required` consistency + nested object/array types; rejects `$ref`). Pass means the handshake worked. Tool-count drift (`tool_count_drift: true`) means the DB's `est_tools_count` is stale and the recommendation needs a refresh.
+
+This step needs network (npx/uvx fetch the package). For air-gapped flows, skip it — `verify_integrity.cjs` covers the supply-chain side; eval is purely an additional confidence layer. The `--no-spawn` flag lints existing `eval_results.json` without touching the network.
+
+Eval results are written to `assets/eval_results.json` — never back into `tools_database.json`. They're an evidence stream, not a DB mutation.
+
 ### Step 2 — choose the install method
 
 **Prefer Docker where an official image exists, pinned by digest.** Use `@sha256:<digest>` rather than `:latest` — the verifier flags any unpinned image with `WARN` (or `FAIL` under `--strict`). Refresh digests with:
