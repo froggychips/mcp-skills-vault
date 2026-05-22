@@ -8,7 +8,6 @@
 | `scripts/verify_integrity.cjs` (current) | ✅ |
 | `scripts/orchestrate.cjs` (current) | ✅ |
 | `scripts/refresh_scores.cjs` (current) | ✅ |
-| `scripts/check_docker_drift.cjs` (current) | ✅ |
 | Pinned `version` entries in DB | ✅ integrity-gated |
 
 Older commits are not patched — update to `HEAD` of `master`.
@@ -53,62 +52,32 @@ Residual risk: a compromised npm/PyPI release that publishes under the same vers
 
 ### `verify_integrity.cjs` — the integrity gate
 
-A logic error here is the most critical failure mode. If the gate can be bypassed, a hash-mismatched package reaches a user's `.mcp.json`.
+A logic error here makes the entire pinning story worthless. Specifically dangerous failure modes:
+- Comparing hash with `==` against a non-string (coerces away difference)
+- Returning early on a parse error instead of failing
+- Falling back to a "warning" when the registry is unreachable
 
-Review checklist when modifying this file:
-- Hash comparison must be constant-time or at minimum use `===` on the full string
-- `--no-audit` must skip CVE checks only — the hash check must always run
-- Error paths must exit non-zero; a silent failure that returns 0 is equivalent to a bypass
+Mitigations:
+- Unit tests in `tests/verify_integrity.test.cjs` cover the parser, advisory dedup, and gate logic
+- Smoke job runs on every PR (`--no-audit` mode), offline, fast — would catch a regression that breaks the gate locally
+- `--strict` mode treats WARNs as failures and is what CI uses
 
-### `orchestrate.cjs --install` — writes `.mcp.json`
+### Weekly hash refresh PR
 
-The `buildServerEntry` function parses `install_cmd` into `{command, args}`. If `install_cmd` contains shell metacharacters and is ever passed through a shell (e.g. `exec shell: true`), it could enable injection.
+`.github/workflows/security-scan.yml`'s `refresh-hashes` job opens a PR every Monday with updated `version` + `pkg_integrity` from live registries. If an attacker can poison the registry during this window AND get the PR merged without review, they win.
 
-Current implementation: uses `spawnSync` with an explicit args array — no shell interpolation. Any future refactor that uses `shell: true` or template-string construction of the command array must be reviewed carefully.
+Mitigations:
+- PR is opened, never auto-merged
+- Diff is reviewable per-entry (one JSON field per line in the formatted DB)
+- The verify-integrity smoke runs on the refresh PR — it will fail if a refreshed hash diverges from what verify_integrity computes when run a second time
+- Reviewer responsibility: skim the diff and look for entries where MORE than the version+hash changed (e.g., `install_cmd` shouldn't move during a refresh)
 
-### Weekly CI PR — the human gate
+### Docker drift
 
-`refresh-hashes` job runs `verify_integrity.cjs --update` + `refresh_scores.cjs --write`, then opens a PR via `peter-evans/create-pull-request`. This is the **only** automated mutation of `tools_database.json`.
+`scripts/check_docker_drift.cjs` compares pinned `@sha256:` against the registry digest for `tracked_tag`. The `docker-drift` weekly job fails on any drift. A maintainer reviews the upstream change BEFORE refreshing the pin — a routine rebuild and a registry hijack look identical from here, and the human gate is the differentiator.
 
-Risk surface: a compromised GitHub Actions token or a misconfigured workflow could auto-merge. The branch protection rule requiring human review is the control; removing it would be a security regression.
+## What this project is NOT
 
-### Docker `@sha256` drift
-
-Docker entries pin the image by digest (`image@sha256:…`). The digest is immutable in the registry, so the pin itself cannot be bypassed by an upstream rebuild. But the pin can become **stale** — the maintainer rebuilds the same tag (e.g. `:latest`) under a new digest, leaving us pointing at an older version that may be missing a security fix.
-
-`scripts/check_docker_drift.cjs` follows the OCI Distribution Spec (anonymous bearer auth) to fetch the current digest for the tracked tag (default `latest`, overridable via `tracked_tag` in the entry) and reports drift. The weekly CI job fails on any drift so a maintainer reviews the upstream change before refreshing the DB.
-
-Drift is not, by itself, a hijack signal — it most often means a routine rebuild. But it **could** be a hijack of the registry namespace; do not auto-refresh the pin without checking the upstream repo's release notes / commit signing.
-
-### `--no-audit` mode
-
-Passes `--no-audit` to skip the CVE advisory check (OSV.dev / npm advisory API). Legitimate use: offline/air-gapped environments. Misuse: masking a known-CVE package from being flagged.
-
-The hash check still runs in `--no-audit` mode. This flag only skips the advisory API call.
-
-### `.env` scanning — key names only
-
-`orchestrate.cjs` reads `.env*` files to detect infrastructure signals. It reads **key names only** — values are never captured, printed, or stored. Regex: `/^([A-Z0-9_]+)=/`.
-
-Verify this invariant if the stack-detection code is modified.
-
-## Privacy Notes
-
-- No telemetry is collected. All processing is local.
-- `~/.claude.json` values are never read by any script in this repo. MCP config inspection uses `jq '.mcpServers | keys'` — never `cat` of the whole file.
-- `.env` scanning: key names only. Value leakage would be a security regression.
-
-## Known Limitations
-
-- **Hash ≠ code audit.** `trust: "verified"` in the DB means the listed hash matched the registry at the time of last refresh. It does not mean the code has been reviewed for malicious behaviour.
-- **Pinned version drift.** The weekly refresh updates hashes to the latest version. A new version that introduces malicious code will pass the hash check (the hash will match the new release). This is why the weekly PR requires human review of every version bump.
-- **git-URL installs are not supported.** `orchestrate.cjs --install` only handles entries in `tools_database.json`. Installing from an arbitrary git URL has no integrity gate and is explicitly unsupported.
-
-## Response SLA
-
-| Severity | Example | Target response |
-|---|---|---|
-| Critical | Hash bypass / script injection → RCE | Patch within 48 h |
-| High | CVE entry missing / not flagged | Patch within 7 days |
-| Medium | Hash mismatch not caught in edge case | Patch within 14 days |
-| Low | Docs / UX issues | Best effort |
+- Not a sandbox. Installing an MCP server runs whatever the server's `command` does, with whatever permissions Claude Code has. The integrity gate guarantees you ran the artifact you expected; it does not guarantee the artifact is benign.
+- Not a CVE database. Advisory feeds (npm bulk, OSV, GHSA, Snyk) are aggregated and surfaced, but the source of truth lives upstream.
+- Not a runtime monitor. The scanner runs at install time; runtime behavior of the installed server is out of scope.
