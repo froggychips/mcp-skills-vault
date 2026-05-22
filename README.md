@@ -1,5 +1,7 @@
 # mcp-skills-vault
 
+**Homepage:** [mcp.froggychips.xyz](https://mcp.froggychips.xyz)
+
 > **Make MCP boring.** A deterministic registry + integrity scanner for [Model Context Protocol](https://modelcontextprotocol.io) servers, so installing one stops feeling like `curl | bash`.
 
 <!-- demo.gif placeholder — regenerate with: bash docs/demo-bootstrap.sh && vhs docs/demo.tape -->
