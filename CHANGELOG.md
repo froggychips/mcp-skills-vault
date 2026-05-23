@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/froggychips/mcp-skills-vault/compare/v0.7.0...v0.8.0) (2026-05-23)
+
+
+### Features
+
+* mcp-vault CLI + npm-publishable package ([#50](https://github.com/froggychips/mcp-skills-vault/issues/50)) ([9c1f9a0](https://github.com/froggychips/mcp-skills-vault/commit/9c1f9a05d16618c033e8d62acaa004fd367b42b1))
+
 ## [0.7.0](https://github.com/froggychips/mcp-skills-vault/compare/v0.6.0...v0.7.0) (2026-05-22)
 
 
