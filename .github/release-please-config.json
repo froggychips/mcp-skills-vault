@@ -23,6 +23,11 @@
         {
           "type": "generic",
           "path": "mcp-ecosystem-intelligence/SKILL.md"
+        },
+        {
+          "type": "json",
+          "path": "package.json",
+          "jsonpath": "$.version"
         }
       ]
     }
