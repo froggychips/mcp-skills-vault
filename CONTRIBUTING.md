@@ -10,10 +10,10 @@ For security-sensitive changes (scripts in `mcp-ecosystem-intelligence/scripts/`
 
 ### Quick path
 
-1. Run `node mcp-ecosystem-intelligence/scripts/discover.cjs --source npm --out /tmp/cands.json` and pick from the output. The script handles dedup against the DB, health scoring, and reject heuristics.
+1. Run `mcp-vault discover --source npm --out /tmp/cands.json` and pick from the output. The script handles dedup against the DB, health scoring, and reject heuristics.
 2. Append the chosen entry to `mcp-ecosystem-intelligence/assets/tools_database.json` with `trust: "candidate"` (see schema below).
-3. Run `node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --update` — fills `version` + `pkg_integrity` from the live registry.
-4. Run `node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --no-audit` — must exit 0.
+3. Run `mcp-vault verify --update` — fills `version` + `pkg_integrity` from the live registry.
+4. Run `mcp-vault verify --no-audit` — must exit 0.
 5. Open a PR using the template at `.github/PULL_REQUEST_TEMPLATE/new-mcp-entry.md`.
 
 ### Entry schema

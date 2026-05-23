@@ -3,44 +3,35 @@
 ##   bash docs/demo-bootstrap.sh && vhs docs/demo.tape
 ## Output: docs/demo.gif
 ##
-## To keep the recording fast and deterministic the demo `cat`s
-## pre-captured outputs. Refresh them with:
+## The demo `cat`s pre-captured outputs through a shell function
+## defined by docs/demo-bootstrap.sh — viewer sees `mcp-vault scan`,
+## runner sees `cat docs/demo-out-*.txt`. Refresh the fixtures with:
 ##   bash docs/demo-bootstrap.sh
-##   node mcp-ecosystem-intelligence/scripts/orchestrate.cjs --cwd /tmp/msv-demo-proj > docs/demo-out-orchestrate.txt
-##   node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --no-audit 2>&1 | tail -3 > docs/demo-out-verify.txt
+##   node bin/mcp-vault.cjs scan   --cwd /tmp/msv-demo-proj > docs/demo-out-orchestrate.txt
+##   node bin/mcp-vault.cjs verify --no-audit 2>&1 | tail -3 > docs/demo-out-verify.txt
 
 Output docs/demo.gif
 
-Set FontSize       16
-Set Width          1200
-Set Height         700
-Set Padding        16
-Set TypingSpeed    40ms
+Set FontSize 14
+Set Width    1100
+Set Height   620
+Set Padding  12
+Set TypingSpeed 30ms
 
-Type "cd /tmp/msv-demo-proj && clear"
+Hide
+Type "cd /tmp/msv-demo-proj && source .demo-aliases.sh && clear"
 Enter
-Sleep 600
+Sleep 200ms
+Show
 
 Type "# Typical infra project: pg + AWS + TeamCity + Atlassian"
-Sleep 1200
 Enter
-Type "ls -1 && cat .env.example"
-Enter
-Sleep 1800
+Sleep 700ms
 
-Type "# Scan it:"
-Sleep 800
+Type "mcp-vault scan --cwd ."
 Enter
-Type "cat ~/repos/mcp-skills-vault/docs/demo-out-orchestrate.txt"
-Enter
-Sleep 5500
+Sleep 3500ms
 
-Type "# Verify the whole 112-entry DB, offline:"
-Sleep 800
+Type "mcp-vault verify --no-audit"
 Enter
-Type "cat ~/repos/mcp-skills-vault/docs/demo-out-verify.txt"
-Enter
-Sleep 3500
-
-Type "# 0 failures. 84% verified. Offline. Boring."
-Sleep 2500
+Sleep 2500ms

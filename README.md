@@ -4,10 +4,10 @@
 
 > **Make MCP boring.** A deterministic registry + integrity scanner for [Model Context Protocol](https://modelcontextprotocol.io) servers, so installing one stops feeling like `curl | bash`.
 
-<!-- demo.gif placeholder — regenerate with: bash docs/demo-bootstrap.sh && vhs docs/demo.tape -->
+![demo](./docs/demo.gif)
 
 ```text
-$ node mcp-ecosystem-intelligence/scripts/orchestrate.cjs
+$ npx -y @froggychips/mcp-vault scan
 Stack: Langs: Node | DB: postgres | Infra: aws, teamcity, atlassian
 Needs: database, infra, ci-cd, pm
 
@@ -22,7 +22,7 @@ Needs: database, infra, ci-cd, pm
   Experimental mcp-atlassian             72 tools ⚠  score  55
                  --toolsets jira,confluence
 
-$ node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --no-audit
+$ npx -y @froggychips/mcp-vault verify --no-audit
 …
 110 entries checked — 0 failure(s)
 ```
@@ -41,17 +41,27 @@ $ node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --no-audit
 
 † Snyk requires `SNYK_TOKEN` (no public anonymous API).
 
-## Quick install
+## Quick start
+
+**As a CLI** — one line, no clone, no global install:
 
 ```bash
-# As a Claude Code skill
+npx -y @froggychips/mcp-vault scan --cwd ./my-project
+npx -y @froggychips/mcp-vault audit --strict
+npx -y @froggychips/mcp-vault verify --no-audit
+```
+
+Prefer it installed? `npm i -g @froggychips/mcp-vault` then drop the `npx -y` prefix.
+
+**As a Claude Code skill** — drop the bundled skill folder into `~/.claude/skills/` and Claude will pick it up:
+
+```bash
 git clone https://github.com/froggychips/mcp-skills-vault.git
 mkdir -p ~/.claude/skills
 cp -r mcp-skills-vault/mcp-ecosystem-intelligence ~/.claude/skills/
-
-# As a CLI (no Claude required)
-node mcp-skills-vault/mcp-ecosystem-intelligence/scripts/orchestrate.cjs --cwd /path/to/project
 ```
+
+**Direct script invocation** — every command also runs without the CLI wrapper, e.g. `node mcp-ecosystem-intelligence/scripts/orchestrate.cjs --cwd /path/to/project`. Flags are identical; the CLI is a thin pass-through.
 
 Zero runtime dependencies. Node built-ins only. One JSON file is the entire database.
 
@@ -88,14 +98,14 @@ Full rationale and the rules each constraint imposes: [PHILOSOPHY.md](./PHILOSOP
 
 ```bash
 # Scan project, match DB, show what to install
-node mcp-ecosystem-intelligence/scripts/orchestrate.cjs --cwd /path/to/project
+mcp-vault scan --cwd /path/to/project
 
 # Keyword search on top of stack detection
-node mcp-ecosystem-intelligence/scripts/orchestrate.cjs --query kubernetes
+mcp-vault scan --query kubernetes
 
 # Install a tool: integrity gate → writes .mcp.json
-node mcp-ecosystem-intelligence/scripts/orchestrate.cjs --install github-mcp-server
-node mcp-ecosystem-intelligence/scripts/orchestrate.cjs --install mcp-server-memory --global
+mcp-vault install github-mcp-server
+mcp-vault install mcp-server-memory --global
 ```
 
 Detects stack from: `package.json`, `pyproject.toml`, `requirements.txt`, `go.mod`, `Cargo.toml`, `docker-compose.yml`, `.env*` (key names only — no value leaks).
@@ -105,7 +115,7 @@ Detects stack from: `package.json`, `pyproject.toml`, `requirements.txt`, `go.mo
 [`scripts/verify_integrity.cjs`](./mcp-ecosystem-intelligence/scripts/verify_integrity.cjs) — run before any install:
 
 ```bash
-node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs
+mcp-vault verify
 ```
 
 | Ecosystem | Integrity | Source URL | Install hooks | CVE / advisory |
@@ -129,9 +139,9 @@ Flags:
 [`scripts/check_docker_drift.cjs`](./mcp-ecosystem-intelligence/scripts/check_docker_drift.cjs) — for every Docker entry, fetches the registry digest for the tracked tag (`tracked_tag` in the entry, default `latest`) via the OCI Distribution Spec and reports drift against the pinned `@sha256:` digest.
 
 ```bash
-node mcp-ecosystem-intelligence/scripts/check_docker_drift.cjs           # human-readable
-node mcp-ecosystem-intelligence/scripts/check_docker_drift.cjs --json    # machine-readable
-node mcp-ecosystem-intelligence/scripts/check_docker_drift.cjs --strict  # exit 1 on any drift
+mcp-vault docker-drift           # human-readable
+mcp-vault docker-drift --json    # machine-readable
+mcp-vault docker-drift --strict  # exit 1 on any drift
 ```
 
 Drift = upstream rebuilt the tag under a new digest. The weekly CI job (`docker-drift`) fails on any drift so a maintainer reviews the upstream change *before* refreshing the pin — a routine rebuild and a registry hijack look identical from here.
@@ -143,10 +153,10 @@ Drift = upstream rebuilt the tag under a new digest. The weekly CI job (`docker-
 For each DB entry with a recognized install method (`npx -y`, `uvx`, `docker run`), the script spawns the subprocess and runs the canonical JSON-RPC handshake — `initialize` → `notifications/initialized` → `tools/list` — then lints each returned tool's `inputSchema` with a minimal validator (intentionally narrower than full JSON Schema Draft 2020-12; covers only what Claude Code actually reads: `type`, `properties`, `required`, `enum`, `description`, plus nested objects + array items).
 
 ```bash
-node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs                       # smoke all (needs network)
-node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --name memory         # one entry, substring match
-node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --json --strict       # CI form
-node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --no-spawn            # offline self-test
+mcp-vault eval                       # smoke all (needs network)
+mcp-vault eval --name memory         # one entry, substring match
+mcp-vault eval --json --strict       # CI form
+mcp-vault eval --no-spawn            # offline self-test
 ```
 
 Output: `assets/eval_results.json` — `{name, status, boot_ms, list_latency_ms, tool_count, tool_count_db, tool_count_drift, schema_errors[], error_code, checked_at}` per entry, sorted by name for deterministic diffs. Results never flow back into `tools_database.json` — DB stays the source of truth, eval is a separate evidence stream.
@@ -161,10 +171,10 @@ What it does NOT validate: behavioural correctness (we don't call any tool), bus
 
 ```bash
 # Default: all three sources, top-50 candidates, capped at 200 gh api calls
-node mcp-ecosystem-intelligence/scripts/discover.cjs --out candidates.json
+mcp-vault discover --out candidates.json
 
 # Single source / smaller limit
-node mcp-ecosystem-intelligence/scripts/discover.cjs --source npm --limit 20 --out candidates.json
+mcp-vault discover --source npm --limit 20 --out candidates.json
 ```
 
 Sources:
@@ -184,9 +194,9 @@ The weekly `discover-candidates` CI job runs this script every Thursday and open
 [`scripts/audit_setup.cjs`](./mcp-ecosystem-intelligence/scripts/audit_setup.cjs) — diff the user's installed MCP servers against the DB. Reads `<cwd>/.mcp.json`, the `mcpServers` key of `~/.claude.json` (and *only* that key — auth tokens live elsewhere in the file), and `<cwd>/.claude/settings.json` (`enabledMcpjsonServers`, `permissions.allow`):
 
 ```bash
-node mcp-ecosystem-intelligence/scripts/audit_setup.cjs            # human-readable
-node mcp-ecosystem-intelligence/scripts/audit_setup.cjs --json     # machine-readable findings
-node mcp-ecosystem-intelligence/scripts/audit_setup.cjs --strict   # exit 1 on drift/untrusted/heavy
+mcp-vault audit            # human-readable
+mcp-vault audit --json     # machine-readable findings
+mcp-vault audit --strict   # exit 1 on drift/untrusted/heavy
 ```
 
 | Finding | Trigger |
@@ -204,7 +214,7 @@ Exit codes: `0` clean / info-only · `1` `--strict` triggered · `2` bad invocat
 [`scripts/calculate_health.cjs`](./mcp-ecosystem-intelligence/scripts/calculate_health.cjs) — score any MCP candidate:
 
 ```bash
-node mcp-ecosystem-intelligence/scripts/calculate_health.cjs \
+mcp-vault health \
   <stars> <last_commit_days> <in_registry> <has_install_cmd> <critical_issues> [license]
 ```
 
@@ -335,11 +345,11 @@ When the vendor server has no native filtering and exposes 50+ tools you don't n
 
 ```bash
 # Skeleton wrapper, no tools yet
-node mcp-ecosystem-intelligence/scripts/generate_wrapper.cjs \
+mcp-vault wrap \
   --name my-cli-mcp --tool "My CLI" --out ./my-cli-mcp
 
 # Pre-populated with tool definitions from a JSON spec
-node mcp-ecosystem-intelligence/scripts/generate_wrapper.cjs \
+mcp-vault wrap \
   --name warehouse-mcp --tool "Internal Warehouse" \
   --tools-file ./tools.json \
   --out ./warehouse-mcp
@@ -359,7 +369,7 @@ Running the suite locally:
 
 ```bash
 node --test tests/*.test.cjs                                              # unit tests (offline, < 1s)
-node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --no-audit   # DB smoke
+mcp-vault verify --no-audit   # DB smoke
 ```
 
 ---

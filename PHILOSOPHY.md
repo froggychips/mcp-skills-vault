@@ -12,7 +12,7 @@ Concretely: the CI `smoke` job is offline. Air-gapped environments install with 
 
 Zero runtime dependencies for the scripts. Node built-ins only (`fs`, `https`, `child_process`, `path`, `crypto`). The supply-chain attack surface for *this* repo is exactly Node's, no more.
 
-The DB is a single JSON file. The orchestrator is one `.cjs` file. The integrity scanner is one `.cjs` file. No build step, no transpilation, no bundler. `git clone` + `node scripts/orchestrate.cjs` works on day one.
+The DB is a single JSON file. The orchestrator is one `.cjs` file. The integrity scanner is one `.cjs` file. No build step, no transpilation, no bundler. `npx -y @froggychips/mcp-vault scan` works on day one — and so does `git clone` + `node scripts/orchestrate.cjs` for users who prefer to inspect first.
 
 ## 3. Inspectable
 
