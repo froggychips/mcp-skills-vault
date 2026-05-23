@@ -1,6 +1,6 @@
 
-Stack: Langs: Node | DB: postgres | Infra: aws, teamcity, atlassian | Keys: TEAMCITY_URL, ATLASSIAN_URL
-Needs: database, infra, ci-cd, pm
+Stack: Langs: Node | DB: postgres | Infra: aws, teamcity, atlassian, jira | Keys: TEAMCITY_URL, ATLASSIAN_URL
+Needs: database, infra, ci-cd, pm, docs
 
 ── Recommended ──────────────────────────────────────────────
   Core          mcp-server-neon            29 tools  score 110
@@ -28,6 +28,9 @@ Needs: database, infra, ci-cd, pm
   ✓ froggy                       global (~/.claude.json)
   ✓ froggy-sre                   global (~/.claude.json)
   ✓ wo-context                   global (~/.claude.json)
+  ✓ mcp-discord                  global (~/.claude.json)
+  ✓ cloudflare-observability     global (~/.claude.json)
+  ✓ cloudflare-graphql           global (~/.claude.json)
 
 ── Integrity (DB snapshot) ──────────────────────────────────
   Matched: 7 verified

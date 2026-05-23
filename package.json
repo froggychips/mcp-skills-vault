@@ -1,0 +1,58 @@
+{
+  "name": "@froggychips/mcp-vault",
+  "version": "0.7.0",
+  "description": "Deterministic registry + integrity scanner for Model Context Protocol servers. Make MCP supply-chain boring.",
+  "bin": {
+    "mcp-vault": "bin/mcp-vault.cjs"
+  },
+  "files": [
+    "bin",
+    "mcp-ecosystem-intelligence/scripts",
+    "mcp-ecosystem-intelligence/assets/tools_database.json",
+    "mcp-ecosystem-intelligence/assets/eval_results.json",
+    "mcp-ecosystem-intelligence/assets/mcp-wrapper-template",
+    "mcp-ecosystem-intelligence/SKILL.md",
+    "PHILOSOPHY.md",
+    "SECURITY.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test tests/*.test.cjs",
+    "verify": "node bin/mcp-vault.cjs verify --no-audit"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/froggychips/mcp-skills-vault.git"
+  },
+  "homepage": "https://mcp.froggychips.xyz",
+  "bugs": {
+    "url": "https://github.com/froggychips/mcp-skills-vault/issues"
+  },
+  "author": "froggychips",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "claude-code",
+    "anthropic",
+    "supply-chain",
+    "security",
+    "registry",
+    "integrity",
+    "sha512",
+    "sha256",
+    "osv",
+    "ghsa",
+    "audit",
+    "offline-first"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
