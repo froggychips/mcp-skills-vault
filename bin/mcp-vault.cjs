@@ -16,6 +16,8 @@ const COMMANDS = {
   verify:          "verify_integrity.cjs",
   scan:            "orchestrate.cjs",
   install:         "orchestrate.cjs",
+  list:            "list_entries.cjs",
+  ls:              "list_entries.cjs",
   discover:        "discover.cjs",
   eval:            "mcp_eval.cjs",
   "docker-drift":  "check_docker_drift.cjs",
@@ -32,6 +34,7 @@ USAGE
 
 COMMANDS
   scan              Detect project stack and recommend MCP servers
+  list (ls)         Show every server in the vault DB (filters: --category, --tier, --query)
   audit             Diff installed MCP servers against the vault DB
   verify            Integrity gate (hashes + advisories) over the whole DB
   install <pkg>     Integrity gate, then write .mcp.json
@@ -95,8 +98,17 @@ function main(argv) {
   if (cmd === "install") {
     const firstNonFlag = passArgs.findIndex(a => !a.startsWith("-"));
     if (firstNonFlag === -1) {
-      process.stderr.write("mcp-vault install: package name required\n");
-      process.stderr.write("  example: mcp-vault install github-mcp-server\n");
+      process.stderr.write(
+        "mcp-vault install: package name required.\n\n" +
+        "Find one:\n" +
+        "  mcp-vault list                          # all 112 servers\n" +
+        "  mcp-vault list --category database      # filter by category\n" +
+        "  mcp-vault list --query github           # substring search\n" +
+        "  mcp-vault scan --cwd ./your-project     # stack-aware recommendations\n\n" +
+        "Then:\n" +
+        "  mcp-vault install <name>                # writes ./.mcp.json\n" +
+        "  mcp-vault install <name> --global       # writes ~/.claude.json\n"
+      );
       process.exit(2);
     }
     const pkg = passArgs[firstNonFlag];
