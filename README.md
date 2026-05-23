@@ -45,7 +45,7 @@ $ npx -y @froggychips/mcp-vault verify --no-audit
 | **Offline use** | doesn't | `--no-audit` skips network entirely; hash gate still runs; air-gapped same as networked |
 | **Telemetry** | varies | none. Ever. |
 
-† Snyk requires `SNYK_TOKEN` (no public anonymous API).
+† Snyk requires `SNYK_TOKEN` (no public anonymous API)
 
 ## Quick start
 
