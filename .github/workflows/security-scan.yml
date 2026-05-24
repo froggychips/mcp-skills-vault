@@ -56,8 +56,8 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '20'
-      - name: verify_integrity --no-audit
-        run: node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --no-audit
+      - name: verify_integrity --offline
+        run: node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --offline
 
   refresh-hashes:
     name: Weekly hash refresh PR

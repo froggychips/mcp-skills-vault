@@ -340,7 +340,8 @@ node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs
 |---|---|
 | *(default)* | integrity + advisory check + hook detection |
 | `--strict` | treat WARNs (hook, repo mismatch, unpinned docker) as hard failures |
-| `--no-audit` | skip advisory APIs (offline/air-gapped environments) |
+| `--no-audit` | skip advisory APIs; still fetch registry metadata |
+| `--offline` | true offline mode; no network calls, validate stored DB pins only |
 | `--update` | refresh `version` + `pkg_integrity` fields from registries |
 
 **Interpreting output:**

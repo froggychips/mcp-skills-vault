@@ -22,7 +22,8 @@
  *   node scripts/verify_integrity.cjs              verify everything
  *   node scripts/verify_integrity.cjs --update     refresh version/integrity from registries
  *   node scripts/verify_integrity.cjs --strict     treat WARNs as hard failures
- *   node scripts/verify_integrity.cjs --no-audit   skip advisory APIs (offline mode)
+ *   node scripts/verify_integrity.cjs --no-audit   skip advisory APIs; still checks live registries
+ *   node scripts/verify_integrity.cjs --offline    true offline mode; validate DB pins only
  *
  * Exit codes:
  *   0  all checks passed
@@ -41,6 +42,7 @@ const DB_PATH   = path.resolve(__dirname, '../assets/tools_database.json');
 const UPDATE    = process.argv.includes('--update');
 const STRICT    = process.argv.includes('--strict');
 const NO_AUDIT  = process.argv.includes('--no-audit');
+const OFFLINE   = process.argv.includes('--offline');
 
 const INSTALL_HOOKS = ['preinstall', 'install', 'postinstall', 'prepare', 'prepack'];
 
@@ -305,6 +307,10 @@ function unifyAdvisories({ npmList, osvList, ghsaList, snykList }) {
 // ── per-tool processors ────────────────────────────────────────────────────
 
 async function processNpm(tool, pkg, advisoriesForTool, results) {
+  if (OFFLINE) {
+    processOfflinePackage(tool, pkg, 'npm', results);
+    return;
+  }
   const versionSpec = tool.version ? `${pkg}@${tool.version}` : `${pkg}@latest`;
   let meta;
   try {
@@ -376,6 +382,10 @@ async function processNpm(tool, pkg, advisoriesForTool, results) {
 }
 
 async function processPypi(tool, pkg, advisoriesForTool, results) {
+  if (OFFLINE) {
+    processOfflinePackage(tool, pkg, 'PyPI', results);
+    return;
+  }
   const meta = await fetchPypiMeta(pkg, tool.version);
   if (!meta) {
     results.push({ tool, status: 'SKIP', msg: `${pkg}: PyPI lookup failed` });
@@ -456,9 +466,40 @@ function processDocker(tool, results) {
   }
 }
 
+function processOfflinePackage(tool, pkg, ecosystem, results) {
+  let failures = 0;
+  const lines = [];
+
+  if (!tool.version) {
+    lines.push(['MISS', 'no pinned version in DB']);
+    if (STRICT) failures++;
+  }
+  if (!tool.pkg_integrity) {
+    lines.push(['MISS', 'no stored pkg_integrity — cannot compare without network']);
+    if (STRICT) failures++;
+  }
+  if (!tool.source_url) {
+    lines.push(['NOTE', 'no source_url in DB']);
+  }
+
+  const pin = tool.version ? `@${tool.version}` : '@?';
+  results.push({
+    tool,
+    status: failures > 0 ? 'FAIL' : 'OK',
+    msg: `${tool.name}${pin} (${ecosystem} offline pin present for ${pkg})`,
+    lines,
+    failures,
+  });
+}
+
 // ── main ───────────────────────────────────────────────────────────────────
 
 async function main() {
+  if (OFFLINE && UPDATE) {
+    console.error('--offline cannot be combined with --update (refresh requires registries).');
+    process.exit(2);
+  }
+
   const db        = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
   const results   = [];
   let totalFails  = 0;
@@ -493,7 +534,7 @@ async function main() {
   let osvPypiResults = [];
   let ghsaResults = {};
   let snykResults = {};
-  if (!UPDATE && !NO_AUDIT) {
+  if (!UPDATE && !NO_AUDIT && !OFFLINE) {
     const npmMap = {};
     for (const { pkg } of npmTools) npmMap[pkg] = [''];   // npm tolerates empty version array
     const npmQueries  = npmTools.map(({ pkg, tool })  => ({ ecosystem: 'npm',  name: pkg, version: tool.version || '0.0.0' }));
@@ -511,6 +552,13 @@ async function main() {
     if (snykResults.__skipped__) sources.push(`Snyk skipped (${snykResults.__skipped__})`);
     else                          sources.push('Snyk');
     console.log(`done — sources: ${sources.join(', ')}.`);
+  }
+
+  // Process npm.
+  if (OFFLINE) {
+    console.log('Offline mode: validating stored pins only; no registry/advisory network calls.');
+  } else if (NO_AUDIT && !UPDATE) {
+    console.log('No-audit mode: checking live registry metadata; advisory feeds skipped.');
   }
 
   // Process npm.
@@ -558,7 +606,7 @@ async function main() {
     writeDb(DB_PATH, db);
     console.log(`\nWrote ${updated} updated entries to ${DB_PATH}`);
   } else if (!UPDATE) {
-    const checked = npmTools.length + pypiTools.length + dockerTools.length;
+    const checked = Array.isArray(db.tools) ? db.tools.length : (npmTools.length + pypiTools.length + dockerTools.length);
     console.log(`\n${checked} entries checked — ${totalFails} failure(s)`);
     if (totalFails > 0) console.error('DO NOT install until failures are resolved.');
   }

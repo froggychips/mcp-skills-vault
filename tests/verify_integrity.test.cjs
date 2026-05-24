@@ -1,6 +1,7 @@
 'use strict';
 const { test }   = require('node:test');
 const assert     = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
 const v = require('../mcp-ecosystem-intelligence/scripts/verify_integrity.cjs');
 
 test('normalizeGitUrl: strips .git, /issues, git+ prefixes', () => {
@@ -97,4 +98,24 @@ test('unifyAdvisories: empty inputs return empty list', () => {
     v.unifyAdvisories({ npmList: [], osvList: [], ghsaList: [], snykList: [] }),
     [],
   );
+});
+
+test('CLI --offline is the network-free smoke path', () => {
+  const r = spawnSync(process.execPath, [
+    'mcp-ecosystem-intelligence/scripts/verify_integrity.cjs',
+    '--offline',
+  ], { cwd: require('node:path').resolve(__dirname, '..'), encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /Offline mode: validating stored pins only/);
+  assert.match(r.stdout, /entries checked/);
+});
+
+test('CLI --offline rejects --update', () => {
+  const r = spawnSync(process.execPath, [
+    'mcp-ecosystem-intelligence/scripts/verify_integrity.cjs',
+    '--offline',
+    '--update',
+  ], { cwd: require('node:path').resolve(__dirname, '..'), encoding: 'utf8' });
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /--offline cannot be combined with --update/);
 });

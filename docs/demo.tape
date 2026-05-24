@@ -8,7 +8,7 @@
 ## runner sees `cat docs/demo-out-*.txt`. Refresh the fixtures with:
 ##   bash docs/demo-bootstrap.sh
 ##   node bin/mcp-vault.cjs scan   --cwd /tmp/msv-demo-proj > docs/demo-out-orchestrate.txt
-##   node bin/mcp-vault.cjs verify --no-audit 2>&1 | tail -3 > docs/demo-out-verify.txt
+##   node bin/mcp-vault.cjs verify --offline 2>&1 | tail -3 > docs/demo-out-verify.txt
 
 Output docs/demo.gif
 
@@ -32,6 +32,6 @@ Type "mcp-vault scan --cwd ."
 Enter
 Sleep 3500ms
 
-Type "mcp-vault verify --no-audit"
+Type "mcp-vault verify --offline"
 Enter
 Sleep 2500ms

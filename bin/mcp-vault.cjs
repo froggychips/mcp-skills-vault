@@ -18,6 +18,7 @@ const COMMANDS = {
   install:         "orchestrate.cjs",
   list:            "list_entries.cjs",
   ls:              "list_entries.cjs",
+  doctor:          "doctor.cjs",
   discover:        "discover.cjs",
   eval:            "mcp_eval.cjs",
   "docker-drift":  "check_docker_drift.cjs",
@@ -25,6 +26,7 @@ const COMMANDS = {
   health:          "calculate_health.cjs",
   refresh:         "refresh_scores.cjs",
   wrap:            "generate_wrapper.cjs",
+  "site-registry": "generate_registry_page.cjs",
 };
 
 const HELP = `mcp-vault — make MCP supply-chain boring.
@@ -35,6 +37,7 @@ USAGE
 COMMANDS
   scan              Detect project stack and recommend MCP servers
   list (ls)         Show every server in the vault DB (filters: --category, --tier, --query)
+  doctor            Check local Node / gh / Docker / uvx / Claude MCP config readiness
   audit             Diff installed MCP servers against the vault DB
   verify            Integrity gate (hashes + advisories) over the whole DB
   install <pkg>     Integrity gate, then write .mcp.json
@@ -45,11 +48,13 @@ COMMANDS
   health <args>     Score a candidate by stars / recency / license / registry
   refresh           Refresh pinned versions + integrity hashes from registries
   wrap              Generate MCP wrapper boilerplate for a CLI / API tool
+  site-registry     Generate docs/site/registry.html from tools_database.json
 
 COMMON OPTIONS
   --json            Machine-readable output
   --strict          Treat warnings as failures (exit 1)
-  --no-audit        Skip advisory APIs (offline mode; verify only)
+  --no-audit        Skip advisory APIs; verify still checks live registries
+  --offline         True offline verify mode; validate stored DB pins only
   --cwd <path>      Target project directory (scan / audit)
 
   Each command also accepts its own flags — run with --help for details.
@@ -57,7 +62,7 @@ COMMON OPTIONS
 QUICK START
   npx -y @froggychips/mcp-vault scan --cwd ./my-project
   npx -y @froggychips/mcp-vault audit --strict
-  npx -y @froggychips/mcp-vault verify --no-audit
+  npx -y @froggychips/mcp-vault verify --offline
 
 DOCS  https://github.com/froggychips/mcp-skills-vault
 SITE  https://mcp.froggychips.xyz

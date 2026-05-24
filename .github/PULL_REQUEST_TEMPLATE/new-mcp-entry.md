@@ -29,7 +29,8 @@ _What gap in the existing DB does this fill? Why this server vs alternatives in 
 
 - [ ] `install_cmd` is pinned to an explicit version (npm/PyPI) or `@sha256:` digest (Docker)
 - [ ] Ran `verify_integrity.cjs --update` — `version` and `pkg_integrity` are populated
-- [ ] Ran `verify_integrity.cjs --no-audit` — exits 0
+- [ ] Ran `verify_integrity.cjs --offline` — exits 0 without network
+- [ ] Ran `verify_integrity.cjs --no-audit` — live registry check exits 0
 - [ ] Ran `verify_integrity.cjs` (full audit) — no HIGH/CRITICAL CVEs, or any flagged ones are listed below
 - [ ] Entry uses the schema from CONTRIBUTING.md (no missing required fields)
 - [ ] Not a duplicate of an existing entry (different name but same `source_url` counts as a duplicate)

@@ -1,0 +1,1309 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MCP Vault Registry</title>
+  <meta name="description" content="Browsable registry of MCP servers from @froggychips/mcp-vault: pinned install commands, health score, trust, license, and estimated tool count.">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header>
+    <nav>
+      <a href="./index.html">home</a>
+      <a href="./vault.html">vault</a>
+      <a href="./registry.html">registry</a>
+      <a href="./install.html">install</a>
+      <a href="https://github.com/froggychips/mcp-skills-vault">github</a>
+    </nav>
+  </header>
+  <main>
+    <h1>MCP Vault Registry</h1>
+    <p class="lede">112 MCP server entries with pinned install commands, trust tier, license, score, and estimated tool count.</p>
+
+    <section class="filters" aria-label="registry filters">
+      <input id="q" type="search" placeholder="Search name or install command" aria-label="Search registry">
+      <select id="category" aria-label="Category"><option value="">All categories</option></select>
+      <select id="tier" aria-label="Tier"><option value="">All tiers</option></select>
+      <select id="trust" aria-label="Trust"><option value="">All trust</option></select>
+    </section>
+
+    <p id="count">112 shown</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th><th>Category</th><th>Tier</th><th>Trust</th><th>Score</th><th>Tools</th><th>License</th><th>Install</th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+        <tr data-name="@last9/mcp-server" data-category="ai" data-tier="Core" data-trust="candidate">
+          <td><a href="https://github.com/last9/last9-mcp-server">@last9/mcp-server</a></td>
+          <td>ai</td>
+          <td>Core</td>
+          <td>candidate</td>
+          <td>107.5</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y @last9/mcp-server</code></td>
+        </tr>
+
+        <tr data-name="lsp-mcp-server" data-category="ai" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/ProfessioneIT/lsp-mcp-server">lsp-mcp-server</a></td>
+          <td>ai</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>101.8</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y lsp-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="codex-mcp-server" data-category="ai" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/tuannvm/codex-mcp-server">codex-mcp-server</a></td>
+          <td>ai</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>100</td>
+          <td>?</td>
+          <td>Unknown</td>
+          <td><code>npx -y codex-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@browserstack/mcp-server" data-category="browser" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/browserstack/mcp-server">@browserstack/mcp-server</a></td>
+          <td>browser</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>AGPL-3.0</td>
+          <td><code>npx -y @browserstack/mcp-server</code></td>
+        </tr>
+
+        <tr data-name="playwright-mcp" data-category="browser" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/microsoft/playwright-mcp">playwright-mcp</a></td>
+          <td>browser</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>64</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y @playwright/mcp@0.0.75</code></td>
+        </tr>
+
+        <tr data-name="@agent-infra/mcp-server-browser" data-category="browser" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/bytedance/UI-TARS-desktop">@agent-infra/mcp-server-browser</a></td>
+          <td>browser</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>105</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y @agent-infra/mcp-server-browser</code></td>
+        </tr>
+
+        <tr data-name="chrome-devtools-mcp" data-category="browser" data-tier="Core" data-trust="candidate">
+          <td><a href="https://github.com/ChromeDevTools/chrome-devtools-mcp">chrome-devtools-mcp</a></td>
+          <td>browser</td>
+          <td>Core</td>
+          <td>candidate</td>
+          <td>105</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y chrome-devtools-mcp</code></td>
+        </tr>
+
+        <tr data-name="fsb-mcp-server" data-category="browser" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/lakshmanturlapati/FSB">fsb-mcp-server</a></td>
+          <td>browser</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>97.8</td>
+          <td>?</td>
+          <td>NOASSERTION</td>
+          <td><code>npx -y fsb-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@circleci/mcp-server-circleci" data-category="ci-cd" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/CircleCI-Public/mcp-server-circleci">@circleci/mcp-server-circleci</a></td>
+          <td>ci-cd</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>99.2</td>
+          <td>?</td>
+          <td>NOASSERTION</td>
+          <td><code>npx -y @circleci/mcp-server-circleci</code></td>
+        </tr>
+
+        <tr data-name="teamcity-mcp" data-category="ci-cd" data-tier="Recommended" data-trust="verified">
+          <td><a href="https://github.com/Daghis/teamcity-mcp">teamcity-mcp</a></td>
+          <td>ci-cd</td>
+          <td>Recommended</td>
+          <td>verified</td>
+          <td>65</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @daghis/teamcity-mcp</code></td>
+        </tr>
+
+        <tr data-name="@contentful/mcp-server" data-category="cms" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/contentful/contentful-mcp-server">@contentful/mcp-server</a></td>
+          <td>cms</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>107.4</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @contentful/mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@diskd-ai/email-mcp" data-category="communication" data-tier="Core" data-trust="candidate">
+          <td><a href="https://github.com/codefuturist/email-mcp">@diskd-ai/email-mcp</a></td>
+          <td>communication</td>
+          <td>Core</td>
+          <td>candidate</td>
+          <td>106.4</td>
+          <td>?</td>
+          <td>LGPL-3.0</td>
+          <td><code>npx -y @diskd-ai/email-mcp</code></td>
+        </tr>
+
+        <tr data-name="slack-mcp-server" data-category="communication" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/korotovsky/slack-mcp-server">slack-mcp-server</a></td>
+          <td>communication</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>105</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y slack-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@salesforce/mcp" data-category="crm" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/salesforcecli/mcp">@salesforce/mcp</a></td>
+          <td>crm</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y @salesforce/mcp</code></td>
+        </tr>
+
+        <tr data-name="mcp-redis" data-category="database" data-tier="Core" data-trust="candidate">
+          <td><a href="https://github.com/redis/mcp-redis">mcp-redis</a></td>
+          <td>database</td>
+          <td>Core</td>
+          <td>candidate</td>
+          <td>110</td>
+          <td>10</td>
+          <td>MIT</td>
+          <td><code>uvx --from git+https://github.com/redis/mcp-redis mcp-redis</code></td>
+        </tr>
+
+        <tr data-name="mcp-server-mysql" data-category="database" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/benborla/mcp-server-mysql">mcp-server-mysql</a></td>
+          <td>database</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @benborla29/mcp-server-mysql</code></td>
+        </tr>
+
+        <tr data-name="mcp-server-neon" data-category="database" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/neondatabase/mcp-server-neon">mcp-server-neon</a></td>
+          <td>database</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>29</td>
+          <td>MIT</td>
+          <td><code>npx -y @neondatabase/mcp-server-neon@0.6.5</code></td>
+        </tr>
+
+        <tr data-name="mongodb-mcp-server" data-category="database" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/mongodb-js/mongodb-mcp-server">mongodb-mcp-server</a></td>
+          <td>database</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>42</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y mongodb-mcp-server@1.10.0</code></td>
+        </tr>
+
+        <tr data-name="@supabase/mcp-server-supabase" data-category="database" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/supabase-community/supabase-mcp">@supabase/mcp-server-supabase</a></td>
+          <td>database</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>105</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y @supabase/mcp-server-supabase</code></td>
+        </tr>
+
+        <tr data-name="mcp-clickhouse" data-category="database" data-tier="Recommended" data-trust="verified">
+          <td><a href="https://github.com/ClickHouse/mcp-clickhouse">mcp-clickhouse</a></td>
+          <td>database</td>
+          <td>Recommended</td>
+          <td>verified</td>
+          <td>80</td>
+          <td>4</td>
+          <td>Apache-2.0</td>
+          <td><code>uvx mcp-clickhouse==0.3.0</code></td>
+        </tr>
+
+        <tr data-name="supabase-mcp" data-category="database" data-tier="Recommended" data-trust="verified">
+          <td><a href="https://github.com/alexander-zuev/supabase-mcp-server">supabase-mcp</a></td>
+          <td>database</td>
+          <td>Recommended</td>
+          <td>verified</td>
+          <td>80</td>
+          <td>8</td>
+          <td>Apache-2.0</td>
+          <td><code>uvx supabase-mcp-server==0.4</code></td>
+        </tr>
+
+        <tr data-name="mcp-server-everything" data-category="demo" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/modelcontextprotocol/servers/tree/main/src/everything">mcp-server-everything</a></td>
+          <td>demo</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>105</td>
+          <td>18</td>
+          <td>MIT</td>
+          <td><code>npx -y @modelcontextprotocol/server-everything@2026.1.26</code></td>
+        </tr>
+
+        <tr data-name="@professional-wiki/mediawiki-mcp-server" data-category="docs" data-tier="Core" data-trust="candidate">
+          <td><a href="https://github.com/ProfessionalWiki/MediaWiki-MCP-Server">@professional-wiki/mediawiki-mcp-server</a></td>
+          <td>docs</td>
+          <td>Core</td>
+          <td>candidate</td>
+          <td>109.5</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @professional-wiki/mediawiki-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="context7" data-category="docs" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/upstash/context7">context7</a></td>
+          <td>docs</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>105</td>
+          <td>4</td>
+          <td>MIT</td>
+          <td><code>npx -y @upstash/context7-mcp@2.2.4</code></td>
+        </tr>
+
+        <tr data-name="notion-mcp-server" data-category="docs" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/makenotion/notion-mcp-server">notion-mcp-server</a></td>
+          <td>docs</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>85</td>
+          <td>22</td>
+          <td>MIT</td>
+          <td><code>npx -y @notionhq/notion-mcp-server@2.2.1</code></td>
+        </tr>
+
+        <tr data-name="mcp-atlassian" data-category="docs" data-tier="Experimental" data-trust="verified">
+          <td><a href="https://github.com/sooperset/mcp-atlassian">mcp-atlassian</a></td>
+          <td>docs</td>
+          <td>Experimental</td>
+          <td>verified</td>
+          <td>55</td>
+          <td>72</td>
+          <td>MIT</td>
+          <td><code>uvx mcp-atlassian==0.21.1</code></td>
+        </tr>
+
+        <tr data-name="mcp-server-filesystem" data-category="filesystem" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem">mcp-server-filesystem</a></td>
+          <td>filesystem</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>105</td>
+          <td>10</td>
+          <td>MIT</td>
+          <td><code>npx -y @modelcontextprotocol/server-filesystem@2026.1.14 &lt;path&gt;</code></td>
+        </tr>
+
+        <tr data-name="dataforseo-mcp-server" data-category="http" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/dataforseo/mcp-server-typescript">dataforseo-mcp-server</a></td>
+          <td>http</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y dataforseo-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="mcp-server-fetch" data-category="http" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/modelcontextprotocol/servers/tree/main/src/fetch">mcp-server-fetch</a></td>
+          <td>http</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>105</td>
+          <td>1</td>
+          <td>MIT</td>
+          <td><code>uvx mcp-server-fetch==2025.4.7</code></td>
+        </tr>
+
+        <tr data-name="@azure-devops/mcp" data-category="infra" data-tier="Core" data-trust="candidate">
+          <td><a href="https://github.com/microsoft/azure-devops-mcp">@azure-devops/mcp</a></td>
+          <td>infra</td>
+          <td>Core</td>
+          <td>candidate</td>
+          <td>110</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @azure-devops/mcp</code></td>
+        </tr>
+
+        <tr data-name="@google-cloud/observability-mcp" data-category="infra" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/googleapis/gcloud-mcp">@google-cloud/observability-mcp</a></td>
+          <td>infra</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y @google-cloud/observability-mcp</code></td>
+        </tr>
+
+        <tr data-name="terraform-mcp-server" data-category="infra" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/hashicorp/terraform-mcp-server">terraform-mcp-server</a></td>
+          <td>infra</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>MPL-2.0</td>
+          <td><code>docker run -i --rm --cap-drop ALL --security-opt no-new-privileges hashicorp/terraform-mcp-server@sha256:67b4d3d39aa2c32c5ee280b21d67fb6513dab463af6c93c2ae0cdd4af09d4603</code></td>
+        </tr>
+
+        <tr data-name="@azure/mcp" data-category="infra" data-tier="Core" data-trust="candidate">
+          <td><a href="https://github.com/microsoft/mcp">@azure/mcp</a></td>
+          <td>infra</td>
+          <td>Core</td>
+          <td>candidate</td>
+          <td>105</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @azure/mcp</code></td>
+        </tr>
+
+        <tr data-name="kubernetes-mcp-server" data-category="infra" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/containers/kubernetes-mcp-server">kubernetes-mcp-server</a></td>
+          <td>infra</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>105</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y kubernetes-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="mcp-server-aws" data-category="infra" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/awslabs/mcp">mcp-server-aws</a></td>
+          <td>infra</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>105</td>
+          <td>20</td>
+          <td>Apache-2.0</td>
+          <td><code>uvx awslabs.core-mcp-server==1.0.27</code></td>
+        </tr>
+
+        <tr data-name="mcp-server-cloudflare" data-category="infra" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/cloudflare/mcp-server-cloudflare">mcp-server-cloudflare</a></td>
+          <td>infra</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>105</td>
+          <td>5</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y @cloudflare/mcp-server-cloudflare@0.2.0</code></td>
+        </tr>
+
+        <tr data-name="mcp-server-kubernetes" data-category="infra" data-tier="Recommended" data-trust="verified">
+          <td><a href="https://github.com/Flux159/mcp-server-kubernetes">mcp-server-kubernetes</a></td>
+          <td>infra</td>
+          <td>Recommended</td>
+          <td>verified</td>
+          <td>80</td>
+          <td>24</td>
+          <td>MIT</td>
+          <td><code>npx -y mcp-server-kubernetes@3.5.1</code></td>
+        </tr>
+
+        <tr data-name="@mapbox/mcp-server" data-category="maps" data-tier="Core" data-trust="candidate">
+          <td><a href="https://github.com/mapbox/mcp-server">@mapbox/mcp-server</a></td>
+          <td>maps</td>
+          <td>Core</td>
+          <td>candidate</td>
+          <td>110</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @mapbox/mcp-server</code></td>
+        </tr>
+
+        <tr data-name="mcp-server-memory" data-category="memory" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/modelcontextprotocol/servers/tree/main/src/memory">mcp-server-memory</a></td>
+          <td>memory</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>105</td>
+          <td>9</td>
+          <td>MIT</td>
+          <td><code>npx -y @modelcontextprotocol/server-memory@2026.1.26</code></td>
+        </tr>
+
+        <tr data-name="mcp-installer" data-category="meta" data-tier="Experimental" data-trust="verified">
+          <td><a href="https://github.com/anaisbetts/mcp-installer">mcp-installer</a></td>
+          <td>meta</td>
+          <td>Experimental</td>
+          <td>verified</td>
+          <td>40</td>
+          <td>3</td>
+          <td>MIT</td>
+          <td><code>npx -y @anaisbetts/mcp-installer@0.5.0</code></td>
+        </tr>
+
+        <tr data-name="ios-simulator-mcp" data-category="mobile" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/joshuayoes/ios-simulator-mcp">ios-simulator-mcp</a></td>
+          <td>mobile</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y ios-simulator-mcp</code></td>
+        </tr>
+
+        <tr data-name="@dynatrace-oss/dynatrace-mcp-server" data-category="observability" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/dynatrace-oss/dynatrace-mcp">@dynatrace-oss/dynatrace-mcp-server</a></td>
+          <td>observability</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @dynatrace-oss/dynatrace-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="datadog-mcp" data-category="observability" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/winor30/mcp-server-datadog">datadog-mcp</a></td>
+          <td>observability</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>105</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y @winor30/mcp-server-datadog</code></td>
+        </tr>
+
+        <tr data-name="sentry-mcp" data-category="observability" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/getsentry/sentry-mcp">sentry-mcp</a></td>
+          <td>observability</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>95</td>
+          <td>18</td>
+          <td>FSL-1.1-ALv2</td>
+          <td><code>npx -y @sentry/mcp-server@0.33.0</code></td>
+        </tr>
+
+        <tr data-name="prometheus-mcp" data-category="observability" data-tier="Experimental" data-trust="verified">
+          <td><a href="https://github.com/idanfishman/prometheus-mcp">prometheus-mcp</a></td>
+          <td>observability</td>
+          <td>Experimental</td>
+          <td>verified</td>
+          <td>60</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y prometheus-mcp</code></td>
+        </tr>
+
+        <tr data-name="@phantom/mcp-server" data-category="payments" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/phantom/phantom-connect-sdk">@phantom/mcp-server</a></td>
+          <td>payments</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @phantom/mcp-server</code></td>
+        </tr>
+
+        <tr data-name="stripe-agent-toolkit" data-category="payments" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/stripe/ai">stripe-agent-toolkit</a></td>
+          <td>payments</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>25</td>
+          <td>MIT</td>
+          <td><code>npx -y @stripe/mcp@0.3.3</code></td>
+        </tr>
+
+        <tr data-name="@delorenj/mcp-server-trello" data-category="pm" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/delorenj/mcp-server-trello">@delorenj/mcp-server-trello</a></td>
+          <td>pm</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @delorenj/mcp-server-trello</code></td>
+        </tr>
+
+        <tr data-name="@mondaydotcomorg/monday-api-mcp" data-category="pm" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/mondaycom/monday-ai">@mondaydotcomorg/monday-api-mcp</a></td>
+          <td>pm</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @mondaydotcomorg/monday-api-mcp</code></td>
+        </tr>
+
+        <tr data-name="@roychri/mcp-server-asana" data-category="pm" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/roychri/mcp-server-asana">@roychri/mcp-server-asana</a></td>
+          <td>pm</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @roychri/mcp-server-asana</code></td>
+        </tr>
+
+        <tr data-name="todoist-mcp" data-category="pm" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/stanislavlysenko0912/todoist-mcp-server">todoist-mcp</a></td>
+          <td>pm</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>108.1</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y todoist-mcp</code></td>
+        </tr>
+
+        <tr data-name="@taazkareem/clickup-mcp-server" data-category="pm" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/taazkareem/clickup-mcp-server">@taazkareem/clickup-mcp-server</a></td>
+          <td>pm</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>96</td>
+          <td>?</td>
+          <td>NOASSERTION</td>
+          <td><code>npx -y @taazkareem/clickup-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="linear-mcp-server" data-category="pm" data-tier="Experimental" data-trust="verified">
+          <td><a href="https://github.com/jerhadf/linear-mcp-server">linear-mcp-server</a></td>
+          <td>pm</td>
+          <td>Experimental</td>
+          <td>verified</td>
+          <td>40</td>
+          <td>5</td>
+          <td>MIT</td>
+          <td><code>npx -y linear-mcp-server@0.1.0</code></td>
+        </tr>
+
+        <tr data-name="mcp-server-sequentialthinking" data-category="reasoning" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking">mcp-server-sequentialthinking</a></td>
+          <td>reasoning</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>105</td>
+          <td>1</td>
+          <td>MIT</td>
+          <td><code>npx -y @modelcontextprotocol/server-sequential-thinking@2025.12.18</code></td>
+        </tr>
+
+        <tr data-name="@brave/brave-search-mcp-server" data-category="search" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/brave/brave-search-mcp-server">@brave/brave-search-mcp-server</a></td>
+          <td>search</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @brave/brave-search-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="obsidian-mcp-server" data-category="search" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/cyanheads/obsidian-mcp-server">obsidian-mcp-server</a></td>
+          <td>search</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y obsidian-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="clinicaltrialsgov-mcp-server" data-category="search" data-tier="Core" data-trust="candidate">
+          <td><a href="https://github.com/cyanheads/clinicaltrialsgov-mcp-server">clinicaltrialsgov-mcp-server</a></td>
+          <td>search</td>
+          <td>Core</td>
+          <td>candidate</td>
+          <td>108.6</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y clinicaltrialsgov-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="linkup-mcp-server" data-category="search" data-tier="Core" data-trust="candidate">
+          <td><a href="https://github.com/LinkupPlatform/linkup-mcp-server">linkup-mcp-server</a></td>
+          <td>search</td>
+          <td>Core</td>
+          <td>candidate</td>
+          <td>104.6</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y linkup-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="duckduckgo-mcp-server" data-category="search" data-tier="Recommended" data-trust="verified">
+          <td><a href="https://github.com/nickclyde/duckduckgo-mcp-server">duckduckgo-mcp-server</a></td>
+          <td>search</td>
+          <td>Recommended</td>
+          <td>verified</td>
+          <td>80</td>
+          <td>2</td>
+          <td>MIT</td>
+          <td><code>uvx duckduckgo-mcp-server==0.4.0</code></td>
+        </tr>
+
+        <tr data-name="exa-mcp-server" data-category="search" data-tier="Recommended" data-trust="verified">
+          <td><a href="https://github.com/exa-labs/exa-mcp-server">exa-mcp-server</a></td>
+          <td>search</td>
+          <td>Recommended</td>
+          <td>verified</td>
+          <td>80</td>
+          <td>5</td>
+          <td>MIT</td>
+          <td><code>npx -y exa-mcp-server@3.2.1</code></td>
+        </tr>
+
+        <tr data-name="tavily-mcp" data-category="search" data-tier="Recommended" data-trust="verified">
+          <td><a href="https://github.com/tavily-ai/tavily-mcp">tavily-mcp</a></td>
+          <td>search</td>
+          <td>Recommended</td>
+          <td>verified</td>
+          <td>80</td>
+          <td>2</td>
+          <td>MIT</td>
+          <td><code>npx -y tavily-mcp@0.2.19</code></td>
+        </tr>
+
+        <tr data-name="brave-search-mcp" data-category="search" data-tier="Experimental" data-trust="verified">
+          <td><a href="https://github.com/mikechao/brave-search-mcp">brave-search-mcp</a></td>
+          <td>search</td>
+          <td>Experimental</td>
+          <td>verified</td>
+          <td>60</td>
+          <td>3</td>
+          <td>GPL-3.0-or-later</td>
+          <td><code>npx -y brave-search-mcp@2.1.0</code></td>
+        </tr>
+
+        <tr data-name="kafka-mcp-server" data-category="streaming" data-tier="Recommended" data-trust="verified">
+          <td><a href="https://github.com/tuannvm/kafka-mcp-server">kafka-mcp-server</a></td>
+          <td>streaming</td>
+          <td>Recommended</td>
+          <td>verified</td>
+          <td>65</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>docker run -i --rm --cap-drop ALL --security-opt no-new-privileges ghcr.io/tuannvm/kafka-mcp-server@sha256:3ac9f77f81933b2be290fefc3d6e069f74751a4ac5c17ce1d0ab120f196ca9ac</code></td>
+        </tr>
+
+        <tr data-name="@eslint/mcp" data-category="testing" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/eslint/rewrite">@eslint/mcp</a></td>
+          <td>testing</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y @eslint/mcp</code></td>
+        </tr>
+
+        <tr data-name="@postman/postman-mcp-server" data-category="testing" data-tier="Core" data-trust="candidate">
+          <td><a href="https://github.com/postmanlabs/postman-mcp-server">@postman/postman-mcp-server</a></td>
+          <td>testing</td>
+          <td>Core</td>
+          <td>candidate</td>
+          <td>110</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y @postman/postman-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@qase/mcp-server" data-category="testing" data-tier="Core" data-trust="candidate">
+          <td><a href="https://github.com/qase-tms/qase-mcp-server">@qase/mcp-server</a></td>
+          <td>testing</td>
+          <td>Core</td>
+          <td>candidate</td>
+          <td>104.8</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @qase/mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@bitwarden/mcp-server" data-category="utility" data-tier="Core" data-trust="candidate">
+          <td><a href="https://github.com/bitwarden/mcp-server">@bitwarden/mcp-server</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>candidate</td>
+          <td>110</td>
+          <td>?</td>
+          <td>GPL-3.0</td>
+          <td><code>npx -y @bitwarden/mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@drawio/mcp" data-category="utility" data-tier="Core" data-trust="candidate">
+          <td><a href="https://github.com/jgraph/drawio-mcp">@drawio/mcp</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>candidate</td>
+          <td>110</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y @drawio/mcp</code></td>
+        </tr>
+
+        <tr data-name="@instantdb/mcp" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/instantdb/instant">@instantdb/mcp</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y @instantdb/mcp</code></td>
+        </tr>
+
+        <tr data-name="@knip/mcp" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/webpro-nl/knip">@knip/mcp</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>ISC</td>
+          <td><code>npx -y @knip/mcp</code></td>
+        </tr>
+
+        <tr data-name="@pandacss/mcp" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/chakra-ui/panda">@pandacss/mcp</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @pandacss/mcp</code></td>
+        </tr>
+
+        <tr data-name="@regle/mcp-server" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/victorgarciaesgi/regle">@regle/mcp-server</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @regle/mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@socketsecurity/mcp" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/SocketDev/socket-mcp">@socketsecurity/mcp</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @socketsecurity/mcp</code></td>
+        </tr>
+
+        <tr data-name="@softeria/ms-365-mcp-server" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/softeria/ms-365-mcp-server">@softeria/ms-365-mcp-server</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @softeria/ms-365-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@vibeframe/mcp-server" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/vericontext/vibeframe">@vibeframe/mcp-server</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @vibeframe/mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@voltagent/mcp-server" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/VoltAgent/voltagent">@voltagent/mcp-server</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @voltagent/mcp-server</code></td>
+        </tr>
+
+        <tr data-name="argocd-mcp" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/argoproj-labs/mcp-for-argocd">argocd-mcp</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y argocd-mcp</code></td>
+        </tr>
+
+        <tr data-name="deepl-mcp-server" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/DeepLcom/deepl-mcp-server">deepl-mcp-server</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y deepl-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="godot-mcp-server" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/tomyud1/godot-mcp">godot-mcp-server</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y godot-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="mcp-searxng" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/ihor-sokoliuk/mcp-searxng">mcp-searxng</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y mcp-searxng</code></td>
+        </tr>
+
+        <tr data-name="openapi-mcp-generator" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/harsha-iiiv/openapi-mcp-generator">openapi-mcp-generator</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>110</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y openapi-mcp-generator</code></td>
+        </tr>
+
+        <tr data-name="@cap-js/mcp-server" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/cap-js/mcp-server">@cap-js/mcp-server</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>109.9</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y @cap-js/mcp-server</code></td>
+        </tr>
+
+        <tr data-name="hostinger-api-mcp" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/hostinger/api-mcp-server">hostinger-api-mcp</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>109.6</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y hostinger-api-mcp</code></td>
+        </tr>
+
+        <tr data-name="@alchemy/mcp-server" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/alchemyplatform/alchemy-mcp-server">@alchemy/mcp-server</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>109.3</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @alchemy/mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@translated/lara-mcp" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/translated/lara-mcp">@translated/lara-mcp</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>109.3</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @translated/lara-mcp</code></td>
+        </tr>
+
+        <tr data-name="@ui5/mcp-server" data-category="utility" data-tier="Core" data-trust="candidate">
+          <td><a href="https://github.com/UI5/mcp-server">@ui5/mcp-server</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>candidate</td>
+          <td>109.3</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y @ui5/mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@heroku/mcp-server" data-category="utility" data-tier="Core" data-trust="candidate">
+          <td><a href="https://github.com/heroku/heroku-mcp-server">@heroku/mcp-server</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>candidate</td>
+          <td>108.9</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y @heroku/mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@transloadit/mcp-server" data-category="utility" data-tier="Core" data-trust="candidate">
+          <td><a href="https://github.com/transloadit/node-sdk">@transloadit/mcp-server</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>candidate</td>
+          <td>108.6</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @transloadit/mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@tocharianou/mcp-server-kibana" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/TocharianOU/mcp-server-kibana">@tocharianou/mcp-server-kibana</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>108.1</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y @tocharianou/mcp-server-kibana</code></td>
+        </tr>
+
+        <tr data-name="@esaio/esa-mcp-server" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/esaio/esa-mcp-server">@esaio/esa-mcp-server</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>107.3</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @esaio/esa-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@upstash/mcp-server" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/upstash/mcp-server">@upstash/mcp-server</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>107.3</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @upstash/mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@renseiai/agentfactory-mcp-server" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/RenseiAI/agentfactory">@renseiai/agentfactory-mcp-server</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>107.2</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @renseiai/agentfactory-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@vapi-ai/mcp-server" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/VapiAI/mcp-server">@vapi-ai/mcp-server</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>107</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @vapi-ai/mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@kintone/mcp-server" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/kintone/mcp-server">@kintone/mcp-server</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>106.4</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y @kintone/mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@contextlint/mcp-server" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/nozomi-koborinai/contextlint">@contextlint/mcp-server</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>105.2</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y @contextlint/mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@penpot/mcp" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/penpot/penpot">@penpot/mcp</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>105</td>
+          <td>?</td>
+          <td>MPL-2.0</td>
+          <td><code>npx -y @penpot/mcp</code></td>
+        </tr>
+
+        <tr data-name="@sap-ux/fiori-mcp-server" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/SAP/open-ux-tools">@sap-ux/fiori-mcp-server</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>105</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y @sap-ux/fiori-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="mcp-server-time" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/modelcontextprotocol/servers/tree/main/src/time">mcp-server-time</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>105</td>
+          <td>2</td>
+          <td>MIT</td>
+          <td><code>uvx mcp-server-time==2026.1.26</code></td>
+        </tr>
+
+        <tr data-name="@tankpkg/mcp-server" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/tankpkg/tank">@tankpkg/mcp-server</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>104.6</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @tankpkg/mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@growthbook/mcp" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/growthbook/growthbook-mcp">@growthbook/mcp</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>103.6</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @growthbook/mcp</code></td>
+        </tr>
+
+        <tr data-name="@currents/mcp" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/currents-dev/currents-mcp">@currents/mcp</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>102.3</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y @currents/mcp</code></td>
+        </tr>
+
+        <tr data-name="@memberjunction/ai-mcp-server" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/MemberJunction/MJ">@memberjunction/ai-mcp-server</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>98.4</td>
+          <td>?</td>
+          <td>ISC</td>
+          <td><code>npx -y @memberjunction/ai-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@skillsmith/mcp-server" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/smith-horn/skillsmith">@skillsmith/mcp-server</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>97.5</td>
+          <td>?</td>
+          <td>NOASSERTION</td>
+          <td><code>npx -y @skillsmith/mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@theia/ai-mcp-server" data-category="utility" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/eclipse-theia/theia">@theia/ai-mcp-server</a></td>
+          <td>utility</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>95</td>
+          <td>?</td>
+          <td>EPL-2.0</td>
+          <td><code>npx -y @theia/ai-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@cyanheads/git-mcp-server" data-category="vcs" data-tier="Core" data-trust="candidate">
+          <td><a href="https://github.com/cyanheads/git-mcp-server">@cyanheads/git-mcp-server</a></td>
+          <td>vcs</td>
+          <td>Core</td>
+          <td>candidate</td>
+          <td>110</td>
+          <td>?</td>
+          <td>Apache-2.0</td>
+          <td><code>npx -y @cyanheads/git-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="@yoda.digital/gitlab-mcp-server" data-category="vcs" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/yoda-digital/mcp-gitlab-server">@yoda.digital/gitlab-mcp-server</a></td>
+          <td>vcs</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>107.1</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @yoda.digital/gitlab-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="github-mcp-server" data-category="vcs" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/github/github-mcp-server">github-mcp-server</a></td>
+          <td>vcs</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>105</td>
+          <td>100</td>
+          <td>MIT</td>
+          <td><code>docker run -i --rm --cap-drop ALL --security-opt no-new-privileges -e GITHUB_PERSONAL_ACCESS_TOKEN ghcr.io/github/github-mcp-server@sha256:2ac27ef03461ef2b877031b838a7d1fd7f12b12d4ace7796d8cad91446d55959</code></td>
+        </tr>
+
+        <tr data-name="mcp-server-git" data-category="vcs" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/modelcontextprotocol/servers/tree/main/src/git">mcp-server-git</a></td>
+          <td>vcs</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>105</td>
+          <td>9</td>
+          <td>MIT</td>
+          <td><code>uvx mcp-server-git==2026.1.14</code></td>
+        </tr>
+
+        <tr data-name="@nexus2520/bitbucket-mcp-server" data-category="vcs" data-tier="Core" data-trust="verified">
+          <td><a href="https://github.com/pdogra1299/bitbucket-mcp-server">@nexus2520/bitbucket-mcp-server</a></td>
+          <td>vcs</td>
+          <td>Core</td>
+          <td>verified</td>
+          <td>103.2</td>
+          <td>?</td>
+          <td>MIT</td>
+          <td><code>npx -y @nexus2520/bitbucket-mcp-server</code></td>
+        </tr>
+
+        <tr data-name="gitlab-mcp" data-category="vcs" data-tier="Recommended" data-trust="verified">
+          <td><a href="https://github.com/zereight/gitlab-mcp">gitlab-mcp</a></td>
+          <td>vcs</td>
+          <td>Recommended</td>
+          <td>verified</td>
+          <td>80</td>
+          <td>153</td>
+          <td>MIT</td>
+          <td><code>npx -y @zereight/mcp-gitlab@2.1.10</code></td>
+        </tr>
+
+        <tr data-name="actors-mcp-server" data-category="web-scraping" data-tier="Recommended" data-trust="verified">
+          <td><a href="https://github.com/apify/apify-mcp-server">actors-mcp-server</a></td>
+          <td>web-scraping</td>
+          <td>Recommended</td>
+          <td>verified</td>
+          <td>75</td>
+          <td>21</td>
+          <td>MIT</td>
+          <td><code>npx -y @apify/actors-mcp-server@0.10.1</code></td>
+        </tr>
+
+        <tr data-name="firecrawl-mcp-server" data-category="web-scraping" data-tier="Recommended" data-trust="verified">
+          <td><a href="https://github.com/firecrawl/firecrawl-mcp-server">firecrawl-mcp-server</a></td>
+          <td>web-scraping</td>
+          <td>Recommended</td>
+          <td>verified</td>
+          <td>75</td>
+          <td>6</td>
+          <td>MIT</td>
+          <td><code>npx -y firecrawl-mcp@3.15.0</code></td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+  <script>
+    const rows = [...document.querySelectorAll("tbody tr")];
+    const q = document.getElementById("q");
+    const category = document.getElementById("category");
+    const tier = document.getElementById("tier");
+    const trust = document.getElementById("trust");
+    const count = document.getElementById("count");
+
+    function fill(select, attr) {
+      [...new Set(rows.map(r => r.dataset[attr]).filter(Boolean))].sort().forEach(v => {
+        const o = document.createElement("option");
+        o.value = v; o.textContent = v;
+        select.appendChild(o);
+      });
+    }
+    fill(category, "category"); fill(tier, "tier"); fill(trust, "trust");
+
+    function apply() {
+      const needle = q.value.trim().toLowerCase();
+      let shown = 0;
+      for (const r of rows) {
+        const text = r.textContent.toLowerCase();
+        const ok = (!needle || text.includes(needle)) &&
+          (!category.value || r.dataset.category === category.value) &&
+          (!tier.value || r.dataset.tier === tier.value) &&
+          (!trust.value || r.dataset.trust === trust.value);
+        r.hidden = !ok;
+        if (ok) shown++;
+      }
+      count.textContent = shown + " shown";
+    }
+    [q, category, tier, trust].forEach(el => el.addEventListener("input", apply));
+  </script>
+</body>
+</html>

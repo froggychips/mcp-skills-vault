@@ -20,7 +20,8 @@
   ],
   "scripts": {
     "test": "node --test tests/*.test.cjs",
-    "verify": "node bin/mcp-vault.cjs verify --no-audit"
+    "verify": "node bin/mcp-vault.cjs verify --offline",
+    "site:registry": "node mcp-ecosystem-intelligence/scripts/generate_registry_page.cjs"
   },
   "engines": {
     "node": ">=18"

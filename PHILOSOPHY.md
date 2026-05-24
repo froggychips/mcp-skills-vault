@@ -4,7 +4,7 @@ Five constraints that shape every decision in this repo. They're not aspirations
 
 ## 1. Offline-first
 
-Every gate the user cares about must run with no network. `verify_integrity.cjs --no-audit` is the canonical example: hash check + repo check + hook check, all from cached data, exit 0 means safe-to-install. The advisory feed calls (npm bulk, OSV, GHSA, Snyk) are an *additive* layer that runs when network is available — they make the gate stricter, never looser.
+Every gate the user cares about must run with no network. `verify_integrity.cjs --offline` is the canonical example: DB pin-shape validation over stored versions, hashes, source URLs, and Docker digests. `--no-audit` is intentionally different: it skips advisory feeds but still checks live registry metadata. The advisory feed calls (npm bulk, OSV, GHSA, Snyk) are an *additive* layer that runs when network is available — they make the gate stricter, never looser.
 
 Concretely: the CI `smoke` job is offline. Air-gapped environments install with the same exit code as networked ones.
 
@@ -22,7 +22,7 @@ You can audit this project by reading the JSON, the four scripts, and the CHANGE
 
 ## 4. Deterministic
 
-The same DB at the same commit produces the same recommendations. `orchestrate.cjs --json` against a fixed `cwd` is reproducible. `verify_integrity.cjs --no-audit` against a fixed DB returns the same exit code every run.
+The same DB at the same commit produces the same recommendations. `orchestrate.cjs --json` against a fixed `cwd` is reproducible. `verify_integrity.cjs --offline` against a fixed DB returns the same exit code every run.
 
 No randomness, no time-dependent behavior, no LLM in the critical path. The Claude skill is a *consumer* of this project's output — Claude reads what `orchestrate.cjs` prints, doesn't replace it.
 

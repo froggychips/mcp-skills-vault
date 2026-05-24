@@ -45,7 +45,7 @@ Every `--install` command is derived from the `install_cmd` field. A tampered en
 
 Mitigations in place:
 - All entries carry a pinned `version` and a `pkg_integrity` hash (npm sha512 / PyPI sha256 / Docker digest)
-- `verify_integrity.cjs` re-fetches the live hash from the registry and compares before writing
+- `verify_integrity.cjs` has two gates: `--offline` validates stored pins without network; default / `--no-audit` re-fetches live registry metadata before writing
 - The weekly CI PR is the **only** automated path to modify this file; it requires human review before merge
 
 Residual risk: a compromised npm/PyPI release that publishes under the same version number would pass — npm and PyPI version immutability is not guaranteed for all packages.
@@ -59,7 +59,7 @@ A logic error here makes the entire pinning story worthless. Specifically danger
 
 Mitigations:
 - Unit tests in `tests/verify_integrity.test.cjs` cover the parser, advisory dedup, and gate logic
-- Smoke job runs on every PR (`--no-audit` mode), offline, fast — would catch a regression that breaks the gate locally
+- Smoke job runs on every PR (`--offline` mode), fast and network-free — would catch a regression that breaks the local gate
 - `--strict` mode treats WARNs as failures and is what CI uses
 
 ### Weekly hash refresh PR

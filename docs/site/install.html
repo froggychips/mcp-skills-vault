@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Install mcp-vault</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header>
+    <nav>
+      <a href="./index.html">home</a>
+      <a href="./vault.html">vault</a>
+      <a href="./registry.html">registry</a>
+      <a href="./install.html">install</a>
+      <a href="https://github.com/froggychips/mcp-skills-vault">github</a>
+    </nav>
+  </header>
+  <main>
+    <h1>Install in 5 minutes</h1>
+    <section class="step">
+      <h3>1. Scan your project</h3>
+      <pre><code>npx -y @froggychips/mcp-vault scan --cwd .</code></pre>
+    </section>
+    <section class="step">
+      <h3>2. Check local readiness</h3>
+      <pre><code>npx -y @froggychips/mcp-vault doctor</code></pre>
+    </section>
+    <section class="step">
+      <h3>3. Verify the vault DB without network</h3>
+      <pre><code>npx -y @froggychips/mcp-vault verify --offline</code></pre>
+    </section>
+    <section class="step">
+      <h3>4. Audit installed MCP servers</h3>
+      <pre><code>npx -y @froggychips/mcp-vault audit --strict</code></pre>
+    </section>
+  </main>
+</body>
+</html>

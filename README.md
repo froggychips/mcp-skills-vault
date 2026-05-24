@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@froggychips/mcp-vault.svg)](https://www.npmjs.com/package/@froggychips/mcp-vault)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Zero deps](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](./PHILOSOPHY.md)
-[![Tests](https://img.shields.io/badge/tests-264%20pass-brightgreen.svg)](./tests)
+[![Tests](https://img.shields.io/badge/tests-271%20pass-brightgreen.svg)](./tests)
 
 **Homepage:** [mcp.froggychips.xyz](https://mcp.froggychips.xyz) · **npm:** [`@froggychips/mcp-vault`](https://www.npmjs.com/package/@froggychips/mcp-vault)
 
@@ -28,9 +28,9 @@ Needs: database, infra, ci-cd, pm
   Experimental mcp-atlassian             72 tools ⚠  score  55
                  --toolsets jira,confluence
 
-$ npx -y @froggychips/mcp-vault verify --no-audit
+$ npx -y @froggychips/mcp-vault verify --offline
 …
-110 entries checked — 0 failure(s)
+112 entries checked — 0 failure(s)
 ```
 
 ## Without this vault vs. with it
@@ -42,7 +42,7 @@ $ npx -y @froggychips/mcp-vault verify --no-audit
 | **Integrity** | `npx -y whatever@latest` runs whatever ships today | sha512/sha256/Docker `@sha256:` pinned + re-verified against the live registry on every check |
 | **Vulnerabilities** | `npm audit` after the fact, if you remember | 4 advisory feeds merged: npm bulk + OSV.dev + GHSA + Snyk† — checked *before* the install command is written |
 | **Stack matching** | manual reading of awesome-lists | detects 40+ env-key patterns + 14 file paths + docker-compose images → suggests what to install |
-| **Offline use** | doesn't | `--no-audit` skips network entirely; hash gate still runs; air-gapped same as networked |
+| **Offline use** | doesn't | `--offline` makes no network calls and validates stored pins; `--no-audit` still checks live registries but skips advisory APIs |
 | **Telemetry** | varies | none. Ever. |
 
 † Snyk requires `SNYK_TOKEN` (no public anonymous API)
@@ -54,7 +54,8 @@ $ npx -y @froggychips/mcp-vault verify --no-audit
 ```bash
 npx -y @froggychips/mcp-vault scan --cwd ./my-project
 npx -y @froggychips/mcp-vault audit --strict
-npx -y @froggychips/mcp-vault verify --no-audit
+npx -y @froggychips/mcp-vault verify --offline
+npx -y @froggychips/mcp-vault doctor
 ```
 
 Prefer it installed? `npm i -g @froggychips/mcp-vault` then drop the `npx -y` prefix.
@@ -138,7 +139,25 @@ Flags:
 |---|---|
 | `--update` | Refresh `version` + `pkg_integrity` from registries |
 | `--strict` | Treat WARNs (hooks, repo mismatch, unpinned docker) as hard failures |
-| `--no-audit` | Skip advisory APIs (offline mode) |
+| `--no-audit` | Skip advisory APIs; still fetch registry metadata for live hash/repo/hook checks |
+| `--offline` | True offline mode; no network calls, validates stored DB pins only |
+
+### Doctor
+
+[`scripts/doctor.cjs`](./mcp-ecosystem-intelligence/scripts/doctor.cjs) — local readiness check:
+
+```bash
+mcp-vault doctor
+mcp-vault doctor --json
+```
+
+Checks Node version, optional `gh` / Docker / `uvx`, project `.mcp.json`, project `.claude/settings.json`, and global `~/.claude.json` MCP server config. It never prints token values.
+
+### What this project is NOT
+
+- **Not a sandbox.** Installing an MCP server still runs that server with your local MCP host's permissions.
+- **Not a runtime monitor.** Vault is an install-time gate; use `mcp-trace` or another monitor for runtime behaviour.
+- **Not proof that a server is benign.** Hashes prove you got the artifact you expected, not that the artifact is safe.
 
 ### Docker `@sha256` drift detection
 
@@ -215,6 +234,16 @@ mcp-vault audit --strict   # exit 1 on drift/untrusted/heavy
 
 Exit codes: `0` clean / info-only · `1` `--strict` triggered · `2` bad invocation. Closes the "Audit my MCP setup" use case without an LLM in the critical path.
 
+### Public registry page
+
+[`scripts/generate_registry_page.cjs`](./mcp-ecosystem-intelligence/scripts/generate_registry_page.cjs) renders the DB into `docs/site/registry.html` plus `docs/site/registry.json`:
+
+```bash
+mcp-vault site-registry
+```
+
+The generated page is static, searchable, and filterable by category, tier, and trust. It is meant to be published with the rest of the GitHub Pages site.
+
 ### Health scorer
 
 [`scripts/calculate_health.cjs`](./mcp-ecosystem-intelligence/scripts/calculate_health.cjs) — score any MCP candidate:
@@ -281,7 +310,7 @@ Entry schema:
 `.github/workflows/security-scan.yml` runs six jobs across PRs, pushes, and two weekly crons:
 
 - **unit-tests** — `node --test tests/*.test.cjs` on every PR / push (fast, no network). Covers parser helpers, advisory dedup, drift parsing, signal mapping, eval schema lint. Smoke depends on this.
-- **smoke** — `verify_integrity.cjs --no-audit` on every PR / push to master (offline, fast).
+- **smoke** — `verify_integrity.cjs --offline` on every PR / push to master (network-free, fast).
 - **refresh-hashes** — Monday cron, opens a PR refreshing `version` + `pkg_integrity` from live registries. Human-gated before merge.
 - **docker-drift** — Monday cron + manual dispatch. Compares each Docker entry's pinned `@sha256:` against the upstream registry digest; fails the job on any drift so a maintainer reviews before refreshing the pin.
 - **discover-candidates** — Thursday cron + manual dispatch. Runs `discover.cjs` against the three sources and opens a PR with a fresh `assets/discovery/candidates.json`. The file is an *inbox* — never auto-merged into `tools_database.json`.
@@ -374,8 +403,9 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for the entry schema, reject criteria, 
 Running the suite locally:
 
 ```bash
-node --test tests/*.test.cjs                                              # unit tests (offline, < 1s)
-mcp-vault verify --no-audit   # DB smoke
+node --test tests/*.test.cjs        # unit tests (offline)
+mcp-vault verify --offline          # DB smoke, no network
+mcp-vault site-registry             # regenerate docs/site/registry.html
 ```
 
 ---

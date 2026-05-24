@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>froggychips — tools for taming the MCP supply chain</title>
+  <meta name="description" content="mcp-skills-vault installs MCP servers safely. mcp-trace shows what they're doing. No cloud, no telemetry.">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header>
+    <nav>
+      <a href="./index.html">home</a>
+      <a href="./vault.html">vault</a>
+      <a href="./registry.html">registry</a>
+      <a href="./install.html">install</a>
+      <a href="https://github.com/froggychips">github</a>
+    </nav>
+  </header>
+  <main>
+    <h1>Tools for taming the MCP supply chain.</h1>
+    <p class="lede">Two small, offline-first tools for people who run Model Context Protocol servers on their own machines and want to know what those servers are doing.</p>
+
+    <section class="cards">
+      <article class="card">
+        <h3>mcp-skills-vault</h3>
+        <p>Install MCP safely: a curated registry with pinned hashes, license info, and advisory checks before install.</p>
+        <a class="cta" href="./vault.html">Learn about vault &rarr;</a>
+      </article>
+      <article class="card">
+        <h3>mcp-trace</h3>
+        <p>See what MCP servers are doing after install: local stdio proxy, SQLite metadata, bodies off by default.</p>
+        <a class="cta" href="https://github.com/froggychips/mcp-trace">Trace repo &rarr;</a>
+      </article>
+    </section>
+
+    <h2>Why these two together</h2>
+    <ul>
+      <li><strong>Vault</strong> answers what to install: integrity-pinned commands before <code>npx -y</code> runs.</li>
+      <li><strong>Trace</strong> answers what it is doing: tool calls, latency, errors, and token-cost estimates.</li>
+      <li>Neither sends anything off your machine. Network checks are additive, not required for the local gate.</li>
+    </ul>
+  </main>
+</body>
+</html>
