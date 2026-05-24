@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.10.0](https://github.com/froggychips/mcp-skills-vault/compare/v0.9.0...v0.10.0) (2026-05-24)
+
+
+### Features
+
+* add `mcp-vault doctor` local readiness checks for Node, `gh`, Docker, `uvx`, and Claude MCP configs
+* add true offline `verify --offline` mode and clarify that `--no-audit` only skips advisory APIs
+* add public registry generator (`mcp-vault site-registry`) for `tools_database.json`
+
 ## [0.9.0](https://github.com/froggychips/mcp-skills-vault/compare/v0.8.0...v0.9.0) (2026-05-23)
 
 
