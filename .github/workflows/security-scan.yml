@@ -307,7 +307,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload eval results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: eval-results
           path: eval_results_run.json
