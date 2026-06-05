@@ -102,6 +102,7 @@ function httpsPostJson(opts, payload, timeoutMs = 10000) {
     const req = https.request(
       { ...opts, headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body), ...(opts.headers || {}) } },
       (res) => {
+        if (res.statusCode < 200 || res.statusCode >= 300) { res.resume(); resolve(null); return; }
         let data = '';
         res.on('data', (c) => { data += c; });
         res.on('end', () => { try { resolve(JSON.parse(data)); } catch { resolve(null); } });
@@ -135,7 +136,7 @@ function fetchNpmAdvisories(pkgMap) {
   return httpsPostJson(
     { hostname: 'registry.npmjs.org', path: '/-/npm/v1/security/advisories/bulk', method: 'POST' },
     pkgMap,
-  ).then((r) => r || {});
+  ).then((r) => ({ ok: r !== null, data: r || {} }));
 }
 
 // OSV.dev batch query — covers npm, PyPI, and ~30 other ecosystems.
@@ -144,7 +145,7 @@ function fetchNpmAdvisories(pkgMap) {
 // Input:  [{ ecosystem, name, version }, ...]
 // Output: parallel array of vuln-list objects.
 function fetchOsvAdvisories(queries) {
-  if (!queries.length) return Promise.resolve([]);
+  if (!queries.length) return Promise.resolve({ ok: true, data: [] });
   const payload = {
     queries: queries.map((q) => ({
       package: { ecosystem: q.ecosystem, name: q.name },
@@ -155,23 +156,28 @@ function fetchOsvAdvisories(queries) {
     { hostname: 'api.osv.dev', path: '/v1/querybatch', method: 'POST' },
     payload,
     15000,
-  ).then((r) => (r && r.results) || []);
+  ).then((r) => ({ ok: r !== null, data: (r && r.results) || [] }));
 }
 
 // GitHub Advisory Database (public REST). One request per (ecosystem, pkg).
-// Anonymous rate limit is 60/hr — adequate for a 30-entry DB; CI passes
-// GITHUB_TOKEN via env to raise to 5000/hr. Filters by `pkg@version` server-side
-// so we only get advisories that affect the *pinned* version — without this,
-// the endpoint returns every advisory in the package's history regardless of
-// whether the pinned version is patched (was the root cause of the false-
-// positive batch in the first GHSA rollout).
+// Anonymous rate limit is 60/hr — the DB now exceeds that (112+ entries), so a
+// tokenless run WILL hit 403 partway through; CI passes GITHUB_TOKEN via env to
+// raise the limit to 5000/hr. A 403/timeout/5xx for a package surfaces as an
+// UNVERIFIED result for that package (data[key] === null), NOT a silent "no
+// advisories" — see degradedFeedsFor() and the fail-closed-under-strict path.
+// Filters by `pkg@version` server-side so we only get advisories that affect the
+// *pinned* version — without this, the endpoint returns every advisory in the
+// package's history regardless of whether the pinned version is patched (was the
+// root cause of the false-positive batch in the first GHSA rollout).
 //
 // OSV.dev already pulls GHSA, but with a lag (hours-to-days). Hitting GHSA
 // directly closes the window for freshly-disclosed advisories.
 //
-// Returns: { "npm:pkg": [advisory, ...], "pip:pkg": [...] }
+// Returns: { ok, failures, data: { "npm:pkg": [advisory,...] | null, ... } }
+//   data[key] === null → feed unreachable for that pkg (degraded, not "clean")
+//   data[key] === []   → queried OK, no advisory affects the pinned version
 async function fetchGhsaAdvisories(queries) {
-  if (!queries.length) return {};
+  if (!queries.length) return { ok: true, data: {}, failures: 0 };
   const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
   const headers = {
     'User-Agent':           'mcp-skills-vault/verify_integrity.cjs',
@@ -180,17 +186,20 @@ async function fetchGhsaAdvisories(queries) {
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
   };
   const out = {};
+  let failures = 0;
   for (const q of queries) {
     // GHSA ecosystem codes: "npm", "pip" (PyPI), "rubygems", "maven", "go", …
     const ecoCode = q.ecosystem === 'PyPI' ? 'pip' : q.ecosystem;
+    const key = `${ecoCode}:${q.name}`;
     // affects=pkg@version → server-side filter to only advisories that the
     // pinned version is actually inside the vulnerable range of. If version
     // is unknown, fall back to the pkg-wide query (caller's problem to triage).
     const affects = q.version ? `${q.name}@${q.version}` : q.name;
     const url = `https://api.github.com/advisories?ecosystem=${encodeURIComponent(ecoCode)}&affects=${encodeURIComponent(affects)}&per_page=20`;
     const advs = await httpsGetJson(url, 10000, headers);
-    if (!Array.isArray(advs)) { out[`${ecoCode}:${q.name}`] = []; continue; }
-    out[`${ecoCode}:${q.name}`] = advs.map((a) => ({
+    if (advs === null)        { out[key] = null; failures++; continue; }  // unreachable: network / 403 rate-limit / 5xx
+    if (!Array.isArray(advs)) { out[key] = [];               continue; }  // 200 but unexpected shape → no advisories
+    out[key] = advs.map((a) => ({
       id:       a.ghsa_id,
       url:      a.html_url,
       severity: (a.severity || '').toUpperCase(),
@@ -198,7 +207,7 @@ async function fetchGhsaAdvisories(queries) {
       source:   'GHSA',
     }));
   }
-  return out;
+  return { ok: failures === 0, data: out, failures };
 }
 
 // Snyk does not expose a public anonymous API. With SNYK_TOKEN, query the
@@ -206,20 +215,23 @@ async function fetchGhsaAdvisories(queries) {
 // hook is here so users with a paid plan get coverage; we don't pretend to
 // have it for free.
 async function fetchSnykAdvisories(queries) {
-  if (!queries.length) return {};
+  if (!queries.length) return { ok: true, data: {}, skipped: false, failures: 0 };
   const token = process.env.SNYK_TOKEN;
-  if (!token) return { __skipped__: 'SNYK_TOKEN not set' };
+  if (!token) return { ok: true, data: {}, skipped: 'SNYK_TOKEN not set', failures: 0 };
   const out = {};
+  let failures = 0;
   const headers = {
     'Authorization': `token ${token}`,
     'User-Agent':    'mcp-skills-vault/verify_integrity.cjs',
   };
   for (const q of queries) {
     const eco = q.ecosystem === 'PyPI' ? 'pip' : q.ecosystem;
+    const key = `${eco}:${q.name}`;
     const url = `https://api.snyk.io/v1/test/${encodeURIComponent(eco)}/${encodeURIComponent(q.name)}/${encodeURIComponent(q.version || '0.0.0')}`;
     const data = await httpsGetJson(url, 10000, headers);
+    if (data === null) { out[key] = null; failures++; continue; }  // unreachable
     const vulns = (data?.issues?.vulnerabilities || []);
-    out[`${eco}:${q.name}`] = vulns.map((v) => ({
+    out[key] = vulns.map((v) => ({
       id:       v.id,
       url:      v.url,
       severity: (v.severity || '').toUpperCase(),
@@ -227,7 +239,7 @@ async function fetchSnykAdvisories(queries) {
       source:   'Snyk',
     }));
   }
-  return out;
+  return { ok: failures === 0, data: out, skipped: false, failures };
 }
 
 function fetchPypiMeta(pkg, version) {
@@ -304,9 +316,47 @@ function unifyAdvisories({ npmList, osvList, ghsaList, snykList }) {
   return out;
 }
 
+// ── feed-health adjudication ─────────────────────────────────────────────────
+// The four advisory feeds resolve to null on any failure (network, timeout,
+// non-2xx, unparseable body, GHSA 403 rate-limit). A null MUST NOT be silently
+// coalesced into "no advisories" — for a supply-chain gate that is fail-open: a
+// transient outage would read as "clean, safe to install". These helpers
+// distinguish "feed unreachable" (null) from "queried, nothing found" ([]).
+
+// Advisory feeds that were UNREACHABLE for a given (ecosystem, mapKey).
+// Snyk-without-token is an intentional skip, not a degradation.
+function degradedFeedsFor(ecosystem, mapKey, health) {
+  const out = [];
+  if (ecosystem === 'npm') {
+    if (!health.npm.ok)    out.push('npm');
+    if (!health.osvNpm.ok) out.push('OSV.dev');
+  } else {
+    if (!health.osvPypi.ok) out.push('OSV.dev');
+  }
+  if (health.ghsa.data[mapKey] === null) out.push('GHSA');
+  if (!health.snyk.skipped && health.snyk.data[mapKey] === null) out.push('Snyk');
+  return out;
+}
+
+// Human-readable per-feed status for the run banner. Reflects what actually
+// happened on the wire, not a static list of feed names.
+function summarizeFeedSources(health) {
+  const s = [];
+  s.push(health.npm.ok ? 'npm bulk' : 'npm bulk UNAVAILABLE');
+  s.push((health.osvNpm.ok && health.osvPypi.ok) ? 'OSV.dev' : 'OSV.dev UNAVAILABLE');
+  if (health.ghsa.failures > 0) {
+    s.push(`GHSA (${health.ghsa.failures} pkg unreachable — set GITHUB_TOKEN to lift the 60/hr anon limit)`);
+  } else {
+    s.push('GHSA');
+  }
+  if (health.snyk.skipped) s.push(`Snyk skipped (${health.snyk.skipped})`);
+  else                     s.push(health.snyk.ok ? 'Snyk' : 'Snyk UNAVAILABLE');
+  return s;
+}
+
 // ── per-tool processors ────────────────────────────────────────────────────
 
-async function processNpm(tool, pkg, advisoriesForTool, results) {
+async function processNpm(tool, pkg, advisoriesForTool, degraded, results) {
   if (OFFLINE) {
     processOfflinePackage(tool, pkg, 'npm', results);
     return;
@@ -372,6 +422,13 @@ async function processNpm(tool, pkg, advisoriesForTool, results) {
   }
   if (advisoriesForTool.some((a) => severityIsHard(a.severity))) failures++;
 
+  // Unreachable advisory feeds: we cannot assert "no known CVEs" when a feed was
+  // down. Surface it loudly; hard-fail under --strict (never silently pass).
+  if (degraded.length) {
+    lines.push(['UNVERIFIED', `advisory feeds unreachable: ${degraded.join(', ')} — cannot assert "no known CVEs"${STRICT ? '' : ' (use --strict to fail closed)'}`]);
+    if (STRICT) failures++;
+  }
+
   results.push({
     tool,
     status: failures > 0 ? 'FAIL' : 'OK',
@@ -381,7 +438,7 @@ async function processNpm(tool, pkg, advisoriesForTool, results) {
   });
 }
 
-async function processPypi(tool, pkg, advisoriesForTool, results) {
+async function processPypi(tool, pkg, advisoriesForTool, degraded, results) {
   if (OFFLINE) {
     processOfflinePackage(tool, pkg, 'PyPI', results);
     return;
@@ -436,6 +493,13 @@ async function processPypi(tool, pkg, advisoriesForTool, results) {
     lines.push(['CVE', `[${a.severity}] (${a.source}) ${a.title || a.url || a.id}`]);
   }
   if (advisoriesForTool.some((a) => severityIsHard(a.severity))) failures++;
+
+  // Unreachable advisory feeds: we cannot assert "no known CVEs" when a feed was
+  // down. Surface it loudly; hard-fail under --strict (never silently pass).
+  if (degraded.length) {
+    lines.push(['UNVERIFIED', `advisory feeds unreachable: ${degraded.join(', ')} — cannot assert "no known CVEs"${STRICT ? '' : ' (use --strict to fail closed)'}`]);
+    if (STRICT) failures++;
+  }
 
   results.push({
     tool,
@@ -529,11 +593,14 @@ async function main() {
   // Batch advisories across 4 feeds: npm bulk + OSV.dev + GHSA REST + Snyk.
   // npm bulk covers npm only. OSV covers npm + PyPI. GHSA covers both directly
   // (less lag than OSV's aggregation). Snyk requires SNYK_TOKEN (optional).
-  let npmAdvisories = {};
-  let osvNpmResults = [];
-  let osvPypiResults = [];
-  let ghsaResults = {};
-  let snykResults = {};
+  // Feed-health objects: each is { ok, data, ... }. ok=false (or a per-pkg null
+  // in data) means the feed was unreachable — surfaced as UNVERIFIED, never
+  // silently treated as "no advisories". See degradedFeedsFor()/summarizeFeedSources().
+  let npmAdvisories = { ok: true, data: {} };
+  let osvNpm        = { ok: true, data: [] };
+  let osvPypi       = { ok: true, data: [] };
+  let ghsa          = { ok: true, data: {}, failures: 0 };
+  let snyk          = { ok: true, data: {}, skipped: false, failures: 0 };
   if (!UPDATE && !NO_AUDIT && !OFFLINE) {
     const npmMap = {};
     for (const { pkg } of npmTools) npmMap[pkg] = [''];   // npm tolerates empty version array
@@ -541,18 +608,16 @@ async function main() {
     const pypiQueries = pypiTools.map(({ pkg, tool }) => ({ ecosystem: 'PyPI', name: pkg, version: tool.version || '0.0.0' }));
     const allQueries  = [...npmQueries, ...pypiQueries];
     process.stdout.write(`Querying npm bulk (${npmTools.length}), OSV.dev (${allQueries.length}), GHSA (${allQueries.length}), Snyk... `);
-    [npmAdvisories, osvNpmResults, osvPypiResults, ghsaResults, snykResults] = await Promise.all([
+    [npmAdvisories, osvNpm, osvPypi, ghsa, snyk] = await Promise.all([
       fetchNpmAdvisories(npmMap),
       fetchOsvAdvisories(npmQueries),
       fetchOsvAdvisories(pypiQueries),
       fetchGhsaAdvisories(allQueries),
       fetchSnykAdvisories(allQueries),
     ]);
-    const sources = ['npm bulk', 'OSV.dev', 'GHSA'];
-    if (snykResults.__skipped__) sources.push(`Snyk skipped (${snykResults.__skipped__})`);
-    else                          sources.push('Snyk');
-    console.log(`done — sources: ${sources.join(', ')}.`);
+    console.log(`done — sources: ${summarizeFeedSources({ npm: npmAdvisories, osvNpm, osvPypi, ghsa, snyk }).join(', ')}.`);
   }
+  const health = { npm: npmAdvisories, osvNpm, osvPypi, ghsa, snyk };
 
   // Process npm.
   if (OFFLINE) {
@@ -564,24 +629,28 @@ async function main() {
   // Process npm.
   for (let i = 0; i < npmTools.length; i++) {
     const { tool, pkg } = npmTools[i];
+    // null (feed down) coalesces to [] for the merge, but degradedFeedsFor() reads
+    // the raw null below so the outage is reported rather than read as "clean".
     const advs = unifyAdvisories({
-      npmList:  npmAdvisories[pkg] || [],
-      osvList:  osvNpmResults[i]?.vulns || [],
-      ghsaList: ghsaResults[`npm:${pkg}`] || [],
-      snykList: snykResults[`npm:${pkg}`] || [],
+      npmList:  npmAdvisories.data[pkg] || [],
+      osvList:  osvNpm.data[i]?.vulns || [],
+      ghsaList: ghsa.data[`npm:${pkg}`] || [],
+      snykList: snyk.data[`npm:${pkg}`] || [],
     });
-    await processNpm(tool, pkg, advs, results);
+    const degraded = (UPDATE || NO_AUDIT) ? [] : degradedFeedsFor('npm', `npm:${pkg}`, health);
+    await processNpm(tool, pkg, advs, degraded, results);
   }
   // Process PyPI (sequentially — PyPI per-package metadata fetch).
   for (let i = 0; i < pypiTools.length; i++) {
     const { tool, pkg } = pypiTools[i];
     const advs = unifyAdvisories({
       npmList:  [],
-      osvList:  osvPypiResults[i]?.vulns || [],
-      ghsaList: ghsaResults[`pip:${pkg}`] || [],
-      snykList: snykResults[`pip:${pkg}`] || [],
+      osvList:  osvPypi.data[i]?.vulns || [],
+      ghsaList: ghsa.data[`pip:${pkg}`] || [],
+      snykList: snyk.data[`pip:${pkg}`] || [],
     });
-    await processPypi(tool, pkg, advs, results);
+    const degraded = (UPDATE || NO_AUDIT) ? [] : degradedFeedsFor('PyPI', `pip:${pkg}`, health);
+    await processPypi(tool, pkg, advs, degraded, results);
   }
   // Process docker.
   for (const { tool } of dockerTools) processDocker(tool, results);
@@ -626,4 +695,6 @@ module.exports = {
   severityIsHard,
   osvSeverity,
   unifyAdvisories,
+  degradedFeedsFor,
+  summarizeFeedSources,
 };

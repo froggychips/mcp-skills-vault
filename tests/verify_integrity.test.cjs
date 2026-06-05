@@ -100,6 +100,58 @@ test('unifyAdvisories: empty inputs return empty list', () => {
   );
 });
 
+test('degradedFeedsFor: null result is degraded, [] is healthy', () => {
+  const health = {
+    npm:     { ok: true,  data: {} },
+    osvNpm:  { ok: true,  data: [] },
+    osvPypi: { ok: true,  data: [] },
+    ghsa:    { ok: false, data: { 'npm:foo': null, 'npm:bar': [] }, failures: 1 },
+    snyk:    { ok: true,  data: {}, skipped: 'SNYK_TOKEN not set', failures: 0 },
+  };
+  // foo: GHSA was unreachable (null) → must be reported, not read as clean.
+  assert.deepEqual(v.degradedFeedsFor('npm', 'npm:foo', health), ['GHSA']);
+  // bar: GHSA queried OK, no advisories ([]) → healthy.
+  assert.deepEqual(v.degradedFeedsFor('npm', 'npm:bar', health), []);
+});
+
+test('degradedFeedsFor: whole-feed outage flags the package', () => {
+  const health = {
+    npm:     { ok: false, data: {} },
+    osvNpm:  { ok: false, data: [] },
+    osvPypi: { ok: true,  data: [] },
+    ghsa:    { ok: true,  data: {}, failures: 0 },
+    snyk:    { ok: true,  data: {}, skipped: false, failures: 0 },
+  };
+  assert.deepEqual(v.degradedFeedsFor('npm', 'npm:x', health), ['npm', 'OSV.dev']);
+  // PyPI tools don't consult npm bulk.
+  assert.deepEqual(v.degradedFeedsFor('PyPI', 'pip:y', health), []);
+});
+
+test('degradedFeedsFor: Snyk-skipped (no token) is NOT a degradation', () => {
+  const health = {
+    npm:     { ok: true, data: {} },
+    osvNpm:  { ok: true, data: [] },
+    osvPypi: { ok: true, data: [] },
+    ghsa:    { ok: true, data: {}, failures: 0 },
+    snyk:    { ok: true, data: {}, skipped: 'SNYK_TOKEN not set', failures: 0 },
+  };
+  assert.deepEqual(v.degradedFeedsFor('npm', 'npm:x', health), []);
+});
+
+test('summarizeFeedSources: reports actual outcome, not a static list', () => {
+  const s = v.summarizeFeedSources({
+    npm:     { ok: false, data: {} },
+    osvNpm:  { ok: true,  data: [] },
+    osvPypi: { ok: true,  data: [] },
+    ghsa:    { ok: false, data: {}, failures: 3 },
+    snyk:    { ok: true,  data: {}, skipped: false, failures: 0 },
+  });
+  assert.ok(s.includes('npm bulk UNAVAILABLE'), s.join(', '));
+  assert.ok(s.includes('OSV.dev'), s.join(', '));
+  assert.ok(s.some((x) => x.startsWith('GHSA (3 pkg unreachable')), s.join(', '));
+  assert.ok(s.includes('Snyk'), s.join(', '));
+});
+
 test('CLI --offline is the network-free smoke path', () => {
   const r = spawnSync(process.execPath, [
     'mcp-ecosystem-intelligence/scripts/verify_integrity.cjs',
