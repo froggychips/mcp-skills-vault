@@ -5,12 +5,18 @@
  * promise; the sister project mcp-trace can vendor the same file so the two
  * tools share one wire layer instead of two drifting copies.
  *
- * Three concerns, all pure / side-effect-light:
- *   1. JSON-RPC framing over newline-delimited stdio (request/notification/read)
- *   2. sandboxWrap()      — wrap a launch command in a locked-down container
- *   3. classifyFailure()  — map a raw failure into an honest failure class
+ * Concerns, all pure / side-effect-light:
+ *   1. Active-client framing (request/notification builders + readResponse) —
+ *      used by mcp_eval.cjs to *drive* a handshake.
+ *   2. Passive framing (LineSplitter / parseFrame / Correlator) — used by
+ *      mcp-trace's proxy to *observe* a real client↔server session. Carried
+ *      here so both repos vendor ONE wire layer instead of two drifting copies.
+ *   3. sandboxWrap()      — wrap a launch command in a locked-down container
+ *   4. classifyFailure()  — map a raw failure into an honest failure class
  *
- * Node builtins only.
+ * VENDORED: this file is copied verbatim into mcp-trace/src/mcp_stdio.cjs.
+ * Keep the two copies in sync. Node builtins only; some exports are unused by
+ * either consumer alone (that's the cost of one shared superset).
  */
 
 // ── 1. JSON-RPC framing ─────────────────────────────────────────────────────
@@ -54,6 +60,85 @@ function readResponse(stdout, wantedId, buffer) {
     stdout.on('end', onEnd);
     tryParseBuffer();
   });
+}
+
+// ── 1b. Passive framing (mcp-trace proxy) ───────────────────────────────────
+
+// Line-delimited JSON-RPC splitter. Feeds bytes in, emits one complete line
+// per newline; buffers partial frames across chunks; tolerates CRLF. MCP
+// servers emit one JSON object per line — LSP-style Content-Length framing is
+// not handled (it surfaces as parse_error downstream).
+class LineSplitter {
+  constructor() { this.buf = ''; }
+  push(chunk) {
+    this.buf += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
+    const out = [];
+    let idx;
+    while ((idx = this.buf.indexOf('\n')) !== -1) {
+      let line = this.buf.slice(0, idx);
+      this.buf = this.buf.slice(idx + 1);
+      if (line.endsWith('\r')) line = line.slice(0, -1);
+      if (line.length > 0) out.push(line);
+    }
+    return out;
+  }
+  flush() { const rest = this.buf; this.buf = ''; return rest.length > 0 ? [rest] : []; }
+}
+
+// Parse one JSON-RPC line into { kind: request|response|notification|parse_error,
+// id, method, error_code, params, result, error, raw }. Passive classifier:
+// unlike readResponse() it doesn't match an id, it just labels whatever it sees.
+function parseFrame(line) {
+  let obj;
+  try { obj = JSON.parse(line); }
+  catch (e) { return { kind: 'parse_error', raw: line, reason: e.message }; }
+  if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
+    return { kind: 'parse_error', raw: line, reason: 'not an object' };
+  }
+  const hasMethod = typeof obj.method === 'string';
+  const hasId = Object.prototype.hasOwnProperty.call(obj, 'id') && obj.id !== null;
+  if (hasMethod && hasId)  return { kind: 'request', id: obj.id, method: obj.method, params: obj.params, raw: line };
+  if (hasMethod && !hasId) return { kind: 'notification', method: obj.method, params: obj.params, raw: line };
+  if (!hasMethod && hasId) {
+    const errCode = obj.error && typeof obj.error.code === 'number' ? obj.error.code : null;
+    return { kind: 'response', id: obj.id, result: obj.result, error: obj.error, error_code: errCode, raw: line };
+  }
+  return { kind: 'parse_error', raw: line, reason: 'not a valid JSON-RPC frame' };
+}
+
+// Pair requests with responses by (server_name, rpc_id), evicting entries
+// older than ttlMs. `now` is injectable for tests.
+class Correlator {
+  constructor({ ttlMs = 5 * 60 * 1000, now = () => Date.now() } = {}) {
+    this.ttlMs = ttlMs;
+    this.now = now;
+    this.pending = new Map();
+  }
+  _key(serverName, id) { return `${serverName} ${id}`; }
+  registerRequest(serverName, frame) {
+    if (frame.kind !== 'request') return null;
+    this.sweep();
+    const key = this._key(serverName, frame.id);
+    const toolName = frame.method === 'tools/call' && frame.params && typeof frame.params.name === 'string'
+      ? frame.params.name : null;
+    this.pending.set(key, { ts: this.now(), method: frame.method, tool_name: toolName });
+    return key;
+  }
+  matchResponse(serverName, frame) {
+    if (frame.kind !== 'response') return null;
+    const key = this._key(serverName, frame.id);
+    const rec = this.pending.get(key);
+    if (!rec) return null;
+    this.pending.delete(key);
+    return { latency_ms: this.now() - rec.ts, method: rec.method, tool_name: rec.tool_name };
+  }
+  sweep() {
+    const cutoff = this.now() - this.ttlMs;
+    let n = 0;
+    for (const [k, v] of this.pending) { if (v.ts < cutoff) { this.pending.delete(k); n++; } }
+    return n;
+  }
+  size() { return this.pending.size; }
 }
 
 // ── 2. Sandbox wrapper ───────────────────────────────────────────────────────
@@ -122,9 +207,15 @@ function classifyFailure({ status, errorCode = '', stderr = '', toolCount = null
 }
 
 module.exports = {
+  // active framing (mcp_eval drives a handshake)
   jsonRpcRequest,
   jsonRpcNotification,
   readResponse,
+  // passive framing (mcp-trace proxy observes a session)
+  LineSplitter,
+  parseFrame,
+  Correlator,
+  // eval policy
   sandboxWrap,
   classifyFailure,
   FAILURE_CLASS,
