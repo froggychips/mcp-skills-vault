@@ -34,10 +34,18 @@
  *   mcp_eval.cjs --timeout <ms>         per-entry timeout (default 30000)
  *   mcp_eval.cjs --json                 machine-readable summary on stdout
  *   mcp_eval.cjs --no-spawn             schema-lint over existing eval_results.json (offline)
+ *   mcp_eval.cjs --sandbox              run each server in a locked-down container (needs docker)
+ *   mcp_eval.cjs --unsafe               run servers directly on the host (explicit opt-out of the sandbox)
  *   mcp_eval.cjs --db <path>            override DB path
  *   mcp_eval.cjs --results <path>       override results file path
  *   mcp_eval.cjs --strict               exit 1 on any pass-rate < 100%
  *   mcp_eval.cjs --help                 print this help
+ *
+ * Spawn policy (default-deny): a live smoke executes third-party server code,
+ * so you must pick how. Pass `--sandbox` (jailed ephemeral container — safe for
+ * PR CI on a shared/host runner) or `--unsafe` (run on the host — fine for the
+ * cron job on a trusted runner). Without either, the live smoke refuses to run.
+ * `--no-spawn` is exempt: it never executes anything.
  *
  * Exit codes:
  *   0  smoke completed (and, under --strict, all entries passed)
@@ -51,6 +59,7 @@ const fs            = require('fs');
 const path          = require('path');
 const { spawn }     = require('child_process');
 const { performance } = require('perf_hooks');
+const stdio         = require('./lib/mcp_stdio.cjs'); // shared framing + sandbox + classifier (vendored, zero-dep)
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -71,6 +80,8 @@ function parseArgs(argv) {
     timeout:  DEFAULT_TIMEOUT_MS,
     json:     false,
     noSpawn:  false,
+    sandbox:  false,
+    unsafe:   false,
     db:       DEFAULT_DB_PATH,
     results:  DEFAULT_RESULTS_PATH,
     strict:   false,
@@ -85,6 +96,8 @@ function parseArgs(argv) {
       case '--timeout': opts.timeout = Math.max(1000, parseInt(next, 10) || DEFAULT_TIMEOUT_MS); i++; break;
       case '--json':    opts.json    = true; break;
       case '--no-spawn':opts.noSpawn = true; break;
+      case '--sandbox': opts.sandbox = true; break;
+      case '--unsafe':  opts.unsafe  = true; break;
       case '--db':      opts.db      = next; i++; break;
       case '--results': opts.results = next; i++; break;
       case '--strict':  opts.strict  = true; break;
@@ -271,64 +284,11 @@ function lintPropSchema(propSchema, name, errors, depth = 0) {
 
 // ── JSON-RPC framing over child stdio ──────────────────────────────────────
 
-// MCP uses newline-delimited JSON over the spawned process's stdin/stdout.
-// We read until we find a response with the expected id; everything else
-// (server-initiated notifications, logs on stdout if any) is buffered and
-// discarded for now.
-function jsonRpcRequest(id, method, params) {
-  return JSON.stringify({ jsonrpc: '2.0', id, method, params: params || {} }) + '\n';
-}
-
-function jsonRpcNotification(method, params) {
-  return JSON.stringify({ jsonrpc: '2.0', method, params: params || {} }) + '\n';
-}
-
-// Reads from a stream and resolves with the first JSON-RPC response whose
-// `id` matches. Times out via the outer Promise.race() in smokeEntry.
-function readResponse(stdout, wantedId, buffer) {
-  return new Promise((resolve, reject) => {
-    function tryParseBuffer() {
-      let nl;
-      while ((nl = buffer.value.indexOf('\n')) !== -1) {
-        const line = buffer.value.slice(0, nl).trim();
-        buffer.value = buffer.value.slice(nl + 1);
-        if (!line) continue;
-        let msg;
-        try {
-          msg = JSON.parse(line);
-        } catch {
-          // Not JSON — server may have printed a log line on stdout.
-          // Ignore and keep reading.
-          continue;
-        }
-        if (msg && msg.id === wantedId) {
-          stdout.removeListener('data', onData);
-          stdout.removeListener('error', onError);
-          stdout.removeListener('end', onEnd);
-          return resolve(msg);
-        }
-        // notifications/responses for other ids are dropped
-      }
-    }
-    function onData(chunk) {
-      buffer.value += chunk.toString('utf8');
-      tryParseBuffer();
-    }
-    function onError(err) {
-      stdout.removeListener('data', onData);
-      reject(err);
-    }
-    function onEnd() {
-      stdout.removeListener('data', onData);
-      reject(new Error('stdout closed before response'));
-    }
-    stdout.on('data', onData);
-    stdout.on('error', onError);
-    stdout.on('end', onEnd);
-    // Try in case the buffer already has data from a previous read.
-    tryParseBuffer();
-  });
-}
+// Framing primitives now live in the shared, vendored core so mcp-trace can
+// reuse the identical wire layer. MCP uses newline-delimited JSON over the
+// spawned process's stdin/stdout; readResponse() resolves with the first
+// message whose id matches, ignoring log lines and other ids.
+const { jsonRpcRequest, jsonRpcNotification, readResponse } = stdio;
 
 // Resolves when the child exits or the timeout elapses, whichever comes
 // first. `isExited` is a thunk because the caller closes over a mutable
@@ -355,6 +315,8 @@ async function smokeEntry(tool, opts) {
     schema_errors:    [],
     stderr_tail:      null,
     error_code:       null,
+    failure_class:    null,
+    sandboxed:        false,
     checked_at:       new Date().toISOString(),
   };
 
@@ -372,6 +334,11 @@ async function smokeEntry(tool, opts) {
   // reserved for "we didn't try because we couldn't parse it".
   result.status = 'fail';
 
+  // Sandbox real entries when asked; the test fake-server (_evalSpawn) always
+  // runs on the host. docker-run entries pass through (already containerized).
+  const launch = (opts.sandbox && !tool._evalSpawn) ? stdio.sandboxWrap(parsed) : parsed;
+  result.sandboxed = !!launch.sandboxed;
+
   // Track stderr for failure diagnostics (last 4 lines, capped at 4KB).
   const stderrChunks = [];
   const stderrLimit  = 4096;
@@ -379,7 +346,7 @@ async function smokeEntry(tool, opts) {
 
   let child;
   try {
-    child = spawn(parsed.command, parsed.args, {
+    child = spawn(launch.command, launch.args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       // Production smoke needs PATH for npx/uvx/docker; we don't pass a
       // scrubbed env. Test fixtures spawn `node` directly and don't care.
@@ -500,6 +467,15 @@ async function smokeEntry(tool, opts) {
     }
   }
 
+  // Honest failure class on top of the raw error_code (TIMEOUT / NEEDS_ENV /
+  // NEEDS_NET / NO_TOOLS / CRASH). null when the smoke passed with ≥1 tool.
+  result.failure_class = stdio.classifyFailure({
+    status:    result.status,
+    errorCode: result.error_code,
+    stderr:    result.stderr_tail || '',
+    toolCount: result.tool_count,
+  });
+
   return result;
 }
 
@@ -562,6 +538,21 @@ function noSpawnLint(payload) {
   return out;
 }
 
+// ── Spawn policy (default-deny) ─────────────────────────────────────────────
+
+// A live smoke executes third-party server code. Force an explicit choice
+// between the sandbox and an explicit host opt-out. `--no-spawn` never spawns,
+// so it's exempt. Pure function so it's unit-testable without running main().
+function spawnPolicy(opts) {
+  if (opts.noSpawn) return { allowed: true, reason: 'no-spawn (offline)' };
+  if (opts.sandbox) return { allowed: true, reason: 'sandbox' };
+  if (opts.unsafe)  return { allowed: true, reason: 'unsafe (host)' };
+  return {
+    allowed: false,
+    reason: 'refusing to run a live smoke without a spawn policy — pass --sandbox (jailed container) or --unsafe (run on host); --no-spawn is offline',
+  };
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -590,6 +581,13 @@ async function main() {
       }
     }
     process.exit(opts.strict && malformed.length ? 1 : 0);
+  }
+
+  // Default-deny: refuse a live smoke unless a spawn policy was chosen.
+  const policy = spawnPolicy(opts);
+  if (!policy.allowed) {
+    process.stderr.write(policy.reason + '\n');
+    process.exit(2);
   }
 
   // Live smoke.
@@ -671,5 +669,8 @@ module.exports = {
   readResults,
   writeResults,
   noSpawnLint,
+  spawnPolicy,
+  sandboxWrap: stdio.sandboxWrap,
+  classifyFailure: stdio.classifyFailure,
   VERSION,
 };

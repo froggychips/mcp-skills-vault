@@ -155,7 +155,7 @@ A candidate is **rejected** if any check fails:
 
 1. **Install command** is documented (`npx -y …`, `uvx …`, `pip install …`, `docker run …`).
 2. **MCP wiring** is detectable: `server.json` present **or** `@modelcontextprotocol/sdk` / `mcp` (Python) imported in source.
-3. **At least one tool** is registered in the server's `ListTools` response (read code or `npx … --help`).
+3. **At least one tool** is registered in the server's `ListTools` response — scripted via `mcp_eval.cjs --name <name> --sandbox` (spawns the server jailed, runs `initialize` → `tools/list`, counts + lints tools). See Step 1 below.
 4. **Recent commit**: default branch was pushed within 180 days.
 5. **Integrity + source verify** (npm packages only): run the integrity script to confirm the tarball hash and that npm's `repository.url` matches `source_url`. A mismatch is a hard reject — it indicates a typosquatted or hijacked package.
 
@@ -362,14 +362,19 @@ node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs
 `verify_integrity.cjs` checks the *artifact you got* (hash matches the registry). It does NOT check that the artifact starts and exposes a usable tool surface. `mcp_eval.cjs` closes that gap:
 
 ```bash
-# Smoke one entry before installing it for real
-node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --name <pkg> --timeout 60000
+# Smoke one entry before installing it for real, jailed in a container
+node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --name <pkg> --sandbox --timeout 60000
 
-# Smoke the whole DB (slow; runs in weekly CI)
-node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --json
+# No docker? Run on the host instead (explicit opt-out of the sandbox)
+node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --name <pkg> --unsafe --timeout 60000
+
+# Smoke the whole DB (slow; runs in weekly CI, --unsafe on the trusted runner)
+node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --unsafe --json
 ```
 
-For each entry the script spawns the server, runs `initialize` → `tools/list`, and lints each tool's `inputSchema` (minimal lint: top-level `type: object` + `properties` + `required` consistency + nested object/array types; rejects `$ref`). Pass means the handshake worked. Tool-count drift (`tool_count_drift: true`) means the DB's `est_tools_count` is stale and the recommendation needs a refresh.
+For each entry the script spawns the server, runs `initialize` → `tools/list`, and lints each tool's `inputSchema` (minimal lint: top-level `type: object` + `properties` + `required` consistency + nested object/array types; rejects `$ref`). Pass means the handshake worked. A failed smoke is classified (`failure_class`): `NEEDS_ENV` / `NEEDS_NET` (server needs creds/network to boot — not broken, just not cheaply smoke-able), `TIMEOUT`, `NO_TOOLS`, or `CRASH`. Tool-count drift (`tool_count_drift: true`) means the DB's `est_tools_count` is stale and the recommendation needs a refresh.
+
+**Spawn policy (default-deny):** a live smoke runs third-party code, so you must pass `--sandbox` (jailed ephemeral container — `--cap-drop ALL`, read-only rootfs, non-root, mem/pid caps, install hooks off; needs docker) or `--unsafe` (run on host). Network stays on even under `--sandbox` because npx/uvx fetch at launch — the jail constrains everything else. On PRs, CI runs `--sandbox` on a disposable github-hosted VM; the weekly whole-DB smoke runs `--unsafe` on the trusted self-hosted runner.
 
 This step needs network (npx/uvx fetch the package). For air-gapped flows, skip it — `verify_integrity.cjs` covers the supply-chain side; eval is purely an additional confidence layer. The `--no-spawn` flag lints existing `eval_results.json` without touching the network.
 

@@ -348,3 +348,70 @@ test('readResults: missing file returns default skeleton', () => {
   assert.equal(r.generated_at, null);
   assert.deepEqual(r.results, []);
 });
+
+// ── spawn policy (default-deny) ─────────────────────────────────────────────
+
+test('spawnPolicy: no flag → denied', () => {
+  const p = e.spawnPolicy({ noSpawn: false, sandbox: false, unsafe: false });
+  assert.equal(p.allowed, false);
+  assert.match(p.reason, /--sandbox|--unsafe/);
+});
+
+test('spawnPolicy: --sandbox / --unsafe / --no-spawn each allow', () => {
+  assert.equal(e.spawnPolicy({ sandbox: true }).allowed, true);
+  assert.equal(e.spawnPolicy({ unsafe: true }).allowed,  true);
+  assert.equal(e.spawnPolicy({ noSpawn: true }).allowed, true);
+});
+
+// ── sandboxWrap ──────────────────────────────────────────────────────────────
+
+test('sandboxWrap: npx is jailed but keeps network (npx must fetch)', () => {
+  const w = e.sandboxWrap({ command: 'npx', args: ['-y', 'pkg@1.2.3'] });
+  assert.equal(w.command, 'docker');
+  assert.equal(w.sandboxed, true);
+  assert.ok(w.args.includes('--cap-drop') && w.args.includes('ALL'));
+  assert.ok(w.args.includes('--read-only'));
+  assert.ok(w.args.includes('--security-opt') && w.args.includes('no-new-privileges'));
+  // network isolation is intentionally NOT applied (would break the npx fetch)
+  assert.ok(!w.args.includes('none'), 'must not pass --network none');
+  // original launch is preserved at the tail
+  assert.deepEqual(w.args.slice(-3), ['npx', '-y', 'pkg@1.2.3']);
+});
+
+test('sandboxWrap: uvx uses a uv-bearing image', () => {
+  const w = e.sandboxWrap({ command: 'uvx', args: ['pkg==1.0.0'] });
+  assert.equal(w.command, 'docker');
+  assert.match(w.image, /uv/);
+  assert.deepEqual(w.args.slice(-2), ['uvx', 'pkg==1.0.0']);
+});
+
+test('sandboxWrap: docker entry passes through (already containerized)', () => {
+  const parsed = { command: 'docker', args: ['run', '--rm', '-i', 'ghcr.io/x/y@sha256:abc'] };
+  const w = e.sandboxWrap(parsed);
+  assert.equal(w.command, 'docker');
+  assert.equal(w.sandboxed, false);
+  assert.deepEqual(w.args, parsed.args);
+});
+
+// ── classifyFailure ──────────────────────────────────────────────────────────
+
+test('classifyFailure: pass with tools → null; pass with 0 tools → NO_TOOLS', () => {
+  assert.equal(e.classifyFailure({ status: 'pass', toolCount: 7 }), null);
+  assert.equal(e.classifyFailure({ status: 'pass', toolCount: 0 }), 'NO_TOOLS');
+});
+
+test('classifyFailure: timeout → TIMEOUT', () => {
+  assert.equal(e.classifyFailure({ status: 'fail', errorCode: 'timeout' }), 'TIMEOUT');
+});
+
+test('classifyFailure: missing credential → NEEDS_ENV', () => {
+  assert.equal(e.classifyFailure({ status: 'fail', errorCode: 'exit 1', stderr: 'FATAL: Missing GITHUB_TOKEN environment variable' }), 'NEEDS_ENV');
+});
+
+test('classifyFailure: network error → NEEDS_NET', () => {
+  assert.equal(e.classifyFailure({ status: 'fail', errorCode: 'exit 1', stderr: 'Error: getaddrinfo ENOTFOUND api.example.com' }), 'NEEDS_NET');
+});
+
+test('classifyFailure: unexplained exit → CRASH', () => {
+  assert.equal(e.classifyFailure({ status: 'fail', errorCode: 'exit 1', stderr: 'Segmentation fault' }), 'CRASH');
+});
