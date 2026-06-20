@@ -15,7 +15,12 @@ name: security-scan
 #   mcp-eval-smoke      — weekly + manual, spawns each DB entry's MCP server,
 #                         runs handshake + tools/list + schema lint, uploads
 #                         eval_results.json as an artifact (no auto-commit).
-#                         Needs network (npx/uvx package fetch) so cron-only.
+#                         Needs network (npx/uvx package fetch); --unsafe on the
+#                         trusted self-hosted runner, cron-only.
+#   mcp-eval-pr         — on PRs touching the DB: behavioural smoke of just the
+#                         changed entries, each in a jailed container
+#                         (mcp_eval --sandbox). github-hosted (untrusted code →
+#                         disposable VM). Fails only on CRASH / NO_TOOLS.
 
 on:
   pull_request:
@@ -274,9 +279,11 @@ jobs:
       - name: mcp_eval --json
         # Long timeout per entry — npx cold-fetches can take 20–30s in CI;
         # the script's per-entry timeout (default 30s) is the inner gate.
+        # --unsafe: trusted self-hosted runner, explicit opt-out of the sandbox
+        # (default-deny requires either --sandbox or --unsafe).
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-          node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --json > eval_results_run.json
+          node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --unsafe --json > eval_results_run.json
       - name: Summary
         if: always()
         run: |
@@ -311,3 +318,63 @@ jobs:
         with:
           name: eval-results
           path: eval_results_run.json
+
+  mcp-eval-pr:
+    name: MCP eval (sandboxed, changed entries)
+    # Behavioural smoke for the DB entries touched by THIS PR. Each changed
+    # server runs in a jailed ephemeral container (mcp_eval --sandbox).
+    #
+    # Runs on a GITHUB-HOSTED runner, never the self-hosted Mac: it executes
+    # untrusted third-party server code from the PR, and a disposable VM is the
+    # right blast radius for that. Informational by default — it fails the check
+    # only on genuine breakage (CRASH / NO_TOOLS), not on servers that merely
+    # need credentials or network to boot (NEEDS_ENV / NEEDS_NET).
+    if: github.event_name == 'pull_request'
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0   # need the base commit to diff the DB
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - name: Determine changed DB entries
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          node -e '
+            const cp = require("child_process"), fs = require("fs");
+            const DB = "mcp-ecosystem-intelligence/assets/tools_database.json";
+            const load = (ref) => { try { return JSON.parse(cp.execSync(`git show ${ref}:${DB}`, {encoding:"utf8"})).tools; } catch { return []; } };
+            const base = new Map(load(process.env.BASE_SHA).map(t => [t.name, JSON.stringify([t.install_cmd, t.version])]));
+            const head = JSON.parse(fs.readFileSync(DB, "utf8")).tools;
+            const changed = head.filter(t => base.get(t.name) !== JSON.stringify([t.install_cmd, t.version])).map(t => t.name);
+            fs.writeFileSync("changed.txt", changed.join("\n"));
+            console.error("changed entries: " + (changed.length ? changed.join(", ") : "(none)"));
+          '
+      - name: Sandboxed smoke of changed entries
+        run: |
+          : > pr_eval.ndjson
+          if [ ! -s changed.txt ]; then echo "No DB entry changes — nothing to smoke."; exit 0; fi
+          while IFS= read -r name; do
+            [ -z "$name" ] && continue
+            echo "smoking $name (sandboxed)…"
+            node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs \
+              --name "$name" --sandbox --json \
+              --results "$RUNNER_TEMP/pr_results.json" >> pr_eval.ndjson || true
+          done < changed.txt
+      - name: Summary + gate (fail on CRASH / NO_TOOLS)
+        if: always()
+        run: |
+          [ -s pr_eval.ndjson ] || { echo "no results to report"; exit 0; }
+          node -e '
+            const fs = require("fs");
+            const runs = fs.readFileSync("pr_eval.ndjson","utf8").trim().split("\n").filter(Boolean).map(JSON.parse);
+            const rows = runs.flatMap(r => r.results || []);
+            const out = ["## MCP eval (sandboxed, changed entries)", "", "| entry | status | tools | class | sandboxed |", "|---|---|---|---|---|"];
+            for (const r of rows) out.push("| " + r.name + " | " + r.status + " | " + (r.tool_count ?? "-") + " | " + (r.failure_class ?? "-") + " | " + r.sandboxed + " |");
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, out.join("\n") + "\n");
+            const breaking = rows.filter(r => r.failure_class === "CRASH" || r.failure_class === "NO_TOOLS");
+            if (breaking.length) { console.error("breaking: " + breaking.map(r => r.name + "(" + r.failure_class + ")").join(", ")); process.exit(1); }
+          '

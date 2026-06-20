@@ -80,12 +80,12 @@ Promotion PR title format: `chore: promote <name> to trust:verified` — body mu
 #### Install-time safety
 - [ ] No `preinstall` / `install` / `postinstall` / `prepack` hooks; `prepare` is allowed only if it's `npm run build` (verified by reading the published `package.json`)
 - [ ] No native binary downloads in install hooks
-- [ ] `est_tools_count` filled in by running the server once (`npx ... --help` or stdio handshake) and counting tools
+- [ ] `est_tools_count` filled in from a real smoke — `node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --name <name> --sandbox --json` reports `tool_count` (use `--unsafe` if you have no docker)
 
 #### Operational fit
 - [ ] `category` is specific (not `utility`) — or there's a note explaining why utility is right
 - [ ] `toolsets` filled in if `est_tools_count >= 30` (heavy-server flag in `orchestrate.cjs`) — otherwise the entry gets shown with a `⚠` and no mitigation
-- [ ] Server runs and answers a ListTools request locally (smoke check)
+- [ ] Server runs and answers a ListTools request (smoke check) — `mcp_eval.cjs --name <name> --sandbox` returns `status: pass`; a `failure_class` of `NEEDS_ENV`/`NEEDS_NET` is acceptable (couldn't boot without creds/net), but `CRASH`/`NO_TOOLS` blocks promotion
 
 #### Advisory sweep
 - [ ] `verify_integrity.cjs` (full audit, no `--no-audit`) reports no HIGH/CRITICAL CVEs for the pinned version
