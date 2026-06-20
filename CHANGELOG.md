@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/froggychips/mcp-skills-vault/compare/v0.11.0...v0.12.0) (2026-06-20)
+
+
+### Features
+
+* **eval:** sandboxed PR-time behavioural smoke + shared stdio core ([#64](https://github.com/froggychips/mcp-skills-vault/issues/64)) ([22df78d](https://github.com/froggychips/mcp-skills-vault/commit/22df78df44a83080991683c2aeb7f58307fd3c12))
+
 ## [0.11.0](https://github.com/froggychips/mcp-skills-vault/compare/v0.10.1...v0.11.0) (2026-06-20)
 
 
