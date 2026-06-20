@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@froggychips/mcp-vault.svg)](https://www.npmjs.com/package/@froggychips/mcp-vault)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Zero deps](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](./PHILOSOPHY.md)
-[![Tests](https://img.shields.io/badge/tests-271%20pass-brightgreen.svg)](./tests)
+[![Tests](https://img.shields.io/badge/tests-285%20pass-brightgreen.svg)](./tests)
 
 **Homepage:** [mcp.froggychips.xyz](https://mcp.froggychips.xyz) · **npm:** [`@froggychips/mcp-vault`](https://www.npmjs.com/package/@froggychips/mcp-vault)
 
@@ -30,15 +30,15 @@ Needs: database, infra, ci-cd, pm
 
 $ npx -y @froggychips/mcp-vault verify --offline
 …
-112 entries checked — 0 failure(s)
+114 entries checked — 0 failure(s)
 ```
 
 ## Without this vault vs. with it
 
 | | Without | With |
 |---|---|---|
-| **Discoverability** | search GitHub, hope the README isn't lying | curated DB of **112 entries** with health scores, license, category, est-tools-count |
-| **Trust** | unknown publisher, unknown last commit | `trust: verified` per entry, **94/112 (84%)** hand-vetted against a written checklist; the remaining 18 are `trust: "candidate"` held by upstream install hooks (see [Install-Hook Policy](./CONTRIBUTING.md#install-hook-policy)) |
+| **Discoverability** | search GitHub, hope the README isn't lying | curated DB of **114 entries** with health scores, license, category, est-tools-count |
+| **Trust** | unknown publisher, unknown last commit | `trust: verified` per entry, **94/114 (82%)** hand-vetted against a written checklist; the remaining 20 are `trust: "candidate"` (18 held by upstream install hooks, 2 freshly promoted from discovery pending a verified smoke) (see [Install-Hook Policy](./CONTRIBUTING.md#install-hook-policy)) |
 | **Integrity** | `npx -y whatever@latest` runs whatever ships today | sha512/sha256/Docker `@sha256:` pinned + re-verified against the live registry on every check |
 | **Vulnerabilities** | `npm audit` after the fact, if you remember | 4 advisory feeds merged: npm bulk + OSV.dev + GHSA + Snyk† — checked *before* the install command is written |
 | **Stack matching** | manual reading of awesome-lists | detects 40+ env-key patterns + 14 file paths + docker-compose images → suggests what to install |
@@ -178,15 +178,17 @@ Drift = upstream rebuilt the tag under a new digest. The weekly CI job (`docker-
 For each DB entry with a recognized install method (`npx -y`, `uvx`, `docker run`), the script spawns the subprocess and runs the canonical JSON-RPC handshake — `initialize` → `notifications/initialized` → `tools/list` — then lints each returned tool's `inputSchema` with a minimal validator (intentionally narrower than full JSON Schema Draft 2020-12; covers only what Claude Code actually reads: `type`, `properties`, `required`, `enum`, `description`, plus nested objects + array items).
 
 ```bash
-mcp-vault eval                       # smoke all (needs network)
-mcp-vault eval --name memory         # one entry, substring match
-mcp-vault eval --json --strict       # CI form
-mcp-vault eval --no-spawn            # offline self-test
+mcp-vault eval --name memory --sandbox   # one entry, jailed in a container
+mcp-vault eval --name memory --unsafe    # one entry, on the host (no docker)
+mcp-vault eval --unsafe --json --strict  # whole DB, CI form (trusted runner)
+mcp-vault eval --no-spawn                # offline self-test
 ```
 
-Output: `assets/eval_results.json` — `{name, status, boot_ms, list_latency_ms, tool_count, tool_count_db, tool_count_drift, schema_errors[], error_code, checked_at}` per entry, sorted by name for deterministic diffs. Results never flow back into `tools_database.json` — DB stays the source of truth, eval is a separate evidence stream.
+Spawn policy is **default-deny**: a live smoke runs third-party code, so it refuses to spawn unless you pass `--sandbox` (jailed ephemeral container — `--cap-drop ALL`, read-only rootfs, non-root, mem/pid caps, install hooks off) or `--unsafe` (run on the host). `--no-spawn` is exempt.
 
-Network policy: real smoke needs to fetch packages (`npx` cache miss, `uvx` wheel download, `docker pull`), so it is NOT offline. The CI job (`mcp-eval-smoke`) runs cron-only — never on PRs. The `--no-spawn` flag re-lints existing results without spawning anything; that path IS offline.
+Output: `assets/eval_results.json` — `{name, status, boot_ms, list_latency_ms, tool_count, tool_count_db, tool_count_drift, schema_errors[], error_code, failure_class, sandboxed, checked_at}` per entry, sorted by name for deterministic diffs. Results never flow back into `tools_database.json` — DB stays the source of truth, eval is a separate evidence stream.
+
+Network policy: real smoke needs to fetch packages (`npx` cache miss, `uvx` wheel download, `docker pull`), so it is NOT offline (network stays on even under `--sandbox` — the jail constrains everything else). The weekly `mcp-eval-smoke` CI job runs the whole DB `--unsafe` on the trusted self-hosted runner; the `mcp-eval-pr` job smokes only the entries changed in a PR with `--sandbox` on a disposable github-hosted runner. The `--no-spawn` flag re-lints existing results without spawning anything; that path IS offline.
 
 What it does NOT validate: behavioural correctness (we don't call any tool), business logic, or security of the server's tool implementations. This is a *smoke* check, not a fitness test.
 
@@ -271,7 +273,7 @@ score = min(20, 10·log10(stars+1))   # popularity, capped
 
 ### Vetted database
 
-`mcp-ecosystem-intelligence/assets/tools_database.json` — **112 entries** across ~25 categories, all with pinned versions, integrity hashes (npm sha512 / PyPI sha256 / Docker @sha256), SPDX license, and `trust` field.
+`mcp-ecosystem-intelligence/assets/tools_database.json` — **114 entries** across ~26 categories, all with pinned versions, integrity hashes (npm sha512 / PyPI sha256 / Docker @sha256), SPDX license, and `trust` field.
 
 ```
 ai        browser   ci-cd      cms       communication   crm
@@ -280,7 +282,7 @@ maps      memory    meta       mobile     observability   payments
 pm        reasoning search     testing    utility         vcs       web-scraping
 ```
 
-Distribution: **96 Core / 11 Recommended / 5 Experimental**.
+Distribution: **20 Core / 76 Recommended / 18 Experimental**.
 
 **Verified hand-curated core** (the original 30): the seven official `modelcontextprotocol/servers` (filesystem, fetch, git, memory, sequentialthinking, time, everything) plus vendor-maintained servers (`github`, `microsoft/playwright`, `cloudflare`, `notion`, `sentry`, `stripe`, `neon`, `mongodb`, `redis`, `clickhouse`, `awslabs/mcp`, `context7`, …) and high-quality community entries (`mcp-atlassian`, `firecrawl`, `tavily`, `exa`, `brave`, `kubernetes`, `duckduckgo`, …).
 
@@ -337,7 +339,7 @@ The following are described in [`SKILL.md`](./mcp-ecosystem-intelligence/SKILL.m
 
 ## Token cost management
 
-Every active MCP server injects its full tool list into Claude's system prompt (~200–500 tokens per tool). With 112 servers in the DB the spread is wide: `mcp-server-fetch` = 1 tool vs. `gitlab-mcp` = 153 tools.
+Every active MCP server injects its full tool list into Claude's system prompt (~200–500 tokens per tool). With 114 servers in the DB the spread is wide: `mcp-server-fetch` = 1 tool vs. `gitlab-mcp` = 153 tools.
 
 Three levers, in order of preference:
 

@@ -110,7 +110,7 @@ A `trust: "candidate"` entry stays at candidate (does **not** auto-promote to `v
 - `prepare` — runs in dev installs; harmless in most cases, but flagged for review
 - `prepack`, `prepublish`, `prepublishOnly` — package-author hooks; usually fine but inspected
 
-This is a deliberate ceiling, not a backlog. The hooks may be perfectly legitimate (build native binaries, download a CLI shim, enforce a package manager) — but `npx -y` runs them automatically, and the integrity gate's hash check covers the tarball, not the side effects of executing arbitrary install scripts. As of the last triage pass, the 18 candidate entries are all held here: `@last9/mcp-server` ships `postinstall: node bin/download-binary.js`, `@azure/mcp` ships `postinstall: node ./scripts/post-install-script.js`, `@postman/postman-mcp-server` ships `preinstall: …` that enforces pnpm, and so on.
+This is a deliberate ceiling, not a backlog. The hooks may be perfectly legitimate (build native binaries, download a CLI shim, enforce a package manager) — but `npx -y` runs them automatically, and the integrity gate's hash check covers the tarball, not the side effects of executing arbitrary install scripts. As of the last triage pass, 18 of the 20 candidate entries are held here by install hooks (the other 2 were freshly promoted from discovery and are pending a verified smoke): `@last9/mcp-server` ships `postinstall: node bin/download-binary.js`, `@azure/mcp` ships `postinstall: node ./scripts/post-install-script.js`, `@postman/postman-mcp-server` ships `preinstall: …` that enforces pnpm, and so on.
 
 To promote a hooked candidate to `verified`, a maintainer must:
 

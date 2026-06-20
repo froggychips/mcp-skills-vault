@@ -6,7 +6,7 @@ Quick answers for Claude Code users who wonder if this is worth installing.
 
 ## What is this?
 
-A vetted database of 112 MCP servers (94 hand-verified + 18 candidates), a supply-chain security scanner, and a CLI that wires them together.
+A vetted database of 114 MCP servers (94 hand-verified + 20 candidates), a supply-chain security scanner, and a CLI that wires them together.
 
 When you want to add an MCP server to a project, this gives you:
 - A curated list of known-good servers with health scores (not the 1000+ entry official registry)
@@ -19,7 +19,7 @@ When you want to add an MCP server to a project, this gives you:
 
 You can. But two problems:
 
-**Quality signal.** The official MCP registry lists everything. This project lists what's worth using — 112 entries, all scored by recency, stars, license, and whether the install actually works.
+**Quality signal.** The official MCP registry lists everything. This project lists what's worth using — 114 entries, all scored by recency, stars, license, and whether the install actually works.
 
 **Token cost.** Every active MCP server injects its full tool list into Claude's context. Some servers have 100+ tools. That's thousands of tokens on every message, even if you never use those tools. The database includes `est_tools_count` for every entry so you can make informed decisions before installing.
 
@@ -97,7 +97,7 @@ Global installs go to `~/.claude.json`.
 ## How is the database kept up to date?
 
 A GitHub Actions workflow runs every Monday:
-1. Re-fetches hashes from npm/PyPI for all 112 entries
+1. Re-fetches hashes from npm/PyPI for all 114 entries
 2. Refreshes GitHub metrics (stars, last commit, open issues)
 3. Opens a PR — **human review required before merge**
 
@@ -107,7 +107,7 @@ The PR is the only automated path to modify `tools_database.json`. Version bumps
 
 ## How is this different from the official MCP registry?
 
-The official registry lists what exists (~1000+ entries). This project lists what's worth using (112 entries), verifies the hash didn't change since review, and scores by health. It's a curated shortlist, not a directory.
+The official registry lists what exists (~1000+ entries). This project lists what's worth using (114 entries), verifies the hash didn't change since review, and scores by health. It's a curated shortlist, not a directory.
 
 ---
 
