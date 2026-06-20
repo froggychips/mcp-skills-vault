@@ -2152,6 +2152,46 @@
       "last_commit_days": 90,
       "open_issues": 12,
       "last_checked": "2026-06-08"
+    },
+    {
+      "name": "@anyproto/anytype-mcp",
+      "category": "docs",
+      "install_cmd": "npx -y @anyproto/anytype-mcp@1.2.8",
+      "source_url": "https://github.com/anyproto/anytype-mcp",
+      "stars": 447,
+      "last_commit_days": 1,
+      "open_issues": 19,
+      "in_registry": true,
+      "health_score": 110,
+      "classification": "Core",
+      "est_tools_count": null,
+      "toolsets": null,
+      "last_checked": "2026-06-20",
+      "version": "1.2.8",
+      "pkg_integrity": "sha512-Qf6Jyg+qYHOhHntgf4r/2vNRajrXJqJ/shhM/UNSEQSF2Hdq016Unyrm6H4eDTmXwomlxsNPWbDfy2Y+vw9x2A==",
+      "trust": "candidate",
+      "license": "MIT",
+      "notes": "Official Anytype MCP server (registry id io.github.anyproto/anytype-mcp). Tools generated from Anytype's OpenAPI spec: search, spaces, members, objects, lists, properties, tags, types, templates. est_tools_count not yet measured (needs the Anytype desktop app + API key to smoke-test). Promoted from discovery candidates 2026-06-20."
+    },
+    {
+      "name": "touchdesigner-mcp-server",
+      "category": "utility",
+      "install_cmd": "npx -y touchdesigner-mcp-server@1.4.10",
+      "source_url": "https://github.com/8beeeaaat/touchdesigner-mcp",
+      "stars": 379,
+      "last_commit_days": 0,
+      "open_issues": 2,
+      "in_registry": true,
+      "health_score": 110,
+      "classification": "Core",
+      "est_tools_count": 13,
+      "toolsets": null,
+      "last_checked": "2026-06-20",
+      "version": "1.4.10",
+      "pkg_integrity": "sha512-q4iH/IUqw7h5qGErOifh6LtFsnUSS9gi54jNjzlohOodiK8/eB7NMWLnbRewK7eCfopo1RuYklMRW7gV7+zT1w==",
+      "trust": "candidate",
+      "license": "MIT",
+      "notes": "Controls TouchDesigner projects via MCP, 13 tools (node create/delete, parameter read/update, Python exec, class/help introspection); registry id io.github.8beeeaaat/touchdesigner-mcp-server. category=utility: no creative/media-tooling category exists; mirrors godot-mcp-server precedent. Promoted from discovery candidates 2026-06-20."
     }
   ]
 }
