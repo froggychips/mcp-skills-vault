@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/froggychips/mcp-skills-vault/compare/v0.10.1...v0.11.0) (2026-06-20)
+
+
+### Features
+
+* **db:** promote anytype-mcp + touchdesigner-mcp-server from discovery ([#62](https://github.com/froggychips/mcp-skills-vault/issues/62)) ([dc96b35](https://github.com/froggychips/mcp-skills-vault/commit/dc96b35cd4eeab32a9535aeda4154b03c1afd98c))
+
 ## [0.10.1](https://github.com/froggychips/mcp-skills-vault/compare/v0.10.0...v0.10.1) (2026-06-05)
 
 
