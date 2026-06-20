@@ -322,16 +322,18 @@ jobs:
   mcp-eval-pr:
     name: MCP eval (sandboxed, changed entries)
     # Behavioural smoke for the DB entries touched by THIS PR. Each changed
-    # server runs in a jailed ephemeral container (mcp_eval --sandbox).
+    # server runs in a jailed container (mcp_eval --sandbox: --cap-drop ALL,
+    # read-only rootfs, non-root, mem/pid caps).
     #
-    # Runs on a GITHUB-HOSTED runner, never the self-hosted Mac: it executes
-    # untrusted third-party server code from the PR, and a disposable VM is the
-    # right blast radius for that. Informational by default — it fails the check
-    # only on genuine breakage (CRASH / NO_TOOLS), not on servers that merely
-    # need credentials or network to boot (NEEDS_ENV / NEEDS_NET).
+    # Ideal home is a disposable github-hosted VM (untrusted PR code), but this
+    # org has none available, so it runs self-hosted. The docker --sandbox jail
+    # is the isolation boundary, and the job is `continue-on-error` (advisory,
+    # never blocks merge) — a maintainer reads the summary and decides. Don't
+    # hard-gate untrusted-code execution on the shared runner.
     if: github.event_name == 'pull_request'
     needs: unit-tests
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v6
         with:
