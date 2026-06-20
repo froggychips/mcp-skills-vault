@@ -107,10 +107,11 @@ jobs:
       always() &&
       (needs.release-please.outputs.release_created == 'true' ||
        (github.event_name == 'workflow_dispatch' && inputs.publish_npm))
-    runs-on: ubuntu-latest
+    # self-hosted: this org has no github-hosted runners available. Publishing
+    # our own package needs no isolation, so the trusted runner is fine.
+    runs-on: self-hosted
     permissions:
       contents: read
-      id-token: write   # npm provenance attestation
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -119,7 +120,9 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
       - name: Tests must pass before publish
         run: node --test tests/*.test.cjs
-      - name: npm publish (provenance)
-        run: npm publish --provenance --access public
+      - name: npm publish
+        # No --provenance: that needs github-hosted OIDC, which isn't available
+        # here. NPM_TOKEN must be an npm *automation* token (bypasses 2FA OTP).
+        run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
