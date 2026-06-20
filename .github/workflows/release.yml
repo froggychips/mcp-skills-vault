@@ -32,6 +32,11 @@ on:
         description: 'Release notes body. Markdown. Leave empty to auto-generate from commits.'
         required: false
         type: string
+      publish_npm:
+        description: 'Publish current master HEAD to npm now (needs NPM_TOKEN secret). Independent of release-please.'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -43,8 +48,12 @@ jobs:
     name: release-please (auto)
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.tag == '')
     runs-on: self-hosted
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       - uses: googleapis/release-please-action@v5
+        id: release
         with:
           release-type: simple
           # `simple` = no language-specific version files, just CHANGELOG.md
@@ -86,3 +95,31 @@ jobs:
           else
             gh release create "$TAG" --target master --title "$TAG" --generate-notes
           fi
+
+  # Publish to npm. Fires automatically when release-please cuts a release, and
+  # on manual dispatch with publish_npm=true (one-click publish of master HEAD).
+  # Runs on a github-hosted runner for clean OIDC-based provenance. Requires the
+  # NPM_TOKEN repo secret (Settings → Secrets and variables → Actions).
+  publish-npm:
+    name: Publish to npm
+    needs: [release-please]
+    if: |
+      always() &&
+      (needs.release-please.outputs.release_created == 'true' ||
+       (github.event_name == 'workflow_dispatch' && inputs.publish_npm))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # npm provenance attestation
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Tests must pass before publish
+        run: node --test tests/*.test.cjs
+      - name: npm publish (provenance)
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
