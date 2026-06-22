@@ -68,7 +68,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0   # need full history for `gh release create --generate-notes`
       - name: Create tag
@@ -113,7 +113,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: '20'
