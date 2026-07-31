@@ -4,7 +4,9 @@
  * recalculate health_score + classification for all DB entries that
  * have a github.com source_url.
  *
- * Requires: gh CLI authenticated (`gh auth status`)
+ * Requires: gh CLI able to reach the API — `gh auth login` locally, or a
+ *           GITHUB_TOKEN in the environment under CI (see the preflight note
+ *           below: `gh auth status` is the wrong check for an Actions token)
  *
  * Usage:
  *   node scripts/refresh_scores.cjs              dry-run (prints diff, no write)
@@ -83,11 +85,19 @@ function main({ write, today } = {}) {
   const WRITE = write ?? process.argv.includes('--write');
   const TODAY = today ?? new Date().toISOString().slice(0, 10);
 
-  // Verify gh is available and authenticated.
+  // Verify gh is available and can actually reach the API.
+  //
+  // Not via `gh auth status`: that validates the token by calling /user, which
+  // a GitHub Actions installation token (ghs_…) is not permitted to do. So in
+  // CI it reported "not authenticated" while every `gh api` call this script
+  // makes worked fine — the job died on the preflight, not on the work.
+  // `rate_limit` is readable by user and installation tokens alike and costs
+  // nothing against the limit it reports.
   try {
-    execSync('gh auth status', { stdio: 'pipe' });
+    execSync('gh api rate_limit', { stdio: 'pipe' });
   } catch {
-    console.error('gh CLI not found or not authenticated. Run: gh auth login');
+    console.error('gh CLI not found, or its token cannot reach the GitHub API.');
+    console.error('Locally: gh auth login. In CI: pass GITHUB_TOKEN to the job.');
     process.exit(1);
   }
 
