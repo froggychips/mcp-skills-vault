@@ -74,6 +74,17 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    # Every step here talks to the GitHub API — verify_integrity reads
+    # GITHUB_TOKEN directly, refresh_scores shells out to `gh api`. Without
+    # this the jobs fell back to whatever ambient auth the runner happened to
+    # have: the maintainer's keyring-stored personal token, carrying `repo`,
+    # `gist`, `user` and `workflow` scopes across every repo they own. A
+    # supply-chain scanner should not run CI with that blast radius, and it
+    # isn't reproducible either — a launchd-spawned runner can't reach the
+    # login keychain, which is exactly how `refresh_scores --write` started
+    # failing with "gh CLI not found or not authenticated".
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
