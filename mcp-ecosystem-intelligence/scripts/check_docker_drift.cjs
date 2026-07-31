@@ -145,12 +145,29 @@ async function fetchToken(challenge) {
   } catch { return null; }
 }
 
+// `docker.io` is a namespace, not an API host: https://docker.io/v2/... answers
+// 302 pointing at www.docker.com — the marketing site — which the prober
+// reported as "probe HTTP 302" and turned into a permanent ERROR for every
+// Docker Hub entry. Note this is NOT a follow-the-redirect fix: the redirect
+// target isn't a registry at all. Docker Hub's OCI API lives on
+// registry-1.docker.io, which answers the expected 401 + bearer challenge.
+const REGISTRY_API_HOST = {
+  'docker.io':       'registry-1.docker.io',
+  'index.docker.io': 'registry-1.docker.io',
+};
+
+// Keep the namespace for display/DB purposes; only requests get rewritten.
+function apiHostFor(registry) {
+  return REGISTRY_API_HOST[registry] || registry;
+}
+
 async function fetchManifestDigest(registry, repo, tag) {
   const reqPath = `/v2/${repo}/manifests/${encodeURIComponent(tag)}`;
+  const host    = apiHostFor(registry);
 
   // Probe — registries reply 401 here with the bearer challenge.
   const probe = await httpsRequest({
-    hostname: registry,
+    hostname: host,
     path:     reqPath,
     method:   'HEAD',
     headers:  { 'Accept': MANIFEST_ACCEPT },
@@ -170,7 +187,7 @@ async function fetchManifestDigest(registry, repo, tag) {
   }
 
   const res = await httpsRequest({
-    hostname: registry,
+    hostname: host,
     path:     reqPath,
     method:   'HEAD',
     headers:  {
@@ -257,4 +274,6 @@ module.exports = {
   dockerImageRef,
   parseImageRef,
   parseBearerChallenge,
+  apiHostFor,
+  REGISTRY_API_HOST,
 };
