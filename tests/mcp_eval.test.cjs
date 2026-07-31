@@ -178,6 +178,45 @@ test('e2e: bad inputSchema → status pass + schema_errors populated', async () 
   assert.deepEqual([...new Set(toolNames)], ['bad', 'ref-bad']);
 });
 
+test('e2e: launcher binary missing → skip, and the eval survives it', async () => {
+  // Regression: ENOENT arrives as an async 'error' event on the child, not as
+  // a throw from spawn(). With no listener Node escalated it to an uncaught
+  // exception and killed the whole run — one absent `docker` took down every
+  // other entry's verdict. See CI run 28357799835.
+  const t = {
+    name: 'no-such-launcher',
+    install_cmd: 'fake',
+    est_tools_count: null,
+    _evalSpawn: { command: path.join(os.tmpdir(), 'definitely-not-a-real-launcher'), args: [] },
+  };
+  const r = await e.smokeEntry(t, { timeout: 3000 });
+  // skip, not fail: the host lacked the launcher, which says nothing about
+  // whether the server itself works.
+  assert.equal(r.status, 'skip');
+  assert.match(r.error_code, /^launcher unavailable: /);
+  assert.equal(r.boot_ms, null);
+});
+
+test('e2e: a dead launcher does not stop the entries after it', async () => {
+  // The whole point of the fix: a bad entry must not poison the batch.
+  const dead = {
+    name: 'dead',
+    install_cmd: 'fake',
+    est_tools_count: null,
+    _evalSpawn: { command: path.join(os.tmpdir(), 'definitely-not-a-real-launcher'), args: [] },
+  };
+  const good = fakeTool('after-dead', {
+    FAKE_TOOLS_JSON: JSON.stringify([
+      { name: 'a', inputSchema: { type: 'object', properties: {} } },
+    ]),
+  });
+  const first  = await e.smokeEntry(dead, { timeout: 3000 });
+  const second = await smokeWithEnv(good, { timeout: 5000 });
+  assert.equal(first.status, 'skip');
+  assert.equal(second.status, 'pass');
+  assert.equal(second.tool_count, 1);
+});
+
 test('e2e: fake server exits non-zero before responding → fail', async () => {
   const t = fakeTool('exit', { FAKE_FAIL: 'exit' });
   const r = await smokeWithEnv(t, { timeout: 3000 });
