@@ -38,7 +38,7 @@
  *   mcp_eval.cjs --unsafe               run servers directly on the host (explicit opt-out of the sandbox)
  *   mcp_eval.cjs --db <path>            override DB path
  *   mcp_eval.cjs --results <path>       override results file path
- *   mcp_eval.cjs --strict               exit 1 on any pass-rate < 100%
+ *   mcp_eval.cjs --strict               exit 1 on any failure or unavailable launcher
  *   mcp_eval.cjs --help                 print this help
  *
  * Spawn policy (default-deny): a live smoke executes third-party server code,
@@ -49,7 +49,8 @@
  *
  * Exit codes:
  *   0  smoke completed (and, under --strict, all entries passed)
- *   1  --strict: at least one entry failed
+ *   1  --strict: at least one entry failed, or an entry went unchecked
+ *      because its launcher was missing on this host (a CI gap, not a pass)
  *   2  bad arguments
  */
 
@@ -330,8 +331,9 @@ async function smokeEntry(tool, opts) {
     return result;
   }
 
-  // Once we commit to spawning, the verdict is pass/fail — `skip` is
-  // reserved for "we didn't try because we couldn't parse it".
+  // Once a process is actually talking to us the verdict is pass/fail;
+  // `skip` stays reserved for "we never got to ask" — an install_cmd we
+  // couldn't parse, or a launcher binary missing on this host (below).
   result.status = 'fail';
 
   // Sandbox real entries when asked; the test fake-server (_evalSpawn) always
@@ -354,6 +356,26 @@ async function smokeEntry(tool, opts) {
   } catch (e) {
     result.status     = 'fail';
     result.error_code = `spawn error: ${e.code || e.message}`;
+    return result;
+  }
+
+  // The catch above only sees synchronous throws. A missing launcher
+  // (docker/npx/uvx not on PATH) is reported asynchronously as an 'error'
+  // event instead — and with no listener Node escalates it to an uncaught
+  // exception, killing the whole eval and losing every other entry's
+  // verdict. Attach a listener before anything else can emit.
+  child.on('error', () => {});
+  // stdin is torn down with the failed spawn; its EPIPE is redundant noise
+  // on top of the 'error' above, and would itself be unhandled.
+  child.stdin.on('error', () => {});
+
+  // A spawn that never started leaves pid undefined — synchronous, so we
+  // can bail before writing a handshake into a dead pipe. This is a gap in
+  // the host environment, not a verdict on the server: `fail` would brand
+  // every docker-based entry as broken on a runner that simply lacks docker.
+  if (child.pid === undefined) {
+    result.status     = 'skip';
+    result.error_code = `launcher unavailable: ${launch.command}`;
     return result;
   }
 
@@ -637,6 +659,12 @@ async function main() {
   const pass = newResults.filter(r => r.status === 'pass').length;
   const fail = newResults.filter(r => r.status === 'fail').length;
   const skip = newResults.filter(r => r.status === 'skip').length;
+  // Broken out of `skip` on purpose: "the host couldn't run this check" is a
+  // CI problem that must not read as a clean pass. Everything else under
+  // skip is a deliberate we-didn't-ask.
+  const skippedLauncher = newResults.filter(
+    r => r.status === 'skip' && /^launcher unavailable: /.test(r.error_code || '')
+  ).length;
 
   if (opts.json) {
     process.stdout.write(JSON.stringify({
@@ -644,14 +672,24 @@ async function main() {
       results_path: opts.results,
       checked: newResults.length,
       pass, fail, skip,
+      skipped_launcher: skippedLauncher,
       results: newResults,
     }, null, 2) + '\n');
   } else {
     process.stderr.write(`\n${newResults.length} checked — ${pass} pass, ${fail} fail, ${skip} skip\n`);
     process.stderr.write(`Results written to ${opts.results}\n`);
   }
+  if (skippedLauncher > 0) {
+    const missing = [...new Set(newResults
+      .filter(r => /^launcher unavailable: /.test(r.error_code || ''))
+      .map(r => r.error_code.replace('launcher unavailable: ', '')))].sort();
+    process.stderr.write(
+      `WARNING: ${skippedLauncher} entr${skippedLauncher === 1 ? 'y' : 'ies'} not checked — ` +
+      `launcher missing on this host: ${missing.join(', ')}\n`
+    );
+  }
 
-  process.exit(opts.strict && fail > 0 ? 1 : 0);
+  process.exit(opts.strict && (fail > 0 || skippedLauncher > 0) ? 1 : 0);
 }
 
 if (require.main === module) {
