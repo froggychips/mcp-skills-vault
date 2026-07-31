@@ -59,3 +59,29 @@ test('parseBearerChallenge: returns null on non-Bearer / malformed', () => {
   assert.equal(d.parseBearerChallenge(null),              null);
   assert.equal(d.parseBearerChallenge(''),                null);
 });
+
+// ── registry API host mapping ──────────────────────────────────────────────
+
+test('apiHostFor: docker.io namespaces map to the registry API host', () => {
+  // https://docker.io/v2/... answers 302 pointing at www.docker.com, so the
+  // prober logged "probe HTTP 302" and every Docker Hub entry sat in a
+  // permanent ERROR — which hid a real digest drift on
+  // hashicorp/terraform-mcp-server rather than reporting it.
+  assert.equal(d.apiHostFor('docker.io'), 'registry-1.docker.io');
+  assert.equal(d.apiHostFor('index.docker.io'), 'registry-1.docker.io');
+});
+
+test('apiHostFor: other registries are passed through untouched', () => {
+  assert.equal(d.apiHostFor('ghcr.io'), 'ghcr.io');
+  assert.equal(d.apiHostFor('quay.io'), 'quay.io');
+  assert.equal(d.apiHostFor('registry.gitlab.com'), 'registry.gitlab.com');
+  assert.equal(d.apiHostFor('localhost:5000'), 'localhost:5000');
+});
+
+test('apiHostFor: the mapping only rewrites requests, not the stored namespace', () => {
+  // parseImageRef must keep reporting docker.io so the DB and the report stay
+  // in the user's vocabulary; only the HTTP hostname changes.
+  const ref = d.parseImageRef('hashicorp/terraform-mcp-server:latest');
+  assert.equal(ref.registry, 'docker.io');
+  assert.notEqual(d.apiHostFor(ref.registry), ref.registry);
+});
