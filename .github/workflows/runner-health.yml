@@ -1,0 +1,105 @@
+name: runner-health
+
+# Deadman для self-hosted CI. Крутится на GitHub-hosted раннере — намеренно:
+# джоба, которая следит за упавшим self-hosted раннером, не может сама
+# зависеть от него, иначе молча встанет в ту же очередь.
+#
+# Ловит два симптома вместо статуса раннера напрямую: GET /actions/runners
+# требует admin-права, а GITHUB_TOKEN такую permission выдать не может.
+#   1. run висит в queued дольше QUEUE_LIMIT_MIN И при этом ничего не
+#      исполняется — раннер offline / лейблы не совпали. Второе условие
+#      обязательно: раннер один, полный security-scan идёт десятки минут, и
+#      очередь за ним — норма, а не авария.
+#   2. нет успешного scheduled-рана security-scan дольше STALE_LIMIT_DAYS — cron мёртв
+#
+# Падение джобы = письмо владельцу репо от GitHub.
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  QUEUE_LIMIT_MIN: 30
+  STALE_LIMIT_DAYS: 8   # cron раз в неделю → 8 дней даёт один пропуск форы
+
+jobs:
+  deadman:
+    name: Self-hosted CI deadman
+    runs-on: ubuntu-latest
+    steps:
+      - name: Залипшая очередь
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          now=$(date -u +%s)
+          stalled=0
+          gh api "repos/${{ github.repository }}/actions/runs?status=queued&per_page=100" \
+            --jq '.workflow_runs[] | "\(.id)\t\(.created_at)\t\(.name)"' > queued.tsv || true
+          while IFS=$'\t' read -r id created name; do
+            [ -z "${id:-}" ] && continue
+            age=$(( (now - $(date -u -d "$created" +%s)) / 60 ))
+            if [ "$age" -ge "$QUEUE_LIMIT_MIN" ]; then
+              echo "run $id ($name) в queued $age мин"
+              stalled=1
+            fi
+          done < queued.tsv
+
+          if [ "$stalled" -eq 0 ]; then
+            echo "Очередь чистая."
+            exit 0
+          fi
+
+          # Ожидание в очереди само по себе ничего не значит: раннер держит одну
+          # джобу за раз, а полный security-scan (eval по ~100 записям) идёт
+          # десятки минут — всё, что встало за ним, ждёт законно. Смерть от
+          # сатурации отличает единственный факт: подхватывает ли кто-нибудь
+          # работу вообще.
+          #
+          # Считать это по `runs?status=in_progress` НЕЛЬЗЯ: статус рана остаётся
+          # `queued`, пока хоть одна его джоба ждёт, даже если другая в этот
+          # момент исполняется. Проверено на живом репо — при работающем eval
+          # фильтр вернул 0. Признак живости живёт на уровне джоб, а job in_progress
+          # всегда принадлежит рану со статусом queued или in_progress, так что
+          # обойти нужно только их.
+          busy=0
+          for st in in_progress queued; do
+            for rid in $(gh api "repos/${{ github.repository }}/actions/runs?status=$st&per_page=20" \
+                          --jq '.workflow_runs[].id' 2>/dev/null || true); do
+              n=$(gh api "repos/${{ github.repository }}/actions/runs/$rid/jobs" \
+                    --jq '[.jobs[] | select(.status=="in_progress")] | length' 2>/dev/null || echo 0)
+              if [ "${n:-0}" -gt 0 ]; then busy=1; break 2; fi
+            done
+          done
+
+          if [ "$busy" -eq 1 ]; then
+            echo "::warning::очередь ждёт дольше ${QUEUE_LIMIT_MIN} мин, но джобы исполняются — раннер жив, это сатурация"
+            exit 0
+          fi
+          echo "::error::очередь ждёт дольше ${QUEUE_LIMIT_MIN} мин и ни одна джоба не исполняется — раннер offline или лейблы не совпали"
+          exit 1
+
+      - name: Deadman на scheduled security-scan
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          last=$(gh api \
+            "repos/${{ github.repository }}/actions/workflows/security-scan.yml/runs?event=schedule&status=success&per_page=1" \
+            --jq '.workflow_runs[0].updated_at // empty')
+          if [ -z "$last" ]; then
+            echo "::error::ни одного успешного scheduled-рана security-scan в истории"
+            exit 1
+          fi
+          age=$(( ( $(date -u +%s) - $(date -u -d "$last" +%s) ) / 86400 ))
+          echo "Последний успешный scheduled-ран: $last ($age дн. назад)"
+          if [ "$age" -ge "$STALE_LIMIT_DAYS" ]; then
+            echo "::error::security-scan не проходил $age дн. (порог $STALE_LIMIT_DAYS) — cron или раннер мёртв"
+            exit 1
+          fi
