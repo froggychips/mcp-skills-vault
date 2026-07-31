@@ -93,3 +93,63 @@ test('license: omitted argument skips the penalty entirely', () => {
   assert.equal(out.breakdown.license, 0);
   assert.equal(out.health_score, 90);
 });
+
+// ── classifyLicense: gaps that pinned the license-drift gate red ───────────
+
+const { classifyLicense, classifySpdxExpression } = require('../mcp-ecosystem-intelligence/scripts/calculate_health.cjs');
+
+test('classifyLicense: Eclipse and other OSI ids that were missing from the set', () => {
+  // EPL-2.0 classified as `restrictive` — it is OSI-approved. That both cost
+  // affected entries -10 health and reported @theia/ai-mcp-server as an
+  // OSI→restrictive drift, which is what kept --strict failing.
+  for (const id of ['EPL-1.0', 'EPL-2.0', 'CDDL-1.0', 'Artistic-2.0', 'BlueOak-1.0.0', 'BSL-1.0']) {
+    assert.equal(classifyLicense(id), 'osi', id);
+  }
+});
+
+test('classifyLicense: BSL-1.0 (Boost) and BUSL-1.1 (Business Source) stay apart', () => {
+  // One character apart, opposite verdicts, and "BSL" is used colloquially for
+  // the Business one. Folding them together would whitelist a
+  // source-available license.
+  assert.equal(classifyLicense('BSL-1.0'), 'osi');
+  assert.equal(classifyLicense('BUSL-1.1'), 'restrictive');
+});
+
+test('classifyLicense: npm non-SPDX values are unknown, not restrictive', () => {
+  assert.equal(classifyLicense('SEE LICENSE IN LICENSE.txt'), 'unknown');
+  assert.equal(classifyLicense('see license in COPYING'), 'unknown');
+  assert.equal(classifyLicense('UNLICENSED'), 'unknown');
+});
+
+test('classifyLicense: dual license is a wider offer, so OR of any OSI is OSI', () => {
+  assert.equal(classifyLicense('(MIT OR Apache-2.0)'), 'osi');
+  assert.equal(classifyLicense('MIT OR Apache-2.0'), 'osi');
+  // The real @theia/ai-mcp-server value.
+  assert.equal(classifyLicense('EPL-2.0 OR GPL-2.0-only WITH Classpath-exception-2.0'), 'osi');
+  // An OR where nothing is OSI must stay restrictive.
+  assert.equal(classifyLicense('BUSL-1.1 OR Elastic-2.0'), 'restrictive');
+});
+
+test('classifyLicense: AND stacks obligations, so every operand must be OSI', () => {
+  assert.equal(classifyLicense('MIT AND Apache-2.0'), 'osi');
+  assert.equal(classifyLicense('MIT AND BUSL-1.1'), 'restrictive');
+});
+
+test('classifyLicense: a WITH exception is judged by its base license', () => {
+  // Exceptions (Classpath, LLVM, GCC) only add permissions.
+  assert.equal(classifyLicense('GPL-2.0-only WITH Classpath-exception-2.0'), 'osi');
+  assert.equal(classifyLicense('BUSL-1.1 WITH Some-exception'), 'restrictive');
+});
+
+test('classifySpdxExpression: returns null for plain ids so callers can fall through', () => {
+  assert.equal(classifySpdxExpression('MIT'), null);
+  assert.equal(classifySpdxExpression('BUSL-1.1'), null);
+  assert.equal(classifySpdxExpression('MIT OR Apache-2.0'), 'osi');
+});
+
+test('classifyLicense: genuine relicensing tokens still classify as restrictive', () => {
+  // The whole point of the gate — these must not have been loosened.
+  for (const id of ['BUSL-1.1', 'SSPL-1.0', 'Elastic-2.0', 'FSL-1.1-ALv2', 'Commons-Clause', 'Proprietary']) {
+    assert.equal(classifyLicense(id), 'restrictive', id);
+  }
+});

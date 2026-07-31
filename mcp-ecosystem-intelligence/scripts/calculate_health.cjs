@@ -58,7 +58,21 @@ const OSI_APPROVED = new Set([
   'LGPL-2.1', 'LGPL-2.1-only', 'LGPL-2.1-or-later',
   'LGPL-3.0', 'LGPL-3.0-only', 'LGPL-3.0-or-later',
   'AGPL-3.0', 'AGPL-3.0-only', 'AGPL-3.0-or-later',
+  'EPL-1.0', 'EPL-2.0',           // Eclipse — OSI-approved, was missing
+  'CDDL-1.0', 'Artistic-2.0', 'BlueOak-1.0.0',
+  // Boost Software License. NOT the same thing as BUSL-1.1 (Business Source
+  // License), which is source-available and must keep classifying as
+  // restrictive. The two ids are one character apart and "BSL" is used
+  // colloquially for the Business one, so never fold them together.
+  'BSL-1.0',
 ]);
+
+// npm allows two non-SPDX values in the `license` field: a pointer to a
+// bundled file, and an explicit refusal to grant a license. Neither means
+// "source-available" — they mean a human has to go read something, which is
+// `unknown`. Classifying them as restrictive is what pinned the license-drift
+// gate red for @bitwarden/mcp-server ("SEE LICENSE IN LICENSE.txt").
+const NPM_NON_SPDX = /^(SEE LICENSE IN\b|UNLICENSED$)/i;
 
 // --- Pure scoring components -------------------------------------------
 
@@ -96,11 +110,54 @@ function classifyLicense(license) {
   if (license === null || license === undefined) return 'unknown';
   const s = String(license).trim();
   if (s === '' || s === 'Unknown' || s === 'NOASSERTION' || s === 'UNKNOWN') return 'unknown';
+  if (NPM_NON_SPDX.test(s)) return 'unknown';
   if (OSI_APPROVED.has(s)) return 'osi';
+  const expr = classifySpdxExpression(s);
+  if (expr) return expr;
   // Everything else that's a real string but not on the OSI list — treat as
   // restrictive. This catches BSL-1.1, SSPL-1.0, Elastic-2.0, FSL-1.1-ALv2,
   // FSL-1.1-MIT, Commons-Clause, ELv2, and any future relicensing token.
   return 'restrictive';
+}
+
+/**
+ * Classify a compound SPDX expression, e.g. "(MIT OR Apache-2.0)" or
+ * "EPL-2.0 OR GPL-2.0-only WITH Classpath-exception-2.0".
+ *
+ * Returns 'osi' | 'restrictive', or null when the string isn't an expression
+ * (so the caller can fall through to its own default).
+ *
+ * Exact-string lookup treated every expression as restrictive, which is
+ * backwards for the common case: a dual license is a *wider* offer, not a
+ * narrower one. `A OR B` lets the recipient pick, so one OSI option is enough.
+ * `A AND B` stacks obligations, so all of them must be OSI.
+ *
+ * `WITH <exception>` is dropped and the base license judged instead —
+ * exceptions (Classpath, LLVM, GCC) only add permissions.
+ *
+ * Simplification, stated because it is one: expressions mixing OR and AND are
+ * not evaluated by precedence. If any OR is present and any operand is OSI we
+ * answer 'osi'. Mixed expressions are vanishingly rare in package metadata,
+ * and the failure direction is the mild one — an over-permissive read here
+ * shows up as a missing drift alert, not as a wrongful accusation of
+ * relicensing. Revisit if a real case appears.
+ */
+function classifySpdxExpression(s) {
+  if (!/[()]|\s(?:OR|AND|WITH)\s/i.test(s)) return null;
+
+  const hasOr = /\sOR\s/i.test(s);
+  const operands = s
+    .replace(/[()]/g, ' ')
+    .split(/\s+(?:OR|AND)\s+/i)
+    .map(part => part.trim().split(/\s+WITH\s+/i)[0].trim())
+    .filter(Boolean);
+
+  if (operands.length === 0) return null;
+  // A lone operand means the only token was a WITH exception or parentheses —
+  // judge it directly rather than reporting a compound verdict.
+  const kinds = operands.map(o => (OSI_APPROVED.has(o) ? 'osi' : 'restrictive'));
+  if (hasOr) return kinds.includes('osi') ? 'osi' : 'restrictive';
+  return kinds.every(k => k === 'osi') ? 'osi' : 'restrictive';
 }
 
 /**
@@ -214,6 +271,7 @@ module.exports = {
   popularityScoreOf,
   recencyBonusOf,
   classifyLicense,
+  classifySpdxExpression,
   licensePenaltyOf,
   classify,
   calculateHealth,
