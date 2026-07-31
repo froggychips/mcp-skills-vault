@@ -78,6 +78,17 @@ const PYPI_BASE     = process.env.MCP_DISCOVER_PYPI_URL || 'https://pypi.org';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
+// Deterministic tiebreaker for every ranked list this script writes. Ranking
+// keys here (stars, health_score) are coarse and volatile; without a stable
+// second key the output order tracks whichever source answered first, so a
+// re-run reshuffles the file even when nothing was discovered or dropped.
+// Locale-independent on purpose — the file is a git artifact, not UI.
+function cmpName(a, b) {
+  const x = String(a && a.name || '');
+  const y = String(b && b.name || '');
+  return x < y ? -1 : x > y ? 1 : 0;
+}
+
 function ghJson(args) {
   try {
     return JSON.parse(execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }));
@@ -494,8 +505,10 @@ async function main() {
   }
 
   // Soft pre-rank by initial stars (from gh-topic source if present) so the
-  // --max-health-checks cap takes the most promising entries first.
-  kept.sort((a, b) => (b.stars || 0) - (a.stars || 0));
+  // --max-health-checks cap takes the most promising entries first. Ties break
+  // on name: without it the cap would keep a different subset run to run,
+  // depending on the order the sources happened to answer in.
+  kept.sort((a, b) => (b.stars || 0) - (a.stars || 0) || cmpName(a, b));
   const toEnrich = kept.slice(0, MAX_HEALTH);
   process.stderr.write(`Enriching health metrics for top ${toEnrich.length} (cap --max-health-checks)\n`);
 
@@ -533,7 +546,13 @@ async function main() {
     if (reason) { rejected.push({ ...c, reject_reason: reason }); continue; }
     candidates.push(c);
   }
-  candidates.sort((a, b) => (b.health_score || 0) - (a.health_score || 0));
+  // Rank for triage — highest health first — but break ties on name, so the
+  // stored order is a function of the data and not of network timing.
+  // health_score is coarse: measured on the current inbox, 45 of 50 entries
+  // share a score with at least one other, so without a tiebreaker almost the
+  // whole file reshuffles every week. That turned a ~41-entry change into a
+  // 1755-line diff (PR #71) and made the reviewer checklist unusable.
+  candidates.sort((a, b) => (b.health_score || 0) - (a.health_score || 0) || cmpName(a, b));
   const top = candidates.slice(0, LIMIT);
 
   process.stderr.write(`After reject heuristics:               ${candidates.length}\n`);
@@ -573,7 +592,10 @@ async function main() {
     kept_count:   top.length,
     rejected_count: rejected.length,
     candidates:   shaped,
-    rejected:     rejected.slice(0, 50).map(r => ({
+    // Rejects carry no ranking at all, so they were stored in raw discovery
+    // order — the noisiest part of the diff. Name order makes the truncation
+    // to 50 reproducible too.
+    rejected:     [...rejected].sort(cmpName).slice(0, 50).map(r => ({
       name: r.name, source_url: r.source_url, reason: r.reject_reason,
       stars: r.stars, last_commit_days: r.last_commit_days,
     })),
@@ -595,6 +617,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  cmpName,
   normalizeRepoUrl,
   ownerRepoFromUrl,
   scoreHealth,
