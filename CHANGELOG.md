@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.13.0](https://github.com/froggychips/mcp-skills-vault/compare/v0.12.0...v0.13.0) (2026-07-31)
+
+
+### Features
+
+* **ops:** CI deadman that runs outside CI ([81bddba](https://github.com/froggychips/mcp-skills-vault/commit/81bddbaf7b38d4d39a0fe72ca2fb55a12b688d80))
+
+
+### Bug Fixes
+
+* **discover:** break ranking ties on name so the inbox stops reshuffling ([dbb364e](https://github.com/froggychips/mcp-skills-vault/commit/dbb364e261bd578e66970cdf7ddc7bb1e38cbc2e))
+* **docker:** talk to registry-1.docker.io, not to the docker.io namespace ([b45be3a](https://github.com/froggychips/mcp-skills-vault/commit/b45be3afec37f623ccd547890a3862d26d6b63ce))
+* **eval:** survive a missing launcher instead of taking the run down ([60c3535](https://github.com/froggychips/mcp-skills-vault/commit/60c353573f70c2e096738d1117fa7a356c9fedc7))
+* flush stdout before exiting, so verdicts and JSON aren't truncated ([d197806](https://github.com/froggychips/mcp-skills-vault/commit/d197806786f3fda51fbaf6bd542cf9da7a2d8d7e))
+* **license:** classify Eclipse, SPDX expressions and npm's non-SPDX values ([f6fba34](https://github.com/froggychips/mcp-skills-vault/commit/f6fba3448d9ff545b1dab8c37d662b437d640560))
+* **release:** run release-please in manifest mode so the version actually bumps ([9b83db9](https://github.com/froggychips/mcp-skills-vault/commit/9b83db9c5c98718c1a92a91e1f51f26820ac78be))
+* **scores:** preflight on API reachability, not on `gh auth status` ([de60457](https://github.com/froggychips/mcp-skills-vault/commit/de604576fc504eedad5c812340bc4d4019893b9e))
+
+
+### Documentation
+
+* sync all .md to 114 entries / 20-76-18 tiers / sandboxed eval / 285 tests ([#66](https://github.com/froggychips/mcp-skills-vault/issues/66)) ([e2a64f4](https://github.com/froggychips/mcp-skills-vault/commit/e2a64f4cc26f08e50b361ef018f6921b7b8439a1))
+
+
+### Build
+
+* **deps:** bump actions/checkout from 6 to 7 ([#68](https://github.com/froggychips/mcp-skills-vault/issues/68)) ([6a2ecc8](https://github.com/froggychips/mcp-skills-vault/commit/6a2ecc81ce2a69486e0ac5d42be419abcf454f7a))
+* **deps:** bump actions/setup-node from 6 to 7 ([de7ebf6](https://github.com/froggychips/mcp-skills-vault/commit/de7ebf6418b98a07e47a99923f087f5945538973))
+
+
+### CI
+
+* deadman for the self-hosted runner ([15513f2](https://github.com/froggychips/mcp-skills-vault/commit/15513f2c384abad0f5ea9e4cdebd6d808a246246))
+* give refresh-hashes a GITHUB_TOKEN instead of the maintainer's keyring ([e593a4b](https://github.com/froggychips/mcp-skills-vault/commit/e593a4b4a775e10ac7fd5f63d7d2e1e14e5d4d68))
+* move npm-publish + mcp-eval-pr to self-hosted (no github-hosted runners) ([#67](https://github.com/froggychips/mcp-skills-vault/issues/67)) ([8be08dd](https://github.com/froggychips/mcp-skills-vault/commit/8be08dd4a7bd76e23d5f61b4ab73612bec2223f7))
+* park the deadman — this account has no GitHub-hosted minutes ([6bb13e2](https://github.com/froggychips/mcp-skills-vault/commit/6bb13e29f270ff6ee5c0c27c0eb8c99bea049d83))
+* smoke the weekly refresh PR, which the pull_request gate can't see ([d4c71c0](https://github.com/froggychips/mcp-skills-vault/commit/d4c71c051073906dffd0306e95ec1032304c2a9b))
+
 ## [0.12.0](https://github.com/froggychips/mcp-skills-vault/compare/v0.11.0...v0.12.0) (2026-06-20)
 
 
