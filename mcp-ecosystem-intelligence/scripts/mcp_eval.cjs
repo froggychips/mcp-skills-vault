@@ -60,6 +60,7 @@ const fs            = require('fs');
 const path          = require('path');
 const { spawn }     = require('child_process');
 const { performance } = require('perf_hooks');
+const { exitAfterFlush } = require('./lib/exit.cjs');
 const stdio         = require('./lib/mcp_stdio.cjs'); // shared framing + sandbox + classifier (vendored, zero-dep)
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -602,7 +603,7 @@ async function main() {
         process.stdout.write(`  - ${m.name}: ${m.schema_errors_recheck.length} malformed entries\n`);
       }
     }
-    process.exit(opts.strict && malformed.length ? 1 : 0);
+    exitAfterFlush(opts.strict && malformed.length ? 1 : 0);
   }
 
   // Default-deny: refuse a live smoke unless a spawn policy was chosen.
@@ -689,7 +690,9 @@ async function main() {
     );
   }
 
-  process.exit(opts.strict && (fail > 0 || skippedLauncher > 0) ? 1 : 0);
+  // --json writes the whole result set to stdout just above; process.exit()
+  // would truncate it mid-object into "Unexpected end of JSON input".
+  exitAfterFlush(opts.strict && (fail > 0 || skippedLauncher > 0) ? 1 : 0);
 }
 
 if (require.main === module) {

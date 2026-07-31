@@ -37,6 +37,7 @@ const https       = require('https');
 const fs          = require('fs');
 const path        = require('path');
 const { writeDb } = require('./lib/db_io.cjs');
+const { exitAfterFlush } = require('./lib/exit.cjs');
 
 const DB_PATH   = path.resolve(__dirname, '../assets/tools_database.json');
 const UPDATE    = process.argv.includes('--update');
@@ -680,7 +681,9 @@ async function main() {
     if (totalFails > 0) console.error('DO NOT install until failures are resolved.');
   }
 
-  process.exit(totalFails > 0 ? 1 : 0);
+  // Not process.exit(): the summary above is still buffered when stdout is a
+  // pipe, and exiting drops it. See lib/exit.cjs.
+  exitAfterFlush(totalFails > 0 ? 1 : 0);
 }
 
 if (require.main === module) {
