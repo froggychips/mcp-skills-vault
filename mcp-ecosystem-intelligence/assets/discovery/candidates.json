@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-31T10:53:52.747Z",
+  "generated_at": "2026-07-31T11:44:28.655Z",
   "sources": [
     "readme",
     "npm",
@@ -92,8 +92,8 @@
       "_discovery": {
         "source": "gh-topic+npm-search",
         "stars": 2651,
-        "last_commit_days": 7,
-        "open_issues": 186,
+        "last_commit_days": 8,
+        "open_issues": 187,
         "registry_id": null
       }
     },
@@ -311,7 +311,7 @@
       "notes": "AI-powered reverse engineering assistant that bridges IDA Pro with language models through MCP.",
       "_discovery": {
         "source": "gh-topic",
-        "stars": 10952,
+        "stars": 10953,
         "last_commit_days": 0,
         "open_issues": 44,
         "registry_id": null
@@ -509,9 +509,9 @@
       "notes": "Token efficient, zero-dependency database MCP server for Postgres, MySQL, SQL Server, MariaDB, SQLite.",
       "_discovery": {
         "source": "gh-topic",
-        "stars": 3260,
+        "stars": 3261,
         "last_commit_days": 0,
-        "open_issues": 2,
+        "open_issues": 3,
         "registry_id": null
       }
     },
@@ -531,7 +531,7 @@
       "notes": "Ghidra MCP Server — 200+ MCP tools for AI-powered reverse engineering. GUI plugin + headless server, lazy tool loading, convention enforcement, batch operations, Ghidra Server integration, and Docker deployment.",
       "_discovery": {
         "source": "gh-topic",
-        "stars": 3081,
+        "stars": 3083,
         "last_commit_days": 0,
         "open_issues": 15,
         "registry_id": null
@@ -597,7 +597,7 @@
       "notes": "Security scanner for AI agents, MCP servers and agent skills.",
       "_discovery": {
         "source": "gh-topic",
-        "stars": 2842,
+        "stars": 2843,
         "last_commit_days": 2,
         "open_issues": 3,
         "registry_id": null
@@ -685,7 +685,7 @@
       "notes": "MCP, CLI, Skills for searching and downloading academic papers from multiple sources like arXiv, PubMed, bioRxiv, etc.",
       "_discovery": {
         "source": "gh-topic",
-        "stars": 2299,
+        "stars": 2300,
         "last_commit_days": 29,
         "open_issues": 47,
         "registry_id": null
@@ -884,7 +884,7 @@
       "_discovery": {
         "source": "gh-topic",
         "stars": 327,
-        "last_commit_days": 26,
+        "last_commit_days": 27,
         "open_issues": 0,
         "registry_id": null
       }
@@ -1115,7 +1115,7 @@
       "name": "n8n",
       "source_url": "https://github.com/n8n-io/n8n",
       "reason": "not-mcp-server",
-      "stars": 198818,
+      "stars": 198823,
       "last_commit_days": 0
     },
     {
@@ -1129,28 +1129,28 @@
       "name": "worldmonitor",
       "source_url": "https://github.com/koala73/worldmonitor",
       "reason": "not-mcp-server",
-      "stars": 77233,
+      "stars": 77245,
       "last_commit_days": 0
     },
     {
       "name": "Scrapling",
       "source_url": "https://github.com/D4Vinci/Scrapling",
       "reason": "not-mcp-server",
-      "stars": 71932,
+      "stars": 71934,
       "last_commit_days": 0
     },
     {
       "name": "ruflo",
       "source_url": "https://github.com/ruvnet/ruflo",
       "reason": "not-mcp-server",
-      "stars": 66645,
+      "stars": 66648,
       "last_commit_days": 0
     },
     {
       "name": "gpt-researcher",
       "source_url": "https://github.com/assafelovic/gpt-researcher",
       "reason": "not-mcp-server",
-      "stars": 28753,
+      "stars": 28754,
       "last_commit_days": 13
     },
     {
@@ -1164,14 +1164,14 @@
       "name": "nuclear",
       "source_url": "https://github.com/nukeop/nuclear",
       "reason": "not-mcp-server",
-      "stars": 18160,
+      "stars": 18161,
       "last_commit_days": 0
     },
     {
       "name": "trigger.dev",
       "source_url": "https://github.com/triggerdotdev/trigger.dev",
       "reason": "not-mcp-server",
-      "stars": 15823,
+      "stars": 15824,
       "last_commit_days": 0
     },
     {
@@ -1185,14 +1185,14 @@
       "name": "OpenMetadata",
       "source_url": "https://github.com/open-metadata/OpenMetadata",
       "reason": "not-mcp-server",
-      "stars": 14617,
+      "stars": 14620,
       "last_commit_days": 0
     },
     {
       "name": "Auto-claude-code-research-in-sleep",
       "source_url": "https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep",
       "reason": "not-mcp-server",
-      "stars": 14071,
+      "stars": 14074,
       "last_commit_days": 0
     },
     {
@@ -1206,7 +1206,7 @@
       "name": "nginx-ui",
       "source_url": "https://github.com/0xJacky/nginx-ui",
       "reason": "not-mcp-server",
-      "stars": 11357,
+      "stars": 11358,
       "last_commit_days": 0
     },
     {
@@ -1220,7 +1220,7 @@
       "name": "QuantDinger",
       "source_url": "https://github.com/OpenByteInc/QuantDinger",
       "reason": "not-mcp-server",
-      "stars": 10139,
+      "stars": 10141,
       "last_commit_days": 0
     },
     {
@@ -1241,7 +1241,7 @@
       "name": "unstract",
       "source_url": "https://github.com/Zipstack/unstract",
       "reason": "not-mcp-server",
-      "stars": 7019,
+      "stars": 7023,
       "last_commit_days": 0
     },
     {
@@ -1276,7 +1276,7 @@
       "name": "lemonade",
       "source_url": "https://github.com/lemonade-sdk/lemonade",
       "reason": "not-mcp-server",
-      "stars": 5177,
+      "stars": 5178,
       "last_commit_days": 0
     },
     {
@@ -1318,8 +1318,8 @@
       "name": "md2wechat-skill",
       "source_url": "https://github.com/geekjourneyx/md2wechat-skill",
       "reason": "not-mcp-server",
-      "stars": 3384,
-      "last_commit_days": 6
+      "stars": 3385,
+      "last_commit_days": 7
     },
     {
       "name": "neo",
@@ -1360,7 +1360,7 @@
       "name": "radar",
       "source_url": "https://github.com/skyhook-io/radar",
       "reason": "not-mcp-server",
-      "stars": 2701,
+      "stars": 2702,
       "last_commit_days": 0
     },
     {
