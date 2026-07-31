@@ -85,6 +85,19 @@ jobs:
         run: node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs
       - name: refresh_scores --write
         run: node mcp-ecosystem-intelligence/scripts/refresh_scores.cjs --write
+      # The `mcp-eval-pr` gate below can never see the PR this job opens:
+      # GitHub doesn't trigger workflows for PRs created with GITHUB_TOKEN, so
+      # `on: pull_request` never fires and the PR lands showing
+      # mergeStateStatus=CLEAN — "no checks" reading as "checks passed". Smoke
+      # the changed entries here instead, against HEAD, while the diff is still
+      # in the working tree. Advisory (gate off): the maintainer reads the
+      # table in this job's summary before merging.
+      - name: Smoke the entries this refresh changed
+        continue-on-error: true
+        uses: ./.github/actions/smoke-changed-entries
+        with:
+          base: HEAD
+          title: MCP eval (entries changed by this refresh)
       - name: Open PR if anything changed
         uses: peter-evans/create-pull-request@v8
         with:
@@ -341,42 +354,8 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '20'
-      - name: Determine changed DB entries
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          node -e '
-            const cp = require("child_process"), fs = require("fs");
-            const DB = "mcp-ecosystem-intelligence/assets/tools_database.json";
-            const load = (ref) => { try { return JSON.parse(cp.execSync(`git show ${ref}:${DB}`, {encoding:"utf8"})).tools; } catch { return []; } };
-            const base = new Map(load(process.env.BASE_SHA).map(t => [t.name, JSON.stringify([t.install_cmd, t.version])]));
-            const head = JSON.parse(fs.readFileSync(DB, "utf8")).tools;
-            const changed = head.filter(t => base.get(t.name) !== JSON.stringify([t.install_cmd, t.version])).map(t => t.name);
-            fs.writeFileSync("changed.txt", changed.join("\n"));
-            console.error("changed entries: " + (changed.length ? changed.join(", ") : "(none)"));
-          '
-      - name: Sandboxed smoke of changed entries
-        run: |
-          : > pr_eval.ndjson
-          if [ ! -s changed.txt ]; then echo "No DB entry changes — nothing to smoke."; exit 0; fi
-          while IFS= read -r name; do
-            [ -z "$name" ] && continue
-            echo "smoking $name (sandboxed)…"
-            node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs \
-              --name "$name" --sandbox --json \
-              --results "$RUNNER_TEMP/pr_results.json" >> pr_eval.ndjson || true
-          done < changed.txt
-      - name: Summary + gate (fail on CRASH / NO_TOOLS)
-        if: always()
-        run: |
-          [ -s pr_eval.ndjson ] || { echo "no results to report"; exit 0; }
-          node -e '
-            const fs = require("fs");
-            const runs = fs.readFileSync("pr_eval.ndjson","utf8").trim().split("\n").filter(Boolean).map(JSON.parse);
-            const rows = runs.flatMap(r => r.results || []);
-            const out = ["## MCP eval (sandboxed, changed entries)", "", "| entry | status | tools | class | sandboxed |", "|---|---|---|---|---|"];
-            for (const r of rows) out.push("| " + r.name + " | " + r.status + " | " + (r.tool_count ?? "-") + " | " + (r.failure_class ?? "-") + " | " + r.sandboxed + " |");
-            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, out.join("\n") + "\n");
-            const breaking = rows.filter(r => r.failure_class === "CRASH" || r.failure_class === "NO_TOOLS");
-            if (breaking.length) { console.error("breaking: " + breaking.map(r => r.name + "(" + r.failure_class + ")").join(", ")); process.exit(1); }
-          '
+      - name: Smoke changed entries
+        uses: ./.github/actions/smoke-changed-entries
+        with:
+          base: ${{ github.event.pull_request.base.sha }}
+          gate: 'true'   # job is continue-on-error, so this reports without blocking merge

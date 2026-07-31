@@ -1,0 +1,78 @@
+name: Smoke changed DB entries
+description: >
+  Behavioural smoke of the tools_database.json entries that changed against a
+  given git ref, each in a jailed container, reported as a step summary table.
+
+# Extracted so the PR gate and the weekly refresh job share one implementation.
+# They used to be one job, which meant the weekly refresh PR — the PR that
+# routinely changes install_cmd/version — got no behavioural check at all:
+# GitHub does not trigger workflows for PRs opened with GITHUB_TOKEN, so
+# `on: pull_request` never fires for it. Rather than mint a PAT just to make
+# the trigger work, the refresh job now runs this smoke itself, before it
+# opens the PR, while it still has the diff in hand.
+
+inputs:
+  base:
+    description: git ref to diff the DB against (PR base sha, or HEAD for a fresh working tree)
+    required: true
+  title:
+    description: heading for the step-summary section
+    required: false
+    default: MCP eval (sandboxed, changed entries)
+  gate:
+    description: >
+      exit non-zero when a changed entry comes back CRASH or NO_TOOLS. Advisory
+      by default — a maintainer reads the table and decides.
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Determine changed DB entries
+      shell: bash
+      env:
+        BASE_REF: ${{ inputs.base }}
+      run: node mcp-ecosystem-intelligence/scripts/changed_entries.cjs --base "$BASE_REF" > changed.txt
+
+    - name: Sandboxed smoke of changed entries
+      shell: bash
+      run: |
+        : > pr_eval.ndjson
+        if [ ! -s changed.txt ]; then echo "No DB entry changes — nothing to smoke."; exit 0; fi
+        while IFS= read -r name; do
+          [ -z "$name" ] && continue
+          echo "smoking $name (sandboxed)…"
+          node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs \
+            --name "$name" --sandbox --json \
+            --results "$RUNNER_TEMP/pr_results.json" >> pr_eval.ndjson || true
+        done < changed.txt
+
+    - name: Summary
+      if: always()
+      shell: bash
+      env:
+        SECTION_TITLE: ${{ inputs.title }}
+        GATE: ${{ inputs.gate }}
+      run: |
+        [ -s pr_eval.ndjson ] || { echo "no results to report"; exit 0; }
+        node -e '
+          const fs = require("fs");
+          const runs = fs.readFileSync("pr_eval.ndjson","utf8").trim().split("\n").filter(Boolean).map(JSON.parse);
+          const rows = runs.flatMap(r => r.results || []);
+          const out = ["## " + process.env.SECTION_TITLE, "", "| entry | status | tools | class | sandboxed |", "|---|---|---|---|---|"];
+          for (const r of rows) out.push("| " + r.name + " | " + r.status + " | " + (r.tool_count ?? "-") + " | " + (r.failure_class ?? "-") + " | " + r.sandboxed + " |");
+          // A launcher missing on the runner is a CI gap, not a verdict on the
+          // server — call it out so an all-skip table cannot read as a pass.
+          const noLauncher = rows.filter(r => /^launcher unavailable: /.test(r.error_code || ""));
+          if (noLauncher.length) {
+            out.push("", "> " + noLauncher.length + " entr" + (noLauncher.length === 1 ? "y" : "ies") +
+              " went unchecked — launcher missing on this runner. Not a pass.");
+          }
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, out.join("\n") + "\n");
+          const breaking = rows.filter(r => r.failure_class === "CRASH" || r.failure_class === "NO_TOOLS");
+          if (breaking.length) {
+            console.error("breaking: " + breaking.map(r => r.name + "(" + r.failure_class + ")").join(", "));
+            if (process.env.GATE === "true") process.exit(1);
+          }
+        '
