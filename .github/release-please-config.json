@@ -19,11 +19,8 @@
         { "type": "ci",       "section": "CI",           "hidden": false },
         { "type": "chore",    "section": "Chore",        "hidden": true  }
       ],
+      "_comment_extra_files": "SKILL.md had a `generic` entry here. The generic updater needs an `x-release-please-version` annotation in the target file, and SKILL.md has neither that nor a version field of any kind — so the entry never did anything. Removed rather than left as decoration. If the skill should carry a version, add one to the frontmatter and put the entry back.",
       "extra-files": [
-        {
-          "type": "generic",
-          "path": "mcp-ecosystem-intelligence/SKILL.md"
-        },
         {
           "type": "json",
           "path": "package.json",
