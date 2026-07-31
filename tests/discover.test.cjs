@@ -287,3 +287,46 @@ test('normalizeRepoUrl: registry and npm sources yield matching keys for the sam
     d.normalizeRepoUrl('git+https://github.com/foo/bar.git'),
   );
 });
+
+// ── deterministic ordering ─────────────────────────────────────────────────
+
+test('cmpName: plain lexicographic, byte-order, no locale surprises', () => {
+  assert.ok(d.cmpName({ name: 'a' }, { name: 'b' }) < 0);
+  assert.ok(d.cmpName({ name: 'b' }, { name: 'a' }) > 0);
+  assert.equal(d.cmpName({ name: 'same' }, { name: 'same' }), 0);
+  // Scoped npm names sort by the leading '@' rather than the package word;
+  // that's fine — it only has to be the same every run.
+  assert.ok(d.cmpName({ name: '@scope/pkg' }, { name: 'apkg' }) < 0);
+});
+
+test('cmpName: missing or non-string names never throw', () => {
+  assert.equal(typeof d.cmpName({}, {}), 'number');
+  assert.equal(typeof d.cmpName(null, undefined), 'number');
+  assert.equal(typeof d.cmpName({ name: 42 }, { name: null }), 'number');
+});
+
+test('cmpName as a tiebreaker makes an equal-score ranking stable', () => {
+  // The churn this fixes: health_score is coarse — on the live inbox 45 of 50
+  // entries share a score — so the stored order used to follow whichever
+  // source answered first, reshuffling the file with nothing discovered.
+  const rank = (rows) =>
+    [...rows].sort((a, b) => (b.health_score || 0) - (a.health_score || 0) || d.cmpName(a, b))
+      .map(r => r.name);
+
+  const arrivalA = [
+    { name: 'zulu',  health_score: 80 },
+    { name: 'alpha', health_score: 80 },
+    { name: 'mike',  health_score: 90 },
+  ];
+  // Same data, different discovery order.
+  const arrivalB = [
+    { name: 'alpha', health_score: 80 },
+    { name: 'mike',  health_score: 90 },
+    { name: 'zulu',  health_score: 80 },
+  ];
+
+  assert.deepEqual(rank(arrivalA), ['mike', 'alpha', 'zulu']);
+  assert.deepEqual(rank(arrivalA), rank(arrivalB));
+  // Ranking itself is preserved: the higher score still leads.
+  assert.equal(rank(arrivalA)[0], 'mike');
+});
