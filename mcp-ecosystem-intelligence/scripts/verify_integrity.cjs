@@ -64,7 +64,7 @@ const {
 const { loadPolicy, evaluateEntry } = require('./lib/policy.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const {
-  buildEvidence, mergeEvidence, staleDimensions, deriveTrust, DEFAULT_MAX_AGE_DAYS,
+  buildEvidence, mergeEvidence, staleDimensions, deriveTrust, requiredFor, DEFAULT_MAX_AGE_DAYS,
 } = require('./lib/evidence.cjs');
 const https       = require('https');
 const fs          = require('fs');
@@ -105,7 +105,15 @@ const POLICY = NO_POLICY
 // otherwise each dimension keeps its own default (advisories perish fastest).
 function evidenceMaxAge() {
   const fromPolicy = POLICY.ok && POLICY.policy ? POLICY.policy.maxEvidenceAgeDays : null;
-  return Number.isFinite(fromPolicy) ? fromPolicy : DEFAULT_MAX_AGE_DAYS;
+  if (!Number.isFinite(fromPolicy)) return DEFAULT_MAX_AGE_DAYS;
+  // A policy raises the bar; it does not lower it. `maxEvidenceAgeDays: 30`
+  // applied flatly would have *extended* the 7-day advisory window, so a
+  // twenty-day-old "clean" became acceptable by adding a policy.
+  const merged = {};
+  for (const [dimension, dflt] of Object.entries(DEFAULT_MAX_AGE_DAYS)) {
+    merged[dimension] = Math.min(dflt, fromPolicy);
+  }
+  return merged;
 }
 
 function policySays(predicate) {
@@ -458,6 +466,26 @@ function fetchRegistryKeys() {
   return registryKeysPromise;
 }
 
+// What a processor actually established, as opposed to what its prose implies.
+// Evidence is built from this, never from matching text: a check that did not
+// run must not be indistinguishable from a check that passed.
+// Tags present in a line list, for the few places that need to look back at
+// what was reported rather than re-derive it.
+function tags(lines) {
+  return new Set((lines || []).map(([tag]) => tag));
+}
+
+function newChecks() {
+  return {
+    artifact:       null,   // { state: 'verified'|'mismatch'|'unverified', method }
+    signature:      null,   // { state: 'verified'|'absent'|'unverified', keyid }
+    provenance:     null,   // { state: 'claimed'|'unreadable'|'absent' , repository }
+    source_binding: null,   // { state: 'verified'|'mismatch'|'unverified' }
+    advisories:     null,   // { state: 'clean'|'vulnerable'|'advisories-present'|'unverified' }
+    dependencies:   null,   // { state: 'clean'|'hooks'|'advisories-present'|'unverified', count }
+  };
+}
+
 // A scoped name keeps its slash encoded: /@scope%2fpkg/1.2.3
 function npmManifestUrl(pkg, version, registry = NPM_REGISTRY) {
   const name = pkg.startsWith('@')
@@ -730,6 +758,7 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
 
   let failures = 0;
   const lines  = [];
+  const checks = newChecks();
 
   // Integrity
   if (!tool.pkg_integrity) {
@@ -737,18 +766,26 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
     // cosmetic MISS: an install used to sail through on an entry with a
     // version and no hash at all.
     lines.push(['UNVERIFIED', `${missingPinAdvice(tool)}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+    checks.artifact = { state: 'unverified', method: 'none' };
     if (FAIL_UNVERIFIED) failures++;
   } else if (tool.pkg_integrity !== npmIntegrity) {
     lines.push(['FAIL', `integrity mismatch\n        stored: ${tool.pkg_integrity}\n        npm   : ${npmIntegrity}`]);
+    checks.artifact = { state: 'mismatch', method: 'registry-metadata' };
     failures++;
+  } else {
+    checks.artifact = { state: 'verified', method: 'registry-metadata' };
   }
 
   // Repo URL — suppress monorepo subdirectory paths
   if (!npmRepo) {
     lines.push(['NOTE', 'npm declares no repository.url']);
+    checks.source_binding = { state: 'unverified' };
   } else if (storedRepo && npmRepo.toLowerCase() !== storedRepo.toLowerCase() && !storedRepo.includes('/tree/')) {
     lines.push(['WARN', `repo mismatch\n        source_url: ${tool.source_url}\n        npm repo  : ${npmRepoRaw}`]);
+    checks.source_binding = { state: 'mismatch' };
     if (STRICT) failures++;
+  } else {
+    checks.source_binding = { state: 'verified' };
   }
 
   // An installed server with no version in its launch command resolves `latest`
@@ -773,14 +810,18 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
   });
   if (sig.state === 'fail') {
     lines.push(['FAIL', `registry signature does not verify — ${sig.reason}`]);
+    checks.signature = { state: 'mismatch', keyid: sig.keyid || null };
     failures++;
   } else if (sig.state === 'ok') {
     lines.push(['SIG', `registry signature verified (${sig.keyid})`]);
+    checks.signature = { state: 'verified', keyid: sig.keyid };
   } else if (REQUIRE_SIGNATURES) {
     lines.push(['FAIL', `no verifiable registry signature — ${sig.reason}`]);
+    checks.signature = { state: 'absent' };
     failures++;
   } else {
     lines.push(['NOTE', `registry signature not verified — ${sig.reason}`]);
+    checks.signature = { state: 'absent' };
   }
 
   // Provenance. Reported as a *claim*: verifying a sigstore bundle properly
@@ -795,6 +836,7 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
     if (!claim) {
       // "There is an attestation but we could not read it" is not evidence of
       // provenance. Under --require-provenance it fails like an absent one.
+      checks.provenance = { state: 'unreadable' };
       if (REQUIRE_PROVENANCE) {
         lines.push(['FAIL', 'provenance attestation present but unreadable']);
         failures++;
@@ -805,14 +847,19 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
       const claimedRepo = normalizeGitUrl(claim.repository);
       if (storedRepo && claimedRepo && claimedRepo.toLowerCase() !== storedRepo.toLowerCase()) {
         lines.push(['WARN', `provenance names a different repository\n        source_url: ${tool.source_url}\n        provenance: ${claim.repository}`]);
+        checks.provenance = { state: 'mismatch', repository: claim.repository };
         if (STRICT) failures++;
       } else {
         lines.push(['PROV', `provenance claims ${claim.repository}${claim.workflowPath ? ` (${claim.workflowPath})` : ''} — claim read, not cryptographically verified`]);
+        checks.provenance = { state: 'claimed', repository: claim.repository };
       }
     }
   } else if (REQUIRE_PROVENANCE) {
     lines.push(['FAIL', 'no provenance attestation published for this version']);
+    checks.provenance = { state: 'absent' };
     failures++;
+  } else {
+    checks.provenance = { state: 'absent' };
   }
 
   // --deep: hash what the registry would actually serve.
@@ -836,9 +883,11 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
   if (DEPS && tree) {
     if (!tree.ok) {
       lines.push(['UNVERIFIED', `could not resolve the dependency tree: ${tree.error}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+      checks.dependencies = { state: 'unverified' };
       if (FAIL_UNVERIFIED) failures++;
     } else {
       const sum = summarizeTree(tree.packages);
+      let treeAuditComplete = true;
       lines.push(['DEPS', `${sum.count} transitive package${sum.count === 1 ? '' : 's'}, max depth ${sum.maxDepth}`]);
 
       // Install scripts anywhere in the tree. This is the finding the one-level
@@ -857,6 +906,7 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
           .map((d) => `${d.name}@${d.version}`);
         if (blind.length) {
           lines.push(['UNVERIFIED', `advisory state unknown for ${blind.length} package${blind.length === 1 ? '' : 's'} in the tree (OSV batch failed)${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+          treeAuditComplete = false;
           if (FAIL_UNVERIFIED) failures++;
         }
       }
@@ -868,10 +918,22 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
           const vulns = depAdvisories.get(`${dep.name}@${dep.version}`);
           for (const vuln of (vulns || [])) {
             const sev = osvSeverity(vuln);
-            hits.push({ id: vuln.id, sev, dep: `${dep.name}@${dep.version}`, hard: severityIsHard(sev) });
+            hits.push({
+              id: vuln.id, sev, dep: `${dep.name}@${dep.version}`,
+              hard: severityIsHard(sev),
+              unresolved: vuln._severityUnresolved === true,
+            });
           }
         }
         const hard = hits.filter((h) => h.hard);
+        // An advisory in the tree whose severity we could not read is not a
+        // mild one — the same fail-open that was fixed for the top level.
+        const blindSeverity = hits.filter((h) => h.unresolved).map((h) => h.id);
+        if (blindSeverity.length) {
+          treeAuditComplete = false;
+          lines.push(['UNVERIFIED', `severity unknown for ${blindSeverity.length} advisor${blindSeverity.length === 1 ? 'y' : 'ies'} in the tree (${blindSeverity.slice(0, 3).join(', ')}) — OSV detail fetch failed${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+          if (FAIL_UNVERIFIED) failures++;
+        }
         if (hits.length) {
           const worst = hard.length ? hard : hits;
           const shown = worst.slice(0, 5).map((h) => `${h.dep} ${h.id} [${h.sev}]`).join(', ');
@@ -879,6 +941,11 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
           if (hard.length && FAIL_DEP_ADVISORIES) failures += 1;
         }
       }
+      checks.dependencies = {
+        state: !treeAuditComplete ? 'unverified'
+          : (tags(lines).has('DEPCVE') ? 'advisories-present' : (tags(lines).has('DEPHOOK') ? 'hooks' : 'clean')),
+        count: sum.count,
+      };
     }
   }
 
@@ -907,6 +974,14 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
     lines.push(['UNVERIFIED', `severity unknown for ${unresolved.length} advisor${unresolved.length === 1 ? 'y' : 'ies'} (${unresolved.slice(0, 4).join(', ')}${unresolved.length > 4 ? ', …' : ''}) — OSV detail fetch failed${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
     if (FAIL_UNVERIFIED) failures++;
   }
+  // Only a run that actually queried the feeds may state an advisory result,
+  // and a degraded feed or an unreadable severity is 'unverified', not 'clean'.
+  if (!NO_AUDIT && !UPDATE && !OFFLINE) {
+    if (degraded.length || unresolved.length) checks.advisories = { state: 'unverified' };
+    else if (advisoriesForTool.some((a) => severityIsHard(a.severity))) checks.advisories = { state: 'vulnerable' };
+    else if (advisoriesForTool.length) checks.advisories = { state: 'advisories-present' };
+    else checks.advisories = { state: 'clean' };
+  }
 
   // Unreachable advisory feeds: we cannot assert "no known CVEs" when a feed was
   // down. Surface it loudly; hard-fail under --strict (never silently pass).
@@ -923,6 +998,7 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
       : `${tool.name}@${npmVersion}`,
     lines,
     failures,
+    checks,
   });
 }
 
@@ -956,6 +1032,7 @@ async function processPypi(tool, pkg, meta, advisoriesForTool, degraded, results
 
   let failures = 0;
   const lines  = [];
+  const checks = newChecks();
 
   // Integrity (PyPI sha256 hex)
   const expected = pySha256 ? `sha256-${pySha256}` : null;
@@ -963,16 +1040,21 @@ async function processPypi(tool, pkg, meta, advisoriesForTool, degraded, results
   // wheel-only release used to report only the first and still come back OK.
   if (!tool.pkg_integrity) {
     lines.push(['UNVERIFIED', `${missingPinAdvice(tool)}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+    checks.artifact = { state: 'unverified', method: 'none' };
     if (FAIL_UNVERIFIED) failures++;
   }
   if (!expected) {
     // Wheel-only release: there is no sdist to hash, so a stored pin cannot be
     // compared against anything. Saying OK here would bless an unchecked file.
     lines.push(['UNVERIFIED', `PyPI ${pyVersion} publishes no sdist — integrity cannot be compared${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+    checks.artifact = { state: 'unverified', method: 'none' };
     if (FAIL_UNVERIFIED) failures++;
   } else if (tool.pkg_integrity && tool.pkg_integrity !== expected) {
     lines.push(['FAIL', `integrity mismatch\n        stored: ${tool.pkg_integrity}\n        pypi  : ${expected}`]);
+    checks.artifact = { state: 'mismatch', method: 'registry-metadata' };
     failures++;
+  } else if (tool.pkg_integrity && expected) {
+    checks.artifact = { state: 'verified', method: 'registry-metadata' };
   }
 
   if (DEPS) {
@@ -990,21 +1072,30 @@ async function processPypi(tool, pkg, meta, advisoriesForTool, degraded, results
       registryIntegrity: sdist?.digests?.sha256 ? `sha256-${sdist.digests.sha256}` : null,
       storedIntegrity:   tool.pkg_integrity,
     });
-    if (deep.state === 'fail') { lines.push(['FAIL', deep.message]); failures++; }
-    else if (deep.state === 'unverified') {
+    if (deep.state === 'fail') {
+      lines.push(['FAIL', deep.message]);
+      checks.artifact = { state: 'mismatch', method: 'deep-hash' };
+      failures++;
+    } else if (deep.state === 'unverified') {
       lines.push(['UNVERIFIED', `${deep.message}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+      checks.artifact = { state: 'unverified', method: 'deep-hash' };
       if (FAIL_UNVERIFIED) failures++;
     } else {
       lines.push(['DEEP', deep.message]);
+      checks.artifact = { state: 'verified', method: 'deep-hash' };
     }
   }
 
   // Source URL
   if (!pyRepo) {
     lines.push(['NOTE', 'PyPI declares no project_urls source — source unverifiable']);
+    checks.source_binding = { state: 'unverified' };
   } else if (storedRepo && pyRepo.toLowerCase() !== storedRepo.toLowerCase() && !storedRepo.includes('/tree/')) {
     lines.push(['WARN', `repo mismatch\n        source_url: ${tool.source_url}\n        pypi src  : ${pySrc}`]);
+    checks.source_binding = { state: 'mismatch' };
     if (STRICT) failures++;
+  } else {
+    checks.source_binding = { state: 'verified' };
   }
 
   // License — NOTE when PyPI omits it but DB has a value (e.g. sourced from GitHub)
@@ -1024,6 +1115,14 @@ async function processPypi(tool, pkg, meta, advisoriesForTool, degraded, results
     lines.push(['UNVERIFIED', `severity unknown for ${unresolved.length} advisor${unresolved.length === 1 ? 'y' : 'ies'} (${unresolved.slice(0, 4).join(', ')}${unresolved.length > 4 ? ', …' : ''}) — OSV detail fetch failed${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
     if (FAIL_UNVERIFIED) failures++;
   }
+  // Only a run that actually queried the feeds may state an advisory result,
+  // and a degraded feed or an unreadable severity is 'unverified', not 'clean'.
+  if (!NO_AUDIT && !UPDATE && !OFFLINE) {
+    if (degraded.length || unresolved.length) checks.advisories = { state: 'unverified' };
+    else if (advisoriesForTool.some((a) => severityIsHard(a.severity))) checks.advisories = { state: 'vulnerable' };
+    else if (advisoriesForTool.length) checks.advisories = { state: 'advisories-present' };
+    else checks.advisories = { state: 'clean' };
+  }
 
   // Unreachable advisory feeds: we cannot assert "no known CVEs" when a feed was
   // down. Surface it loudly; hard-fail under --strict (never silently pass).
@@ -1038,6 +1137,7 @@ async function processPypi(tool, pkg, meta, advisoriesForTool, degraded, results
     msg: `${tool.name}@${pyVersion}`,
     lines,
     failures,
+    checks,
   });
 }
 
@@ -1055,26 +1155,35 @@ async function processDocker(tool, results) {
   const pinned = dockerDigestPinned(ref);
   if (pinned) {
     const lines = [];
+    const checks = newChecks();
     let failures = 0;
+    // A digest in the DB is a *claim*. Without --deep nothing fetched the
+    // manifest, so the artifact is unverified — it was previously recorded as
+    // verified purely because the entry looked well-formed.
+    checks.artifact = { state: 'unverified', method: 'digest-pin-only' };
     // --deep: a digest *is* the sha256 of the manifest document, so the pin can
     // be verified by hashing what the registry serves. No layers to download.
     if (DEEP && !OFFLINE) {
       const { registry, repo, digest } = parseImageRef(ref);
       if (!ALLOWED_REGISTRIES.has(registry)) {
         lines.push(['UNVERIFIED', `registry "${registry}" is not in the supported allowlist${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+        checks.artifact = { state: 'unverified', method: 'none' };
         if (FAIL_UNVERIFIED) failures++;
       } else {
         const m = await fetchManifest(registry, repo, digest);
         if (m.error) {
           lines.push(['UNVERIFIED', `could not fetch the manifest: ${m.error}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+          checks.artifact = { state: 'unverified', method: 'deep-hash' };
           if (FAIL_UNVERIFIED) failures++;
         } else {
           const computed = ociManifestDigest(m.body);
           if (computed !== digest) {
             lines.push(['FAIL', `manifest digest mismatch\n        pinned  : ${digest}\n        computed: ${computed}`]);
+            checks.artifact = { state: 'mismatch', method: 'deep-hash' };
             failures++;
           } else {
             lines.push(['DEEP', `manifest hashed locally: ${computed.slice(0, 26)}…`]);
+            checks.artifact = { state: 'verified', method: 'deep-hash' };
           }
         }
       }
@@ -1085,6 +1194,7 @@ async function processDocker(tool, results) {
       msg: `${tool.name}: docker pinned by digest`,
       lines,
       failures,
+      checks,
     });
   } else {
     // A structured finding, so a policy rule (docker: "digest") and the SARIF
@@ -1097,6 +1207,7 @@ async function processDocker(tool, results) {
       msg: `${tool.name}: docker image not pinned by digest (${ref})`,
       lines: [['DIGEST', `image ${ref} is referenced by tag, not by @sha256 digest`]],
       failures,
+      checks: { ...newChecks(), artifact: { state: 'unverified', method: 'none' } },
     });
   }
 }
@@ -1126,6 +1237,9 @@ function processOfflinePackage(tool, pkg, ecosystem, results) {
     msg: `${tool.name}${pin} (${ecosystem} offline pin present for ${pkg})`,
     lines,
     failures,
+    // Offline establishes that the DB *has* pins, not that they match anything.
+    // Recording 'verified' here would be recording the absence of a check.
+    checks: { ...newChecks(), artifact: { state: 'unverified', method: 'offline-pin-present' } },
   });
 }
 
@@ -1341,7 +1455,14 @@ async function main() {
   if (DEPS && !OFFLINE && npmTools.length) {
     progress(`Resolving dependency trees for ${npmTools.length} npm entries (${DEPS_CONCURRENCY} at a time)... `);
     npmTrees = await mapLimit(npmTools, DEPS_CONCURRENCY, ({ tool, pkg }) =>
-      resolveNpmTreeCached(pkg, tool.version, { registry: NPM_REGISTRY === 'https://registry.npmjs.org' ? null : NPM_REGISTRY }));
+      resolveNpmTreeCached(pkg, tool.version, {
+        registry: NPM_REGISTRY === 'https://registry.npmjs.org' ? null : NPM_REGISTRY,
+        // A pinned root does not pin its tree: `dep: ^1` moves under a fixed
+        // `server@1.0.0`. For an install gate (--entry, or fail-closed) that
+        // means the tree checked must be the tree resolved now, so the cache is
+        // off. A survey run over the whole DB may use it.
+        cacheTtlMs: (ENTRY || FAIL_UNVERIFIED) ? 0 : undefined,
+      }));
     const distinct = new Map();
     for (const tree of npmTrees) {
       for (const dep of (tree.ok ? tree.packages : [])) {
@@ -1413,20 +1534,24 @@ async function main() {
       console.error('--record-evidence applies to DB entries, not to --installed subjects.');
       return exitAfterFlush(2);
     }
-    const draft = toJsonReport({ results, meta: { mode: OFFLINE ? 'offline' : (NO_AUDIT ? 'no-audit' : 'full') } });
     let recorded = 0;
     for (let i = 0; i < results.length; i++) {
       const tool = results[i].tool;
       if (!tool || !tool.name) continue;
       const typed = toTypedEntry(tool);
-      const fresh = buildEvidence(draft.entries[i], {
+      // Built from what the processors established, not from the report text.
+      const fresh = buildEvidence(results[i].checks, {
         artifactId: typed ? artifactId(typed.artifact) : null,
-        mode: draft.mode,
       });
       if (!Object.keys(fresh.dimensions).length) continue;
       tool.trust_evidence = mergeEvidence(tool.trust_evidence, fresh);
       // The word stays, but it is now computed from the dated evidence.
-      tool.trust = deriveTrust(tool.trust_evidence, { maxAgeDays: evidenceMaxAge() });
+      tool.trust = deriveTrust(tool.trust_evidence, {
+        maxAgeDays: evidenceMaxAge(),
+        // npm/PyPI have advisory feeds; an image digest does not, so what
+        // "verified" requires differs by ecosystem.
+        require: requiredFor(typed ? typed.artifact.ecosystem : null),
+      });
       recorded++;
     }
     if (recorded) {
@@ -1441,9 +1566,18 @@ async function main() {
   // (text, JSON, SARIF) shows them without special-casing.
   // Evidence that has aged out. An advisory result especially: "clean" means
   // clean as of that date, and disclosures don't wait.
+  //
+  // What counts is the *effective* evidence: this run's own results merged over
+  // what was stored, whether or not --record-evidence is going to save it.
+  // Otherwise a run that just checked everything successfully still failed on a
+  // stored timestamp, and the only way out was to write to the DB — which made
+  // a read-only verification impossible to pass.
   for (const r of results) {
-    const evidence = r.tool && r.tool.trust_evidence;
-    if (!evidence) continue;
+    const stored = r.tool && r.tool.trust_evidence;
+    if (!stored) continue;
+    const typed = r.tool ? toTypedEntry(r.tool) : null;
+    const fresh = buildEvidence(r.checks, { artifactId: typed ? artifactId(typed.artifact) : null });
+    const evidence = Object.keys(fresh.dimensions).length ? mergeEvidence(stored, fresh) : stored;
     const stale = staleDimensions(evidence, evidenceMaxAge());
     if (!stale.length) continue;
     r.lines = r.lines || [];

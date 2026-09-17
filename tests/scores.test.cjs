@@ -126,3 +126,48 @@ test('recommend: low health is a reason, not a veto', () => {
   assert.equal(r.verdict, 'recommended');
   assert.match(r.reasons.join(' '), /project health is low/);
 });
+
+test('trustScore: the gate is not a threshold on the sum', () => {
+  // signature + provenance + source_binding + advisories reach 55 on their own.
+  // Without a verified artifact that must still be 'thin': knowing which bytes
+  // run is the claim the others qualify.
+  const noArtifact = s.trustScore({
+    artifact_id: 'npm:p@1',
+    dimensions: {
+      signature:      fresh('verified'),
+      provenance:     fresh('claimed'),
+      source_binding: fresh('verified'),
+      advisories:     fresh('clean'),
+    },
+  }, { now: NOW });
+  assert.ok(noArtifact.score >= 55, `score was ${noArtifact.score}`);
+  assert.equal(noArtifact.gate, 'thin');
+  assert.match(noArtifact.reasons[0], /artifact was never verified/);
+
+  const unverifiedArtifact = s.trustScore({
+    artifact_id: 'npm:p@1',
+    dimensions: {
+      artifact:       fresh('unverified'),
+      signature:      fresh('verified'),
+      provenance:     fresh('claimed'),
+      source_binding: fresh('verified'),
+      advisories:     fresh('clean'),
+    },
+  }, { now: NOW });
+  assert.equal(unverifiedArtifact.gate, 'thin');
+  assert.match(unverifiedArtifact.reasons[0], /artifact: unverified/);
+});
+
+test('trustScore: an artifact verified long ago does not hold the gate open', () => {
+  const stale = s.trustScore({
+    artifact_id: 'npm:p@1',
+    dimensions: {
+      artifact:       { status: 'verified', checked_at: '2026-01-01' },   // 259 days
+      signature:      fresh('verified'),
+      source_binding: fresh('verified'),
+      advisories:     fresh('clean'),
+    },
+  }, { now: NOW });
+  assert.equal(stale.gate, 'thin');
+  assert.match(stale.reasons[0], /past its shelf life/);
+});

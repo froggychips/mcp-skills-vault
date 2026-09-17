@@ -482,3 +482,43 @@ test('detectStack: two sources agreeing are recorded as both', () => {
   assert.equal(redis.confidence, 0.95);   // the stronger source wins
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('scan: evidence from a different version does not score the current one', () => {
+  // Bumping `version` while leaving trust_evidence in place otherwise carries
+  // the old release's verdict onto a version nothing has checked.
+  const stale = {
+    name: 'pkg', category: 'database', install_cmd: 'npx -y pkg@2.0.0', version: '2.0.0',
+    pkg_integrity: 'sha512-new', health_score: 80, est_tools_count: 5,
+    trust_evidence: {
+      artifact_id: 'npm:pkg@1.0.0',
+      dimensions: {
+        artifact:   { status: 'verified', checked_at: new Date().toISOString().slice(0, 10) },
+        advisories: { status: 'clean',    checked_at: new Date().toISOString().slice(0, 10) },
+        signature:  { status: 'verified', checked_at: new Date().toISOString().slice(0, 10) },
+      },
+    },
+  };
+  const out = o.slim(stale, { cats: new Set(['database']), dbs: new Set(), infra: new Set(), signals: [] });
+  assert.equal(out.scores.trust.gate, 'thin');
+  assert.match(out.scores.trust.reasons.join(' '), /describes npm:pkg@1\.0\.0, not npm:pkg@2\.0\.0/);
+  assert.notEqual(out.scores.recommendation.verdict, 'recommended');
+});
+
+test('scan: evidence for the current version is used', () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const current = {
+    name: 'pkg', category: 'database', install_cmd: 'npx -y pkg@2.0.0', version: '2.0.0',
+    pkg_integrity: 'sha512-new', health_score: 80, est_tools_count: 5,
+    trust_evidence: {
+      artifact_id: 'npm:pkg@2.0.0',
+      dimensions: {
+        artifact:       { status: 'verified', checked_at: today },
+        advisories:     { status: 'clean',    checked_at: today },
+        signature:      { status: 'verified', checked_at: today },
+        source_binding: { status: 'verified', checked_at: today },
+      },
+    },
+  };
+  const out = o.slim(current, { cats: new Set(['database']), dbs: new Set(), infra: new Set(), signals: [] });
+  assert.equal(out.scores.trust.gate, 'ok');
+});

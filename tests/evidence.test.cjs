@@ -10,50 +10,52 @@ const entry = (findings, extra = {}) => ({
   ...extra,
 });
 
-test('buildEvidence: records only what the run actually examined', () => {
-  // A --no-audit run says nothing about advisories; writing "clean" would
-  // overwrite a real answer from a run that did query the feeds.
-  const e = ev.buildEvidence(entry([['SIG', 'registry signature verified (SHA256:k)']]), { now: NOW, mode: 'no-audit', artifactId: 'npm:p@1' });
-  assert.equal(e.dimensions.advisories, undefined);
+test('buildEvidence: records only the checks that ran', () => {
+  // A check that did not run must be absent, not "fine". This is the property
+  // that lets a later run fill it in without overwriting a real answer — and
+  // the one that was broken while evidence was derived from report prose.
+  const e = ev.buildEvidence({ signature: { state: 'verified', keyid: 'SHA256:k' } }, { now: NOW, artifactId: 'npm:p@1' });
+  assert.deepEqual(Object.keys(e.dimensions), ['signature']);
   assert.equal(e.dimensions.signature.status, 'verified');
   assert.equal(e.dimensions.signature.keyid, 'SHA256:k');
   assert.equal(e.dimensions.signature.checked_at, '2026-09-17');
   assert.equal(e.artifact_id, 'npm:p@1');
+  // Nothing at all is an empty record, not a clean one.
+  assert.deepEqual(ev.buildEvidence(null, { now: NOW }).dimensions, {});
+  assert.deepEqual(ev.buildEvidence({}, { now: NOW }).dimensions, {});
 });
 
-test('buildEvidence: deep hash and registry metadata are different methods', () => {
-  const deep = ev.buildEvidence(entry([['DEEP', 'hashed 100 bytes locally: sha512-x']]), { now: NOW, mode: 'full' });
-  assert.deepEqual(deep.dimensions.artifact, { status: 'verified', checked_at: '2026-09-17', method: 'deep-hash' });
-  const shallow = ev.buildEvidence(entry([]), { now: NOW, mode: 'full' });
-  assert.equal(shallow.dimensions.artifact.method, 'registry-metadata');
+test('buildEvidence: a digest pin on its own is not a verified artifact', () => {
+  // The docker path used to report OK without fetching the manifest, and that
+  // OK was recorded as artifact+source_binding+advisories verified.
+  const pinOnly = ev.buildEvidence({ artifact: { state: 'unverified', method: 'digest-pin-only' } }, { now: NOW });
+  assert.equal(pinOnly.dimensions.artifact.status, 'unverified');
+  assert.equal(pinOnly.dimensions.artifact.method, 'digest-pin-only');
+  assert.equal(pinOnly.dimensions.source_binding, undefined);
+  assert.equal(pinOnly.dimensions.advisories, undefined);
+});
+
+test('buildEvidence: method distinguishes how the artifact was checked', () => {
+  const deep = ev.buildEvidence({ artifact: { state: 'verified', method: 'deep-hash' } }, { now: NOW });
+  assert.equal(deep.dimensions.artifact.method, 'deep-hash');
+  const meta = ev.buildEvidence({ artifact: { state: 'verified', method: 'registry-metadata' } }, { now: NOW });
+  assert.equal(meta.dimensions.artifact.method, 'registry-metadata');
+  const offline = ev.buildEvidence({ artifact: { state: 'unverified', method: 'offline-pin-present' } }, { now: NOW });
+  assert.equal(offline.dimensions.artifact.status, 'unverified');
 });
 
 test('buildEvidence: a mismatch is recorded as a mismatch', () => {
-  const e = ev.buildEvidence(entry([['FAIL', 'integrity mismatch stored: a npm: b']], { status: 'FAIL' }), { now: NOW, mode: 'full' });
+  const e = ev.buildEvidence({ artifact: { state: 'mismatch', method: 'deep-hash' } }, { now: NOW });
   assert.equal(e.dimensions.artifact.status, 'mismatch');
 });
 
-test('buildEvidence: advisory state distinguishes clean, present and unverified', () => {
-  const clean = ev.buildEvidence(entry([]), { now: NOW, mode: 'full' });
-  assert.equal(clean.dimensions.advisories.status, 'clean');
-
-  const hard = ev.buildEvidence(entry([['CVE', '[CRITICAL] (GHSA) rce']]), { now: NOW, mode: 'full' });
-  assert.equal(hard.dimensions.advisories.status, 'vulnerable');
-
-  const mild = ev.buildEvidence(entry([['CVE', '[MODERATE] (OSV) something']]), { now: NOW, mode: 'full' });
-  assert.equal(mild.dimensions.advisories.status, 'advisories-present');
-
-  const degraded = ev.buildEvidence(entry([['UNVERIFIED', 'advisory feeds unreachable: GHSA']]), { now: NOW, mode: 'full' });
-  assert.equal(degraded.dimensions.advisories.status, 'unverified');
-});
-
-test('buildEvidence: dependency findings carry the tree size', () => {
-  const e = ev.buildEvidence(entry([
-    ['DEPS', '608 transitive packages, max depth 2'],
-    ['DEPHOOK', 'install scripts in dependencies (2): a@1, b@2'],
-  ]), { now: NOW, mode: 'full' });
-  assert.equal(e.dimensions.dependencies.status, 'hooks');
-  assert.equal(e.dimensions.dependencies.count, 608);
+test('buildEvidence: advisory and dependency states pass through as given', () => {
+  for (const state of ['clean', 'vulnerable', 'advisories-present', 'unverified']) {
+    assert.equal(ev.buildEvidence({ advisories: { state } }, { now: NOW }).dimensions.advisories.status, state);
+  }
+  const deps = ev.buildEvidence({ dependencies: { state: 'hooks', count: 608 } }, { now: NOW });
+  assert.equal(deps.dimensions.dependencies.status, 'hooks');
+  assert.equal(deps.dimensions.dependencies.count, 608);
 });
 
 test('mergeEvidence: newest per dimension wins, untouched dimensions survive', () => {
@@ -106,6 +108,9 @@ test('deriveTrust: the word is computed, not typed', () => {
   assert.equal(ev.deriveTrust(fresh('mismatch'), { now: NOW }), 'unverified');
   // Nothing recorded at all is not vetted yet.
   assert.equal(ev.deriveTrust({ dimensions: {} }, { now: NOW }), 'candidate');
+  // An unrecognised status is treated as "nothing established", so adding a
+  // status later cannot accidentally read as a pass.
+  assert.equal(ev.deriveTrust({ dimensions: { artifact: { status: 'something-new', checked_at: '2026-09-17' } } }, { now: NOW }), 'candidate');
   // A vulnerable dependency chain is "found wanting", not "not yet looked at".
   assert.equal(ev.deriveTrust({ dimensions: { artifact: { status: 'verified', checked_at: '2026-09-17' }, advisories: { status: 'vulnerable', checked_at: '2026-09-17' } } }, { now: NOW }), 'unverified');
 });
@@ -123,4 +128,28 @@ test('smokeEvidence: a separate stream, with its own date', () => {
   assert.equal(ev.smokeEvidence({ status: 'fail', error_code: 'CRASH' }).status, 'fail');
   assert.equal(ev.smokeEvidence({ status: 'skip' }).status, 'skipped');
   assert.equal(ev.smokeEvidence(null), null);
+});
+
+test('requiredFor: what "verified" needs depends on what is checkable', () => {
+  // npm and PyPI have advisory feeds keyed by package@version; an image digest
+  // does not, so demanding an advisory result there would make every docker
+  // entry a permanent candidate.
+  assert.deepEqual(ev.requiredFor('npm'), ['artifact', 'advisories']);
+  assert.deepEqual(ev.requiredFor('pypi'), ['artifact', 'advisories']);
+  assert.deepEqual(ev.requiredFor('oci'), ['artifact']);
+  assert.deepEqual(ev.requiredFor('git'), []);
+  assert.deepEqual(ev.requiredFor(undefined), ['artifact']);
+});
+
+test('deriveTrust: an npm entry needs an advisory answer, an image does not', () => {
+  const artifactOnly = { artifact_id: 'x', dimensions: { artifact: { status: 'verified', checked_at: '2026-09-17' } } };
+  assert.equal(ev.deriveTrust(artifactOnly, { now: NOW, require: ev.requiredFor('oci') }), 'verified');
+  assert.equal(ev.deriveTrust(artifactOnly, { now: NOW, require: ev.requiredFor('npm') }), 'candidate');
+});
+
+test('deriveTrust: nothing checkable never becomes verified', () => {
+  // A git source install has no artifact to hash; having no requirements must
+  // not mean having nothing to fail.
+  const empty = { artifact_id: 'git:git+https://x/y', dimensions: {} };
+  assert.equal(ev.deriveTrust(empty, { now: NOW, require: ev.requiredFor('git') }), 'candidate');
 });

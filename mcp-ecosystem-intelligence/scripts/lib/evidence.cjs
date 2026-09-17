@@ -29,7 +29,7 @@
  * 1.2.3 says nothing about 1.2.4.
  *
  * API:
- *   buildEvidence(reportEntry, opts)          -> { artifact_id, dimensions }
+ *   buildEvidence(checks, opts)               -> { artifact_id, dimensions }
  *   mergeEvidence(existing, fresh)            -> merged   (per-dimension, newest wins)
  *   staleDimensions(evidence, maxAgeDays, now)-> [names]
  *   deriveTrust(evidence, opts)               -> 'verified' | 'candidate' | 'unverified'
@@ -63,75 +63,46 @@ const DEFAULT_MAX_AGE_DAYS = {
 
 const today = (now = Date.now()) => new Date(now).toISOString().slice(0, 10);
 
-function tagsOf(entry) {
-  return new Set((entry.findings || []).map((f) => f.tag));
-}
-
-function messagesFor(entry, tag) {
-  return (entry.findings || []).filter((f) => f.tag === tag).map((f) => f.message);
-}
+// What counts as an answer in the affirmative, per dimension vocabulary. Used
+// where "did this actually check out?" is being asked, so that a new status
+// added later defaults to "not established" rather than to "fine".
+const POSITIVE_STATUSES = new Set(['verified', 'clean', 'claimed', 'pass', 'hooks', 'advisories-present', 'osi']);
 
 /**
- * Turn one `verify --json` entry into dated evidence.
+ * Turn one run's *typed check results* into dated evidence.
  *
- * Only dimensions the run actually examined are recorded. A run without
- * `--deps` says nothing about dependencies, and recording "unknown" for it
- * would overwrite a real answer from an earlier run.
+ * This deliberately does not look at report prose. Deriving evidence by
+ * matching messages meant a check that never ran was indistinguishable from a
+ * check that passed: a digest-pinned docker entry came back `OK` without the
+ * manifest ever being fetched, and that `OK` was recorded as artifact,
+ * source_binding and advisories all verified. A processor now says what it
+ * established, and anything it did not examine is simply absent — which is what
+ * lets a later run fill it in without overwriting a real answer.
  */
-function buildEvidence(entry, { now = Date.now(), artifactId = null, mode = null } = {}) {
+function buildEvidence(checks, { now = Date.now(), artifactId = null } = {}) {
   const at = today(now);
-  const tags = tagsOf(entry);
   const dimensions = {};
-  const offline = mode === 'offline';
+  const put = (name, status, extra = {}) => {
+    dimensions[name] = { status, checked_at: at, ...extra };
+  };
 
-  // artifact: the pin either matched the bytes (--deep), matched the registry's
-  // metadata, or could not be compared.
-  if (tags.has('FAIL') && messagesFor(entry, 'FAIL').some((m) => /integrity mismatch|do not match/.test(m))) {
-    dimensions.artifact = { status: 'mismatch', checked_at: at, method: tags.has('DEEP') ? 'deep-hash' : 'registry-metadata' };
-  } else if (tags.has('DEEP')) {
-    dimensions.artifact = { status: 'verified', checked_at: at, method: 'deep-hash' };
-  } else if (!offline && entry.status === 'OK' && entry.integrity) {
-    dimensions.artifact = { status: 'verified', checked_at: at, method: 'registry-metadata' };
-  } else if (messagesFor(entry, 'UNVERIFIED').some((m) => /pkg_integrity|sdist|no longer in the npm registry/.test(m))) {
-    dimensions.artifact = { status: 'unverified', checked_at: at, method: 'none' };
-  }
+  const c = checks || {};
 
-  if (tags.has('SIG')) {
-    const keyid = (messagesFor(entry, 'SIG')[0] || '').match(/\(([^)]+)\)/);
-    dimensions.signature = { status: 'verified', checked_at: at, keyid: keyid ? keyid[1] : null };
-  } else if (!offline && messagesFor(entry, 'NOTE').some((m) => /registry signature not verified/.test(m))) {
-    dimensions.signature = { status: 'absent', checked_at: at };
+  if (c.artifact) {
+    put('artifact', c.artifact.state, c.artifact.method ? { method: c.artifact.method } : {});
   }
-
-  if (tags.has('PROV')) {
-    const repo = (messagesFor(entry, 'PROV')[0] || '').match(/claims (\S+)/);
-    dimensions.provenance = { status: 'claimed', checked_at: at, repository: repo ? repo[1] : null };
+  if (c.signature) {
+    put('signature', c.signature.state, c.signature.keyid ? { keyid: c.signature.keyid } : {});
   }
-
-  if (!offline) {
-    const repoMismatch = messagesFor(entry, 'WARN').some((m) => /repo mismatch|different repository/.test(m));
-    if (repoMismatch) dimensions.source_binding = { status: 'mismatch', checked_at: at };
-    else if (entry.status === 'OK' || entry.status === 'WARN') dimensions.source_binding = { status: 'verified', checked_at: at };
+  if (c.provenance) {
+    put('provenance', c.provenance.state, c.provenance.repository ? { repository: c.provenance.repository } : {});
   }
-
-  // advisories: only a run that actually queried the feeds may record this.
-  const feedsDegraded = messagesFor(entry, 'UNVERIFIED').some((m) => /advisory feeds unreachable|severity unknown/.test(m));
-  if (!offline && mode !== 'no-audit') {
-    if (feedsDegraded) dimensions.advisories = { status: 'unverified', checked_at: at };
-    else if (tags.has('CVE')) {
-      const hard = messagesFor(entry, 'CVE').some((m) => /\[(CRITICAL|HIGH)\]/.test(m));
-      dimensions.advisories = { status: hard ? 'vulnerable' : 'advisories-present', checked_at: at };
-    } else dimensions.advisories = { status: 'clean', checked_at: at };
+  if (c.source_binding) put('source_binding', c.source_binding.state);
+  if (c.advisories)     put('advisories', c.advisories.state);
+  if (c.dependencies) {
+    put('dependencies', c.dependencies.state, Number.isFinite(c.dependencies.count) ? { count: c.dependencies.count } : {});
   }
-
-  if (tags.has('DEPS')) {
-    const count = ((messagesFor(entry, 'DEPS')[0] || '').match(/^(\d+) transitive/) || [])[1];
-    dimensions.dependencies = {
-      status: tags.has('DEPCVE') ? 'advisories-present' : (tags.has('DEPHOOK') ? 'hooks' : 'clean'),
-      checked_at: at,
-      count: count ? Number(count) : null,
-    };
-  }
+  if (c.license) put('license', c.license.state, c.license.value ? { value: c.license.value } : {});
 
   return { artifact_id: artifactId, dimensions };
 }
@@ -200,23 +171,40 @@ function staleDimensions(evidence, maxAgeDays = DEFAULT_MAX_AGE_DAYS, now = Date
  * 'unverified' rather than 'candidate': candidate means "not vetted yet", not
  * "vetted and found wanting".
  */
+const REQUIRED_BY_ECOSYSTEM = {
+  npm:  ['artifact', 'advisories'],
+  pypi: ['artifact', 'advisories'],
+  oci:  ['artifact'],                 // no advisory feed keyed by image digest
+  git:  [],                           // nothing to verify; never reaches 'verified'
+};
+
+/** Which dimensions must be affirmative for a given ecosystem. */
+function requiredFor(ecosystem) {
+  return REQUIRED_BY_ECOSYSTEM[ecosystem] || ['artifact'];
+}
+
 function deriveTrust(evidence, { maxAgeDays = DEFAULT_MAX_AGE_DAYS, now = Date.now(), require: required = ['artifact'] } = {}) {
   const dims = (evidence && evidence.dimensions) || {};
-  const bad = ['mismatch', 'vulnerable', 'fail'];
+  const bad = ['mismatch', 'vulnerable', 'fail'];   // actively wrong, not merely unknown
   for (const value of Object.values(dims)) {
     if (bad.includes(value.status)) return 'unverified';
   }
   for (const name of required) {
     const dim = dims[name];
-    if (!dim || dim.status === 'unverified' || dim.status === 'absent') return 'candidate';
+    // 'unverified' and 'absent' both mean nothing was established. So does a
+    // status the vocabulary doesn't recognise as a positive result.
+    if (!dim || !POSITIVE_STATUSES.has(dim.status)) return 'candidate';
   }
   if (staleDimensions(evidence, maxAgeDays, now).some((s) => required.includes(s.dimension) || s.dimension === 'advisories')) {
     return 'candidate';
   }
+  // An ecosystem with nothing checkable (a git source install) cannot reach
+  // 'verified' by having no requirements to fail.
+  if (!required.length) return 'candidate';
   return 'verified';
 }
 
 module.exports = {
-  DIMENSIONS, DEFAULT_MAX_AGE_DAYS,
+  DIMENSIONS, DEFAULT_MAX_AGE_DAYS, POSITIVE_STATUSES, REQUIRED_BY_ECOSYSTEM, requiredFor,
   buildEvidence, smokeEvidence, mergeEvidence, staleDimensions, deriveTrust,
 };

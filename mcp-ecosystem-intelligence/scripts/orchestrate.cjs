@@ -29,6 +29,7 @@ const { spawnSync } = require('child_process');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { listHosts, resolveTarget, writeServerEntry } = require('./lib/hosts.cjs');
 const { trustScore, fitScore, recommend } = require('./lib/scores.cjs');
+const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 // Reuse the gate's parsers so "what gets pinned" and "what gets checked" can
 // never drift apart — they were two independent regexes before.
 const {
@@ -817,6 +818,7 @@ if (require.main === module) {
 
 module.exports = {
   detectStack,
+  slim,
   matchDB,
   unmappedSignals,
   fallbackBySignal,
@@ -831,7 +833,19 @@ function slim(t, stack = null) {
   // maintained, trust says we know which bytes we would run, fit says this
   // project has a use for it. A recommendation is a policy over the three —
   // trust gates, the others rank — so popularity cannot outvote a bad pin.
-  const trust = trustScore(t.trust_evidence);
+  // Evidence only counts for the artifact it was collected on. Bumping
+  // `version` while leaving `trust_evidence` in place otherwise carries the old
+  // release's verdict onto a version nothing has checked.
+  const typed = toTypedEntry(t);
+  const currentId = typed ? artifactId(typed.artifact) : null;
+  const evidence = t.trust_evidence
+    && (!t.trust_evidence.artifact_id || !currentId || t.trust_evidence.artifact_id === currentId)
+    ? t.trust_evidence
+    : null;
+  const trust = trustScore(evidence);
+  if (t.trust_evidence && !evidence) {
+    trust.reasons.unshift(`stored evidence describes ${t.trust_evidence.artifact_id}, not ${currentId} — ignored`);
+  }
   const fit   = stack ? fitScore(t, stack, { signalToTools: SIGNAL_TO_TOOLS, universal: UNIVERSAL_TOOLS }) : null;
   return {
     name:            t.name,

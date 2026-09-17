@@ -127,9 +127,14 @@ jobs:
         # `verify.sarif` as a symlink to any file the runner user can write,
         # which `-v …:ro` does nothing about.
         run: |
-          set -euo pipefail
+          set -uo pipefail
           out="$RUNNER_TEMP/mcp-vault-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.sarif"
           rm -f "$out"
+          # Publish the path first. With `set -e` and the output written last, a
+          # verifier exiting non-zero — a policy gate doing its job — skipped
+          # the line, and the always() upload below got an empty path: the run
+          # that most needed its findings published was the one that lost them.
+          echo "path=$out" >> "$GITHUB_OUTPUT"
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             docker run --rm --network none \
               --cap-drop ALL --security-opt no-new-privileges \
@@ -138,7 +143,6 @@ jobs:
           else
             node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --offline --sarif > "$out"
           fi
-          echo "path=$out" >> "$GITHUB_OUTPUT"
       - name: Upload to code scanning
         if: always()
         continue-on-error: true   # code scanning may be off; never block the gate on it
@@ -505,7 +509,12 @@ jobs:
               name: r.name, status: r.status, error_code: r.error_code || null,
               tool_count: r.tool_count, tool_count_db: r.tool_count_db,
               tool_count_drift: r.tool_count_drift, tools_payload_bytes: r.tools_payload_bytes,
-              boot_ms: r.boot_ms, schema_errors: (r.schema_errors || []).length,
+              boot_ms: r.boot_ms,
+              // A count, under its own name: `schema_errors` is an array that
+              // `mcp_eval --no-spawn` iterates, and turning it into a number
+              // made that mode throw.
+              schema_errors: r.schema_errors || [],
+              schema_error_count: (r.schema_errors || []).length,
               sandboxed: r.sandboxed, checked_at: r.checked_at,
             });
             const byName = new Map((prev.results || []).map((r) => [r.name, r]));

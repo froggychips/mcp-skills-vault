@@ -88,7 +88,22 @@ function trustScore(evidence, { now = Date.now(), maxAgeDays = DEFAULT_MAX_AGE_D
   }
 
   score = Math.max(0, Math.min(100, score));
-  const gate = blocked ? 'block' : (score >= 55 ? 'ok' : 'thin');
+
+  // The gate is not a threshold on the sum. Signature + provenance +
+  // source_binding + advisories add up to 55 on their own, so an artifact that
+  // was never verified — or was verified eight months ago — could clear a
+  // numeric bar. Knowing *which bytes* run is the claim the others qualify, so
+  // it is a precondition, not a term.
+  const artifact = dims.artifact;
+  const artifactCurrent = artifact
+    && artifact.status === 'verified'
+    && !stale.has('artifact');
+  const gate = blocked ? 'block' : (artifactCurrent && score >= 55 ? 'ok' : 'thin');
+  if (!blocked && !artifactCurrent) {
+    reasons.unshift(artifact
+      ? `artifact: ${artifact.status}${stale.has('artifact') ? ` (and ${artifact.checked_at} is past its shelf life)` : ''} — nothing else substitutes for that`
+      : 'artifact was never verified — nothing else substitutes for that');
+  }
   return { score, gate, reasons };
 }
 

@@ -66,7 +66,29 @@ const { spawn }     = require('child_process');
 const { performance } = require('perf_hooks');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { readInstalledServers } = require('./lib/installed.cjs');
-const { dockerImageRef } = require('./lib/install_cmd.cjs');
+const { dockerImageRef, npmPkgName, pypiPkgName } = require('./lib/install_cmd.cjs');
+
+// Which version a launch command actually asks for; null means it resolves at
+// launch time, so no result can be attributed to a specific release.
+function versionFromInstallCmd(cmd) {
+  if (typeof cmd !== 'string' || !cmd) return null;
+  if (/^docker\s+run/.test(cmd)) {
+    const ref = dockerImageRef(cmd);
+    const m = ref && ref.match(/@(sha256:[a-f0-9]{64})$/);
+    return m ? m[1] : null;
+  }
+  const npm = npmPkgName(cmd);
+  if (npm) {
+    const token = cmd.split(/\s+/).find((t) => t.startsWith(`${npm}@`));
+    return token ? token.slice(npm.length + 1) : null;
+  }
+  const py = pypiPkgName(cmd);
+  if (py) {
+    const token = cmd.split(/\s+/).find((t) => t.startsWith(`${py}==`));
+    return token ? token.slice(py.length + 2) : null;
+  }
+  return null;
+}
 const { readDb, writeDb } = require('./lib/db_io.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { smokeEvidence, mergeEvidence } = require('./lib/evidence.cjs');
@@ -737,8 +759,14 @@ async function main() {
         const dim = smokeEvidence(r);
         if (!dim) continue;
         const typed = toTypedEntry(tool);
+        // Only attribute the result to a version if that version is what
+        // started. `npx -y pkg` resolves latest at launch, so attaching the
+        // result to the DB's `version` would claim a release was smoked when
+        // something else ran. Record it unattributed instead, and say so.
+        const launchPinned = versionFromInstallCmd(tool.install_cmd) !== null;
+        if (!launchPinned) dim.launch = 'unpinned';
         tool.trust_evidence = mergeEvidence(tool.trust_evidence, {
-          artifact_id: typed ? artifactId(typed.artifact) : null,
+          artifact_id: launchPinned && typed ? artifactId(typed.artifact) : null,
           dimensions: { smoke: dim },
         });
         recorded++;
