@@ -169,6 +169,28 @@ An entry the gate could not actually compare against a registry reports
 advisory by default and a failure under `--fail-unverified`, which is what
 `install` passes.
 
+### Hosts
+
+`install` writes whichever host's config you point it at, not just Claude
+Code's. The vault entry is the same; only the file and (for two of them) the
+shape differ.
+
+```bash
+mcp-vault install --list-hosts              # ids, scopes, formats
+mcp-vault install <name>                    # Claude Code, project  (./.mcp.json)
+mcp-vault install <name> --global           # Claude Code, user     (~/.claude.json)
+mcp-vault install <name> --host cursor      # Cursor                (./.cursor/mcp.json)
+mcp-vault install <name> --host vscode      # VS Code               (./.vscode/mcp.json, `servers` key)
+mcp-vault install <name> --host claude-desktop --scope user
+mcp-vault install <name> --host codex       # prints a TOML block to paste
+```
+
+An existing config is backed up before it is touched, unrelated keys are left
+alone, and a config that exists but does not parse is never overwritten — it is
+more likely a file worth keeping than a file worth clobbering. Codex keeps TOML;
+rewriting that without a TOML parser would destroy comments and formatting, so
+`mcp-vault` prints the three correct lines and lets you paste them.
+
 ### Policy file
 
 The flags above answer one question each. A project usually wants the same
@@ -393,6 +415,29 @@ The following are described in [`SKILL.md`](./mcp-ecosystem-intelligence/SKILL.m
 ## Token cost management
 
 Every active MCP server injects its full tool list into Claude's system prompt (~200–500 tokens per tool). With 114 servers in the DB the spread is wide: `mcp-server-fetch` = 1 tool vs. `gitlab-mcp` = 153 tools.
+
+**First, measure.** `mcp-vault budget` reads your host configs and totals the
+surface, stating where each number came from:
+
+```bash
+mcp-vault eval --installed --unsafe --results /tmp/eval.json   # measure real tools/list payloads
+mcp-vault budget --results /tmp/eval.json                      # add it up
+mcp-vault budget --budget 25                                   # exit 1 over 25% of the window
+```
+
+```
+server                     tools    tokens  source
+hostinger                    396    87,831  measured
+chrome-devtools               29     6,505  measured
+github                        26     3,964  measured
+teamcity                      13     2,668  measured
+codex                          4     1,065  measured
+TOTAL                        468   102,034  ≈51% of a 200,000-token window
+```
+
+`measured` is a real payload (bytes ÷ 4); `eval`/`db` is a tool count times the
+200–500 range above; `unknown` is counted as unknown, never as zero. Where the
+DB knows how to narrow a server, the report says so.
 
 Three levers, in order of preference:
 
