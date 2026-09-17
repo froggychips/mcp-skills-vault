@@ -45,6 +45,7 @@ const COMMANDS = {
   "site-registry": "generate_registry_page.cjs",
   budget:          "token_budget.cjs",
   lock:            "lock.cjs",
+  sbom:            "sbom.cjs",
 };
 
 const HELP = `mcp-vault — make MCP supply-chain boring.
@@ -71,6 +72,7 @@ COMMANDS
   wrap              Generate MCP wrapper boilerplate for a CLI / API tool
   site-registry     Generate docs/site/registry.html from tools_database.json
   budget            What your configured servers cost in context tokens
+  sbom              CycloneDX bill of materials (--installed / --deps)
   lock              Freeze the verified dependency tree + tool surface (mcp.lock.json)
                     (--check: diff a fresh resolve against it; --vendor: install it)
 

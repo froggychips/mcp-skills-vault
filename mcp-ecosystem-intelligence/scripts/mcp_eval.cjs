@@ -35,6 +35,8 @@
  *   mcp_eval.cjs --json                 machine-readable summary on stdout
  *   mcp_eval.cjs --no-spawn             schema-lint over existing eval_results.json (offline)
  *   mcp_eval.cjs --fail-surface-drift   exit 1 if a server's tool surface changed
+ *   mcp_eval.cjs --timeout <ms>         per-entry deadline (default 30s on the host,
+ *                                       90s under --sandbox: a container starts cold)
  *   mcp_eval.cjs --sandbox              run each server in a locked-down container (needs docker)
  *   mcp_eval.cjs --unsafe               run servers directly on the host (explicit opt-out of the sandbox)
  *   mcp_eval.cjs --db <path>            override DB path
@@ -134,6 +136,13 @@ const VERSION = '0.1.0';
 const DEFAULT_DB_PATH      = path.resolve(__dirname, '../assets/tools_database.json');
 const DEFAULT_RESULTS_PATH = path.resolve(__dirname, '../assets/eval_results.json');
 const DEFAULT_TIMEOUT_MS   = 30000;
+// A sandboxed launch starts from an empty cache inside a fresh container, so
+// the clock covers downloading the package before the server has run a line of
+// its own code. Measured boot times under `--sandbox`: 25s, 36s, 38s, 44s, 45s
+// for five entries that the 30s default recorded as TIMEOUT — and "times out"
+// read as "does not work" everywhere downstream. The host path keeps 30s,
+// where the package is usually already in the npx cache.
+const SANDBOX_TIMEOUT_MS   = 90000;
 const SHUTDOWN_GRACE_MS    = 2000;
 const PROTOCOL_VERSION     = '2025-06-18';
 const CLIENT_INFO          = { name: 'mcp-eval', version: VERSION };
@@ -160,6 +169,7 @@ function parseArgs(argv) {
     paceMs: 400,
     cwd:      process.cwd(),
     strict:   false,
+    timeoutExplicit: false,
     // A surface change on an unchanged artifact is the rug-pull shape. Off by
     // default because an upgrade legitimately changes the surface; CI turns it
     // on to make the unexplained case loud.
@@ -172,7 +182,7 @@ function parseArgs(argv) {
     switch (a) {
       case '--name':    opts.name    = next; i++; break;
       case '--all':     opts.all     = true; break;
-      case '--timeout': opts.timeout = Math.max(1000, parseInt(next, 10) || DEFAULT_TIMEOUT_MS); i++; break;
+      case '--timeout': opts.timeout = Math.max(1000, parseInt(next, 10) || DEFAULT_TIMEOUT_MS); opts.timeoutExplicit = true; i++; break;
       case '--json':    opts.json    = true; break;
       case '--no-spawn':opts.noSpawn = true; break;
       case '--installed': opts.installed = true; break;
@@ -194,6 +204,9 @@ function parseArgs(argv) {
         }
     }
   }
+  // The sandbox pays for a cold cache; give it the time that takes unless the
+  // caller said otherwise.
+  if (opts.sandbox && !opts.timeoutExplicit) opts.timeout = SANDBOX_TIMEOUT_MS;
   return opts;
 }
 

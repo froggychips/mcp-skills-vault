@@ -12,6 +12,26 @@
 
 Older commits are not patched — update to `HEAD` of `master`.
 
+## Static analysis (CodeQL)
+
+CodeQL runs as **advanced setup** on the self-hosted runner
+([.github/workflows/codeql.yml](.github/workflows/codeql.yml)), analysing
+`javascript-typescript` and `actions` with the `security-extended` suite on
+pushes to master, on pull requests that touch code or workflows, and weekly.
+
+The default setup was **disabled**, not abandoned. It is hard-wired to
+GitHub-hosted runners, and this account's hosted minutes are blocked by a
+billing lock (see [runner-health.yml](.github/workflows/runner-health.yml)), so
+every "CodeQL Setup" run failed before executing a step — a red check that said
+nothing about the code. In a repository about supply-chain scanning, a scanner
+that cannot run is worse than one that is honestly absent.
+
+The `actions` language is the reason this is worth a runner slot: the CI
+problems fixed in this repo recently — a `pull_request_target` trust boundary, a
+job running with a token scoped far wider than it needed, unpinned third-party
+actions — are precisely what those queries look for, and all of them were found
+by a human reading the YAML.
+
 ## Reporting a Vulnerability
 
 Please report privately — do **not** open a public GitHub issue for security matters.

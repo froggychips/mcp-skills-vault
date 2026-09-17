@@ -1,0 +1,88 @@
+name: codeql
+
+# CodeQL, advanced setup, on the self-hosted runner.
+#
+# Why advanced rather than the default setup: the default setup is hard-wired to
+# GitHub-hosted runners (`runner_type: standard`), and this account's hosted
+# minutes are blocked by a billing lock — see runner-health.yml. Every "CodeQL
+# Setup" run therefore failed before executing a single step, which is the worst
+# of both worlds: a red check that says nothing about the code. A failing
+# scanner in a repository *about* supply-chain scanning is worse than no
+# scanner, so it is either this or nothing, and this costs one runner slot a
+# week.
+#
+# Two languages:
+#   javascript-typescript — the scripts. Zero runtime dependencies means CodeQL
+#       has little third-party surface to model here, but the queries that
+#       matter for this repo are the injection ones: every script shells out to
+#       npm/docker/gh and parses registry JSON.
+#   actions — the workflows themselves. This is the interesting one. The
+#       problems fixed in this repo's own CI over the past weeks (a
+#       `pull_request_target` boundary, a token with the wrong scope, unpinned
+#       third-party actions) are exactly what these queries look for, and a
+#       human reviewer had to find them.
+#
+# `security-extended` rather than the default suite: the default suite is tuned
+# for signal on large codebases with a low tolerance for noise. This is ~9k
+# lines of scripts, so the extra queries cost minutes, not review hours.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+    # Docs-only pull requests do not need a static analysis run, and the
+    # self-hosted runner is one machine.
+    paths:
+      - '**/*.cjs'
+      - '**/*.js'
+      - '**/*.mjs'
+      - '.github/workflows/**'
+      - '.github/actions/**'
+      - '.github/codeql/**'
+  schedule:
+    # Mondays 07:40 UTC — after the security-scan cron (06:17) has finished with
+    # the runner, so the two jobs are not fighting over one machine.
+    - cron: '40 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # A second push should replace the analysis in flight, not queue behind it:
+  # one runner, and the result is only interesting for the current head.
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze ${{ matrix.language }}
+    runs-on: self-hosted
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write      # the SARIF upload; nothing else needs writing
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: javascript-typescript
+            build-mode: none
+          - language: actions
+            build-mode: none
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@4bd7200e1f146b1c937cae12d258b50f41a53cf8   # v4.38.0
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-extended
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@4bd7200e1f146b1c937cae12d258b50f41a53cf8   # v4.38.0
+        with:
+          category: /language:${{ matrix.language }}
