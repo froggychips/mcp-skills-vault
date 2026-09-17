@@ -26,6 +26,7 @@
  *   node scripts/verify_integrity.cjs --offline    true offline mode; validate DB pins only
  *   node scripts/verify_integrity.cjs --entry NAME  check a single DB entry by name
  *   node scripts/verify_integrity.cjs --fail-unverified  UNVERIFIED → hard failure
+ *   node scripts/verify_integrity.cjs --deep       download artifacts and hash them locally
  *   node scripts/verify_integrity.cjs --json       structured report on stdout
  *   node scripts/verify_integrity.cjs --sarif      SARIF 2.1.0 (GitHub code scanning)
  *
@@ -43,6 +44,8 @@
 'use strict';
 
 const { getJson, postJson, mapLimit } = require('./lib/http.cjs');
+const { hashUrl, sriEqual, parseSri, ociManifestDigest } = require('./lib/artifact.cjs');
+const { parseImageRef, fetchManifest, ALLOWED_REGISTRIES } = require('./lib/oci.cjs');
 const https       = require('https');
 const fs          = require('fs');
 const path        = require('path');
@@ -75,6 +78,13 @@ const FAIL_UNVERIFIED = STRICT || process.argv.includes('--fail-unverified');
 // which puts each finding on the tools_database.json line that caused it.
 const AS_JSON  = process.argv.includes('--json');
 const AS_SARIF = process.argv.includes('--sarif');
+// --deep: download the artifact and hash it here, instead of comparing the DB
+// pin against metadata served by the same registry that serves the tarball.
+const DEEP = process.argv.includes('--deep');
+// Artifact downloads are heavier than metadata requests, so they get their own
+// (smaller) pool.
+const DEEP_CONCURRENCY = Math.max(1, Number(process.env.MCP_VAULT_DEEP_CONCURRENCY || 4));
+const DEEP_MAX_BYTES   = Math.max(1, Number(process.env.MCP_VAULT_DEEP_MAX_BYTES || 64 * 1024 * 1024));
 
 const INSTALL_HOOKS = ['preinstall', 'install', 'postinstall', 'prepare', 'prepack'];
 
@@ -252,6 +262,37 @@ async function fetchSnykAdvisories(queries) {
  * document is small (unlike the full packument) and carries everything the gate
  * reads: dist.integrity, dist.tarball, repository, scripts, license.
  */
+/**
+ * Hash the artifact the registry would actually serve and compare it with both
+ * the registry's own metadata and the DB pin.
+ *
+ * Three outcomes worth telling apart:
+ *   - bytes disagree with the registry's metadata → the registry is serving
+ *     something that does not match what it says. Always a hard failure.
+ *   - bytes disagree with the DB pin → the pin is stale or the release was
+ *     replaced. Hard failure.
+ *   - could not download → UNVERIFIED, never a pass.
+ */
+async function deepCheckArtifact({ url, algo, registryIntegrity, storedIntegrity }) {
+  if (!url) return { state: 'unverified', message: 'no artifact url in registry metadata' };
+  const hashed = await hashUrl(url, algo, { maxBytes: DEEP_MAX_BYTES });
+  if (!hashed.ok) return { state: 'unverified', message: `could not hash the artifact: ${hashed.error}` };
+
+  if (registryIntegrity && !sriEqual(hashed.sri, registryIntegrity)) {
+    return {
+      state: 'fail',
+      message: `the bytes the registry served do not match the registry's own metadata\n        bytes   : ${hashed.sri}\n        metadata: ${registryIntegrity}`,
+    };
+  }
+  if (storedIntegrity && !sriEqual(hashed.sri, storedIntegrity)) {
+    return {
+      state: 'fail',
+      message: `downloaded artifact does not match the stored pin\n        bytes : ${hashed.sri}\n        stored: ${storedIntegrity}`,
+    };
+  }
+  return { state: 'ok', message: `hashed ${hashed.bytes} bytes locally: ${hashed.sri.slice(0, 24)}…`, sri: hashed.sri, bytes: hashed.bytes };
+}
+
 // A scoped name keeps its slash encoded: /@scope%2fpkg/1.2.3
 function npmManifestUrl(pkg, version, registry = NPM_REGISTRY) {
   const name = pkg.startsWith('@')
@@ -280,11 +321,14 @@ function pypiSourceUrl(info) {
   return info?.home_page || null;
 }
 
-function pypiSdistSha256(meta) {
+function pypiSdistFile(meta) {
   const v = meta?.info?.version;
   const files = (meta?.releases && meta.releases[v]) || meta?.urls || [];
-  const sdist = files.find((f) => f.packagetype === 'sdist');
-  return sdist?.digests?.sha256 || null;
+  return files.find((f) => f.packagetype === 'sdist') || null;
+}
+
+function pypiSdistSha256(meta) {
+  return pypiSdistFile(meta)?.digests?.sha256 || null;
 }
 
 // Severity ordering. MODERATE is npm's word for MEDIUM; UNKNOWN sorts lowest so
@@ -541,6 +585,23 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
     if (STRICT) failures++;
   }
 
+  // --deep: hash what the registry would actually serve.
+  if (DEEP) {
+    const deep = await deepCheckArtifact({
+      url:               meta.dist?.tarball,
+      algo:              parseSri(npmIntegrity || tool.pkg_integrity)?.algo || 'sha512',
+      registryIntegrity: npmIntegrity,
+      storedIntegrity:   tool.pkg_integrity,
+    });
+    if (deep.state === 'fail') { lines.push(['FAIL', deep.message]); failures++; }
+    else if (deep.state === 'unverified') {
+      lines.push(['UNVERIFIED', `${deep.message}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+      if (FAIL_UNVERIFIED) failures++;
+    } else {
+      lines.push(['DEEP', deep.message]);
+    }
+  }
+
   // Hooks
   const hooks = INSTALL_HOOKS.filter((h) => meta.scripts?.[h]);
   if (hooks.length > 0) {
@@ -626,6 +687,23 @@ async function processPypi(tool, pkg, meta, advisoriesForTool, degraded, results
     failures++;
   }
 
+  if (DEEP) {
+    const sdist = pypiSdistFile(meta);
+    const deep = await deepCheckArtifact({
+      url:               sdist?.url,
+      algo:              'sha256',
+      registryIntegrity: sdist?.digests?.sha256 ? `sha256-${sdist.digests.sha256}` : null,
+      storedIntegrity:   tool.pkg_integrity,
+    });
+    if (deep.state === 'fail') { lines.push(['FAIL', deep.message]); failures++; }
+    else if (deep.state === 'unverified') {
+      lines.push(['UNVERIFIED', `${deep.message}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+      if (FAIL_UNVERIFIED) failures++;
+    } else {
+      lines.push(['DEEP', deep.message]);
+    }
+  }
+
   // Source URL
   if (!pyRepo) {
     lines.push(['NOTE', 'PyPI declares no project_urls source — source unverifiable']);
@@ -662,7 +740,7 @@ async function processPypi(tool, pkg, meta, advisoriesForTool, degraded, results
   });
 }
 
-function processDocker(tool, results) {
+async function processDocker(tool, results) {
   const ref = dockerImageRef(tool.install_cmd);
   if (!ref) {
     results.push({
@@ -675,7 +753,38 @@ function processDocker(tool, results) {
   }
   const pinned = dockerDigestPinned(ref);
   if (pinned) {
-    results.push({ tool, status: 'OK', msg: `${tool.name}: docker pinned by digest` });
+    const lines = [];
+    let failures = 0;
+    // --deep: a digest *is* the sha256 of the manifest document, so the pin can
+    // be verified by hashing what the registry serves. No layers to download.
+    if (DEEP && !OFFLINE) {
+      const { registry, repo, digest } = parseImageRef(ref);
+      if (!ALLOWED_REGISTRIES.has(registry)) {
+        lines.push(['UNVERIFIED', `registry "${registry}" is not in the supported allowlist${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+        if (FAIL_UNVERIFIED) failures++;
+      } else {
+        const m = await fetchManifest(registry, repo, digest);
+        if (m.error) {
+          lines.push(['UNVERIFIED', `could not fetch the manifest: ${m.error}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+          if (FAIL_UNVERIFIED) failures++;
+        } else {
+          const computed = ociManifestDigest(m.body);
+          if (computed !== digest) {
+            lines.push(['FAIL', `manifest digest mismatch\n        pinned  : ${digest}\n        computed: ${computed}`]);
+            failures++;
+          } else {
+            lines.push(['DEEP', `manifest hashed locally: ${computed.slice(0, 26)}…`]);
+          }
+        }
+      }
+    }
+    results.push({
+      tool,
+      status: verdictFor(failures, lines),
+      msg: `${tool.name}: docker pinned by digest`,
+      lines,
+      failures,
+    });
   } else {
     const failures = STRICT ? 1 : 0;
     results.push({
@@ -843,7 +952,7 @@ async function main() {
     await processPypi(tool, pkg, pypiMetas[i], advs, degraded, results);
   }
   // Process docker.
-  for (const { tool } of dockerTools) processDocker(tool, results);
+  for (const { tool } of dockerTools) await processDocker(tool, results);
 
   // Machine-readable modes: one document on stdout, nothing else. Everything
   // human-facing has gone to stderr already, so `--json` stays pipeable.

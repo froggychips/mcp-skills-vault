@@ -144,6 +144,7 @@ Flags:
 | `--offline` | True offline mode; no network calls, validates stored DB pins only |
 | `--fail-unverified` | Treat `UNVERIFIED` (registry unreachable, unparsable install command, wheel-only PyPI release) as a hard failure. Implied by `--strict` |
 | `--entry <name>` | Check a single DB entry instead of all of them |
+| `--deep` | Download each artifact and hash it locally, instead of comparing the DB pin against metadata from the same registry that serves the tarball. Docker digests are verified by hashing the manifest |
 | `--json` | Structured report on stdout (progress goes to stderr); exit code unchanged |
 | `--sarif` | SARIF 2.1.0 for GitHub code scanning — each finding anchored to its `tools_database.json` line |
 

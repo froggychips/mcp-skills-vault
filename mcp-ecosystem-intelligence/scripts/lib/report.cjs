@@ -28,6 +28,7 @@ const TAG_LEVEL = {
   WARN:       'warning',
   HOOK:       'warning',
   DIGEST:     'note',
+  DEEP:       'note',
   NOTE:       'note',
 };
 
@@ -41,6 +42,7 @@ const TAG_RULE = {
   WARN:       'metadata-mismatch',
   HOOK:       'install-hook',
   DIGEST:     'unpinned-image',
+  DEEP:       'deep-verified',
   NOTE:       'note',
 };
 
@@ -52,6 +54,7 @@ const RULE_HELP = {
   'metadata-mismatch':  'Registry metadata disagrees with the DB (repository URL, license).',
   'install-hook':       'The package runs code at install time (preinstall/install/postinstall/prepare/prepack).',
   'unpinned-image':     'A container image is referenced by tag rather than by @sha256 digest.',
+  'deep-verified':      'The artifact was downloaded and hashed locally; the bytes match both the registry metadata and the DB pin.',
   'note':               'Informational.',
 };
 
