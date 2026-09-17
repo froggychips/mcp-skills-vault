@@ -22,6 +22,9 @@
  *     "docker": "digest",              // digest | tag      (default digest)
  *     "licenses": { "allow": ["MIT", "Apache-2.0"], "deny": ["BUSL-1.1"] },
  *     "minHealthScore": 60,
+ *     "maxContextTokens": 40000,       // tool surface ceiling for a config
+ *     "maxContextPercent": 20,         // …or as a share of the context window
+ *     "contextBudget": "warn",         // fail | warn      (default warn)
  *     "maxEvidenceAgeDays": 30,       // stored evidence older than this is stale
  *     "trust": ["verified"],           // acceptable trust tiers
  *     "deep": true,                    // hash artifacts locally
@@ -55,6 +58,13 @@ const DEFAULTS = {
   docker:               'digest',
   licenses:             null,
   minHealthScore:       null,
+  // A tool surface ceiling for the whole config. Every enabled server injects
+  // its tool list into every request, so this is a property of the set, not of
+  // any one entry — which is why it is checked at install time, when the set
+  // changes, rather than per entry by the gate.
+  maxContextTokens:     null,
+  maxContextPercent:    null,
+  contextBudget:        'warn',
   maxEvidenceAgeDays:   null,
   trust:                null,
   deep:                 false,
@@ -69,6 +79,7 @@ const ENUMS = {
   signatures:           ['require', 'prefer'],
   provenance:           ['require', 'prefer'],
   docker:               ['digest', 'tag'],
+  contextBudget:        ['fail', 'warn'],
 };
 
 /** Nearest policy file at or above `startDir`. */
@@ -123,6 +134,20 @@ function normalizePolicy(raw) {
       const n = Number(value);
       if (!Number.isInteger(n) || n < 1) { errors.push('"maxEvidenceAgeDays" must be a positive whole number of days'); continue; }
       policy.maxEvidenceAgeDays = n;
+      continue;
+    }
+    if (key === 'maxContextTokens') {
+      if (value === null) { policy.maxContextTokens = null; continue; }
+      const n = Number(value);
+      if (!Number.isInteger(n) || n < 1) { errors.push('"maxContextTokens" must be a positive whole number of tokens'); continue; }
+      policy.maxContextTokens = n;
+      continue;
+    }
+    if (key === 'maxContextPercent') {
+      if (value === null) { policy.maxContextPercent = null; continue; }
+      const n = Number(value);
+      if (!Number.isFinite(n) || n <= 0 || n > 100) { errors.push('"maxContextPercent" must be a percentage between 0 and 100'); continue; }
+      policy.maxContextPercent = n;
       continue;
     }
     if (key === 'minHealthScore') {

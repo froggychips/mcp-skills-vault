@@ -30,6 +30,9 @@ const { exitAfterFlush } = require('./lib/exit.cjs');
 const { listHosts, resolveTarget, writeServerEntry } = require('./lib/hosts.cjs');
 const { trustScore, fitScore, behaviour, recommend } = require('./lib/scores.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
+const { loadPolicy } = require('./lib/policy.cjs');
+const { readInstalledServers } = require('./lib/installed.cjs');
+const { estimateServer, matchDbEntry, wouldExceed, DEFAULT_CONTEXT } = require('./lib/budget.cjs');
 // Reuse the gate's parsers so "what gets pinned" and "what gets checked" can
 // never drift apart — they were two independent regexes before.
 const {
@@ -56,6 +59,9 @@ const STRICT     = argv.includes('--strict');
 // Off by default: writing an unpinned command into .mcp.json means the thing
 // that runs is not the thing the gate checked.
 const ALLOW_UNPINNED = argv.includes('--allow-unpinned');
+// A context ceiling in policy is enforced at install: the cost is a property of
+// the whole set of enabled servers, and install is the moment the set changes.
+const ALLOW_OVER_BUDGET = argv.includes('--allow-over-budget');
 // Which host's config to write. The same vault entry is just as useful in
 // Cursor, VS Code, Claude Desktop or Codex; only the path (and in two cases the
 // shape) differs.
@@ -479,6 +485,37 @@ function getInstalled(cwd) {
 
 // ── Install: verify + write ─────────────────────────────────────────────────
 
+// The policy in force for the directory being written into — not for wherever
+// this process happens to have been started.
+const POLICY = loadPolicy(CWD).policy;
+
+/**
+ * What this install would do to the config's standing context cost.
+ *
+ * Returns null when the policy has no opinion about context: a policy that is
+ * silent is not a policy that says "unlimited", and inventing a default ceiling
+ * here would be a bar nobody agreed to.
+ */
+function checkBudget(tool, cwd) {
+  if (POLICY.maxContextTokens === null && POLICY.maxContextPercent === null) return null;
+  let db;
+  try { db = JSON.parse(fs.readFileSync(DB_PATH, 'utf8')).tools || []; } catch { db = []; }
+  let evals = [];
+  try { evals = (JSON.parse(fs.readFileSync(EVAL_PATH, 'utf8')).results) || []; } catch { /* no snapshot */ }
+  const evalBy = new Map(evals.map((r) => [r.name, r]));
+
+  const rows = readInstalledServers({ cwd }).map((srv) => {
+    const dbEntry = matchDbEntry(srv, db);
+    return estimateServer({
+      name:      srv.name,
+      dbEntry,
+      evalEntry: evalBy.get(srv.name) || (dbEntry && evalBy.get(dbEntry.name)),
+    });
+  });
+  const adding = estimateServer({ name: tool.name, dbEntry: tool, evalEntry: evalBy.get(tool.name) });
+  return wouldExceed({ rows, adding, policy: POLICY, context: DEFAULT_CONTEXT });
+}
+
 function installTool(tool, cwd, global_) {
   process.stderr.write(`\nRunning integrity scan for ${tool.name}…\n`);
 
@@ -512,6 +549,42 @@ function installTool(tool, cwd, global_) {
   }
   if (/^(WARN|HOOK)\b|\[(WARN|HOOK)\]/m.test(out)) {
     process.stderr.write(`\n${YL}WARN: review the issue above before proceeding.${RS}\n`);
+  }
+
+  // Context budget. Every enabled server injects its whole tool list into every
+  // request, so the cost of a config is a property of the set — and the moment
+  // the set changes is the only moment anyone is in a position to decide about
+  // it. `mcp-vault budget` could already compute this; it was a report you had
+  // to think to run, which meant it ran after the surprise rather than before.
+  const budget = checkBudget(tool, cwd);
+  if (budget) {
+    const pct = ((budget.after / budget.context) * 100).toFixed(1);
+    // "this config" means every server the host will load, which includes the
+    // user-scope ones — the model sees one merged tool list, not one per scope,
+    // and a project-only total would understate what it actually costs.
+    const line = `${tool.name} adds ≈${(budget.adding.tokens ?? 0).toLocaleString('en-US')} tokens`
+      + `${budget.adding.tools ? ` (${budget.adding.tools} tools, ${budget.adding.source})` : ''}`
+      + ` — ${budget.server_count} server${budget.server_count === 1 ? '' : 's'} across project and user scope`
+      + ` would inject ≈${budget.after.toLocaleString('en-US')} tokens into every request (${pct}% of ${budget.context.toLocaleString('en-US')})`;
+    if (budget.over) {
+      const over = `over the policy ceiling of ${budget.limit.toLocaleString('en-US')} (${budget.limit_source})`;
+      if (budget.unknown_servers) {
+        // Saying "over by N" while N servers went uncounted would be a number
+        // with a hole in it. Say where the hole is.
+        process.stderr.write(`${YL}NOTE: ${budget.unknown_servers} configured server(s) could not be measured and are not in this total: ${budget.unknown_names.join(', ')}${RS}\n`);
+      }
+      if (POLICY.contextBudget === 'fail' && !ALLOW_OVER_BUDGET) {
+        process.stderr.write(`\n${RD}ABORT: ${line}, ${over}.${RS}\n`);
+        if (tool.toolsets) process.stderr.write(`This server can be narrowed: ${tool.toolsets}\n`);
+        process.stderr.write(`Run \`mcp-vault budget --cwd ${cwd}\` to see what the rest of the config costs, `
+          + `or pass --allow-over-budget to install anyway.\n`);
+        process.exit(1);
+      }
+      process.stderr.write(`\n${YL}WARN: ${line}, ${over}.${RS}\n`);
+      if (tool.toolsets) process.stderr.write(`${YL}This server can be narrowed: ${tool.toolsets}${RS}\n`);
+    } else if (budget.adding.tokens) {
+      process.stderr.write(`\n${DM}${line}; ${Math.max(0, budget.headroom).toLocaleString('en-US')} tokens of headroom left.${RS}\n`);
+    }
   }
 
   // Build the server config entry

@@ -36,17 +36,13 @@ const fs   = require('fs');
 const path = require('path');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { readInstalledServers } = require('./lib/installed.cjs');
-const { npmPkgName, pypiPkgName } = require('./lib/install_cmd.cjs');
+const {
+  estimateServer, matchDbEntry, summarise,
+  TOKENS_PER_TOOL_LOW, TOKENS_PER_TOOL_HIGH, TOKENS_PER_TOOL_MID, BYTES_PER_TOKEN,
+} = require('./lib/budget.cjs');
 
 const DB_PATH   = path.resolve(__dirname, '../assets/tools_database.json');
 const EVAL_PATH = path.resolve(__dirname, '../assets/eval_results.json');
-
-// The per-tool range this repo documents. Used when all we have is a count.
-const TOKENS_PER_TOOL_LOW  = 200;
-const TOKENS_PER_TOOL_HIGH = 500;
-const TOKENS_PER_TOOL_MID  = (TOKENS_PER_TOOL_LOW + TOKENS_PER_TOOL_HIGH) / 2;
-// Rough bytes-per-token for English text with JSON punctuation.
-const BYTES_PER_TOKEN = 4;
 
 function parseArgs(argv) {
   const opts = { cwd: process.cwd(), json: false, context: 200000, all: false, budget: null, help: false, results: null };
@@ -83,46 +79,6 @@ const HELP = `token_budget — what your MCP servers cost in context
   --json             machine-readable
 `;
 
-/** Tool count and token estimate for one server, with its provenance. */
-function estimateServer({ name, dbEntry, evalEntry }) {
-  if (evalEntry && Number.isFinite(evalEntry.tools_payload_bytes) && evalEntry.tools_payload_bytes > 0) {
-    const tokens = Math.round(evalEntry.tools_payload_bytes / BYTES_PER_TOKEN);
-    return {
-      name,
-      tools:  Number.isFinite(evalEntry.tool_count) ? evalEntry.tool_count : null,
-      tokens, low: tokens, high: tokens,
-      source: 'measured',
-    };
-  }
-  const count = Number.isFinite(evalEntry?.tool_count) ? evalEntry.tool_count
-    : (Number.isFinite(dbEntry?.est_tools_count) ? dbEntry.est_tools_count : null);
-  if (count === null) {
-    return { name, tools: null, tokens: null, low: null, high: null, source: 'unknown' };
-  }
-  return {
-    name,
-    tools:  count,
-    tokens: Math.round(count * TOKENS_PER_TOOL_MID),
-    low:    count * TOKENS_PER_TOOL_LOW,
-    high:   count * TOKENS_PER_TOOL_HIGH,
-    source: Number.isFinite(evalEntry?.tool_count) ? 'eval' : 'db',
-  };
-}
-
-/** Match a configured server to a DB entry by name, then by package name. */
-function matchDbEntry(server, db) {
-  const byName = db.find((t) => t.name === server.name);
-  if (byName) return byName;
-  const pkg = server.install_cmd
-    ? (npmPkgName(server.install_cmd) || pypiPkgName(server.install_cmd))
-    : null;
-  if (!pkg) return null;
-  return db.find((t) => {
-    const other = t.install_cmd ? (npmPkgName(t.install_cmd) || pypiPkgName(t.install_cmd)) : null;
-    return other && other === pkg;
-  }) || null;
-}
-
 function readJson(file, fallback) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
 }
@@ -151,12 +107,12 @@ function main(argv) {
     };
   });
 
-  const known    = rows.filter((r) => r.tokens !== null);
-  const unknown  = rows.filter((r) => r.tokens === null);
-  const total    = known.reduce((n, r) => n + r.tokens, 0);
-  const totalLow = known.reduce((n, r) => n + r.low, 0);
-  const totalHigh = known.reduce((n, r) => n + r.high, 0);
-  const pct      = (total / opts.context) * 100;
+  const unknown   = rows.filter((r) => r.tokens === null);
+  const totals    = summarise(rows, opts.context);
+  const total     = totals.tokens;
+  const totalLow  = totals.tokens_low;
+  const totalHigh = totals.tokens_high;
+  const pct       = (total / opts.context) * 100;
 
   // Servers the DB says can be narrowed, that are installed at full width.
   const trimmable = rows
@@ -169,15 +125,7 @@ function main(argv) {
     cwd: opts.cwd,
     context_window: opts.context,
     servers: rows.sort((a, b) => (b.tokens || 0) - (a.tokens || 0)),
-    totals: {
-      servers: rows.length,
-      tools: known.reduce((n, r) => n + (r.tools || 0), 0),
-      tokens: total,
-      tokens_low: totalLow,
-      tokens_high: totalHigh,
-      percent_of_context: Number(pct.toFixed(1)),
-      unknown_servers: unknown.length,
-    },
+    totals,
     trimmable,
     method: {
       bytes_per_token: BYTES_PER_TOKEN,
@@ -237,4 +185,7 @@ if (require.main === module) {
   exitAfterFlush(main(process.argv.slice(2)));
 }
 
+// estimateServer / matchDbEntry are re-exported so the existing tests (and
+// anything else importing them from here) keep working after the move to
+// lib/budget.cjs.
 module.exports = { estimateServer, matchDbEntry, parseArgs, TOKENS_PER_TOOL_LOW, TOKENS_PER_TOOL_HIGH, BYTES_PER_TOKEN };

@@ -84,6 +84,8 @@ COMMON OPTIONS
   --require-signatures  Unsigned npm release = failure (verify)
   --require-provenance  No provenance attestation = failure (verify)
   --allow-unpinned  Allow install to write a launch command with no version pin
+  --allow-over-budget   Install even when the config would exceed the policy's
+                        context ceiling (maxContextTokens / maxContextPercent)
   --cwd <path>      Target project directory (scan / audit)
   --host <id>       Which host config to write (install; --list-hosts to see them)
   --scope <s>       project or user (install; --global means --scope user)
