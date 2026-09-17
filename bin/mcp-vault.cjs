@@ -75,6 +75,7 @@ COMMON OPTIONS
   --fail-unverified Treat "could not check" as a failure (verify)
   --deep            Download artifacts and hash them locally (verify)
   --deps            Resolve and check dependency trees (verify)
+  --show-policy     Print the .mcp-vault.policy.json in force (verify)
   --require-signatures  Unsigned npm release = failure (verify)
   --require-provenance  No provenance attestation = failure (verify)
   --allow-unpinned  Allow install to write a launch command with no version pin

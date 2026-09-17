@@ -1,0 +1,23 @@
+{
+  "$schema": "mcp-vault/policy@1",
+  "comment": "Copy to .mcp-vault.policy.json and adjust. Every key is optional; an unknown key is an error, so a typo can't quietly enforce nothing. A policy can only raise the bar — flags still win where given.",
+
+  "unverified": "fail",
+  "installHooks": "warn",
+  "dependencyHooks": "warn",
+  "dependencyAdvisories": "warn",
+
+  "signatures": "require",
+  "provenance": "prefer",
+  "docker": "digest",
+
+  "licenses": {
+    "allow": ["MIT", "Apache-2.0", "BSD-3-Clause", "BSD-2-Clause", "ISC", "MPL-2.0"],
+    "deny": ["BUSL-1.1", "SSPL-1.0", "Elastic-2.0", "Proprietary"]
+  },
+  "minHealthScore": 60,
+  "trust": ["verified"],
+
+  "deep": false,
+  "deps": false
+}

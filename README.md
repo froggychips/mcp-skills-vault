@@ -141,6 +141,8 @@ Flags:
 | `--update` | Refresh `version` + `pkg_integrity` from registries |
 | `--strict` | Treat WARNs (hooks, repo mismatch, unpinned docker) as hard failures |
 | `--no-audit` | Skip advisory APIs; still fetch registry metadata for live hash/repo/hook checks |
+| `--no-policy` | Ignore `.mcp-vault.policy.json` |
+| `--show-policy` | Print the policy in force and the switches it implies |
 | `--offline` | True offline mode; no network calls, validates stored DB pins only |
 | `--fail-unverified` | Treat `UNVERIFIED` (registry unreachable, unparsable install command, wheel-only PyPI release) as a hard failure. Implied by `--strict` |
 | `--entry <name>` | Check a single DB entry instead of all of them |
@@ -166,6 +168,32 @@ An entry the gate could not actually compare against a registry reports
 `UNVERIFIED`, never `OK` — "the feed was down" is not "the pin is good". It is
 advisory by default and a failure under `--fail-unverified`, which is what
 `install` passes.
+
+### Policy file
+
+The flags above answer one question each. A project usually wants the same
+answers every time, in CI and in a developer's shell — so write them down once
+in `.mcp-vault.policy.json` (nearest file at or above `--cwd`; see
+[`.mcp-vault.policy.example.json`](./.mcp-vault.policy.example.json)):
+
+```json
+{
+  "unverified": "fail",
+  "signatures": "require",
+  "dependencyHooks": "warn",
+  "licenses": { "deny": ["BUSL-1.1", "SSPL-1.0"] },
+  "minHealthScore": 60,
+  "trust": ["verified"]
+}
+```
+
+A policy can only raise the bar; an explicit flag still wins. Rules that aren't
+facts about the artifact — license lists, trust tiers, a health floor — appear
+as ordinary findings, so JSON and SARIF carry them too. An unknown key is a
+hard error rather than a no-op: a policy with a typo that silently enforces
+nothing is worse than no policy, because it reads as a bar being enforced.
+
+`mcp-vault verify --show-policy` prints what is in force and where it came from.
 
 ### Doctor
 

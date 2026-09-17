@@ -34,6 +34,8 @@ const TAG_LEVEL = {
   DEPS:       'note',
   DEPHOOK:    'warning',
   DEPCVE:     'warning',
+  'POLICY-FAIL': 'error',
+  'POLICY-WARN': 'warning',
   NOTE:       'note',
 };
 
@@ -53,6 +55,8 @@ const TAG_RULE = {
   DEPS:       'dependency-tree',
   DEPHOOK:    'dependency-install-hook',
   DEPCVE:     'dependency-advisory',
+  'POLICY-FAIL': 'policy-violation',
+  'POLICY-WARN': 'policy-warning',
   NOTE:       'note',
 };
 
@@ -70,6 +74,8 @@ const RULE_HELP = {
   'dependency-tree':    'Size and depth of the resolved dependency tree.',
   'dependency-install-hook': 'A transitive dependency runs code at install time. It runs whether or not the top-level package has hooks of its own.',
   'dependency-advisory':'An advisory affects a package inside the dependency tree.',
+  'policy-violation':   'The entry breaks a rule in this project\u2019s .mcp-vault.policy.json.',
+  'policy-warning':     'A policy rule could not be evaluated for this entry.',
   'note':               'Informational.',
 };
 

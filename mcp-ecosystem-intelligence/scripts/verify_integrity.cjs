@@ -29,6 +29,7 @@
  *                                                  (.mcp.json, ~/.claude.json, Cursor, …)
  *   node scripts/verify_integrity.cjs --fail-unverified  UNVERIFIED → hard failure
  *   node scripts/verify_integrity.cjs --deps       resolve and check dependency trees
+ *   node scripts/verify_integrity.cjs --no-policy  ignore .mcp-vault.policy.json
  *   node scripts/verify_integrity.cjs --deep       download artifacts and hash them locally
  *   node scripts/verify_integrity.cjs --require-signatures  unsigned npm release = failure
  *   node scripts/verify_integrity.cjs --require-provenance  no provenance attestation = failure
@@ -58,6 +59,7 @@ const { readInstalledServers } = require('./lib/installed.cjs');
 const {
   resolveNpmTreeCached, pypiDirectDependencies, summarizeTree,
 } = require('./lib/deps.cjs');
+const { loadPolicy, evaluateEntry } = require('./lib/policy.cjs');
 const https       = require('https');
 const fs          = require('fs');
 const path        = require('path');
@@ -74,6 +76,24 @@ const UPDATE    = process.argv.includes('--update');
 const STRICT    = process.argv.includes('--strict');
 const NO_AUDIT  = process.argv.includes('--no-audit');
 const OFFLINE   = process.argv.includes('--offline');
+const CWD = (() => {
+  const i = process.argv.indexOf('--cwd');
+  return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : process.cwd();
+})();
+
+// A policy file (.mcp-vault.policy.json, nearest at or above --cwd) states the
+// bar once, so CI and a developer's shell enforce the same one instead of each
+// assembling its own garland of flags. Flags still win where they are given: an
+// explicit flag is someone saying what they want right now. A policy can only
+// raise the bar here, never lower it.
+const NO_POLICY = process.argv.includes('--no-policy');
+const POLICY = NO_POLICY
+  ? { ok: true, policy: null, path: null, errors: [], found: false }
+  : loadPolicy(CWD);
+
+function policySays(predicate) {
+  return Boolean(POLICY.ok && POLICY.policy && predicate(POLICY.policy));
+}
 // --entry NAME: check one DB entry instead of all 100+. `orchestrate --install`
 // uses it so a single install doesn't drag the whole registry over the wire.
 const ENTRY     = (() => {
@@ -85,14 +105,14 @@ const ENTRY     = (() => {
 //   --fail-unverified  "we could not check this at all" is a failure
 // --strict implies --fail-unverified; an install gate wants the latter without
 // necessarily refusing every entry that ships a postinstall hook.
-const FAIL_UNVERIFIED = STRICT || process.argv.includes('--fail-unverified');
+const FAIL_UNVERIFIED = STRICT || process.argv.includes('--fail-unverified') || policySays((p) => p.unverified === 'fail');
 // Machine-readable output. --sarif is SARIF 2.1.0 for GitHub code scanning,
 // which puts each finding on the tools_database.json line that caused it.
 const AS_JSON  = process.argv.includes('--json');
 const AS_SARIF = process.argv.includes('--sarif');
 // --deep: download the artifact and hash it here, instead of comparing the DB
 // pin against metadata served by the same registry that serves the tarball.
-const DEEP = process.argv.includes('--deep');
+const DEEP = process.argv.includes('--deep') || policySays((p) => p.deep);
 // Artifact downloads are heavier than metadata requests, so they get their own
 // (smaller) pool.
 const DEEP_CONCURRENCY = Math.max(1, Number(process.env.MCP_VAULT_DEEP_CONCURRENCY || 4));
@@ -100,8 +120,8 @@ const DEEP_MAX_BYTES   = Math.max(1, Number(process.env.MCP_VAULT_DEEP_MAX_BYTES
 // A package the registry never signed, or that ships no provenance, is common
 // enough that flagging it by default would bury the real findings. These turn
 // "absent" into a failure for anyone who wants that bar.
-const REQUIRE_SIGNATURES = process.argv.includes('--require-signatures');
-const REQUIRE_PROVENANCE = process.argv.includes('--require-provenance');
+const REQUIRE_SIGNATURES = process.argv.includes('--require-signatures') || policySays((p) => p.signatures === 'require');
+const REQUIRE_PROVENANCE = process.argv.includes('--require-provenance') || policySays((p) => p.provenance === 'require');
 // --installed: verify what the local hosts are configured to launch, instead of
 // what the DB says. The DB is still consulted — for a pin to compare against —
 // but the subjects are the configured servers.
@@ -109,15 +129,12 @@ const INSTALLED = process.argv.includes('--installed');
 // --deps: resolve each package's dependency tree and check it too. An
 // install-time script is far more often in a transitive dependency than in the
 // package itself, so a one-level check is a check at the wrong depth.
-const DEPS = process.argv.includes('--deps');
+const DEPS = process.argv.includes('--deps') || policySays((p) => p.deps);
 // A hard failure on a transitive advisory is a policy choice, not a fact about
 // the artifact: most trees carry something. Off unless asked for.
-const FAIL_DEP_ADVISORIES = process.argv.includes('--fail-dep-advisories');
+const FAIL_DEP_ADVISORIES = process.argv.includes('--fail-dep-advisories') || policySays((p) => p.dependencyAdvisories === 'fail');
 const DEPS_CONCURRENCY = Math.max(1, Number(process.env.MCP_VAULT_DEPS_CONCURRENCY || 4));
-const CWD = (() => {
-  const i = process.argv.indexOf('--cwd');
-  return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : process.cwd();
-})();
+
 
 const INSTALL_HOOKS = ['preinstall', 'install', 'postinstall', 'prepare', 'prepack'];
 
@@ -1037,6 +1054,28 @@ function processOfflinePackage(tool, pkg, ecosystem, results) {
 // ── main ───────────────────────────────────────────────────────────────────
 
 async function main() {
+  // A policy that doesn't parse is not a policy: refuse rather than run a bar
+  // nobody set.
+  if (POLICY.found && !POLICY.ok) {
+    console.error(`policy error in ${POLICY.path}:`);
+    for (const e of POLICY.errors) console.error(`  - ${e}`);
+    process.exit(2);
+  }
+
+  if (process.argv.includes('--show-policy')) {
+    process.stdout.write(JSON.stringify({
+      policy_file: POLICY.path,
+      found:       POLICY.found,
+      effective:   POLICY.policy || null,
+      switches: {
+        fail_unverified: FAIL_UNVERIFIED, deep: DEEP, deps: DEPS,
+        require_signatures: REQUIRE_SIGNATURES, require_provenance: REQUIRE_PROVENANCE,
+        fail_dep_advisories: FAIL_DEP_ADVISORIES, strict: STRICT,
+      },
+    }, null, 2) + '\n');
+    return exitAfterFlush(0);
+  }
+
   if (OFFLINE && UPDATE) {
     console.error('--offline cannot be combined with --update (refresh requires registries).');
     process.exit(2);
@@ -1258,6 +1297,24 @@ async function main() {
   }
   // Process docker.
   for (const { tool } of dockerTools) await processDocker(tool, results);
+
+  // Policy rules that are not facts about the artifact — license lists, trust
+  // tiers, a health-score floor — are judged here, once each entry has its
+  // findings. They ride along as ordinary findings so every output mode
+  // (text, JSON, SARIF) shows them without special-casing.
+  if (POLICY.ok && POLICY.policy) {
+    const draft = toJsonReport({ results });
+    for (let i = 0; i < results.length; i++) {
+      const verdicts = evaluateEntry(draft.entries[i], POLICY.policy, results[i].tool);
+      if (!verdicts.length) continue;
+      results[i].lines = results[i].lines || [];
+      for (const v of verdicts) {
+        results[i].lines.push([v.level === 'fail' ? 'POLICY-FAIL' : 'POLICY-WARN', `${v.rule}: ${v.message}`]);
+        if (v.level === 'fail') results[i].failures = (results[i].failures || 0) + 1;
+      }
+      if (results[i].failures > 0) results[i].status = 'FAIL';
+    }
+  }
 
   // Machine-readable modes: one document on stdout, nothing else. Everything
   // human-facing has gone to stderr already, so `--json` stays pipeable.

@@ -346,6 +346,7 @@ node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs
 | `--fail-unverified` | `UNVERIFIED` (registry unreachable / unparsable cmd / no sdist) becomes a hard failure; implied by `--strict` |
 | `--entry <name>` | check one DB entry instead of the whole DB |
 | `--installed` | verify the servers local host configs launch, not the DB |
+| `--no-policy` / `--show-policy` | ignore `.mcp-vault.policy.json` / print the policy in force |
 | `--deep` | download the artifact and hash it locally (npm tarball sha512, PyPI sdist sha256, OCI manifest sha256) |
 | `--deps` | resolve the dependency tree and check it (transitive install hooks + OSV over every package in the tree) |
 | `--fail-dep-advisories` | a high/critical advisory in the tree fails the run |
