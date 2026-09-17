@@ -128,6 +128,27 @@ that.
 `tests/ci_manifest.test.cjs` asserts these properties against the manifests —
 per step, not per job — so a later one-line edit cannot quietly remove them.
 
+### Repository settings this relies on
+
+Two Actions settings matter here, and one of them is a single switch doing two
+jobs.
+
+- **Default `GITHUB_TOKEN` permission: read.** Jobs that need to write a branch,
+  a tag or a pull request declare it for themselves. Before this, every job in
+  every workflow started with write.
+- **"Allow GitHub Actions to create and approve pull requests": on.** The name
+  is the problem — it is one flag for both. Turning it off to prevent
+  self-approval also stops release-please, the weekly hash refresh, the
+  discovery inbox, the drift refresh and the eval snapshot from opening their
+  PRs, which is most of the automation. It is on, and the protection against a
+  bot approving its own work is that no workflow here requests a review — not
+  the flag.
+- **Fork pull requests require maintainer approval for all external
+  contributors.** This is the mitigation for the limitation below, and it is a
+  setting rather than code.
+- **SHA pinning required for actions.** Enforced by the platform as well as by
+  `tests/ci_manifest.test.cjs`.
+
 ### Known limitation
 
 For a `pull_request` event, GitHub uses the workflow file **from the pull
