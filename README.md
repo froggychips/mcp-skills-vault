@@ -43,6 +43,7 @@ $ npx -y @froggychips/mcp-vault verify --offline
 | **Vulnerabilities** | `npm audit` after the fact, if you remember | 4 advisory feeds merged: npm bulk + OSV.dev + GHSA + Snyk† — checked *before* the install command is written |
 | **Stack matching** | manual reading of awesome-lists | detects 40+ env-key patterns + 14 file paths + docker-compose images → suggests what to install |
 | **Offline use** | doesn't | `--offline` makes no network calls and validates stored pins; `--no-audit` still checks live registries but skips advisory APIs |
+| **What actually launches** | `npx -y pkg` resolves `latest` at every start — not the artifact anyone reviewed | `install` writes the version the gate hashed (`pkg@1.2.3`, `pkg==1.2.3`, `image@sha256:…`), and refuses to write an unpinned command without `--allow-unpinned` |
 | **Telemetry** | varies | none. Ever. |
 
 † Snyk requires `SNYK_TOKEN` (no public anonymous API)
@@ -141,6 +142,13 @@ Flags:
 | `--strict` | Treat WARNs (hooks, repo mismatch, unpinned docker) as hard failures |
 | `--no-audit` | Skip advisory APIs; still fetch registry metadata for live hash/repo/hook checks |
 | `--offline` | True offline mode; no network calls, validates stored DB pins only |
+| `--fail-unverified` | Treat `UNVERIFIED` (registry unreachable, unparsable install command, wheel-only PyPI release) as a hard failure. Implied by `--strict` |
+| `--entry <name>` | Check a single DB entry instead of all of them |
+
+An entry the gate could not actually compare against a registry reports
+`UNVERIFIED`, never `OK` — "the feed was down" is not "the pin is good". It is
+advisory by default and a failure under `--fail-unverified`, which is what
+`install` passes.
 
 ### Doctor
 

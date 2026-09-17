@@ -343,6 +343,8 @@ node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs
 | `--no-audit` | skip advisory APIs; still fetch registry metadata |
 | `--offline` | true offline mode; no network calls, validate stored DB pins only |
 | `--update` | refresh `version` + `pkg_integrity` fields from registries |
+| `--fail-unverified` | `UNVERIFIED` (registry unreachable / unparsable cmd / no sdist) becomes a hard failure; implied by `--strict` |
+| `--entry <name>` | check one DB entry instead of the whole DB |
 
 **Interpreting output:**
 
