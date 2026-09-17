@@ -74,13 +74,108 @@ test('a GNU long name applies to the following entry only', () => {
   assert.deepEqual(r.files.map((f) => f.path), [longName, 'package/second.js']);
 });
 
+/** A pax record: the declared length counts the whole record, itself included. */
+function paxRecord(key, value) {
+  const body = ` ${key}=${value}\n`;
+  // The length digits are part of the length, so solve for it.
+  let len = body.length + 2;
+  while (String(len).length + body.length !== len) len = String(len).length + body.length;
+  return `${len}${body}`;
+}
+
 test('a pax extended header supplies the path', () => {
-  const pax = '30 path=package/from-pax.js\n';
   const tar = archive(
-    entry('PaxHeader/x', pax, { type: 'x' }),
+    entry('PaxHeader/x', paxRecord('path', 'package/from-pax.js'), { type: 'x' }),
     entry('package/ignored', 'body'),
   );
   assert.equal(t.parseTar(tar).files[0].path, 'package/from-pax.js');
+});
+
+test('paxRecords walks declared lengths instead of searching the payload', () => {
+  const records = t.paxRecords(paxRecord('path', 'a/b.js') + paxRecord('uid', '501'));
+  assert.equal(records.get('path'), 'a/b.js');
+  assert.equal(records.get('uid'), '501');
+  // The attack: a value that *contains* a path record. Searching the blob for
+  // `path=` took this as the next entry's name, so a .js file could be
+  // presented under a name the include filter skips.
+  const hostile = t.paxRecords(paxRecord('comment', '20 path=package/hidden.txt\n'));
+  assert.equal(hostile.get('path'), undefined);
+  assert.match(hostile.get('comment'), /path=package\/hidden\.txt/);
+  // A declared length that does not fit stops the walk rather than guessing.
+  assert.equal(t.paxRecords('99 path=x\n').size, 0);
+});
+
+test('a hostile pax comment cannot rename the next entry', () => {
+  const tar = archive(
+    entry('PaxHeader/x', paxRecord('comment', '20 path=package/hidden.txt\n'), { type: 'x' }),
+    entry('package/real.js', 'code'),
+  );
+  const r = t.parseTar(tar, { include: (p) => p.endsWith('.js') });
+  assert.deepEqual(r.files.map((f) => f.path), ['package/real.js']);
+});
+
+test('a long name survives a metadata header in between', () => {
+  // GNU tar writes L → x → file. Clearing the pending name on the `x` made
+  // this parser read the entry under its truncated 100-byte name while system
+  // tar used the long one — enough to hide a .js file from an include filter.
+  const longName = `package/${'d'.repeat(110)}/real.js`;
+  const tar = archive(
+    entry('././@LongLink', `${longName}\0`, { type: 'L' }),
+    entry('PaxHeader/x', paxRecord('uid', '501'), { type: 'x' }),
+    entry('package/fallback.txt', 'code'),
+  );
+  const r = t.parseTar(tar);
+  assert.deepEqual(r.files.map((f) => f.path), [longName]);
+});
+
+test('a negative size stops the walk instead of looping forever', () => {
+  // `parseInt('-0000001000', 8)` is -512: the bounds check passed, the padded
+  // length went negative, and the offset moved *backwards* onto the same
+  // header. An attacker-supplied archive that never terminates, in a parser
+  // whose whole job is attacker-supplied archives.
+  const header = entry('package/evil.js', 'x');
+  header.write('-00000001000', 124, 12, 'latin1');
+  const r = t.parseTar(Buffer.concat([header, Buffer.alloc(BLOCK * 3, 0)]), { include: () => false });
+  assert.equal(r.truncated, true);
+  assert.equal(r.files.length, 0);
+});
+
+test('a size field that is not octal is refused', () => {
+  assert.equal(t.octal(Buffer.from('99999999999\0'), 0, 12), null);
+  assert.equal(t.octal(Buffer.from('-0000001000\0'), 0, 12), null);
+  assert.equal(t.octal(Buffer.from('0000000644\0 '), 0, 12), 0o644);
+});
+
+test('a name longer than the cap is refused rather than allocated', () => {
+  const huge = 'p'.repeat(8000);
+  const tar = archive(
+    entry('././@LongLink', `${huge}\0`, { type: 'L' }),
+    entry('package/x.js', 'code'),
+  );
+  const r = t.parseTar(tar, { maxBytes: 1 });
+  assert.equal(r.truncated, true);
+  // And the name budget is counted, not bypassed: the file is not returned
+  // under maxBytes: 1 either.
+  assert.equal(r.files.length, 0);
+});
+
+test('a short or non-tar payload is truncated, not an empty archive', () => {
+  // The distinction this whole repo is about: "we read nothing" must not look
+  // like "there was nothing to read".
+  const short = t.parseTar(Buffer.from('not a tar at all'));
+  assert.equal(short.truncated, true);
+  assert.equal(short.endOfArchive, false);
+
+  const proper = t.parseTar(archive(entry('package/a.js', 'x')));
+  assert.equal(proper.truncated, false);
+  assert.equal(proper.endOfArchive, true);
+});
+
+test('a dangling long name is truncated, not silently dropped', () => {
+  const tar = archive(entry('././@LongLink', 'package/never-arrives.js\0', { type: 'L' }));
+  const r = t.parseTar(tar);
+  assert.equal(r.truncated, true);
+  assert.equal(r.files.length, 0);
 });
 
 test('directories, symlinks and devices are skipped and counted', () => {

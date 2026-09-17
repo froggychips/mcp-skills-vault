@@ -59,6 +59,48 @@ test('coverage describes what was read, and flags a bundle', () => {
   assert.ok(bundle.coverage.longest_line > 5000);
 });
 
+test('one unreadable file is not made readable by a readable neighbour', () => {
+  // A package-wide average meant adding a file with a hundred newlines flipped
+  // `minified` to false. No executable code became any more readable, and the
+  // caveat printed next to "nothing found" got weaker for no reason.
+  const alone = c.detect([file('package/dist/bundle.js', 'x'.repeat(9000))]);
+  const beside = c.detect([
+    file('package/dist/bundle.js', 'x'.repeat(9000)),
+    file('package/readable.js', '\n'.repeat(200)),
+  ]);
+  assert.equal(alone.coverage.minified, true);
+  assert.equal(beside.coverage.minified, true);
+  assert.deepEqual(beside.coverage.minified_files, ['package/dist/bundle.js']);
+});
+
+test('a method call on a regex or a string is not shell execution', () => {
+  // `/re/.exec(s)` produced a high-risk, build-stopping finding on ordinary
+  // code. A real child_process call is reached through an import that matches
+  // in the same file anyway.
+  assert.deepEqual(Object.keys(c.detect([file('a.js', 'if (/foo/.exec(s)) return;')]).found), []);
+  assert.deepEqual(Object.keys(c.detect([file('a.js', 'const m = str.match(re).exec(x);')]).found), []);
+  assert.ok(c.detect([file('a.js', 'const { exec } = require("child_process"); exec("ls");')]).found.shell);
+  assert.ok(c.detect([file('a.js', 'spawn("ls", []);')]).found.shell);
+});
+
+test('a literal require stays literal however it is spaced', () => {
+  // The lookahead used to sit after `\s*`, which backtracks: for
+  // `require( "fs")` the engine matched zero spaces, saw a space instead of
+  // the quote, and called a statically known module name dynamic.
+  for (const src of ['require("fs")', "require( 'fs')", 'require(\n  "fs")', 'require(  `fs`)']) {
+    assert.equal(c.detect([file('a.js', src)]).found.dynamic_require, undefined, src);
+  }
+  assert.ok(c.detect([file('a.js', 'require(name)')]).found.dynamic_require);
+  assert.ok(c.detect([file('a.js', 'require(`${dir}/x`)')]).found.dynamic_require);
+});
+
+test('a documentation link is not credential access', () => {
+  const comment = c.detect([file('a.js', '// See https://example.org/docs/.aws/credentials for setup')]);
+  assert.equal(comment.found.credential_paths, undefined);
+  const real = c.detect([file('a.js', 'const p = home + "/.aws/credentials";')]);
+  assert.ok(real.found.credential_paths);
+});
+
 test('a base64 payload is counted, because it is why a scan can see nothing', () => {
   const result = c.detect([file('package/index.js', `const blob = "${'QUJD'.repeat(200)}";\n`)]);
   assert.ok(result.coverage.base64_bytes > 512);

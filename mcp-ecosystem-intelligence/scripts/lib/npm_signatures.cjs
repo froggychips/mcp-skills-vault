@@ -49,9 +49,12 @@
  * API:
  *   signatureMessage(name, version, integrity)    -> string            (pure)
  *   verifyRegistrySignature({...})                -> { state, ... }    (pure)
- *   provenanceClaim(attestationsDocument)         -> { ... } | null    (pure)
+ *   provenanceClaim(attestationsDocument)         -> { ..., records } | null
+ *   attestationRecords(attestationsDocument)      -> [{ ... }]          (pure)
  *   certIdentity(bundle)                          -> { ... } | null    (pure)
  *   checkProvenance({ claim, ... })               -> { state, ... }    (pure)
+ *   verifyEnvelope(dsseEnvelope, key)             -> { state, ... }    (pure)
+ *   pae(payloadType, payload)                     -> Buffer            (pure)
  *   purlFor(ecosystem, name, version)             -> string            (pure)
  *   keysUrl(registry)                             -> string            (pure)
  */
@@ -131,40 +134,74 @@ function verifyRegistrySignature({ name, version, integrity, signatures, keys, n
  * source in different places, so both are checked.
  */
 function provenanceClaim(doc) {
+  const records = attestationRecords(doc);
+  // The flat shape callers already use: the first record that names a source
+  // repository. `records` carries all of them, which is what the binding check
+  // needs — npm publishes two attestations per release and the useful fields
+  // are split between them.
+  const primary = records.find((r) => r.repository) || null;
+  if (!primary) return null;
+  return {
+    predicateType: primary.predicateType,
+    repository:    primary.repository,
+    ref:           primary.ref,
+    workflowPath:  primary.workflowPath,
+    builder:       primary.builder,
+    subjects:      primary.subjects,
+    subjectDigests: primary.subjectDigests,
+    certificate:   primary.certificate,
+    records,
+  };
+}
+
+/**
+ * Every attestation in the document, parsed, with what is needed to check it.
+ *
+ * npm publishes two per release and they carry different things: the *publish*
+ * attestation is signed by npm's own registry key (the trust root we already
+ * use for `dist.signatures`) and carries the subject digest; the *SLSA
+ * provenance* attestation is signed by a Fulcio-issued certificate and carries
+ * the workflow identity. Reading only the first one that mentioned a repository
+ * meant the digest and the identity were never checked together.
+ */
+function attestationRecords(doc) {
   const list = (doc && doc.attestations) || [];
+  const out = [];
   for (const att of list) {
-    const payload = att?.bundle?.dsseEnvelope?.payload;
+    const envelope = att?.bundle?.dsseEnvelope || null;
+    const payload = envelope && envelope.payload;
     if (!payload) continue;
     let statement;
     try { statement = JSON.parse(Buffer.from(payload, 'base64').toString('utf8')); }
     catch { continue; }
 
     const predicate = statement.predicate || {};
-    // SLSA v1: buildDefinition.externalParameters.workflow.repository
-    // SLSA v0.2: invocation.configSource.uri (git+https://github.com/o/r@refs/…)
     const workflow = predicate?.buildDefinition?.externalParameters?.workflow || {};
     const configUri = predicate?.invocation?.configSource?.uri || null;
     const repo = workflow.repository
       || (configUri ? String(configUri).replace(/^git\+/, '').replace(/@refs\/.*$/, '') : null);
 
-    if (!repo) continue;
-    return {
+    const vm = att?.bundle?.verificationMaterial || {};
+    out.push({
       predicateType: att.predicateType || statement.predicateType || null,
       repository:    repo,
       ref:           workflow.ref || predicate?.invocation?.configSource?.digest?.sha1 || null,
       workflowPath:  workflow.path || null,
       builder:       predicate?.runDetails?.builder?.id || predicate?.builder?.id || null,
       subjects:      (statement.subject || []).map((s) => s.name).filter(Boolean),
-      // The subject with its digests, which is what ties the attestation to an
-      // artifact. `subjects` above stays a list of names because callers (and
-      // tests) read it that way.
       subjectDigests: (statement.subject || [])
         .filter((s) => s && s.digest)
         .map((s) => ({ name: s.name || null, digest: { ...s.digest } })),
       certificate:   certIdentity(att.bundle),
-    };
+      // Kept so the signature can actually be checked rather than assumed.
+      envelope,
+      certificateDer: vm?.certificate?.rawBytes
+        || vm?.x509CertificateChain?.certificates?.[0]?.rawBytes
+        || null,
+      publicKeyId: (envelope.signatures || []).map((sig) => sig && sig.keyid).find(Boolean) || null,
+    });
   }
-  return null;
+  return out;
 }
 
 /**
@@ -225,89 +262,257 @@ function purlFor(ecosystem, name, version) {
   return `pkg:${ecosystem}/${encoded}${version ? `@${version}` : ''}`;
 }
 
-/** sha512-<base64> → lowercase hex, which is how in-toto writes digests. */
+/**
+ * `sha512-<base64>` → lowercase hex, which is how in-toto writes digests.
+ *
+ * Strict on purpose. `Buffer.from(x, 'base64')` ignores everything it does not
+ * recognise, so a value with trailing junk after a padded digest decoded to
+ * exactly 64 bytes and compared equal — an integrity string that npm would
+ * never accept could still reach a digest comparison here. An SRI value may
+ * also carry several space-separated tokens; rather than silently taking the
+ * first, that is refused, because "which one did we compare" should not be a
+ * question a reader has to ask.
+ */
+const BASE64_ONLY = /^[A-Za-z0-9+/]+={0,2}$/;
+
 function integrityToHex(integrity) {
-  const m = String(integrity || '').match(/^(sha256|sha384|sha512)-(.+)$/);
+  const raw = String(integrity || '').trim();
+  if (!raw || /\s/.test(raw)) return null;              // multiple SRI tokens
+  const m = raw.match(/^(sha256|sha384|sha512)-([A-Za-z0-9+/=]+)$/);
   if (!m) return null;
+  if (!BASE64_ONLY.test(m[2])) return null;
+  const expected = { sha256: 32, sha384: 48, sha512: 64 }[m[1]];
+  // A padded base64 digest of N bytes has a known length; anything else is not
+  // this digest, whatever it decodes to.
+  if (m[2].length !== Math.ceil(expected / 3) * 4) return null;
   let buf;
   try { buf = Buffer.from(m[2], 'base64'); } catch { return null; }
-  const expected = { sha256: 32, sha384: 48, sha512: 64 }[m[1]];
   if (buf.length !== expected) return null;
   return { algorithm: m[1], hex: buf.toString('hex') };
 }
 
 /**
- * What a provenance attestation establishes about *this* artifact.
+ * DSSE Pre-Authentication Encoding (dsse v1):
+ *   "DSSEv1 " + len(payloadType) + " " + payloadType + " " + len(payload) + " " + payload
  *
- * Returns { state, issuer, subject_match, repository, findings } where state is
- *   'bound'      — the statement's subject is the artifact we verified, and the
- *                  signing identity belongs to the repository the DB records
- *   'claimed'    — readable and consistent, but nothing tied it to these bytes
- *   'mismatch'   — it describes a different repository or different bytes
+ * This is what a DSSE signature actually covers. Verifying it is what ties the
+ * in-toto statement — and therefore the subject digest we compare against the
+ * artifact — to the key that signed it.
+ */
+function pae(payloadType, payload) {
+  const type = Buffer.from(String(payloadType), 'utf8');
+  const body = Buffer.isBuffer(payload) ? payload : Buffer.from(String(payload), 'utf8');
+  return Buffer.concat([
+    Buffer.from(`DSSEv1 ${type.length} `, 'utf8'), type,
+    Buffer.from(` ${body.length} `, 'utf8'), body,
+  ]);
+}
+
+/**
+ * Verify a DSSE envelope's signature against a key we already have.
+ *
+ * Why this matters, and why its absence was the hole: the registry signs
+ * `name@version:integrity` (verifyRegistrySignature above), and the attestation
+ * document is served separately. Without checking the envelope, a hostile
+ * endpoint could take a *genuine* bundle for some other artifact, replace the
+ * subject digest with the integrity value npm signed for ours, keep the
+ * original certificate, and every comparison downstream would agree. The
+ * signature is now the thing that makes the statement's subject digest mean
+ * something.
+ *
+ * `key` is a KeyObject, or a base64 SPKI DER string, or an X509Certificate.
+ * Returns { state: 'ok' | 'fail' | 'unverified', reason }.
+ */
+function verifyEnvelope(envelope, key) {
+  const payload = envelope && envelope.payload;
+  const sigs = (envelope && envelope.signatures) || [];
+  if (!payload) return { state: 'unverified', reason: 'envelope carries no payload' };
+  if (!sigs.length) return { state: 'unverified', reason: 'envelope carries no signature' };
+  if (!key) return { state: 'unverified', reason: 'no key to verify against' };
+
+  let publicKey;
+  try {
+    if (key instanceof crypto.X509Certificate) publicKey = key.publicKey;
+    else if (typeof key === 'string') {
+      publicKey = crypto.createPublicKey({ key: Buffer.from(key, 'base64'), format: 'der', type: 'spki' });
+    } else publicKey = key;
+  } catch (e) {
+    return { state: 'unverified', reason: `unusable key: ${e.message}` };
+  }
+
+  const message = pae(envelope.payloadType || 'application/vnd.in-toto+json', Buffer.from(payload, 'base64'));
+  for (const sig of sigs) {
+    if (!sig || !sig.sig) continue;
+    try {
+      if (crypto.verify('sha256', message, publicKey, Buffer.from(sig.sig, 'base64'))) {
+        return { state: 'ok', keyid: sig.keyid || null };
+      }
+    } catch (e) {
+      return { state: 'unverified', reason: `could not check the envelope signature: ${e.message}` };
+    }
+  }
+  return { state: 'fail', reason: 'the envelope signature does not verify against this key' };
+}
+
+/**
+ * What a provenance attestation *establishes* about *this* artifact.
+ *
+ * Returns { state, issuer, subject_match, repo_match, signature, findings }
+ * where state is
+ *   'bound'      — **npm's own registry key** signed a statement saying this
+ *                  name@version has this digest, that digest is the artifact we
+ *                  verified, and a certificate claims the repository the DB
+ *                  records built it
+ *   'claimed'    — readable and not contradicted, but something in that chain
+ *                  is missing: no verifiable signature, no certificate, or no
+ *                  digest to compare
+ *   'mismatch'   — it describes a different repository or different bytes, or
+ *                  a signature did not verify
  *   'unreadable' — there is an attestation but no statement could be read
  *
- * 'bound' is deliberately not called "verified": see the note at the top of
- * this file about what is still unchecked.
+ * Three holes closed here after review, all the same shape — a comparison that
+ * looked like a proof and was not:
+ *
+ *   1. **The statement was never tied to a key.** The subject digest was read
+ *      out of an unauthenticated document. A hostile endpoint could take a
+ *      genuine bundle for another artifact, replace its subject digest with the
+ *      integrity value npm signed for ours, keep the original certificate, and
+ *      every comparison downstream agreed. Now the DSSE envelope must verify:
+ *      against npm's published registry key for the publish attestation (the
+ *      same trust root as `dist.signatures`), or against the embedded
+ *      certificate for the SLSA one.
+ *   2. **`bound` did not require a certificate.** Without one the code fell
+ *      back to the statement's *self-reported* repository — a field the
+ *      publisher writes — and called a match "bound".
+ *   3. **The builder check was a substring.** `https://evil/actions/runner/x`
+ *      passed as GitHub Actions. It is anchored now.
+ *
+ * What is still NOT established, and is stated rather than implied:
+ *
+ *   - The certificate chain is not validated against Fulcio's root, and the
+ *     Rekor inclusion proof is not checked. So a certificate in a bundle proves
+ *     only that *someone holding its key* signed the statement — anybody can
+ *     mint a certificate with any SAN in it. That is why the **digest** half of
+ *     `bound` requires npm's registry key (which an attacker cannot supply)
+ *     while the **identity** half remains a claim about a repository, and why
+ *     the word "verified" never appears next to provenance in the output.
+ *   - Consequently a package whose bundle carries only a certificate-signed
+ *     statement reaches `claimed`, with the reason given. In practice npm
+ *     publishes both attestations, so this costs nothing for real packages and
+ *     refuses a forged document that carries only the forgeable half.
  */
-function checkProvenance({ claim, sourceUrl = null, name = null, version = null, integrity = null, normalizeRepo = (u) => u } = {}) {
+function checkProvenance({
+  claim, sourceUrl = null, name = null, version = null, integrity = null,
+  keys = null, normalizeRepo = (u) => u,
+} = {}) {
   if (!claim) return { state: 'unreadable', findings: ['attestation present but no in-toto statement could be read'] };
 
   const findings = [];
   const storedRepo = sourceUrl ? String(normalizeRepo(sourceUrl) || '').toLowerCase() : null;
+  const records = Array.isArray(claim.records) && claim.records.length
+    ? claim.records
+    // A caller holding only the flat legacy shape: usable for a claim, never
+    // for a binding, because there is no envelope to verify.
+    : [{ ...claim, envelope: null, certificateDer: null }];
 
-  // ── who built it ──
-  const builder = claim.builder || null;
-  const cert    = claim.certificate && !claim.certificate.error ? claim.certificate : null;
-  const issuer  = /\/actions\/runner\//.test(String(builder || '')) ? 'github-actions'
-    : (cert && /github\.com/.test(String(cert.identity || '')) ? 'github-actions' : 'unknown');
-  if (issuer !== 'github-actions') {
-    findings.push(`builder is not a GitHub Actions runner (${builder || 'builder id absent'})`);
-  }
-  if (claim.certificate && claim.certificate.error) findings.push(claim.certificate.error);
-
-  // ── which repository signed ──
-  // The certificate's SAN is the stronger statement of the two: the workflow in
-  // the statement is self-reported build metadata, while the SAN is what the
-  // identity token was issued for.
-  let repoMatch = 'unknown';
-  const certRepo = cert && cert.repository ? String(normalizeRepo(cert.repository) || '').toLowerCase() : null;
-  if (storedRepo && certRepo) {
-    repoMatch = certRepo === storedRepo ? 'ok' : 'mismatch';
-    if (repoMatch === 'mismatch') {
-      findings.push(`the signing identity belongs to ${cert.repository}, not to ${sourceUrl}`);
+  // ── verify what can be verified ──
+  const verified = [];
+  let anyFailure = null;
+  for (const rec of records) {
+    let result = { state: 'unverified', reason: 'no key available for this attestation' };
+    if (rec.envelope && rec.certificateDer) {
+      try {
+        result = verifyEnvelope(rec.envelope, new crypto.X509Certificate(Buffer.from(rec.certificateDer, 'base64')));
+        if (result.state === 'ok') result.trust = 'certificate (chain not validated)';
+      } catch (e) {
+        result = { state: 'unverified', reason: `certificate unusable: ${e.message}` };
+      }
+    } else if (rec.envelope && rec.publicKeyId && keys) {
+      const key = ((keys && keys.keys) || []).find((k) => k.keyid === rec.publicKeyId);
+      result = key
+        ? verifyEnvelope(rec.envelope, key.key)
+        : { state: 'unverified', reason: `no published key matches ${rec.publicKeyId}` };
+      if (result.state === 'ok') result.trust = 'npm registry key';
     }
-  } else if (storedRepo && claim.repository) {
-    const claimed = String(normalizeRepo(claim.repository) || '').toLowerCase();
-    repoMatch = claimed === storedRepo ? 'ok' : 'mismatch';
-    if (repoMatch === 'mismatch') {
-      findings.push(`provenance names ${claim.repository}, not ${sourceUrl}`);
-    }
+    rec._signature = result;
+    if (result.state === 'ok') verified.push(rec);
+    if (result.state === 'fail') anyFailure = { rec, result };
   }
 
-  // ── which bytes ──
-  let subjectMatch = 'unknown';
+  if (anyFailure) {
+    findings.push(`the signature over the ${anyFailure.rec.predicateType || 'attestation'} statement does not verify`);
+  }
+
+  // ── which bytes: only from a statement whose signature checked out ──
   const want = integrityToHex(integrity);
   const purl = purlFor('npm', name, version);
-  if (want && Array.isArray(claim.subjectDigests) && claim.subjectDigests.length) {
-    const hit = claim.subjectDigests.find((s) => String(s.digest?.[want.algorithm] || '').toLowerCase() === want.hex);
-    if (hit) {
-      subjectMatch = 'ok';
-      // A digest match with the wrong name is still a match on the bytes, but
-      // worth saying out loud.
-      if (purl && hit.name && hit.name !== purl) findings.push(`attestation subject is named ${hit.name}, expected ${purl}`);
-    } else {
-      subjectMatch = 'mismatch';
-      const seen = claim.subjectDigests.map((s) => s.name || '(unnamed)').join(', ');
-      findings.push(`no attestation subject matches this artifact's ${want.algorithm} (subjects: ${seen})`);
-    }
-  } else if (!want) {
-    findings.push('no integrity value to compare the attestation subject against');
+  let subjectMatch = 'unknown';
+  let subjectSource = null;
+  if (!want) {
+    findings.push('no usable integrity value to compare the attestation subject against');
   } else {
-    findings.push('attestation carries no subject digest');
+    const digestsOf = (pool) => pool.flatMap((rec) => (rec.subjectDigests || []).map((sd) => ({ rec, sd })));
+    const matches = (entry) => String(entry.sd.digest?.[want.algorithm] || '').toLowerCase() === want.hex;
+    const signedHit = digestsOf(verified).find(matches);
+    const anyHit    = signedHit || digestsOf(records).find(matches);
+
+    if (signedHit) {
+      // Which key signed it decides what the match is worth. npm's registry
+      // key is the one trust root here that an attacker cannot supply: the
+      // certificate in a bundle is *unvalidated* (no Fulcio chain, no Rekor
+      // proof), so anybody can mint one with any identity in it and sign a
+      // statement about any bytes. A digest confirmed only that way is a claim.
+      subjectSource = signedHit.rec._signature.trust || 'signature verified';
+      subjectMatch = subjectSource === 'npm registry key' ? 'ok' : 'self-signed';
+      if (subjectMatch === 'self-signed') {
+        findings.push('the subject digest was confirmed only against the bundle\'s own certificate, which is not validated against a trust root');
+      }
+      if (purl && signedHit.sd.name && signedHit.sd.name !== purl) {
+        findings.push(`attestation subject is named ${signedHit.sd.name}, expected ${purl}`);
+      }
+    } else if (anyHit) {
+      // The digest matches, but nothing authenticated the document it came
+      // from. That is a claim, not a binding, and must not read as one.
+      subjectMatch = 'unsigned';
+      findings.push('the subject digest matches, but no signature over that statement could be verified');
+    } else {
+      const seen = records.flatMap((rec) => (rec.subjectDigests || []).map((sd) => sd.name || '(unnamed)'));
+      subjectMatch = 'mismatch';
+      findings.push(`no attestation subject matches this artifact's ${want.algorithm}`
+        + `${seen.length ? ` (subjects: ${seen.join(', ')})` : ' (no subject digest published)'}`);
+    }
   }
 
+  // ── which repository: the certificate's SAN, which is what an identity token
+  //    was issued for, rather than the statement's own prose ──
+  const certRec = records.find((rec) => rec.certificate && !rec.certificate.error && rec.certificate.repository);
+  const cert = certRec ? certRec.certificate : null;
+  let repoMatch = 'unknown';
+  if (storedRepo && cert) {
+    const certRepo = String(normalizeRepo(cert.repository) || '').toLowerCase();
+    repoMatch = certRepo === storedRepo ? 'ok' : 'mismatch';
+    if (repoMatch === 'mismatch') findings.push(`the signing identity belongs to ${cert.repository}, not to ${sourceUrl}`);
+  } else if (storedRepo) {
+    const claimed = records.map((rec) => rec.repository).find(Boolean);
+    if (claimed) {
+      const norm = String(normalizeRepo(claimed) || '').toLowerCase();
+      repoMatch = norm === storedRepo ? 'self-reported' : 'mismatch';
+      if (repoMatch === 'mismatch') findings.push(`provenance names ${claimed}, not ${sourceUrl}`);
+      else findings.push('the repository is self-reported: no signing certificate was published with this attestation');
+    }
+  }
+  for (const rec of records) if (rec.certificate && rec.certificate.error) findings.push(rec.certificate.error);
+
+  // ── who built it. Anchored: a substring match accepted
+  //    `https://evil/actions/runner/x` as GitHub Actions. ──
+  const builder = records.map((rec) => rec.builder).find(Boolean) || null;
+  const builderIsGha = /^https:\/\/github\.com\/actions\/runner\//.test(String(builder || ''));
+  const identityIsGha = Boolean(cert && /^https:\/\/github\.com\//.test(String(cert.identity || '')));
+  const issuer = (builderIsGha || identityIsGha) ? 'github-actions' : 'unknown';
+  if (issuer !== 'github-actions') findings.push(`builder is not a GitHub Actions runner (${builder || 'builder id absent'})`);
+
   let state;
-  if (repoMatch === 'mismatch' || subjectMatch === 'mismatch') state = 'mismatch';
+  if (repoMatch === 'mismatch' || subjectMatch === 'mismatch' || anyFailure) state = 'mismatch';
   else if (subjectMatch === 'ok' && repoMatch === 'ok' && issuer === 'github-actions') state = 'bound';
   else state = 'claimed';
 
@@ -315,15 +520,24 @@ function checkProvenance({ claim, sourceUrl = null, name = null, version = null,
     state,
     issuer,
     subject_match: subjectMatch,
+    subject_verified_by: subjectSource,
     repo_match:    repoMatch,
-    repository:    (cert && cert.repository) || claim.repository || null,
-    identity:      cert ? cert.identity : null,
-    workflow:      (cert && cert.workflowPath) || claim.workflowPath || null,
+    signature:     records.map((rec) => ({
+      predicateType: rec.predicateType,
+      state:  rec._signature ? rec._signature.state : 'unverified',
+      trust:  rec._signature ? (rec._signature.trust || null) : null,
+      reason: rec._signature ? (rec._signature.reason || null) : null,
+    })),
+    repository: (cert && cert.repository) || records.map((rec) => rec.repository).find(Boolean) || null,
+    identity:   cert ? cert.identity : null,
+    workflow:   (cert && cert.workflowPath) || records.map((rec) => rec.workflowPath).find(Boolean) || null,
     findings,
   };
 }
 
+
 module.exports = {
   signatureMessage, verifyRegistrySignature, provenanceClaim, keysUrl,
-  certIdentity, checkProvenance, purlFor, integrityToHex,
+  certIdentity, checkProvenance, purlFor, integrityToHex, attestationRecords,
+  verifyEnvelope, pae,
 };

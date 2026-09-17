@@ -145,7 +145,7 @@ const CLAIMS = [
   {
     what:  'how many packages were scanned, and how many are minified',
     file:  'README.md',
-    re:    /(\d+) of\n(\d+) ship a minified bundle/,
+    re:    /(\d+) of\n(\d+) ship at least one minified file/,
     expected: () => {
       const pkgs = Object.values(capabilities.packages || {});
       return [pkgs.filter((p) => p.coverage && p.coverage.minified).length, pkgs.length];

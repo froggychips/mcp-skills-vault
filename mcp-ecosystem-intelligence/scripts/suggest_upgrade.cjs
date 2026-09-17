@@ -16,12 +16,18 @@
  *
  * What it reports, per entry:
  *
- *   clear       nothing known applies to the pinned version
- *   upgrade     a published version clears every advisory — named, with what
- *               each one was
- *   no-fix      advisories apply and none of them has a fix. This is the case
- *               worth knowing about and the one a "just upgrade" tool hides.
- *   unknown     the feed did not answer, or a version string nobody can order
+ *   clear        nothing known applies to the pinned version
+ *   upgrade      a published version clears every advisory *and* was confirmed
+ *                clean itself — named, with what each advisory was
+ *   upgrade-unconfirmed
+ *                a target that clears them on paper, which we could not check.
+ *                Not counted as a safe upgrade: a recommendation resting on a
+ *                check that failed is the bug this repo keeps finding.
+ *   no-clean-target
+ *                every candidate has advisories of its own
+ *   no-fix       advisories apply and none of them has a fix. This is the case
+ *                worth knowing about and the one a "just upgrade" tool hides.
+ *   unknown      the feed did not answer, or a version string nobody can order
  *
  * The advisory feeds are asked about the *candidate* too, because "fixed in
  * 2.1.30" means fixed for that advisory, not free of every other one. A
@@ -276,19 +282,39 @@ async function checkEntry(tool) {
   if (plan.state === 'upgrade') {
     const after = await osvFor(eco, pkg, plan.target);
     if (!after.ok) {
+      // The check did not run. Saying "upgrade to X" on the strength of a
+      // check that failed is the bug this whole repo is about, so the state
+      // says the target is unconfirmed and every reader has to deal with it.
       plan.target_check = { ok: false, reason: after.error };
+      plan.state = 'upgrade-unconfirmed';
     } else {
       const remaining = fixedVersions(after.vulns, pkg);
       plan.target_check = { ok: true, remaining: remaining.map((a) => ({ id: a.id, severity: a.severity })) };
       if (remaining.length) {
         // Try the newest release before giving up on a clean target.
         const latest = plan.latest;
+        let cleanFound = false;
         if (latest && latest !== plan.target) {
           const atLatest = await osvFor(eco, pkg, latest);
           if (atLatest.ok && !atLatest.vulns.length) {
             plan.target = latest;
             plan.target_check = { ok: true, remaining: [], note: 'the shortest hop still had advisories; the latest release is clean' };
+            cleanFound = true;
+          } else if (!atLatest.ok) {
+            plan.latest_check = { ok: false, reason: atLatest.error };
+          } else {
+            plan.latest_check = { ok: true, remaining: fixedVersions(atLatest.vulns, pkg).map((a) => ({ id: a.id, severity: a.severity })) };
           }
+        }
+        if (!cleanFound) {
+          // No version we can name is clean. This is not an upgrade
+          // recommendation and must not be counted as one — the previous
+          // version of this code left `state: 'upgrade'` with a target whose
+          // own advisories it had just read.
+          plan.state = 'no-clean-target';
+          plan.reason = `${plan.target} clears the advisories against ${current} but has `
+            + `${plan.target_check.remaining.length} of its own`
+            + `${latest && latest !== plan.target ? `, and ${latest} is not clean either` : ''}`;
         }
       }
     }
@@ -311,7 +337,8 @@ function main(argv) {
   }
 
   return mapLimit(tools, CONCURRENCY, (t) => checkEntry(t)).then((rows) => {
-    const affected = rows.filter((r) => r.plan.state === 'upgrade' || r.plan.state === 'no-fix');
+    const STATES = ['upgrade', 'upgrade-unconfirmed', 'no-clean-target', 'no-fix'];
+    const affected = rows.filter((r) => STATES.includes(r.plan.state));
 
     if (opts.json) {
       process.stdout.write(`${JSON.stringify({
@@ -320,10 +347,12 @@ function main(argv) {
         source: 'OSV.dev',
         checked: rows.length,
         summary: {
-          clear:   rows.filter((r) => r.plan.state === 'clear').length,
-          upgrade: rows.filter((r) => r.plan.state === 'upgrade').length,
-          no_fix:  rows.filter((r) => r.plan.state === 'no-fix').length,
-          unknown: rows.filter((r) => r.plan.state === 'unknown').length,
+          clear:               rows.filter((r) => r.plan.state === 'clear').length,
+          upgrade:             rows.filter((r) => r.plan.state === 'upgrade').length,
+          upgrade_unconfirmed: rows.filter((r) => r.plan.state === 'upgrade-unconfirmed').length,
+          no_clean_target:     rows.filter((r) => r.plan.state === 'no-clean-target').length,
+          no_fix:              rows.filter((r) => r.plan.state === 'no-fix').length,
+          unknown:             rows.filter((r) => r.plan.state === 'unknown').length,
         },
         entries: rows,
       }, null, 2)}\n`);
@@ -332,12 +361,18 @@ function main(argv) {
         const p = r.plan;
         const worst = p.advisories ? worstSeverity((p.advisories || []).map((a) => ({ database_specific: { severity: a.severity } }))) : 'UNKNOWN';
         const colour = worst === 'CRITICAL' || worst === 'HIGH' ? RD : YL;
-        process.stdout.write(`\n${colour}${p.state === 'no-fix' ? 'NO FIX' : 'UPGRADE'}${RS}  ${B}${r.name}${RS} ${DM}${r.package}@${r.current}${RS}\n`);
+        const label = {
+          'no-fix': 'NO FIX',
+          'no-clean-target': 'NO CLEAN TARGET',
+          'upgrade-unconfirmed': 'UNCONFIRMED',
+          upgrade: 'UPGRADE',
+        }[p.state] || p.state.toUpperCase();
+        process.stdout.write(`\n${p.state === 'upgrade' ? colour : RD}${label}${RS}  ${B}${r.name}${RS} ${DM}${r.package}@${r.current}${RS}\n`);
         for (const a of p.advisories || []) {
           process.stdout.write(`  ${a.severity.padEnd(9)} ${a.id}${a.fixed.length ? ` — fixed in ${a.fixed.join(' / ')}` : ` — ${RD}no published fix${RS}`}\n`);
           if (a.summary) process.stdout.write(`            ${DM}${a.summary.slice(0, 96)}${RS}\n`);
         }
-        if (p.state === 'upgrade') {
+        if (p.state === 'upgrade' || p.state === 'upgrade-unconfirmed') {
           process.stdout.write(`  ${GN}→ ${r.package}@${p.target}${RS} clears ${(p.advisories || []).filter((a) => a.fixed.length).length} of ${(p.advisories || []).length}`);
           process.stdout.write(`${p.latest && p.latest !== p.target ? `  ${DM}(latest is ${p.latest})${RS}` : ''}\n`);
           if (p.unresolved && p.unresolved.length) {
@@ -357,10 +392,13 @@ function main(argv) {
         }
       }
       const unknown = rows.filter((r) => r.plan.state === 'unknown');
+      const count = (state) => rows.filter((r) => r.plan.state === state).length;
       process.stdout.write(
-        `\n${rows.length} checked — ${GN}${rows.filter((r) => r.plan.state === 'clear').length} clear${RS}, `
-        + `${rows.filter((r) => r.plan.state === 'upgrade').length} with a safe upgrade, `
-        + `${rows.filter((r) => r.plan.state === 'no-fix').length} with no fix available, `
+        `\n${rows.length} checked — ${GN}${count('clear')} clear${RS}, `
+        + `${count('upgrade')} with a confirmed safe upgrade, `
+        + `${count('upgrade-unconfirmed')} with a target we could not confirm, `
+        + `${count('no-clean-target')} where every candidate has advisories of its own, `
+        + `${count('no-fix')} with no fix available, `
         + `${unknown.length} not checkable\n`
       );
     }

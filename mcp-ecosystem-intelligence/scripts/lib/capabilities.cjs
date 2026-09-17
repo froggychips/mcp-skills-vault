@@ -41,7 +41,14 @@ const CAPABILITIES = {
     patterns: [
       /\brequire\s*\(\s*['"](?:node:)?child_process['"]\s*\)/,
       /\bfrom\s+['"](?:node:)?child_process['"]/,
-      /\b(?:exec|execSync|execFile|execFileSync|spawn|spawnSync|fork)\s*\(/,
+      // Not `.exec(` — `/re/.exec(s)` and `str.match(…).exec` are regex and
+      // string methods, and reporting them as shell execution put a
+      // *build-stopping* high-risk finding on ordinary code. A real
+      // child_process call is either preceded by the import above (which
+      // matches the same file) or reached through a binding, so requiring
+      // something other than a dot in front costs almost nothing and removes
+      // the whole false-positive class.
+      /(?:^|[^.\w$])(?:exec|execSync|execFile|execFileSync|spawn|spawnSync)\s*\(/m,
     ],
   },
   network: {
@@ -85,10 +92,25 @@ const CAPABILITIES = {
   dynamic_require: {
     why: 'loads a module named at runtime, so the import graph is not knowable from the text',
     // `require(variable)` and `require(`${x}`)`, not `require('literal')`.
-    patterns: [/\brequire\s*\(\s*(?!['"])[^)]{1,60}\)/],
+    //
+    // The first version put the lookahead after `\s*`, which backtracks: for
+    // `require( "fs")` the engine matched zero spaces, saw a space rather than
+    // the quote, and reported a literal require as dynamic. The first
+    // *non-space* character has to be the thing that is tested.
+    patterns: [
+      // An identifier or expression: the first non-space character is not a
+      // quote of any kind.
+      /\brequire\s*\(\s*(?=[^\s'"`])[^)]{1,60}\)/,
+      // A template literal *with interpolation* — `require(`${dir}/x`)` is
+      // dynamic, while `require(`fs`)` is a literal written oddly.
+      /\brequire\s*\(\s*`[^`]*\$\{/,
+    ],
   },
   credential_paths: {
     why: 'mentions a path where credentials live; almost never legitimate in a published package',
+    // The one detector that fires on a *mention*, so a documentation link
+    // mentioning `.aws/credentials` must not become a high-risk finding.
+    ignoreComments: true,
     patterns: [
       /\.ssh\/(?:id_[a-z0-9]+|authorized_keys|config)/,
       /\.aws\/credentials/,
@@ -136,11 +158,21 @@ function coverageOf(files) {
   let totalLines = 0;
   let base64Blobs = 0;
   let escapeHeavy = 0;
+  // Per file, because the question is "is any of the shipped code unreadable",
+  // not "is the average readable". A package-wide average let one 3.6 KB
+  // single-line bundle be classified as readable as soon as a second file with
+  // a hundred newlines was added beside it — no executable code became any
+  // more readable, and the caveat printed next to "nothing found" got weaker.
+  const minifiedFiles = [];
 
   for (const f of code) {
     const lines = f.text.split('\n');
     totalLines += lines.length;
-    for (const l of lines) if (l.length > longestLine) longestLine = l.length;
+    let fileLongest = 0;
+    for (const l of lines) if (l.length > fileLongest) fileLongest = l.length;
+    if (fileLongest > longestLine) longestLine = fileLongest;
+    const fileAvg = lines.length ? Math.round(f.text.length / lines.length) : 0;
+    if (f.text.length > 1000 && (fileLongest > 5000 || fileAvg > 400)) minifiedFiles.push(f.path);
     // A long base64 run is a payload, not code. Not a capability on its own,
     // but it is the reason a scan can be complete and still see nothing.
     for (const m of f.text.match(/[A-Za-z0-9+/]{512,}={0,2}/g) || []) base64Blobs += m.length;
@@ -149,9 +181,7 @@ function coverageOf(files) {
   }
 
   const avgLine = totalLines ? Math.round(bytes / totalLines) : 0;
-  // Not a judgement, a description: "minified" means the text was not written
-  // for a human, which is exactly when a pattern scan misses things.
-  const minified = longestLine > 5000 || avgLine > 400;
+  const minified = minifiedFiles.length > 0;
 
   return {
     code_files: code.length,
@@ -160,11 +190,14 @@ function coverageOf(files) {
     longest_line: longestLine,
     avg_line_length: avgLine,
     minified,
+    // Named, so "minified" is a statement about specific files rather than a
+    // mood about the package.
+    minified_files: minifiedFiles.slice(0, 10),
     base64_bytes: base64Blobs,
     escape_heavy_files: escapeHeavy,
     // The sentence a report should print next to any "not found".
     caveat: minified
-      ? 'the shipped code is a bundle written for a machine; a pattern scan over it can show presence, never absence'
+      ? `${minifiedFiles.length} of ${code.length} code file(s) are written for a machine; a pattern scan over them can show presence, never absence`
       : 'a pattern scan can show presence, never absence',
   };
 }
@@ -176,6 +209,23 @@ function coverageOf(files) {
  * parsed manifest, used only for install scripts — which are a capability
  * declared rather than detected, and the most reliable signal here.
  */
+/**
+ * Text that is documentation rather than behaviour.
+ *
+ * `// See https://example.org/docs/.aws/credentials` produced a high-risk
+ * `credential_paths` finding — a fact, with evidence, able to stop a build —
+ * for a comment. Line comments and URLs are stripped before the
+ * credential-path patterns run. Block comments and string literals are *not*
+ * stripped: doing that properly needs a parser, and the point of this module is
+ * that it is a pattern scan which says so.
+ */
+function withoutCommentsAndUrls(text) {
+  return text
+    .split('\n')
+    .map((line) => line.replace(/\/\/.*$/, '').replace(/https?:\/\/\S+/g, ' '))
+    .join('\n');
+}
+
 function detect(files, packageJson = null) {
   const found = {};
   const notes = [];
@@ -187,10 +237,13 @@ function detect(files, packageJson = null) {
 
   for (const f of files) {
     if (!CODE_FILE.test(f.path) || typeof f.text !== 'string') continue;
+    // Computed once per file, not per pattern.
+    const prose = withoutCommentsAndUrls(f.text);
     for (const [cap, spec] of Object.entries(CAPABILITIES)) {
+      const haystack = spec.ignoreComments ? prose : f.text;
       for (const pattern of spec.patterns) {
-        const m = pattern.exec(f.text);
-        if (m) { add(cap, f.path, lineOf(f.text, m.index), m[0]); break; }
+        const m = pattern.exec(haystack);
+        if (m) { add(cap, f.path, lineOf(haystack, m.index), m[0].trim()); break; }
       }
     }
   }
@@ -253,4 +306,4 @@ function diffCapabilities(before, after) {
   };
 }
 
-module.exports = { CAPABILITIES, HIGH_RISK, detect, diffCapabilities, coverageOf, lineOf, CODE_FILE };
+module.exports = { CAPABILITIES, HIGH_RISK, detect, diffCapabilities, coverageOf, lineOf, withoutCommentsAndUrls, CODE_FILE };

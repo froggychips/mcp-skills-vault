@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@froggychips/mcp-vault.svg)](https://www.npmjs.com/package/@froggychips/mcp-vault)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Zero deps](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](./PHILOSOPHY.md)
-[![Tests](https://img.shields.io/badge/tests-675%20pass-brightgreen.svg)](./tests)
+[![Tests](https://img.shields.io/badge/tests-703%20pass-brightgreen.svg)](./tests)
 
 **Homepage:** [mcp.froggychips.xyz](https://mcp.froggychips.xyz) · **npm:** [`@froggychips/mcp-vault`](https://www.npmjs.com/package/@froggychips/mcp-vault)
 
@@ -49,7 +49,7 @@ $ npx -y @froggychips/mcp-vault verify --offline
 | **Is it still there?** | a 404 looks like a network blip | `availability` tells *gone* / *version-gone* / *yanked* / *deprecated* apart, and an unpublished name is treated as what it is: claimable by somebody else |
 | **Who published it** | whatever `repository.url` says | cross-referenced with the official MCP registry, whose namespaces are **ownership-verified** at publish (`io.github.<owner>/…`) |
 | **Does it run?** | find out after installing | behavioural eval, and the result caps the recommendation: **40 of 113** complete a handshake, and an entry nothing has seen start cannot read as "recommended" |
-| **What can it do?** | read the source, if it isn't minified | `capabilities` records what each package is able to do with a file and a line — 46 of 99 can shell out, 84 read `process.env` — and reports what a new version **gained** |
+| **What can it do?** | read the source, if it isn't minified | `capabilities` records what each package is able to do with a file and a line — 35 of 99 can shell out, 84 read `process.env` — and reports what a new version **gained** |
 | **Did the tools change?** | invisible | every passing eval fingerprints the tool surface per tool; the same artifact presenting a different surface is reported as the case with no innocent explanation |
 | **So what do I install instead?** | read four advisories | `upgrade` computes the shortest version that clears all of them (8 entries today, all with a safe path) |
 | **Why was it denied?** | read four outputs | `explain` prints the evidence with dates, the policy in force, every rule with its outcome, and the rule that decided it |
@@ -378,14 +378,14 @@ match is recorded with a file and a line. Across the 99 npm entries it can
 read:
 
 ```
-env_access  84    shell           46    dynamic_code      15
+env_access  84    shell           35    dynamic_code      15
 network     74    install_script  31    dynamic_require    8
 fs_read     58    fs_write        39    credential_paths   3
 ```
 
-39 of those packages can both run other programs and reach the network. 17 of
-99 ship a minified bundle, where a pattern scan can show presence and nothing
-else.
+28 of those packages can both run other programs and reach the network. 18 of
+99 ship at least one minified file, where a pattern scan can show presence and
+nothing else.
 
 Two rules make this honest rather than theatrical:
 

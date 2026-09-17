@@ -148,13 +148,20 @@ const DEEP_MAX_BYTES   = Math.max(1, Number(process.env.MCP_VAULT_DEEP_MAX_BYTES
 // enough that flagging it by default would bury the real findings. These turn
 // "absent" into a failure for anyone who wants that bar.
 const REQUIRE_SIGNATURES = process.argv.includes('--require-signatures') || policySays((p) => p.signatures === 'require');
-const REQUIRE_PROVENANCE = process.argv.includes('--require-provenance')
-  || policySays((p) => p.provenance === 'require' || p.provenance === 'bound');
 // The stricter bar: an attestation whose in-toto subject digest *is* the
 // artifact we verified, signed by the source repository's own workflow. A
 // readable attestation that merely names the right repo does not clear it.
 const REQUIRE_PROVENANCE_BINDING = process.argv.includes('--require-provenance-binding')
   || policySays((p) => p.provenance === 'bound');
+// Asking for a *bound* attestation is asking for an attestation. Without this
+// implication, `--require-provenance-binding` on its own enforced the binding
+// only for attestations that were readable in the first place: a package with
+// no attestation at all, or one we could not parse, sailed through the stricter
+// flag while a package that published a readable one was held to it. Exactly
+// backwards.
+const REQUIRE_PROVENANCE = process.argv.includes('--require-provenance')
+  || REQUIRE_PROVENANCE_BINDING
+  || policySays((p) => p.provenance === 'require' || p.provenance === 'bound');
 // --installed: verify what the local hosts are configured to launch, instead of
 // what the DB says. The DB is still consulted — for a pin to compare against —
 // but the subjects are the configured servers.
@@ -856,6 +863,11 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
       name:          pkg,
       version:       npmVersion,
       integrity:     npmIntegrity,
+      // The same keys the registry signature above was checked against. They
+      // are what makes the attestation's subject digest mean anything: a
+      // certificate inside a bundle is not validated against a trust root, so
+      // the digest half of a binding has to rest on npm's own key.
+      keys,
       normalizeRepo: normalizeGitUrl,
     });
 
@@ -872,10 +884,11 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
     } else if (prov.state === 'mismatch') {
       lines.push(['WARN', `provenance does not describe this artifact\n        ${prov.findings.join('\n        ')}`]);
       checks.provenance = { state: 'mismatch', repository: prov.repository };
-      if (STRICT || REQUIRE_PROVENANCE) failures++;
+      if (STRICT || REQUIRE_PROVENANCE || REQUIRE_PROVENANCE_BINDING) failures++;
     } else if (prov.state === 'bound') {
-      lines.push(['PROVBOUND', `provenance is bound to this artifact: subject sha512 matches dist.integrity, `
-        + `signed as ${prov.identity} — chain and Rekor proof still unverified`]);
+      lines.push(['PROVBOUND', `provenance bound to this artifact: npm's registry key signed a statement `
+        + `carrying this sha512, and a certificate claims ${prov.identity} built it `
+        + `(certificate chain and Rekor proof not validated)`]);
       checks.provenance = { state: 'bound', repository: prov.repository, identity: prov.identity };
     } else {
       // Readable, nothing contradicts it, but nothing tied it to these bytes

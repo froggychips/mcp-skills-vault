@@ -78,7 +78,17 @@ function lockEntry({ tool, artifact = null, tree = null, surface = null, now = n
       count:           tree.packages.length,
       install_scripts: tree.packages.filter((p) => p.hasInstallScript).map((p) => `${p.name}@${p.version}`).sort(),
       packages: tree.packages
-        .map((p) => ({ name: p.name, version: p.version || null, integrity: p.integrity || null }))
+        // `optional` and `dev` are carried because they decide whether npm is
+        // *expected* to install an entry: a Darwin-only optional dependency
+        // recorded flatly made "installs exactly this tree" false on Linux,
+        // where npm legitimately skips it.
+        .map((p) => ({
+          name: p.name,
+          version: p.version || null,
+          integrity: p.integrity || null,
+          ...(p.optional ? { optional: true } : {}),
+          ...(p.dev ? { dev: true } : {}),
+        }))
         .sort((a, b) => (a.name === b.name
           ? String(a.version).localeCompare(String(b.version))
           : (a.name < b.name ? -1 : 1))),
@@ -129,11 +139,30 @@ function writeLock(file, lock) {
   fs.writeFileSync(file, `${JSON.stringify(lock, null, 2)}\n`);
 }
 
-/** The tree as a map, for comparing two of them by name@version. */
+/**
+ * The tree as name → (version → integrity).
+ *
+ * Keyed by name *and* version on purpose. A real npm tree routinely contains
+ * the same package at several versions (nested node_modules), and the first
+ * version of this indexed by name alone: the map kept whichever occurrence came
+ * last, so a version or integrity change in any of the others was invisible and
+ * `lock --check` reported "no change" over different locked bytes.
+ */
 function treeIndex(entry) {
   const out = new Map();
-  for (const p of entry?.tree?.packages || []) out.set(p.name, p);
+  for (const p of entry?.tree?.packages || []) {
+    if (!out.has(p.name)) out.set(p.name, new Map());
+    // Two records for the same name@version can only differ in integrity; the
+    // first is kept and the second would be a corrupt lock, not a finding.
+    const versions = out.get(p.name);
+    if (!versions.has(p.version)) versions.set(p.version, p.integrity || null);
+  }
   return out;
+}
+
+/** "name@1.0.0, name@2.0.0" — for a message about a package at several versions. */
+function versionList(versions) {
+  return [...versions.keys()].sort().join(', ');
 }
 
 /**
@@ -145,7 +174,8 @@ function treeIndex(entry) {
  *   artifact         the pinned package or its integrity moved
  *   tree-added       a transitive dependency appeared
  *   tree-removed     one disappeared
- *   tree-version     one resolved to a different version …
+ *   tree-version     the set of versions for a package changed (a package can
+ *                    legitimately appear at several versions in one tree) …
  *   tree-integrity   … or to the same version with different bytes, which is
  *                    not something that happens innocently
  *   install-script   a package in the tree gained an install-time hook
@@ -175,18 +205,34 @@ function diffLock(before, after) {
 
     const pi = treeIndex(prev);
     const ni = treeIndex(next);
-    for (const [pkg, node] of ni) {
-      const old = pi.get(pkg);
-      if (!old) { changes.push({ kind: 'tree-added', detail: `${pkg}@${node.version}` }); continue; }
-      if (old.version !== node.version) {
-        changes.push({ kind: 'tree-version', detail: `${pkg} ${old.version} → ${node.version}` });
-      } else if (old.integrity && node.integrity && old.integrity !== node.integrity) {
-        // Same version, different bytes. npm does not allow republishing a
-        // version, so this is either a registry problem or a proxy in the way.
-        changes.push({ kind: 'tree-integrity', detail: `${pkg}@${node.version} has different integrity than when locked` });
+    for (const [pkg, nowVersions] of ni) {
+      const wasVersions = pi.get(pkg);
+      if (!wasVersions) {
+        changes.push({ kind: 'tree-added', detail: `${pkg}@${versionList(nowVersions)}` });
+        continue;
+      }
+      // Same version, different bytes, per occurrence. npm does not allow
+      // republishing a version, so this is either a registry problem or a proxy
+      // in the way — and it is the finding with no innocent reading.
+      for (const [version, integrity] of nowVersions) {
+        if (!wasVersions.has(version)) continue;
+        const before = wasVersions.get(version);
+        if (before && integrity && before !== integrity) {
+          changes.push({ kind: 'tree-integrity', detail: `${pkg}@${version} has different integrity than when locked` });
+        }
+      }
+      const appeared = [...nowVersions.keys()].filter((v) => !wasVersions.has(v));
+      const vanished = [...wasVersions.keys()].filter((v) => !nowVersions.has(v));
+      if (appeared.length || vanished.length) {
+        changes.push({
+          kind: 'tree-version',
+          detail: `${pkg} ${versionList(wasVersions)} → ${versionList(nowVersions)}`,
+        });
       }
     }
-    for (const pkg of pi.keys()) if (!ni.has(pkg)) changes.push({ kind: 'tree-removed', detail: `${pkg}@${pi.get(pkg).version}` });
+    for (const [pkg, wasVersions] of pi) {
+      if (!ni.has(pkg)) changes.push({ kind: 'tree-removed', detail: `${pkg}@${versionList(wasVersions)}` });
+    }
 
     const prevHooks = new Set(prev.tree?.install_scripts || []);
     for (const hook of next.tree?.install_scripts || []) {
@@ -247,7 +293,17 @@ function vendorFiles(entry) {
 
   const NAME = 'mcp-vault-vendored';
   const VERSION = '0.0.0';
-  const dependencies = { [pkg]: version };
+  const root = lock.packages[''];
+  // Every root dependency group is carried over, with only *our* package's
+  // specifier rewritten to the exact version. Replacing the whole map with one
+  // pin dropped the root's devDependencies from package.json while leaving
+  // them in the lockfile: `npm ci` is happy to prune what package.json no
+  // longer asks for, so the installed tree was a subset of the recorded one
+  // while the claim said "exactly".
+  const dependencies = { ...(root.dependencies || {}), [pkg]: version };
+  const devDependencies = root.devDependencies ? { ...root.devDependencies } : null;
+  const optionalDependencies = root.optionalDependencies ? { ...root.optionalDependencies } : null;
+  const peerDependencies = root.peerDependencies ? { ...root.peerDependencies } : null;
 
   // A copy: callers hold the lock document and must not have it mutated under
   // them, least of all the one field that says what to install.
@@ -257,17 +313,33 @@ function vendorFiles(entry) {
     version: VERSION,
     packages: {
       ...lock.packages,
-      '': { ...lock.packages[''], name: NAME, version: VERSION, dependencies },
+      '': {
+        ...root,
+        name: NAME,
+        version: VERSION,
+        dependencies,
+        ...(devDependencies ? { devDependencies } : {}),
+        ...(optionalDependencies ? { optionalDependencies } : {}),
+        ...(peerDependencies ? { peerDependencies } : {}),
+      },
     },
   };
 
   return {
-    packageJson: { name: NAME, version: VERSION, private: true, dependencies },
+    packageJson: {
+      name: NAME,
+      version: VERSION,
+      private: true,
+      dependencies,
+      ...(devDependencies ? { devDependencies } : {}),
+      ...(optionalDependencies ? { optionalDependencies } : {}),
+      ...(peerDependencies ? { peerDependencies } : {}),
+    },
     packageLock,
   };
 }
 
 module.exports = {
   LOCK_SCHEMA, LOCK_FILENAME,
-  emptyLock, lockEntry, lockPath, readLock, writeLock, diffLock, vendorFiles, treeIndex,
+  emptyLock, lockEntry, lockPath, readLock, writeLock, diffLock, vendorFiles, treeIndex, versionList,
 };

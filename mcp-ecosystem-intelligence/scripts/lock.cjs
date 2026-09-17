@@ -14,9 +14,11 @@
  *                       configures (or --entry <name> from the vault DB)
  *   lock --check        resolve again and diff against the lockfile; exit 1 on
  *                       any difference. This is the CI form.
- *   lock --vendor       install the locked tree into .mcp-vault/<name>/ with
- *                       `npm ci --ignore-scripts` and print the launch command
- *                       that runs *that* copy instead of resolving at start.
+ *   lock --vendor       install the tree *recorded in the lockfile* into
+ *                       .mcp-vault/<name>/ with `npm ci --ignore-scripts`, and
+ *                       print the launch command that runs that copy instead of
+ *                       resolving at start. It never resolves: a server the
+ *                       lockfile does not describe is reported, not installed.
  *
  * `--check` is the one worth running on a schedule: a dependency that resolved
  * to a new version is ordinary, a dependency that resolved to the *same*
@@ -271,25 +273,35 @@ async function main(argv) {
   const found = readLock(file);
   if (!found.ok) { process.stderr.write(`lock: ${found.error}\n`); return 2; }
 
-  const fresh = emptyLock();
-  const errors = [];
-  for (const tool of targets) {
-    if (!opts.json) process.stderr.write(`resolving ${tool.name}…\n`);
-    const res = await lockOne(tool, { surfaceByName });
-    if (res.error) errors.push(res);
-    if (res.entry) fresh.servers[res.name] = res.entry;
-  }
-
-  // ── --vendor ──
+  // ── --vendor: install what was locked, never a fresh resolve ──
+  //
+  // This used to resolve every target again, vendor *that*, and overwrite the
+  // lockfile with it — so a dependency published between `lock` and
+  // `lock --vendor` was silently installed instead of the reviewed version, and
+  // the record of what had been reviewed was replaced at the same time. A
+  // vendor step that re-resolves is a slower `npx` with extra steps.
   if (opts.vendor) {
+    if (found.missing) {
+      process.stderr.write(`lock: no ${LOCK_FILENAME} in ${opts.cwd} — run \`mcp-vault lock\` first, review it, then --vendor\n`);
+      return 2;
+    }
+    const wanted = new Set(targets.map((t) => t.name));
     const results = [];
-    for (const [name, entry] of Object.entries(fresh.servers)) {
-      if (!opts.json) process.stderr.write(`vendoring ${name}…\n`);
+    for (const [name, entry] of Object.entries(found.lock.servers)) {
+      if (wanted.size && !wanted.has(name)) continue;
+      if (!opts.json) process.stderr.write(`vendoring ${name} from the lockfile…\n`);
       results.push(vendorOne(name, entry, opts.cwd));
     }
-    writeLock(file, fresh);
+    // A configured server that the lockfile does not describe is reported
+    // rather than resolved on the spot: adding it to the lock is a separate,
+    // reviewable step.
+    const unlocked = targets.filter((t) => !found.lock.servers[t.name]).map((t) => t.name);
+    for (const name of unlocked) {
+      results.push({ name, ok: false, error: `not in ${LOCK_FILENAME} — run \`mcp-vault lock\` and review the diff first` });
+    }
+
     if (opts.json) {
-      process.stdout.write(`${JSON.stringify({ schema: 'mcp-vault/lock-vendor@1', lockfile: file, vendored: results }, null, 2)}\n`);
+      process.stdout.write(`${JSON.stringify({ schema: 'mcp-vault/lock-vendor@1', lockfile: file, locked_at: found.lock.generated_at, vendored: results }, null, 2)}\n`);
     } else {
       for (const r of results) {
         if (!r.ok) { process.stdout.write(`${RD}FAIL${RS} ${r.name} — ${r.error}\n`); continue; }
@@ -297,11 +309,20 @@ async function main(argv) {
         if (r.launch) process.stdout.write(`     launch with: ${B}${r.launch}${RS}\n`);
         if (r.note)   process.stdout.write(`     ${DM}${r.note}${RS}\n`);
       }
-      process.stdout.write(`\nLockfile: ${file}\n`);
+      process.stdout.write(`\nInstalled from ${file} as written on ${found.lock.generated_at.slice(0, 10)}${RS}\n`);
       process.stdout.write(`${DM}Point your host config at the launch paths above; nothing is resolved at start.\n`
         + `Add ${VENDOR_DIR}/ to .gitignore unless you mean to commit the tree.${RS}\n`);
     }
     return results.some((r) => !r.ok) ? 1 : 0;
+  }
+
+  const fresh = emptyLock();
+  const errors = [];
+  for (const tool of targets) {
+    if (!opts.json) process.stderr.write(`resolving ${tool.name}…\n`);
+    const res = await lockOne(tool, { surfaceByName });
+    if (res.error) errors.push(res);
+    if (res.entry) fresh.servers[res.name] = res.entry;
   }
 
   // ── --check ──

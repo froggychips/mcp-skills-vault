@@ -44,6 +44,29 @@ test('semver: build metadata is ignored, as the spec requires', () => {
   assert.equal(v.compareSemver('v1.0.0', '1.0.0'), 0, 'a leading v is common in tags');
 });
 
+test('versions too large for a JS number are still ordered exactly', () => {
+  // `Number('9007199254740993')` is 9007199254740992, so two different
+  // versions compared *equal* and maxVersion could keep the lower one.
+  assert.equal(v.compareSemver('9007199254740992.0.0', '9007199254740993.0.0'), -1);
+  assert.equal(v.compareSemver('1.0.0-9007199254740993', '1.0.0-9007199254740992'), 1);
+  assert.equal(v.comparePep440('9007199254740993.0', '9007199254740992.0'), 1);
+  assert.equal(v.maxVersion(['9007199254740992.0.0', '9007199254740993.0.0'], v.compareSemver), '9007199254740993.0.0');
+});
+
+test('semver: an invalid pre-release identifier is refused, not ordered', () => {
+  // semver §9: a numeric identifier may not carry a leading zero, and an
+  // empty identifier is not an identifier. Both used to receive a confident
+  // ordering, against this module's own contract.
+  assert.equal(v.compareSemver('1.0.0-01', '1.0.0-1'), null);
+  assert.equal(v.compareSemver('1.0.0-a..b', '1.0.0-a'), null);
+  assert.equal(v.compareSemver('1.0.0-', '1.0.0'), null);
+  // A non-numeric identifier that merely starts with a zero is fine — and by
+  // §11 an alphanumeric identifier outranks a numeric one, so it sorts above
+  // `-1` rather than below it.
+  assert.equal(v.compareSemver('1.0.0-0alpha', '1.0.0-1'), 1);
+  assert.equal(v.compareSemver('1.0.0-0', '1.0.0-1'), -1, 'a bare zero is a valid numeric identifier');
+});
+
 test('semver: a partial or non-version string is refused, not ranked', () => {
   // `1.2` and `1.x` are ranges wearing a version's clothes, and "latest" is not
   // a version at all. Ranking them would produce a plan.
@@ -59,11 +82,37 @@ test('pep440: release segments of different length compare field by field', () =
   assert.equal(v.comparePep440('1.0.0', '1.0.1'), -1);
 });
 
-test('pep440: dev < pre < final < post, within one release', () => {
-  const chain = ['1.0.dev1', '1.0a1', '1.0a2', '1.0b1', '1.0rc1', '1.0', '1.0.post1', '1.0.post2'];
+test('pep440: the canonical ordering example from the spec, in full', () => {
+  // Straight out of PEP 440. Every *combination* of suffixes used to order
+  // wrongly, because the first implementation reduced a version to one rank
+  // (dev / pre / final / post) and then compared only that field:
+  //   1.0.post1.dev2 == 1.0.post1, 1.0a1.post1 == 1.0a1, and
+  //   1.0a1.post1.dev2 < 1.0a1 — reversed.
+  const chain = [
+    '1.0.dev456', '1.0a1', '1.0a2.dev456', '1.0a12.dev456', '1.0a12',
+    '1.0b1.dev456', '1.0b2', '1.0b2.post345.dev456', '1.0b2.post345',
+    '1.0rc1.dev456', '1.0rc1', '1.0', '1.0.post456.dev34', '1.0.post456', '1.1.dev1',
+  ];
   for (let i = 0; i < chain.length - 1; i++) {
     assert.equal(v.comparePep440(chain[i], chain[i + 1]), -1, `${chain[i]} should precede ${chain[i + 1]}`);
+    assert.equal(v.comparePep440(chain[i + 1], chain[i]), 1, `and the reverse`);
   }
+});
+
+test('pep440: a dev release with no pre and no post precedes every pre-release', () => {
+  // The subtle rule, and the one a rewrite lost: `1.0.dev1` is a development
+  // release *of 1.0*, so it sorts below 1.0a1 rather than next to 1.0.
+  assert.equal(v.comparePep440('1.0.dev1', '1.0a1'), -1);
+  assert.equal(v.comparePep440('1.0.dev1', '1.0rc9'), -1);
+  // But a dev release *of a pre-release* stays with its pre-release.
+  assert.equal(v.comparePep440('1.0a1.dev1', '1.0a1'), -1);
+  assert.equal(v.comparePep440('1.0a1.dev1', '1.0.dev1'), 1);
+});
+
+test('pep440: maxVersion cannot pick the lower of a suffix pair', () => {
+  assert.equal(v.maxVersion(['1.0a1', '1.0a1.post1'], v.comparePep440), '1.0a1.post1');
+  assert.equal(v.maxVersion(['1.0.post1', '1.0.post1.dev2'], v.comparePep440), '1.0.post1');
+  assert.equal(v.maxVersion(['1.0.dev9', '1.0a1'], v.comparePep440), '1.0a1');
 });
 
 test('pep440: an epoch outranks the release segment', () => {

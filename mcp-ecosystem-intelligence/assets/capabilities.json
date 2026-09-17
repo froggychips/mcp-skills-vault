@@ -1,6 +1,6 @@
 {
   "$schema": "mcp-vault/capabilities@1",
-  "generated_at": "2026-09-17T12:39:52.982Z",
+  "generated_at": "2026-09-17T13:11:06.655Z",
   "note": "Capability presence with evidence, per package version. `found` is a fact; absence is never recorded — see lib/capabilities.cjs.",
   "packages": {
     "npm:@agent-infra/mcp-server-browser@1.2.29": {
@@ -11,16 +11,6 @@
             "file": "package/dist/index.cjs",
             "line": 4999,
             "match": "require(\"node:child_process\")"
-          },
-          {
-            "file": "package/dist/request-context.cjs",
-            "line": 229,
-            "match": "exec("
-          },
-          {
-            "file": "package/dist/server.cjs",
-            "line": 229,
-            "match": "exec("
           }
         ],
         "network": [
@@ -89,9 +79,14 @@
         "longest_line": 260089,
         "avg_line_length": 50,
         "minified": true,
+        "minified_files": [
+          "package/dist/index.cjs",
+          "package/dist/request-context.cjs",
+          "package/dist/server.cjs"
+        ],
         "base64_bytes": 8124,
         "escape_heavy_files": 0,
-        "caveat": "the shipped code is a bundle written for a machine; a pattern scan over it can show presence, never absence",
+        "caveat": "3 of 22 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
         "tarball_bytes": 2187615,
         "truncated": true
       }
@@ -131,6 +126,7 @@
         "longest_line": 245,
         "avg_line_length": 47,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -180,6 +176,7 @@
         "longest_line": 153,
         "avg_line_length": 28,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -190,13 +187,6 @@
     "npm:@anyproto/anytype-mcp@1.2.8": {
       "checked_at": "2026-09-17",
       "found": {
-        "shell": [
-          {
-            "file": "package/bin/cli.mjs",
-            "line": 3,
-            "match": "exec("
-          }
-        ],
         "network": [
           {
             "file": "package/bin/cli.mjs",
@@ -275,9 +265,12 @@
         "longest_line": 159803,
         "avg_line_length": 153,
         "minified": true,
+        "minified_files": [
+          "package/bin/cli.mjs"
+        ],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
-        "caveat": "the shipped code is a bundle written for a machine; a pattern scan over it can show presence, never absence",
+        "caveat": "1 of 29 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
         "tarball_bytes": 270723,
         "truncated": false
       }
@@ -285,23 +278,6 @@
     "npm:@apify/actors-mcp-server@0.10.1": {
       "checked_at": "2026-09-17",
       "found": {
-        "shell": [
-          {
-            "file": "package/dist/web/dist/actor-detail-widget.js",
-            "line": 9,
-            "match": "exec("
-          },
-          {
-            "file": "package/dist/web/dist/actor-run-widget.js",
-            "line": 9,
-            "match": "exec("
-          },
-          {
-            "file": "package/dist/web/dist/search-actors-widget.js",
-            "line": 9,
-            "match": "exec("
-          }
-        ],
         "network": [
           {
             "file": "package/dist/web/dist/actor-detail-widget.js",
@@ -378,9 +354,14 @@
         "longest_line": 217564,
         "avg_line_length": 189,
         "minified": true,
+        "minified_files": [
+          "package/dist/web/dist/actor-detail-widget.js",
+          "package/dist/web/dist/actor-run-widget.js",
+          "package/dist/web/dist/search-actors-widget.js"
+        ],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
-        "caveat": "the shipped code is a bundle written for a machine; a pattern scan over it can show presence, never absence",
+        "caveat": "3 of 185 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
         "tarball_bytes": 1582072,
         "truncated": false
       }
@@ -429,13 +410,6 @@
             "match": "readFile("
           }
         ],
-        "shell": [
-          {
-            "file": "package/dist/shared/tool-validation.js",
-            "line": 67,
-            "match": "exec("
-          }
-        ],
         "install_script": [
           {
             "file": "package.json",
@@ -456,6 +430,7 @@
         "longest_line": 468,
         "avg_line_length": 55,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -502,6 +477,7 @@
         "longest_line": 176,
         "avg_line_length": 33,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -568,6 +544,7 @@
         "longest_line": 841,
         "avg_line_length": 36,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -607,6 +584,7 @@
         "longest_line": 432,
         "avg_line_length": 36,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -706,10 +684,16 @@
         "bytes": 648912,
         "longest_line": 3289,
         "avg_line_length": 45,
-        "minified": false,
+        "minified": true,
+        "minified_files": [
+          "package/dist/tools/sdk-utils/common/constants.d.ts",
+          "package/dist/tools/sdk-utils/percy-automate/constants.d.ts",
+          "package/dist/tools/sdk-utils/percy-bstack/constants.d.ts",
+          "package/dist/tools/sdk-utils/percy-web/constants.d.ts"
+        ],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
-        "caveat": "a pattern scan can show presence, never absence",
+        "caveat": "4 of 272 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
         "tarball_bytes": 159512,
         "truncated": false
       }
@@ -788,6 +772,7 @@
         "longest_line": 191,
         "avg_line_length": 29,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -859,6 +844,7 @@
         "longest_line": 435,
         "avg_line_length": 43,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -912,6 +898,7 @@
         "longest_line": 274,
         "avg_line_length": 29,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -937,6 +924,7 @@
         "longest_line": 718,
         "avg_line_length": 30,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -954,6 +942,7 @@
         "longest_line": 299,
         "avg_line_length": 36,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -996,6 +985,7 @@
         "longest_line": 572,
         "avg_line_length": 35,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -1021,6 +1011,7 @@
         "longest_line": 0,
         "avg_line_length": 0,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -1031,13 +1022,6 @@
     "npm:@daghis/teamcity-mcp@2.12.1": {
       "checked_at": "2026-09-17",
       "found": {
-        "shell": [
-          {
-            "file": "package/dist/index.js",
-            "line": 4125,
-            "match": "exec("
-          }
-        ],
         "network": [
           {
             "file": "package/dist/index.js",
@@ -1067,6 +1051,7 @@
         "longest_line": 396,
         "avg_line_length": 38,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -1077,13 +1062,6 @@
     "npm:@delorenj/mcp-server-trello@1.7.1": {
       "checked_at": "2026-09-17",
       "found": {
-        "shell": [
-          {
-            "file": "package/build/index.js",
-            "line": 2734,
-            "match": "exec("
-          }
-        ],
         "network": [
           {
             "file": "package/build/index.js",
@@ -1127,6 +1105,7 @@
         "longest_line": 1182,
         "avg_line_length": 32,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -1166,6 +1145,7 @@
         "longest_line": 107,
         "avg_line_length": 25,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -1219,9 +1199,12 @@
         "longest_line": 72296,
         "avg_line_length": 41,
         "minified": true,
+        "minified_files": [
+          "package/index.js"
+        ],
         "base64_bytes": 144292,
         "escape_heavy_files": 0,
-        "caveat": "the shipped code is a bundle written for a machine; a pattern scan over it can show presence, never absence",
+        "caveat": "1 of 1 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
         "tarball_bytes": 1315269,
         "truncated": false
       }
@@ -1256,9 +1239,15 @@
         "longest_line": 11307,
         "avg_line_length": 420,
         "minified": true,
+        "minified_files": [
+          "package/bin/mcp-response-Bo-CZwgG.js",
+          "package/bin/resources-BxzOJggA.js",
+          "package/bin/teams-0Aha0RZz.js",
+          "package/bin/tools-BtN_Xrp3.js"
+        ],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
-        "caveat": "the shipped code is a bundle written for a machine; a pattern scan over it can show presence, never absence",
+        "caveat": "4 of 16 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
         "tarball_bytes": 35508,
         "truncated": false
       }
@@ -1273,6 +1262,7 @@
         "longest_line": 260,
         "avg_line_length": 33,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -1286,7 +1276,7 @@
         "shell": [
           {
             "file": "package/dist/bundle.js",
-            "line": 2793,
+            "line": 28139,
             "match": "exec("
           }
         ],
@@ -1347,9 +1337,12 @@
         "longest_line": 14133,
         "avg_line_length": 37,
         "minified": true,
+        "minified_files": [
+          "package/dist/bundle.js"
+        ],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
-        "caveat": "the shipped code is a bundle written for a machine; a pattern scan over it can show presence, never absence",
+        "caveat": "1 of 1 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
         "tarball_bytes": 301060,
         "truncated": false
       }
@@ -1398,9 +1391,12 @@
         "longest_line": 12418,
         "avg_line_length": 44,
         "minified": true,
+        "minified_files": [
+          "package/server/prompts/experiment-prompts.js"
+        ],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
-        "caveat": "the shipped code is a bundle written for a machine; a pattern scan over it can show presence, never absence",
+        "caveat": "1 of 17 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
         "tarball_bytes": 41023,
         "truncated": false
       }
@@ -1508,6 +1504,7 @@
         "longest_line": 323,
         "avg_line_length": 44,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -1545,6 +1542,7 @@
         "longest_line": 234,
         "avg_line_length": 37,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -1591,6 +1589,7 @@
         "longest_line": 338,
         "avg_line_length": 36,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -1628,6 +1627,7 @@
         "longest_line": 184,
         "avg_line_length": 36,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -1686,6 +1686,7 @@
         "longest_line": 191,
         "avg_line_length": 31,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -1762,6 +1763,7 @@
         "longest_line": 4446,
         "avg_line_length": 46,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 17184,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -1828,9 +1830,12 @@
         "longest_line": 5498,
         "avg_line_length": 39,
         "minified": true,
+        "minified_files": [
+          "package/dist/auth/ConsentPage.js"
+        ],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
-        "caveat": "the shipped code is a bundle written for a machine; a pattern scan over it can show presence, never absence",
+        "caveat": "1 of 44 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
         "tarball_bytes": 146232,
         "truncated": false
       }
@@ -1894,9 +1899,12 @@
         "longest_line": 5413,
         "avg_line_length": 43,
         "minified": true,
+        "minified_files": [
+          "package/dist/tools/get-tiny-image.js"
+        ],
         "base64_bytes": 5380,
         "escape_heavy_files": 0,
-        "caveat": "the shipped code is a bundle written for a machine; a pattern scan over it can show presence, never absence",
+        "caveat": "1 of 36 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
         "tarball_bytes": 43481,
         "truncated": false
       }
@@ -1948,6 +1956,7 @@
         "longest_line": 365,
         "avg_line_length": 42,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -1994,6 +2003,7 @@
         "longest_line": 128,
         "avg_line_length": 40,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -2026,6 +2036,7 @@
         "longest_line": 127,
         "avg_line_length": 43,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -2051,6 +2062,7 @@
         "longest_line": 233,
         "avg_line_length": 42,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -2122,6 +2134,7 @@
         "longest_line": 708,
         "avg_line_length": 38,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -2159,6 +2172,7 @@
         "longest_line": 359,
         "avg_line_length": 42,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -2169,13 +2183,6 @@
     "npm:@notionhq/notion-mcp-server@2.2.1": {
       "checked_at": "2026-09-17",
       "found": {
-        "shell": [
-          {
-            "file": "package/bin/cli.mjs",
-            "line": 10,
-            "match": "exec("
-          }
-        ],
         "network": [
           {
             "file": "package/bin/cli.mjs",
@@ -2259,9 +2266,12 @@
         "longest_line": 581987,
         "avg_line_length": 266,
         "minified": true,
+        "minified_files": [
+          "package/bin/cli.mjs"
+        ],
         "base64_bytes": 0,
         "escape_heavy_files": 1,
-        "caveat": "the shipped code is a bundle written for a machine; a pattern scan over it can show presence, never absence",
+        "caveat": "1 of 21 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
         "tarball_bytes": 1623029,
         "truncated": false
       }
@@ -2291,6 +2301,7 @@
         "longest_line": 204,
         "avg_line_length": 34,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -2376,6 +2387,7 @@
         "longest_line": 192,
         "avg_line_length": 35,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -2427,6 +2439,7 @@
         "longest_line": 123,
         "avg_line_length": 32,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -2444,6 +2457,7 @@
         "longest_line": 157,
         "avg_line_length": 31,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -2495,6 +2509,7 @@
         "longest_line": 1547,
         "avg_line_length": 43,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -2541,11 +2556,6 @@
         ],
         "shell": [
           {
-            "file": "package/dist/results/diffFormat.js",
-            "line": 28,
-            "match": "exec("
-          },
-          {
             "file": "package/dist/config/loadConfig.js",
             "line": 3,
             "match": "from 'child_process'"
@@ -2585,6 +2595,7 @@
         "longest_line": 1322,
         "avg_line_length": 39,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -2651,6 +2662,7 @@
         "longest_line": 335,
         "avg_line_length": 35,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -2676,9 +2688,12 @@
         "longest_line": 18153,
         "avg_line_length": 118,
         "minified": true,
+        "minified_files": [
+          "package/dist/regle-mcp-server.js"
+        ],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
-        "caveat": "the shipped code is a bundle written for a machine; a pattern scan over it can show presence, never absence",
+        "caveat": "1 of 2 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
         "tarball_bytes": 67110,
         "truncated": false
       }
@@ -2718,6 +2733,7 @@
         "longest_line": 190,
         "avg_line_length": 44,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -2750,6 +2766,7 @@
         "longest_line": 718,
         "avg_line_length": 32,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -2772,8 +2789,8 @@
             "match": "exec("
           },
           {
-            "file": "package/lib/utils/registry-utils.js",
-            "line": 108,
+            "file": "package/lib/tools/enable_tools.d.ts",
+            "line": 22,
             "match": "exec("
           }
         ],
@@ -2816,6 +2833,7 @@
         "longest_line": 300,
         "avg_line_length": 39,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -2883,9 +2901,12 @@
         "longest_line": 217695,
         "avg_line_length": 2517,
         "minified": true,
+        "minified_files": [
+          "package/dist/index.js"
+        ],
         "base64_bytes": 7672,
         "escape_heavy_files": 0,
-        "caveat": "the shipped code is a bundle written for a machine; a pattern scan over it can show presence, never absence",
+        "caveat": "1 of 1 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
         "tarball_bytes": 1302619,
         "truncated": false
       }
@@ -2981,6 +3002,7 @@
         "longest_line": 2016,
         "avg_line_length": 37,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -3061,19 +3083,19 @@
         ],
         "shell": [
           {
-            "file": "package/dist/src/__tests__/context.test.js",
-            "line": 253,
+            "file": "package/dist/src/index.js",
+            "line": 10,
+            "match": "from 'child_process'"
+          },
+          {
+            "file": "package/dist/tests/unit/install-helpers.test.js",
+            "line": 378,
             "match": "exec("
           },
           {
-            "file": "package/dist/src/audit/edit-suggester.js",
-            "line": 305,
-            "match": "exec("
-          },
-          {
-            "file": "package/dist/tests/health.test.js",
-            "line": 113,
-            "match": "exec("
+            "file": "package/dist/src/tools/publish.helpers.js",
+            "line": 6,
+            "match": "from 'child_process'"
           }
         ]
       },
@@ -3084,6 +3106,7 @@
         "longest_line": 725,
         "avg_line_length": 42,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -3150,6 +3173,7 @@
         "longest_line": 475,
         "avg_line_length": 41,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -3237,11 +3261,6 @@
         ],
         "shell": [
           {
-            "file": "package/dist/generated/hack.js",
-            "line": 18,
-            "match": "exec("
-          },
-          {
             "file": "package/test-calendar-fix.js",
             "line": 6,
             "match": "from 'child_process'"
@@ -3260,6 +3279,7 @@
         "longest_line": 1181,
         "avg_line_length": 44,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -3290,6 +3310,7 @@
         "longest_line": 196,
         "avg_line_length": 40,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -3332,9 +3353,21 @@
         "longest_line": 16069,
         "avg_line_length": 61,
         "minified": true,
+        "minified_files": [
+          "package/dist/chunk-EVDY7FB4.cjs",
+          "package/dist/chunk-LYI5DEVZ.cjs",
+          "package/dist/chunk-QX2UXNCU.cjs",
+          "package/dist/index.cjs",
+          "package/dist/platform/index.cjs",
+          "package/dist/transports/stdio.cjs",
+          "package/dist/chunk-IO3RHCXN.js",
+          "package/dist/chunk-OCWOYE3R.js",
+          "package/dist/chunk-VCRYYVOD.js",
+          "package/dist/index.js"
+        ],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
-        "caveat": "the shipped code is a bundle written for a machine; a pattern scan over it can show presence, never absence",
+        "caveat": "10 of 26 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
         "tarball_bytes": 120836,
         "truncated": false
       }
@@ -3384,9 +3417,21 @@
         "longest_line": 83426,
         "avg_line_length": 16925,
         "minified": true,
+        "minified_files": [
+          "package/build/tools/attachment.js",
+          "package/build/services/clickup/audit-logs.js",
+          "package/build/tools/audit-logs.js",
+          "package/build/middleware/auth.js",
+          "package/build/services/clickup/base.js",
+          "package/build/tools/task/bulk-operations.js",
+          "package/build/services/clickup/bulk.js",
+          "package/build/utils/cache.js",
+          "package/build/tools/categories.js",
+          "package/build/services/clickup/chat.js"
+        ],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
-        "caveat": "the shipped code is a bundle written for a machine; a pattern scan over it can show presence, never absence",
+        "caveat": "92 of 94 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
         "tarball_bytes": 476019,
         "truncated": false
       }
@@ -3397,8 +3442,8 @@
         "shell": [
           {
             "file": "package/dist/index.js",
-            "line": 5440,
-            "match": "exec("
+            "line": 8097,
+            "match": "execSync("
           }
         ],
         "network": [
@@ -3444,6 +3489,7 @@
         "longest_line": 432,
         "avg_line_length": 34,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -3461,6 +3507,7 @@
         "longest_line": 162,
         "avg_line_length": 43,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -3522,6 +3569,7 @@
         "longest_line": 893,
         "avg_line_length": 43,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -3578,6 +3626,7 @@
         "longest_line": 297,
         "avg_line_length": 41,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -3627,6 +3676,7 @@
         "longest_line": 232,
         "avg_line_length": 40,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -3669,18 +3719,6 @@
             "file": "package/lib/tools/create_integration_card/create_integration_card.js",
             "line": 72,
             "match": "readFile("
-          }
-        ],
-        "shell": [
-          {
-            "file": "package/lib/tools/get_api_reference/lib/apiReferenceResources.js",
-            "line": 18,
-            "match": "exec("
-          },
-          {
-            "file": "package/lib/resources/documentation/getDocumentation.js",
-            "line": 36,
-            "match": "exec("
           }
         ],
         "env_access": [
@@ -3727,6 +3765,7 @@
         "longest_line": 344,
         "avg_line_length": 39,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -3786,6 +3825,7 @@
         "longest_line": 525,
         "avg_line_length": 44,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -3825,6 +3865,7 @@
         "longest_line": 443,
         "avg_line_length": 39,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -3874,6 +3915,7 @@
         "longest_line": 240,
         "avg_line_length": 37,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -3891,6 +3933,7 @@
         "longest_line": 0,
         "avg_line_length": 0,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -3921,6 +3964,7 @@
         "longest_line": 1107,
         "avg_line_length": 34,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -3946,6 +3990,7 @@
         "longest_line": 175,
         "avg_line_length": 29,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -3980,14 +4025,14 @@
             "match": "from \"node:child_process\""
           },
           {
-            "file": "package/build/index.js",
-            "line": 7745,
-            "match": "exec("
-          },
-          {
             "file": "package/build/test/utils/server-launcher.js",
             "line": 5,
             "match": "from \"child_process\""
+          },
+          {
+            "file": "package/build/test/streamable-http-static-token-auth.test.js",
+            "line": 2,
+            "match": "from \"node:child_process\""
           }
         ],
         "env_access": [
@@ -4056,6 +4101,7 @@
         "longest_line": 4383,
         "avg_line_length": 44,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -4088,6 +4134,7 @@
         "longest_line": 313,
         "avg_line_length": 36,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -4098,13 +4145,6 @@
     "npm:brave-search-mcp@2.1.0": {
       "checked_at": "2026-09-17",
       "found": {
-        "shell": [
-          {
-            "file": "package/dist/index.js",
-            "line": 5,
-            "match": "exec("
-          }
-        ],
         "network": [
           {
             "file": "package/dist/index.js",
@@ -4134,9 +4174,12 @@
         "longest_line": 456986,
         "avg_line_length": 69504,
         "minified": true,
+        "minified_files": [
+          "package/dist/index.js"
+        ],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
-        "caveat": "the shipped code is a bundle written for a machine; a pattern scan over it can show presence, never absence",
+        "caveat": "1 of 1 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
         "tarball_bytes": 895772,
         "truncated": false
       }
@@ -4256,6 +4299,7 @@
         "longest_line": 4546,
         "avg_line_length": 38,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -4288,6 +4332,7 @@
         "longest_line": 724,
         "avg_line_length": 46,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -4354,6 +4399,7 @@
         "longest_line": 203,
         "avg_line_length": 41,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -4422,6 +4468,7 @@
         "longest_line": 549,
         "avg_line_length": 45,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -4464,6 +4511,7 @@
         "longest_line": 574,
         "avg_line_length": 32,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -4474,18 +4522,6 @@
     "npm:exa-mcp-server@3.2.1": {
       "checked_at": "2026-09-17",
       "found": {
-        "shell": [
-          {
-            "file": "package/smithery/shttp/index.cjs",
-            "line": 9,
-            "match": "exec("
-          },
-          {
-            "file": "package/smithery/stdio/index.cjs",
-            "line": 6,
-            "match": "exec("
-          }
-        ],
         "network": [
           {
             "file": "package/smithery/shttp/index.cjs",
@@ -4551,9 +4587,13 @@
         "longest_line": 594413,
         "avg_line_length": 4435,
         "minified": true,
+        "minified_files": [
+          "package/smithery/shttp/index.cjs",
+          "package/smithery/stdio/index.cjs"
+        ],
         "base64_bytes": 0,
         "escape_heavy_files": 1,
-        "caveat": "the shipped code is a bundle written for a machine; a pattern scan over it can show presence, never absence",
+        "caveat": "2 of 2 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
         "tarball_bytes": 930037,
         "truncated": false
       }
@@ -4590,6 +4630,7 @@
         "longest_line": 341,
         "avg_line_length": 38,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -4663,6 +4704,7 @@
         "longest_line": 2126,
         "avg_line_length": 48,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -4748,6 +4790,7 @@
         "longest_line": 858,
         "avg_line_length": 44,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -4831,6 +4874,7 @@
         "longest_line": 701,
         "avg_line_length": 30,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -4884,6 +4928,7 @@
         "longest_line": 249,
         "avg_line_length": 41,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -4909,6 +4954,7 @@
         "longest_line": 108,
         "avg_line_length": 34,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -4941,6 +4987,7 @@
         "longest_line": 316,
         "avg_line_length": 44,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -4990,6 +5037,7 @@
         "longest_line": 430,
         "avg_line_length": 39,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -5066,6 +5114,7 @@
         "longest_line": 809,
         "avg_line_length": 40,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -5132,6 +5181,7 @@
         "longest_line": 240,
         "avg_line_length": 39,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -5208,6 +5258,7 @@
         "longest_line": 286,
         "avg_line_length": 34,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -5228,11 +5279,6 @@
             "file": "package/dist/esm/setup/aiTool.js",
             "line": 6,
             "match": "from \"child_process\""
-          },
-          {
-            "file": "package/dist/cjs/ui/lib/tools/list-databases.js",
-            "line": 10,
-            "match": "exec("
           }
         ],
         "fs_read": [
@@ -5315,9 +5361,9 @@
             "match": "Keychain"
           },
           {
-            "file": "package/dist/cjs/common/logging/compositeLogger.js",
-            "line": 8,
-            "match": "Keychain"
+            "file": "package/dist/cjs/tools/atlas/connect/connectCluster.js",
+            "line": 98,
+            "match": "keychain"
           }
         ],
         "dynamic_code": [
@@ -5362,9 +5408,14 @@
         "longest_line": 1465485,
         "avg_line_length": 163,
         "minified": true,
+        "minified_files": [
+          "package/dist/cjs/ui/lib/tools/list-databases.js",
+          "package/dist/esm/ui/lib/tools/list-databases.js",
+          "package/dist/cjs/ui/lib/tools/list-databases.d.ts"
+        ],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
-        "caveat": "the shipped code is a bundle written for a machine; a pattern scan over it can show presence, never absence",
+        "caveat": "3 of 572 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
         "tarball_bytes": 1832823,
         "truncated": true
       }
@@ -5391,18 +5442,8 @@
         ],
         "shell": [
           {
-            "file": "package/dist/mcp-server/tools/definitions/obsidian-write-note.tool.js",
-            "line": 159,
-            "match": "exec("
-          },
-          {
-            "file": "package/dist/services/obsidian/frontmatter-ops.js",
-            "line": 10,
-            "match": "exec("
-          },
-          {
             "file": "package/dist/services/obsidian/obsidian-service.js",
-            "line": 348,
+            "line": 396,
             "match": "exec("
           }
         ],
@@ -5421,6 +5462,7 @@
         "longest_line": 663,
         "avg_line_length": 49,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -5495,13 +5537,6 @@
             "line": 213,
             "match": "eval("
           }
-        ],
-        "shell": [
-          {
-            "file": "package/dist/utils/url.js",
-            "line": 84,
-            "match": "exec("
-          }
         ]
       },
       "coverage": {
@@ -5511,6 +5546,7 @@
         "longest_line": 339,
         "avg_line_length": 35,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -5543,6 +5579,7 @@
         "longest_line": 118,
         "avg_line_length": 32,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -5582,6 +5619,7 @@
         "longest_line": 107,
         "avg_line_length": 37,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -5621,6 +5659,7 @@
         "longest_line": 372,
         "avg_line_length": 49,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -5631,13 +5670,6 @@
     "npm:todoist-mcp@1.3.4": {
       "checked_at": "2026-09-17",
       "found": {
-        "shell": [
-          {
-            "file": "package/dist/utils/handlers.js",
-            "line": 62,
-            "match": "exec("
-          }
-        ],
         "env_access": [
           {
             "file": "package/dist/utils/helpers.js",
@@ -5660,6 +5692,7 @@
         "longest_line": 378,
         "avg_line_length": 36,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
@@ -5719,6 +5752,7 @@
         "longest_line": 692,
         "avg_line_length": 36,
         "minified": false,
+        "minified_files": [],
         "base64_bytes": 0,
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
