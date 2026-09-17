@@ -73,6 +73,8 @@ COMMON OPTIONS
   --offline         True offline verify mode; validate stored DB pins only
   --fail-unverified Treat "could not check" as a failure (verify)
   --deep            Download artifacts and hash them locally (verify)
+  --require-signatures  Unsigned npm release = failure (verify)
+  --require-provenance  No provenance attestation = failure (verify)
   --allow-unpinned  Allow install to write a launch command with no version pin
   --cwd <path>      Target project directory (scan / audit)
 

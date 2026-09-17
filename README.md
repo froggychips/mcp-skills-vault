@@ -145,6 +145,17 @@ Flags:
 | `--fail-unverified` | Treat `UNVERIFIED` (registry unreachable, unparsable install command, wheel-only PyPI release) as a hard failure. Implied by `--strict` |
 | `--entry <name>` | Check a single DB entry instead of all of them |
 | `--deep` | Download each artifact and hash it locally, instead of comparing the DB pin against metadata from the same registry that serves the tarball. Docker digests are verified by hashing the manifest |
+| `--require-signatures` | An npm release with no verifiable registry signature is a failure |
+| `--require-provenance` | An npm release with no provenance attestation is a failure |
+
+Every npm entry's registry signature is checked on every run: npm signs
+`<name>@<version>:<integrity>` with a published ECDSA key, so a response with a
+swapped `dist.integrity` cannot pass. 100 of the DB's 102 npm entries verify
+today; 45 also publish a provenance attestation, whose claimed source
+repository is compared against `source_url`. Provenance is reported as a claim,
+not a proof — verifying the sigstore bundle itself (Fulcio chain, Rekor
+inclusion) is not something this tool does, and it says so rather than implying
+otherwise.
 | `--json` | Structured report on stdout (progress goes to stderr); exit code unchanged |
 | `--sarif` | SARIF 2.1.0 for GitHub code scanning — each finding anchored to its `tools_database.json` line |
 

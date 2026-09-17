@@ -27,6 +27,8 @@
  *   node scripts/verify_integrity.cjs --entry NAME  check a single DB entry by name
  *   node scripts/verify_integrity.cjs --fail-unverified  UNVERIFIED → hard failure
  *   node scripts/verify_integrity.cjs --deep       download artifacts and hash them locally
+ *   node scripts/verify_integrity.cjs --require-signatures  unsigned npm release = failure
+ *   node scripts/verify_integrity.cjs --require-provenance  no provenance attestation = failure
  *   node scripts/verify_integrity.cjs --json       structured report on stdout
  *   node scripts/verify_integrity.cjs --sarif      SARIF 2.1.0 (GitHub code scanning)
  *
@@ -46,6 +48,9 @@
 const { getJson, postJson, mapLimit } = require('./lib/http.cjs');
 const { hashUrl, sriEqual, parseSri, ociManifestDigest } = require('./lib/artifact.cjs');
 const { parseImageRef, fetchManifest, ALLOWED_REGISTRIES } = require('./lib/oci.cjs');
+const {
+  verifyRegistrySignature, provenanceClaim, keysUrl,
+} = require('./lib/npm_signatures.cjs');
 const https       = require('https');
 const fs          = require('fs');
 const path        = require('path');
@@ -85,6 +90,11 @@ const DEEP = process.argv.includes('--deep');
 // (smaller) pool.
 const DEEP_CONCURRENCY = Math.max(1, Number(process.env.MCP_VAULT_DEEP_CONCURRENCY || 4));
 const DEEP_MAX_BYTES   = Math.max(1, Number(process.env.MCP_VAULT_DEEP_MAX_BYTES || 64 * 1024 * 1024));
+// A package the registry never signed, or that ships no provenance, is common
+// enough that flagging it by default would bury the real findings. These turn
+// "absent" into a failure for anyone who wants that bar.
+const REQUIRE_SIGNATURES = process.argv.includes('--require-signatures');
+const REQUIRE_PROVENANCE = process.argv.includes('--require-provenance');
 
 const INSTALL_HOOKS = ['preinstall', 'install', 'postinstall', 'prepare', 'prepack'];
 
@@ -291,6 +301,18 @@ async function deepCheckArtifact({ url, algo, registryIntegrity, storedIntegrity
     };
   }
   return { state: 'ok', message: `hashed ${hashed.bytes} bytes locally: ${hashed.sri.slice(0, 24)}…`, sri: hashed.sri, bytes: hashed.bytes };
+}
+
+// npm's signing keys. One request per run, cached for a day — they rotate on
+// the order of years, and a run that cannot fetch them reports signatures as
+// unverified rather than as failures.
+let registryKeysPromise = null;
+function fetchRegistryKeys() {
+  if (!registryKeysPromise) {
+    registryKeysPromise = getJson(keysUrl(NPM_REGISTRY), { cacheTtlMs: 24 * 60 * 60 * 1000 })
+      .then((r) => (r.ok ? r.data : null));
+  }
+  return registryKeysPromise;
 }
 
 // A scoped name keeps its slash encoded: /@scope%2fpkg/1.2.3
@@ -583,6 +605,55 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
   } else if (storedRepo && npmRepo.toLowerCase() !== storedRepo.toLowerCase() && !storedRepo.includes('/tree/')) {
     lines.push(['WARN', `repo mismatch\n        source_url: ${tool.source_url}\n        npm repo  : ${npmRepoRaw}`]);
     if (STRICT) failures++;
+  }
+
+  // Registry signature. npm signs `<name>@<version>:<integrity>` with a
+  // published ECDSA key, so this is a real cryptographic check: it proves the
+  // registry vouched for this exact integrity value, and a response with a
+  // swapped `dist.integrity` cannot pass it.
+  const keys = await fetchRegistryKeys();
+  const sig  = verifyRegistrySignature({
+    name:       meta.name || pkg,
+    version:    npmVersion,
+    integrity:  npmIntegrity,
+    signatures: meta.dist?.signatures,
+    keys,
+  });
+  if (sig.state === 'fail') {
+    lines.push(['FAIL', `registry signature does not verify — ${sig.reason}`]);
+    failures++;
+  } else if (sig.state === 'ok') {
+    lines.push(['SIG', `registry signature verified (${sig.keyid})`]);
+  } else if (REQUIRE_SIGNATURES) {
+    lines.push(['FAIL', `no verifiable registry signature — ${sig.reason}`]);
+    failures++;
+  } else {
+    lines.push(['NOTE', `registry signature not verified — ${sig.reason}`]);
+  }
+
+  // Provenance. Reported as a *claim*: verifying a sigstore bundle properly
+  // means a Fulcio chain and a Rekor inclusion proof, which this tool does not
+  // do, and saying "verified" without doing it would be worse than not saying
+  // it. What is checked is whether the claim points at the repository the DB
+  // says this package comes from.
+  const attestationsUrl = meta.dist?.attestations?.url;
+  if (attestationsUrl) {
+    const att = await httpsGetJson(attestationsUrl, 10000, {}, CACHE_TTL_MS);
+    const claim = att ? provenanceClaim(att) : null;
+    if (!claim) {
+      lines.push(['NOTE', 'provenance attestation present but unreadable']);
+    } else {
+      const claimedRepo = normalizeGitUrl(claim.repository);
+      if (storedRepo && claimedRepo && claimedRepo.toLowerCase() !== storedRepo.toLowerCase()) {
+        lines.push(['WARN', `provenance names a different repository\n        source_url: ${tool.source_url}\n        provenance: ${claim.repository}`]);
+        if (STRICT) failures++;
+      } else {
+        lines.push(['PROV', `provenance claims ${claim.repository}${claim.workflowPath ? ` (${claim.workflowPath})` : ''} — claim read, not cryptographically verified`]);
+      }
+    }
+  } else if (REQUIRE_PROVENANCE) {
+    lines.push(['FAIL', 'no provenance attestation published for this version']);
+    failures++;
   }
 
   // --deep: hash what the registry would actually serve.

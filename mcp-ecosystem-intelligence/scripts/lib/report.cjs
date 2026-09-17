@@ -29,6 +29,8 @@ const TAG_LEVEL = {
   HOOK:       'warning',
   DIGEST:     'note',
   DEEP:       'note',
+  SIG:        'note',
+  PROV:       'note',
   NOTE:       'note',
 };
 
@@ -43,6 +45,8 @@ const TAG_RULE = {
   HOOK:       'install-hook',
   DIGEST:     'unpinned-image',
   DEEP:       'deep-verified',
+  SIG:        'signature-verified',
+  PROV:       'provenance-claim',
   NOTE:       'note',
 };
 
@@ -55,6 +59,8 @@ const RULE_HELP = {
   'install-hook':       'The package runs code at install time (preinstall/install/postinstall/prepare/prepack).',
   'unpinned-image':     'A container image is referenced by tag rather than by @sha256 digest.',
   'deep-verified':      'The artifact was downloaded and hashed locally; the bytes match both the registry metadata and the DB pin.',
+  'signature-verified': "The registry's signature over <name>@<version>:<integrity> verifies against a published npm key.",
+  'provenance-claim':   'A provenance attestation is published and names the source repository. The claim is read, not cryptographically verified.',
   'note':               'Informational.',
 };
 
