@@ -34,7 +34,10 @@
  *   mcp_eval.cjs --timeout <ms>         per-entry timeout (default 30000)
  *   mcp_eval.cjs --json                 machine-readable summary on stdout
  *   mcp_eval.cjs --no-spawn             schema-lint over existing eval_results.json (offline)
- *   mcp_eval.cjs --fail-surface-drift   exit 1 if a server's tool surface changed
+ *   mcp_eval.cjs --fail-surface-drift   exit 1 if any server's tool surface changed
+ *   mcp_eval.cjs --fail-unexplained-surface-drift
+ *                                       exit 1 only when a surface changed and the
+ *                                       artifact demonstrably did not
  *   mcp_eval.cjs --timeout <ms>         per-entry deadline (default 30s on the host,
  *                                       90s under --sandbox: a container starts cold)
  *   mcp_eval.cjs --sandbox              run each server in a locked-down container (needs docker)
@@ -171,10 +174,14 @@ function parseArgs(argv) {
     cwd:      process.cwd(),
     strict:   false,
     timeoutExplicit: false,
-    // A surface change on an unchanged artifact is the rug-pull shape. Off by
-    // default because an upgrade legitimately changes the surface; CI turns it
-    // on to make the unexplained case loud.
+    // Two different questions, so two flags. `--fail-surface-drift` fails on
+    // *any* change to a tool surface, which is a reasonable bar for a pinned
+    // production config. `--fail-unexplained-surface-drift` fails only when the
+    // surface moved and the artifact demonstrably did not — the narrower,
+    // more interesting case. The comment here used to describe the second while
+    // the code did the first.
     failSurfaceDrift: false,
+    failUnexplainedDrift: false,
     help:     false,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -196,6 +203,7 @@ function parseArgs(argv) {
       case '--results': opts.results = next; i++; break;
       case '--strict':  opts.strict  = true; break;
       case '--fail-surface-drift': opts.failSurfaceDrift = true; break;
+      case '--fail-unexplained-surface-drift': opts.failUnexplainedDrift = true; break;
       case '-h':
       case '--help':    opts.help    = true; break;
       default:
@@ -422,24 +430,59 @@ function artifactIdentity(tool, parsed) {
 }
 
 /**
+ * Which identity fields mean anything for a given artifact.
+ *
+ * An OCI image has no npm integrity value and no DB "version" in the semver
+ * sense — its digest *is* its identity, carried inside artifact_id. A git
+ * source install has neither. Demanding the same four fields everywhere would
+ * make every OCI comparison permanently `unknown`, which is its own kind of
+ * dishonesty: refusing to answer a question that can be answered.
+ */
+function relevantIdentityFields(identity) {
+  const id = (identity && identity.artifact_id) || '';
+  if (id.startsWith('oci:')) return ['artifact_id', 'launch_digest'];
+  if (id.startsWith('git:')) return ['artifact_id', 'launch_digest'];
+  if (!id) return ['artifact_id', 'launch_digest'];
+  return ['artifact_id', 'artifact_integrity', 'db_version', 'launch_digest'];
+}
+
+/**
  * Did the artifact change between two runs? yes / no / we cannot tell.
  *
- * The third answer is the point. The previous version compared
- * `launched.install_cmd` strings and treated a missing field as a change, so
- * a snapshot written without that field — which is exactly what the weekly
- * job wrote — made *every* surface change look like it came with a version
- * bump. That silently destroyed the one comparison this feature exists for.
+ * The aggregation is the subtle part, and the first version got it wrong in a
+ * way that reads as careful:
+ *
+ *   it compared only the fields present on *both* sides and, if those matched,
+ *   answered `false` — "the artifact did not change". But when the integrity
+ *   value and the launch digest were missing from one side, what it had
+ *   actually established was "the parts I could measure are unchanged", which
+ *   is not the same claim. A missing input had quietly become a value again,
+ *   one level down from where that bug was just fixed.
+ *
+ * So:
+ *   any field that differs on both sides         → true   (a proven change)
+ *   no difference, but a relevant field is absent → null   (cannot tell)
+ *   every relevant field present and equal        → false  (unchanged)
  */
 function artifactChangedBetween(prior, fresh) {
   const a = prior && prior.identity;
   const b = fresh && fresh.identity;
-  if (!a || !b) return null;                       // nothing recorded: unknown
-  const fields = ['artifact_id', 'artifact_integrity', 'db_version', 'launch_digest'];
-  // A field present on one side and absent on the other tells us nothing
-  // about that field; only two present, differing values are a change.
-  const comparable = fields.filter((f) => a[f] != null && b[f] != null);
-  if (!comparable.length) return null;
-  return comparable.some((f) => a[f] !== b[f]);
+  if (!a || !b) return null;
+
+  // Two different ecosystems is itself a change, and nothing else about them
+  // is comparable.
+  const ecosystemOf = (id) => String(id || '').split(':')[0] || null;
+  const ea = ecosystemOf(a.artifact_id);
+  const eb = ecosystemOf(b.artifact_id);
+  if (ea && eb && ea !== eb) return true;
+
+  const fields = relevantIdentityFields(b.artifact_id ? b : a);
+  let unknown = false;
+  for (const field of fields) {
+    if (a[field] == null || b[field] == null) { unknown = true; continue; }
+    if (a[field] !== b[field]) return true;
+  }
+  return unknown ? null : false;
 }
 
 function surfaceDrift(prior, fresh) {
@@ -1146,7 +1189,11 @@ async function main() {
   // produced the evidence it was asked for — under --strict that is a failure
   // regardless of how few entries got as far as failing.
   const incomplete = runAborted || notAttempted > 0 || sandboxUnavailable > 0;
-  const driftFails = opts.failSurfaceDrift && surfaceDrifted.length > 0;
+  const driftFails = (opts.failSurfaceDrift && surfaceDrifted.length > 0)
+    // Strictly the unexplained ones: a drift we could not attribute (`null`)
+    // is not evidence of anything, and failing a build on it would punish an
+    // old snapshot rather than a changed server.
+    || (opts.failUnexplainedDrift && unexplainedDrift.length > 0);
   exitAfterFlush((opts.strict && (fail > 0 || skippedLauncher > 0 || incomplete)) || driftFails ? 1 : 0);
 }
 
@@ -1159,6 +1206,7 @@ if (require.main === module) {
 
 module.exports = {
   artifactIdentity,
+  relevantIdentityFields,
   artifactChangedBetween,
   surfaceDrift,
   parseInstallCmd,

@@ -126,3 +126,35 @@ test('the CI snapshot writer keeps both surface and identity', () => {
     assert.ok(slim.includes(field), `the snapshot writer drops ${field}`);
   }
 });
+
+test('a partly-recorded identity cannot answer "unchanged"', () => {
+  // The subtler half of the same rule. Comparing only the fields present on
+  // both sides and answering `false` establishes "the parts I could measure
+  // are unchanged" — not "the artifact is unchanged". A missing input had
+  // become a value again, one level down from where it was just fixed.
+  const full    = { artifact_id: 'npm:p@1.0.0', artifact_integrity: 'sha512-A', db_version: '1.0.0', launch_digest: 'abc' };
+  const partial = { artifact_id: 'npm:p@1.0.0', artifact_integrity: null, db_version: '1.0.0', launch_digest: null };
+
+  assert.equal(e.artifactChangedBetween({ identity: full }, { identity: full }), false);
+  assert.equal(e.artifactChangedBetween({ identity: partial }, { identity: full }), null,
+    'the integrity value and the launch contract were never compared');
+  // A proven mismatch still outranks an unknown: one differing field is enough.
+  assert.equal(e.artifactChangedBetween({ identity: { ...partial, db_version: '0.9.0' } }, { identity: full }), true);
+});
+
+test('which fields are relevant depends on the ecosystem', () => {
+  // An OCI image has no npm integrity value and no semver version — its digest
+  // *is* its identity. Demanding the npm field set everywhere would make every
+  // container comparison permanently "cannot tell", which is its own
+  // dishonesty: refusing to answer a question that can be answered.
+  const oci = { artifact_id: 'oci:ghcr.io/o/r@sha256:aa', artifact_integrity: null, db_version: null, launch_digest: 'd1' };
+  assert.deepEqual(e.relevantIdentityFields(oci), ['artifact_id', 'launch_digest']);
+  assert.equal(e.artifactChangedBetween({ identity: oci }, { identity: oci }), false);
+  assert.equal(
+    e.artifactChangedBetween({ identity: { ...oci, artifact_id: 'oci:ghcr.io/o/r@sha256:bb' } }, { identity: oci }),
+    true,
+  );
+  // And an entry that changed ecosystem entirely is a change, not a puzzle.
+  const npm = { artifact_id: 'npm:p@1.0.0', artifact_integrity: 'sha512-A', db_version: '1.0.0', launch_digest: 'abc' };
+  assert.equal(e.artifactChangedBetween({ identity: npm }, { identity: oci }), true);
+});

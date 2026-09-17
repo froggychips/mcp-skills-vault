@@ -271,6 +271,21 @@ async function checkEntry(tool, { osv = osvFor, published = publishedVersions } 
   }
 
   const pub = await published(eco, pkg);
+  if (!pub.ok) {
+    // The registry did not answer. Without the version list the planner would
+    // reason from an empty one and conclude "a fix exists in 2.0.0, but no
+    // published version reaches it" — turning an outage into a verdict, in the
+    // one command that tells people what to install. `could not check` is not
+    // `checked and found nothing`, and this is the command where that
+    // distinction costs the most.
+    row.plan = {
+      state: 'unknown',
+      advisories: fixedVersions(now.vulns, pkg),
+      reason: `the package registry did not answer: ${pub.error}`,
+    };
+    return row;
+  }
+
   const plan = planUpgrade({
     ecosystem: eco, pkg, current: tool.version, vulns: now.vulns,
     published: pub.versions, allowPrerelease: false,

@@ -283,19 +283,34 @@ function diffCapabilities(before, after) {
   const added = [...b].filter((cap) => !a.has(cap)).sort();
   const removed = [...a].filter((cap) => !b.has(cap)).sort();
 
-  // Coverage can only be compared when both sides recorded it. A stored record
-  // without it produced an invented transition — "readable → readable, 0 → 38
-  // bytes" — stated as fact, which is the same failure as the surface
-  // comparison that treated a missing identity as a change. Missing means
-  // *unknown*, and unknown is its own answer.
+  // Coverage is two questions, and they can be answerable separately: "did the
+  // readable/minified shape change" and "did the amount of code change". The
+  // first fix here made the *block* tri-state but left the components
+  // aggregated as a boolean, so a record with `minified` and no `bytes`
+  // answered `false` — "coverage unchanged" — while the byte comparison had
+  // not happened. Same bug, one level down. Each component now carries its own
+  // unknown, and the overall answer is the weakest of them.
   const beforeCov = (before && before.coverage) || null;
   const afterCov  = (after && after.coverage) || null;
-  const comparable = Boolean(beforeCov && afterCov
-    && typeof beforeCov.minified === 'boolean' && typeof afterCov.minified === 'boolean');
-  const coverageChanged = comparable
-    ? (beforeCov.minified !== afterCov.minified
-      || Boolean(beforeCov.bytes && afterCov.bytes && Math.abs(afterCov.bytes - beforeCov.bytes) / beforeCov.bytes > 0.5))
+
+  const minifiedChanged = (beforeCov && afterCov
+    && typeof beforeCov.minified === 'boolean' && typeof afterCov.minified === 'boolean')
+    ? beforeCov.minified !== afterCov.minified
     : null;
+
+  const bytesChanged = (beforeCov && afterCov
+    && Number.isFinite(beforeCov.bytes) && Number.isFinite(afterCov.bytes) && beforeCov.bytes > 0)
+    ? Math.abs(afterCov.bytes - beforeCov.bytes) / beforeCov.bytes > 0.5
+    : null;
+
+  const parts = [minifiedChanged, bytesChanged];
+  const coverageChanged = parts.some((x) => x === true) ? true
+    : (parts.some((x) => x === null) ? null : false);
+
+  const uncomparable = [
+    minifiedChanged === null ? 'whether the code is minified' : null,
+    bytesChanged === null ? 'how much code there is' : null,
+  ].filter(Boolean);
 
   return {
     added: added.map((cap) => ({
@@ -310,8 +325,11 @@ function diffCapabilities(before, after) {
       note: 'stopped matching — this may mean the code changed, or only that it became harder to read',
     })),
     coverage_changed: coverageChanged,
+    // Reported per component, so "unchanged" never covers for a comparison
+    // that did not happen.
+    coverage_detail: { minified_changed: minifiedChanged, bytes_changed: bytesChanged },
     coverage_note: coverageChanged === null
-      ? 'one of the two scans recorded no coverage, so how much of the code was readable cannot be compared'
+      ? `the two scans cannot be compared on ${uncomparable.join(' or ')} — one of them did not record it`
       : (coverageChanged
         ? `what was scanned changed shape (${beforeCov.minified ? 'minified' : 'readable'} → ${afterCov.minified ? 'minified' : 'readable'}, `
           + `${beforeCov.bytes || 0} → ${afterCov.bytes || 0} bytes), so the comparison is weaker than usual`

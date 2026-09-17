@@ -206,3 +206,21 @@ test('coverage comparisons still work when both sides have one', () => {
   assert.equal(c.diffCapabilities(readable, bundle).coverage_changed, true);
   assert.match(c.diffCapabilities(readable, bundle).coverage_note, /readable → minified/);
 });
+
+test('each half of the coverage comparison carries its own unknown', () => {
+  // Making the *block* tri-state was not enough: a record with `minified` and
+  // no `bytes` answered "coverage unchanged" while the byte comparison had
+  // never happened. Same bug, one level down.
+  const after = c.detect([file('a.js', 'const y = 2;')]);
+  const minifiedOnly = { found: {}, coverage: { minified: false } };
+  const d = c.diffCapabilities(minifiedOnly, after);
+  assert.equal(d.coverage_changed, null);
+  assert.deepEqual(d.coverage_detail, { minified_changed: false, bytes_changed: null });
+  assert.match(d.coverage_note, /how much code there is/);
+
+  // Both sides complete: a real answer, per component.
+  const before = c.detect([file('a.js', 'const x = 1;')]);
+  const full = c.diffCapabilities(before, before);
+  assert.equal(full.coverage_changed, false);
+  assert.deepEqual(full.coverage_detail, { minified_changed: false, bytes_changed: false });
+});

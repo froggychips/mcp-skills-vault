@@ -226,3 +226,20 @@ test('an unreachable advisory feed for the current version is unknown, never cle
   assert.equal(row.plan.state, 'unknown');
   assert.match(row.plan.reason, /OSV did not answer/);
 });
+
+test('a package registry that did not answer is unknown, never "no fix"', async () => {
+  // The symmetric case to an unreachable OSV, and the more dangerous one: with
+  // no version list the planner reasons from an empty one and reports "a fix
+  // exists in 2.0.0, but no published version reaches it" — an outage stated
+  // as a verdict, in the command that tells people what to install.
+  const tool = { name: 'x', install_cmd: 'npx -y pkg@1.0.0', version: '1.0.0' };
+  const row = await u.checkEntry(tool, {
+    osv: async () => ({ ok: true, vulns: [vulnAt('GHSA-a', '2.0.0')] }),
+    published: async () => ({ ok: false, versions: [], error: 'HTTP 503' }),
+  });
+  assert.equal(row.plan.state, 'unknown');
+  assert.match(row.plan.reason, /registry did not answer/);
+  assert.match(row.plan.reason, /503/);
+  // The advisories are still reported — those *were* established.
+  assert.deepEqual(row.plan.advisories.map((a) => a.id), ['GHSA-a']);
+});
