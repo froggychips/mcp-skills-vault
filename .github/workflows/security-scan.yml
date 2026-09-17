@@ -84,6 +84,10 @@ jobs:
           JAIL_IMAGE: node:22-alpine
         # Bash expands the glob into a file list before node sees it;
         # node --test in Node 20 doesn't glob-expand quoted patterns itself.
+        # The run is teed to RUNNER_TEMP so the next step can read the count
+        # without executing anything: a second `node --test` would double the
+        # runtime and, on a PR, would be a second unjailed execution of PR code.
+        # `pipefail` is set, so tee cannot mask a failing suite.
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" = "pull_request" ]; then
@@ -92,9 +96,34 @@ jobs:
               --cap-drop ALL --security-opt no-new-privileges \
               --memory 2g --pids-limit 512 \
               -v "$PWD":/w:ro -w /w "$JAIL_IMAGE" \
-              node --test tests/*.test.cjs
+              node --test tests/*.test.cjs | tee "$RUNNER_TEMP/test-output.txt"
           else
-            node --test tests/*.test.cjs
+            node --test tests/*.test.cjs | tee "$RUNNER_TEMP/test-output.txt"
+          fi
+      # The test count is on the README badge, and tests/docs_numbers.test.cjs
+      # cannot check it: counting `test(` calls statically misses the 30 that
+      # are generated in loops, and running the suite inside the suite is not a
+      # thing to do. So it is read out of the run that just happened — this step
+      # executes no repository code, only `sed` over two files. Advisory: a
+      # stale badge is a documentation bug, not a reason to fail a green build.
+      - name: README test badge matches the suite
+        if: always()
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          # Two reporters, two prefixes: `node --test` prints "ℹ pass 675" by
+          # default and "# pass 675" under TAP. Matching only the TAP form
+          # silently produced "unknown" and compared nothing.
+          count=$(grep -oE '(^#|ℹ) pass [0-9]+' "$RUNNER_TEMP/test-output.txt" | grep -oE '[0-9]+' | tail -1)
+          badge=$(sed -n 's/.*badge\/tests-\([0-9]*\)%20pass.*/\1/p' README.md | head -1)
+          echo "suite: ${count:-unknown} | badge: ${badge:-none}"
+          if [ -n "${count:-}" ] && [ "${count}" != "${badge}" ]; then
+            echo "::warning file=README.md::the tests badge says ${badge}, the suite has ${count}"
+            {
+              echo "## Tests badge"
+              echo
+              echo "README says **${badge}**, the suite ran **${count}**. Update the badge in README.md."
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
   smoke:
@@ -235,6 +264,82 @@ jobs:
             }
             require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
           '
+      - name: Registry identity (official MCP registry)
+        id: identity
+        continue-on-error: true
+        run: |
+          node mcp-ecosystem-intelligence/scripts/check_identity.cjs --write --json > /tmp/identity.json || true
+          node -e '
+            const r = require("/tmp/identity.json");
+            const s = r.summary;
+            const rows = r.entries.filter((e) => ["contradicted", "withdrawn"].includes(e.registry.state));
+            const lines = [
+              "## Registry identity",
+              "",
+              `${r.checked} entries — ${s.listed} listed under an ownership-verified namespace, ${s.unlisted} not listed, ${s.contradicted} contradicted, ${s.withdrawn} withdrawn, ${s.unknown} not checkable.`,
+              "",
+              "Being unlisted is not a finding: listing is opt-in.",
+              "",
+            ];
+            if (rows.length) {
+              lines.push("| entry | state | finding |", "| --- | --- | --- |");
+              for (const e of rows) lines.push(`| ${e.name} | ${e.registry.state} | ${(e.registry.findings[0] || "").replace(/\|/g, "\\|").slice(0, 160)} |`);
+            }
+            if (s.in_registry_flag_drift) {
+              lines.push("", `${s.in_registry_flag_drift} entries have an \`in_registry\` flag that disagrees with the live registry (it adds 30 points to health_score).`);
+            }
+            require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+          '
+      - name: Upstream repository posture (OpenSSF Scorecard)
+        continue-on-error: true
+        run: node mcp-ecosystem-intelligence/scripts/check_posture.cjs --write
+      # Capability delta. Only versions this refresh has not scanned before are
+      # fetched, so the cost tracks the version bumps rather than the DB size —
+      # and the interesting output is the *diff* of assets/capabilities.json,
+      # which is what lands in the PR.
+      - name: Capability scan + delta
+        id: capabilities
+        continue-on-error: true
+        run: |
+          node mcp-ecosystem-intelligence/scripts/check_capabilities.cjs --write --json > /tmp/caps.json || true
+          node -e '
+            const r = require("/tmp/caps.json");
+            const gained = (r.entries || []).filter((e) => e.delta && e.delta.added.length);
+            const lines = ["## Capability delta", ""];
+            if (!gained.length) {
+              lines.push(`${r.scanned} package(s) scanned; none gained a capability since the version last recorded.`);
+            } else {
+              lines.push(`${gained.length} of ${r.scanned} scanned packages gained a capability:`, "");
+              lines.push("| entry | version | gained | evidence |", "| --- | --- | --- | --- |");
+              for (const e of gained) {
+                for (const a of e.delta.added) {
+                  const ev = (a.evidence[0] || {});
+                  lines.push(`| ${e.name} | ${e.compared_with} → ${e.version} | ${a.high_risk ? `**${a.capability}**` : a.capability} | ${ev.file || ""}:${ev.line || "?"} |`);
+                }
+              }
+              lines.push("", "A capability *found* is a fact; nothing here claims a package cannot do something. Bold = high risk (shell, dynamic code, credential paths, install scripts).");
+            }
+            require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+          '
+      - name: Safe upgrade paths for anything with an advisory
+        continue-on-error: true
+        run: |
+          node mcp-ecosystem-intelligence/scripts/suggest_upgrade.cjs --json > /tmp/upgrade.json || true
+          node -e '
+            const r = require("/tmp/upgrade.json");
+            const rows = (r.entries || []).filter((e) => ["upgrade", "no-fix"].includes(e.plan.state));
+            const lines = ["## Advisories and the shortest safe version", ""];
+            if (!rows.length) {
+              lines.push(`${r.checked} entries — nothing known applies to any pinned version.`);
+            } else {
+              lines.push("| entry | pinned | clears at | advisories | latest |", "| --- | --- | --- | --- | --- |");
+              for (const e of rows) {
+                const p = e.plan;
+                lines.push(`| ${e.name} | ${e.current} | ${p.target || "**no fix**"} | ${(p.advisories || []).map((a) => a.id).join(", ")} | ${p.latest || "?"} |`);
+              }
+            }
+            require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+          '
       # The `mcp-eval-pr` gate below can never see the PR this job opens:
       # GitHub doesn't trigger workflows for PRs created with GITHUB_TOKEN, so
       # `on: pull_request` never fires and the PR lands showing
@@ -256,8 +361,17 @@ jobs:
           body: |
             Automated weekly refresh via:
             - `verify_integrity.cjs --update` — refreshes `version` + `pkg_integrity`
+            - `verify_integrity.cjs --deep --record-evidence` — dated evidence per dimension
             - `refresh_scores.cjs --write` — refreshes `stars`, `last_commit_days`,
               `open_issues`, `health_score`, `classification` from GitHub API
+            - `check_availability.cjs --write` — gone / yanked / deprecated / relocated
+            - `check_identity.cjs --write` — the official registry's ownership-verified listing
+            - `check_posture.cjs --write` — OpenSSF Scorecard for the upstream repo
+            - `check_capabilities.cjs --write` — what each package can do, and what it gained
+            - `suggest_upgrade.cjs` — the shortest version that clears any advisory
+
+            Read the job summary: it carries the availability, identity, capability-delta
+            and upgrade tables for this run.
 
             ## Reviewer checklist
             - [ ] Diff each version bump against the package's CHANGELOG / GitHub releases
@@ -265,6 +379,9 @@ jobs:
             - [ ] Confirm no entry switched maintainer / org silently
             - [ ] Check tier changes (Recommended → Experimental, etc.) — may need manual follow-up
             - [ ] Large star-count drops may indicate repo transfer or star-farming removal
+            - [ ] Read the **Capability delta** table: a new `shell`, `dynamic_code`,
+                  `credential_paths` or `install_script` in a patch release is the shape a
+                  compromised release takes before it has a CVE
             - [ ] Read the **Availability** table in the job summary: `gone` / `version-gone`
                   / `yanked` entries have had their trust downgraded and need re-pinning or
                   removal; `relocated` means the registry now points somewhere else
@@ -276,6 +393,7 @@ jobs:
           delete-branch: true
           add-paths: |
             mcp-ecosystem-intelligence/assets/tools_database.json
+            mcp-ecosystem-intelligence/assets/capabilities.json
 
   docker-drift:
     name: Docker @sha256 drift
@@ -537,6 +655,29 @@ jobs:
               }
             "
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Tool-surface drift
+        if: always()
+        run: |
+          node -e '
+            const run = require("./eval_results_run.json");
+            const drifted = (run.results || []).filter((r) => r.surface_drift);
+            const unexplained = drifted.filter((r) => !r.surface_drift.artifact_changed);
+            const lines = ["## Tool surface", ""];
+            if (!drifted.length) {
+              lines.push("No server changed the tools it exposes since the last run.");
+            } else {
+              lines.push(`${drifted.length} server(s) changed their tool surface; ${unexplained.length} did so **without the artifact changing**.`, "");
+              lines.push("| server | artifact | change |", "| --- | --- | --- |");
+              for (const r of drifted) {
+                const d = r.surface_drift;
+                lines.push(`| ${r.name} | ${d.artifact_changed ? "changed too" : "**unchanged**"} | ${d.lines.join("; ").replace(/\|/g, "\\|").slice(0, 160)} |`);
+              }
+              if (unexplained.length) {
+                lines.push("", "> The same artifact presenting a different tool surface has no innocent explanation for a pinned local server: either the launch is not deterministic, or the server was changed under whoever trusted it.");
+              }
+            }
+            require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+          '
       - name: Upload eval results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
@@ -565,9 +706,16 @@ jobs:
             // carry paths and tokens from a failing server.
             const slim = (r) => ({
               name: r.name, status: r.status, error_code: r.error_code || null,
+              failure_class: r.failure_class || null,
               tool_count: r.tool_count, tool_count_db: r.tool_count_db,
               tool_count_drift: r.tool_count_drift, tools_payload_bytes: r.tools_payload_bytes,
               boot_ms: r.boot_ms,
+              // The tool surface, hashed per tool. This is the baseline the next
+              // run diffs against, so dropping it here would mean a rug pull is
+              // never visible. Hashes only: a tool description is
+              // attacker-controlled text and must not land in this repository.
+              surface: r.surface || null,
+              surface_drift: r.surface_drift || null,
               // A count, under its own name: `schema_errors` is an array that
               // `mcp_eval --no-spawn` iterates, and turning it into a number
               // made that mode throw.

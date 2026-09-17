@@ -1,6 +1,6 @@
 ---
 name: mcp-ecosystem-intelligence
-description: Find, evaluate, and install MCP servers for a project. Use when the user asks "is there an MCP for X", "what MCP tools should I use here", "add MCP server for Y", "audit my MCP setup", "is package Z safe to install", or wants to wrap an existing CLI/API as MCP. Combines a seeded local database, registry-first discovery, a Health Score script, a supply-chain security scanner (sha512/sha256 integrity, install-hook detection, npm advisory + OSV.dev CVE check, Docker digest pinning) gating every install, and a concrete install path via direct edit of ~/.claude.json.
+description: Find, evaluate, and install MCP servers for a project. Use when the user asks "is there an MCP for X", "what MCP tools should I use here", "add MCP server for Y", "audit my MCP setup", "is package Z safe to install", or wants to wrap an existing CLI/API as MCP. Combines a seeded local database, registry-first discovery, a Health Score script, and a supply-chain security scanner gating every install (sha512/sha256 integrity, registry signatures, provenance bound to the artifact digest, 4 advisory feeds, install-hook and capability detection, Docker digest pinning, availability and ownership cross-checks), plus a behavioural smoke that decides whether a server is recommended at all, an upgrade planner for anything with an advisory, and a concrete install path for Claude Code, Claude Desktop, Cursor, VS Code or Codex.
 ---
 
 # MCP Ecosystem Intelligence
@@ -18,14 +18,29 @@ Steps marked **[scripted]** have a dedicated script you call via Bash. Steps mar
 3. Discovery (if miss)  → [scripted] node scripts/discover.cjs  (inbox only)
 4. Validate             → [scripted] node scripts/verify_integrity.cjs
                                      --deep hashes the artifact, --deps the tree,
-                                     signatures + provenance checked by default
-5. Score                → [scripted] health (calculate_health.cjs) + trust + fit
-                                     (lib/scores.cjs), trust gates the rest
-6. Reject heuristics    → [Claude]   apply 5-Minute / Bloat / Duplication rules
-7. Recommend            → [scripted] orchestrate.cjs --json carries the three axes
-8. Install (on consent) → [scripted] node scripts/orchestrate.cjs --install <name>
-                                     writes the verified version, any host
-9. Update DB            → [Claude]   append/update assets/tools_database.json
+                                     signatures + provenance checked by default;
+                                     provenance reaches `bound` when the
+                                     attestation's subject digest is this artifact
+5. Still published?     → [scripted] node scripts/check_availability.cjs
+                                     gone / version-gone / yanked / deprecated
+6. Who published it?    → [scripted] node scripts/check_identity.cjs
+                                     the official registry's verified namespace
+7. What can it do?      → [scripted] node scripts/check_capabilities.cjs
+                                     found-with-evidence; absence never recorded
+8. Score                → [scripted] health (calculate_health.cjs) + trust + fit
+                                     (lib/scores.cjs), trust gates the rest;
+                                     behaviour caps it (eval_results.json)
+9. Reject heuristics    → [Claude]   apply 5-Minute / Bloat / Duplication rules
+10. Recommend           → [scripted] orchestrate.cjs --json carries the axes
+                                     node scripts/explain.cjs <name> for one entry
+11. If an advisory      → [scripted] node scripts/suggest_upgrade.cjs --entry <n>
+                                     the shortest version that clears it
+12. Install (on consent)→ [scripted] node scripts/orchestrate.cjs --install <name>
+                                     writes the verified version, any host;
+                                     a context ceiling in policy is enforced here
+13. Freeze what runs    → [scripted] node scripts/lock.cjs [--vendor]
+                                     npx re-resolves the tree at every start
+14. Update DB           → [Claude]   append/update assets/tools_database.json
                                      evidence via verify --record-evidence
 ```
 

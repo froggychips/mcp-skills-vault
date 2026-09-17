@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@froggychips/mcp-vault.svg)](https://www.npmjs.com/package/@froggychips/mcp-vault)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Zero deps](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](./PHILOSOPHY.md)
-[![Tests](https://img.shields.io/badge/tests-535%20pass-brightgreen.svg)](./tests)
+[![Tests](https://img.shields.io/badge/tests-675%20pass-brightgreen.svg)](./tests)
 
 **Homepage:** [mcp.froggychips.xyz](https://mcp.froggychips.xyz) · **npm:** [`@froggychips/mcp-vault`](https://www.npmjs.com/package/@froggychips/mcp-vault)
 
@@ -38,7 +38,7 @@ $ npx -y @froggychips/mcp-vault verify --offline
 | | Without | With |
 |---|---|---|
 | **Discoverability** | search GitHub, hope the README isn't lying | curated DB of **114 entries** with health scores, license, category, est-tools-count |
-| **Trust** | unknown publisher, unknown last commit | `trust: verified` per entry, **94/114 (82%)** hand-vetted against a written checklist; the remaining 20 are `trust: "candidate"` (18 held by upstream install hooks, 2 freshly promoted from discovery pending a verified smoke) (see [Install-Hook Policy](./CONTRIBUTING.md#install-hook-policy)) |
+| **Trust** | unknown publisher, unknown last commit | `trust` is **derived from dated evidence**, not typed by hand: **101 verified / 1 candidate / 12 unverified** today. The 12 are eight entries with an advisory against the pinned version, two whose repository disagrees with the registry's, one yanked and one unpublished (see [Install-Hook Policy](./CONTRIBUTING.md#install-hook-policy)) |
 | **Integrity** | `npx -y whatever@latest` runs whatever ships today | sha512/sha256/Docker `@sha256:` pinned + re-verified against the live registry on every check |
 | **Vulnerabilities** | `npm audit` after the fact, if you remember | 4 advisory feeds merged: npm bulk + OSV.dev + GHSA + Snyk† — checked *before* the install command is written |
 | **Depth** | the package you asked for | `--deps` resolves the whole tree without installing it: **19,377 transitive packages** across the DB, 25 entries whose *dependencies* run install scripts, 38 with a high/critical advisory somewhere in the tree |
@@ -46,6 +46,14 @@ $ npx -y @froggychips/mcp-vault verify --offline
 | **"Verified" as a word** | a label someone typed once | dated evidence per dimension — a hash match holds for 90 days, "no advisories" for 7 — and `trust` is computed from it, dropped when the version moves |
 | **Context cost** | unknown until the window fills | `budget` totals what your configured servers inject on every request, each number stating whether it was measured or estimated |
 | **Which host** | Claude Code | `install --host` writes Claude Code, Claude Desktop, Cursor, VS Code, or prints a TOML block for Codex |
+| **Is it still there?** | a 404 looks like a network blip | `availability` tells *gone* / *version-gone* / *yanked* / *deprecated* apart, and an unpublished name is treated as what it is: claimable by somebody else |
+| **Who published it** | whatever `repository.url` says | cross-referenced with the official MCP registry, whose namespaces are **ownership-verified** at publish (`io.github.<owner>/…`) |
+| **Does it run?** | find out after installing | behavioural eval, and the result caps the recommendation: **40 of 113** complete a handshake, and an entry nothing has seen start cannot read as "recommended" |
+| **What can it do?** | read the source, if it isn't minified | `capabilities` records what each package is able to do with a file and a line — 46 of 99 can shell out, 84 read `process.env` — and reports what a new version **gained** |
+| **Did the tools change?** | invisible | every passing eval fingerprints the tool surface per tool; the same artifact presenting a different surface is reported as the case with no innocent explanation |
+| **So what do I install instead?** | read four advisories | `upgrade` computes the shortest version that clears all of them (8 entries today, all with a safe path) |
+| **Why was it denied?** | read four outputs | `explain` prints the evidence with dates, the policy in force, every rule with its outcome, and the rule that decided it |
+| **What runs, exactly** | `npx` re-resolves the tree at every start | `lock` freezes npm's own lockfile per server; `--vendor` installs it so nothing resolves at launch |
 | **Stack matching** | manual reading of awesome-lists | detects 40+ env-key patterns + 14 file paths + docker-compose images → suggests what to install |
 | **Offline use** | doesn't | `--offline` makes no network calls and validates stored pins; `--no-audit` still checks live registries but skips advisory APIs |
 | **What actually launches** | `npx -y pkg` resolves `latest` at every start — not the artifact anyone reviewed | `install` writes the version the gate hashed (`pkg@1.2.3`, `pkg==1.2.3`, `image@sha256:…`), and refuses to write an unpinned command without `--allow-unpinned` |
@@ -274,7 +282,218 @@ a hash 90), overridable with `maxEvidenceAgeDays`; evidence past it is reported
 as `UNVERIFIED` — "verified, eight months ago" is a different claim from
 "verified".
 
-The weekly refresh job records evidence as part of its run.
+The weekly refresh job records evidence as part of its run. The eight
+dimensions it fills for this DB today:
+
+```
+availability   present 104, deprecated 4, yanked 1, gone 1
+artifact       verified 112, unverified 2
+signature      verified 100, absent 1
+provenance     bound 45, absent 56
+source_binding verified 98, unverified 9, mismatch 2
+registry       listed 11, unlisted 102
+advisories     clean 100, vulnerable 8, advisories-present 1
+posture        clean 1, weak 3        (Scorecard covers 4 of 114 repositories)
+→ trust:       verified 101, candidate 1, unverified 12
+```
+
+### Is it still there? (`availability`)
+
+The gate cannot answer "does this still exist": a 404 and a network failure
+arrive on the same code path, so both read as "could not check". That is how
+`@diskd-ai/email-mcp@0.3.8` kept `trust: verified` after npm had stopped
+serving it — and an unpublished name is not a broken link, it is a name
+*somebody else can register*.
+
+```bash
+mcp-vault availability            # gone / version-gone / yanked / deprecated
+mcp-vault availability --repos    # also ask GitHub whether the repo moved
+```
+
+Four states, kept apart because they need different responses, plus
+`relocated` for an identity change. `gone`, `version-gone` and `yanked` block
+in `trustScore`, so an unavailable entry reads as `avoid`. A feed that did not
+answer is never recorded — that would empty the DB the first time npm had a bad
+minute.
+
+### Who published it? (`identity`)
+
+The [official MCP registry](https://registry.modelcontextprotocol.io) answers
+the one question this DB cannot: **who published this, under a name they proved
+they own.** Its namespaces are ownership-verified at publish —
+`io.github.<owner>/<name>` requires authenticating as that GitHub account, a
+reverse-DNS namespace requires control of the domain. Nothing else here is
+proved in that sense: npm's `repository.url` is typed by the publisher, and our
+`source_url` is typed by a pull request.
+
+```bash
+mcp-vault identity
+```
+
+So this repo is not a competing registry — it is a security overlay over one:
+
+```
+official registry  →  who published it, under a name they proved they own
+mcp-vault          →  supply-chain evidence, policy, behaviour
+```
+
+11 entries are listed today and all of them agree; a verified namespace under a
+different owner is the finding worth having. **Being unlisted is explicitly not
+a finding** — listing is opt-in and 102 entries simply are not listed. It also
+reports that `in_registry`, the hand-set boolean adding 30 points to every
+health score, disagrees with the live registry for 26 entries.
+
+### How is the upstream repo run? (`posture`)
+
+OpenSSF Scorecard, read through deps.dev: branch protection, code review,
+dangerous workflow triggers, token permissions, pinned actions, signed
+releases. An artifact can be perfectly verified and come out of a repository
+anybody can push to.
+
+```bash
+mcp-vault posture
+```
+
+The checks are recorded individually rather than as Scorecard's 0–10 average —
+an average puts "there is a SECURITY.md" and "a fork can trigger the release
+workflow" into one number. Scorecard's `-1` ("could not run this check") is
+recorded as `unknown`, never as a failure. Coverage is stated rather than
+implied: **4 of 114** entries have a report, and the other 110 read "no
+report".
+
+### What can it do, and what did it gain? (`capabilities`)
+
+The blind spot the rest of this repo cannot see: a patch release that starts
+reading `process.env` and shelling out is not a hash mismatch and does not have
+a CVE yet. Between "compromised release published" and "advisory published", an
+integrity scanner is blind.
+
+```bash
+mcp-vault capabilities                 # only versions not scanned before
+mcp-vault capabilities --all --write   # rebuild the baseline
+```
+
+The published tarball is read in memory (nothing is unpacked to disk) and every
+match is recorded with a file and a line. Across the 99 npm entries it can
+read:
+
+```
+env_access  84    shell           46    dynamic_code      15
+network     74    install_script  31    dynamic_require    8
+fs_read     58    fs_write        39    credential_paths   3
+```
+
+39 of those packages can both run other programs and reach the network. 17 of
+99 ship a minified bundle, where a pattern scan can show presence and nothing
+else.
+
+Two rules make this honest rather than theatrical:
+
+1. **`found` is a fact; `absent` is never recorded.** Not finding a capability
+   says something about the detector, not the package — minified bundles,
+   dynamic requires and runtime-built strings all defeat a pattern scan. There
+   is no `absent` list in the output to be mistaken for a finding, and every
+   scan carries a coverage block describing what was actually read.
+2. **Additions are findings; disappearances are not improvements.** A
+   capability that stopped matching is as likely to mean a new bundler as a
+   changed behaviour, and it is reported with exactly that wording.
+
+History lives in `assets/capabilities.json` keyed by `npm:pkg@version`, so a
+version bump in a pull request shows its capability delta *in the diff*. Scope:
+the package's own files — a capability arriving through a dependency is
+`verify --deps`' job, and PyPI needs a zip reader it does not have yet (those
+13 entries report `unsupported`, not "nothing found").
+
+### So what do I install instead? (`upgrade`)
+
+"Affected by GHSA-2h44-8472-frjj" is correct and not actionable. OSV carries a
+`fixed` version per advisory, so the target is *computed*: the highest fix
+across every advisory that applies, then the smallest published version that
+reaches it.
+
+```bash
+mcp-vault upgrade
+mcp-vault upgrade --entry gitlab-mcp --json
+```
+
+```
+UPGRADE  gitlab-mcp @zereight/mcp-gitlab@2.1.10
+  CRITICAL  GHSA-2h44-8472-frjj — fixed in 2.1.27
+  HIGH      GHSA-5648-rgj9-v224 — fixed in 2.1.30
+  CRITICAL  GHSA-cv3r-c5h8-f4g5 — fixed in 2.1.27
+  CRITICAL  GHSA-vmp7-252j-cwp7 — fixed in 2.1.30
+  → @zereight/mcp-gitlab@2.1.30 clears 4 of 4  (latest is 2.1.63)
+```
+
+The shortest hop, not the newest release. The candidate is queried too, because
+"fixed in 2.1.30" means fixed for *that* advisory — a recommendation onto a
+version with a different CVE would be worse than none. An advisory with no
+published fix stays in the output rather than being dropped into a false
+all-clear. All 8 affected entries in this DB have a safe path today.
+
+### Why was it denied? (`explain`)
+
+Everything needed to answer that existed; what did not exist was a way to ask.
+
+```bash
+mcp-vault explain gitlab-mcp
+mcp-vault explain gitlab-mcp --json --record decisions.jsonl
+```
+
+```
+DENIED  gitlab-mcp  npm:@zereight/mcp-gitlab@2.1.10
+  ✓ artifact        verified (2026-09-17)
+  ✓ signature       verified (2026-09-17)
+  ✓ provenance      bound (2026-09-17)
+  ? advisories      vulnerable (2026-09-17)
+  trust 85/100 (block)   health 80   behaviour never-started
+
+Rules:
+  ✗ trust/advisories               advisories is vulnerable (as of 2026-09-17)
+  ! behaviour/never-started        did not complete a handshake in a clean sandbox
+Blocking: trust/advisories
+```
+
+Each dimension with the date it was established and whether that date is inside
+its shelf life; the policy in force; every rule with its outcome; the rule that
+decided it. `--json` emits a decision record and `--record` appends it as one
+line — "allowed on this date, under that policy, on this evidence" is what a
+policy engine gets asked for six months later and otherwise cannot
+reconstruct.
+
+### What actually runs (`lock`)
+
+The gate verifies `server@1.2.3` down to its transitive tree. Then `.mcp.json`
+launches `npx -y server@1.2.3`, and npm re-resolves those dependencies at every
+start: a pinned root does not pin its tree, so `server@1.2.3` depending on
+`lib: ^2` runs whatever `lib` published most recently.
+
+```bash
+mcp-vault lock                  # write mcp.lock.json for this project
+mcp-vault lock --check          # resolve again and diff (exit 1 on drift)
+mcp-vault lock --vendor         # npm ci the locked tree; nothing resolves at launch
+```
+
+The lockfile records npm's own lockfile per server (which is what makes
+`--vendor` reinstall the *locked* tree rather than a fresh resolve), the
+artifact identity, and the tool-surface fingerprint. `--check` distinguishes
+ordinary dependency movement from the changes an upgrade does not explain: the
+same version with different bytes, a tree that gained an install script, or a
+tool surface that changed while the artifact did not.
+
+### Bill of materials (`sbom`)
+
+```bash
+mcp-vault sbom --out sbom.json              # the whole registry
+mcp-vault sbom --installed --deps --out sbom.json
+```
+
+CycloneDX 1.6 (validated against the official schema), with the things this
+repo knows and CycloneDX has no field for carried as `mcp-vault:` properties:
+the trust tier, each evidence dimension **with the date it was established**,
+which dimensions have aged out, the behavioural status, the tool-surface hash,
+and for transitive packages the one property that matters most — it runs code
+at install time.
 
 ### Policy file
 
@@ -479,7 +698,7 @@ Entry schema:
 ### CI
 
 `.github/workflows/security-scan.yml` runs eight jobs across PRs, pushes and two
-weekly crons.
+weekly crons; `.github/workflows/codeql.yml` adds static analysis.
 
 **Isolation first.** GitHub-hosted runners do not start on this account, so
 everything lands on one self-hosted machine — which means pull-request code
@@ -497,9 +716,14 @@ per step, so a later edit cannot quietly add an unjailed one. See
 - **smoke** — `verify_integrity.cjs --offline` on every PR / push, plus a SARIF
   upload so each finding lands on the `tools_database.json` line that caused it
   instead of in a log.
-- **refresh-hashes** — Monday cron. Refreshes `version` + `pkg_integrity` from
-  live registries, re-verifies with `--deep --record-evidence`, opens a PR.
-  Human-gated before merge.
+- **refresh-hashes** — Monday cron. The evidence-collecting job: refreshes
+  `version` + `pkg_integrity` from live registries, re-verifies with `--deep
+  --record-evidence`, then runs `availability`, `identity`, `posture` and
+  `capabilities` (all `--write`) and computes safe upgrade paths for anything
+  with an advisory. Each one writes a table into the job summary — availability,
+  registry identity, capability delta, upgrade targets — and the whole lot
+  arrives as one human-gated PR. Never auto-merged: this PR is the only gate
+  between a registry publishing something and this DB blessing it.
 - **docker-drift** — Monday cron + manual. Compares each pinned `@sha256:`
   against upstream, then **opens a PR moving the pins** with a link to the
   upstream releases page. A red job says something moved; a diff says what.
@@ -515,6 +739,15 @@ per step, so a later edit cannot quietly add an unjailed one. See
   down, and opens a PR refreshing the shipped `eval_results.json`.
 - **mcp-eval-pr** — on PRs touching the DB. Behavioural smoke of just the
   changed entries, advisory (never blocks merge).
+- **codeql** — pushes to master, PRs touching code or workflows, and a weekly
+  cron. `javascript-typescript` and `actions`, `security-extended`. Advanced
+  setup on the self-hosted runner: the default setup is hard-wired to
+  GitHub-hosted runners, which this account cannot start, so every "CodeQL
+  Setup" run failed before executing a step. The `actions` queries are the ones
+  worth a runner slot — the CI problems fixed in this repo lately (a
+  `pull_request_target` boundary, a token scoped wider than its job, unpinned
+  third-party actions) are exactly what they look for, and a human found all of
+  them.
 
 ---
 
@@ -538,9 +771,26 @@ Everything in this table is scripted and tested; the column says where it lives.
 | Behavioural smoke in a rebuilt jail | [`mcp_eval.cjs`](./mcp-ecosystem-intelligence/scripts/mcp_eval.cjs), [`lib/mcp_stdio.cjs`](./mcp-ecosystem-intelligence/scripts/lib/mcp_stdio.cjs) |
 | Discovery pipeline (npm / gh / README) | [`discover.cjs`](./mcp-ecosystem-intelligence/scripts/discover.cjs) |
 | Wrapper generator (CLI/API → MCP) | [`generate_wrapper.cjs`](./mcp-ecosystem-intelligence/scripts/generate_wrapper.cjs) |
+| Provenance bound to the artifact digest, not just read | [`lib/npm_signatures.cjs`](./mcp-ecosystem-intelligence/scripts/lib/npm_signatures.cjs) |
+| Behaviour capping the recommendation | [`lib/scores.cjs`](./mcp-ecosystem-intelligence/scripts/lib/scores.cjs) |
+| Gone / yanked / deprecated / relocated packages | [`check_availability.cjs`](./mcp-ecosystem-intelligence/scripts/check_availability.cjs) |
+| Ownership-verified identity from the official registry | [`lib/mcp_registry.cjs`](./mcp-ecosystem-intelligence/scripts/lib/mcp_registry.cjs) |
+| Upstream repository posture (OpenSSF Scorecard) | [`lib/scorecard.cjs`](./mcp-ecosystem-intelligence/scripts/lib/scorecard.cjs) |
+| Capability presence with evidence, and the version-to-version delta | [`lib/capabilities.cjs`](./mcp-ecosystem-intelligence/scripts/lib/capabilities.cjs), [`lib/tarball.cjs`](./mcp-ecosystem-intelligence/scripts/lib/tarball.cjs) |
+| Tool-surface fingerprint, for the rug-pull case | [`lib/surface.cjs`](./mcp-ecosystem-intelligence/scripts/lib/surface.cjs) |
+| Lockfile + vendored tree, so nothing re-resolves at launch | [`lib/lockfile.cjs`](./mcp-ecosystem-intelligence/scripts/lib/lockfile.cjs), [`lock.cjs`](./mcp-ecosystem-intelligence/scripts/lock.cjs) |
+| Shortest safe upgrade for anything with an advisory | [`suggest_upgrade.cjs`](./mcp-ecosystem-intelligence/scripts/suggest_upgrade.cjs), [`lib/versions.cjs`](./mcp-ecosystem-intelligence/scripts/lib/versions.cjs) |
+| A decision, with the rule that made it, as an audit record | [`explain.cjs`](./mcp-ecosystem-intelligence/scripts/explain.cjs) |
+| CycloneDX SBOM | [`sbom.cjs`](./mcp-ecosystem-intelligence/scripts/sbom.cjs) |
+| Context ceiling enforced where the set changes | [`lib/budget.cjs`](./mcp-ecosystem-intelligence/scripts/lib/budget.cjs) |
+| The documented numbers checked against the data | [`tests/docs_numbers.test.cjs`](./tests/docs_numbers.test.cjs) |
 
 Still judgement, not script — deliberately: the reject heuristics (5-Minute
-Rule, Bloat, Duplication) and promoting a candidate to `trust: verified`. The
+Rule, Bloat, Duplication) and promoting a candidate to `trust: verified`. And
+still open: PyPI capability scanning (sdists and wheels need a zip reader), a
+capability delta across the *dependency* tree rather than the top-level package,
+and Scorecard's coverage, which is 4 of 114 repositories and not something this
+repo can fix. The
 typed `artifact`/`launch` model exists in
 [`lib/entry_model.cjs`](./mcp-ecosystem-intelligence/scripts/lib/entry_model.cjs)
 and is asserted to reproduce every entry's `install_cmd`; consumers still read

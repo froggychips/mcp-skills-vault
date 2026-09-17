@@ -34,6 +34,16 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
 const db    = JSON.parse(read('mcp-ecosystem-intelligence/assets/tools_database.json')).tools;
 const evals = JSON.parse(read('mcp-ecosystem-intelligence/assets/eval_results.json')).results;
+const capabilities = JSON.parse(read('mcp-ecosystem-intelligence/assets/capabilities.json'));
+
+/** How many scanned packages have each capability. */
+function capabilityCounts() {
+  const out = {};
+  for (const pkg of Object.values(capabilities.packages || {})) {
+    for (const cap of Object.keys(pkg.found || {})) out[cap] = (out[cap] || 0) + 1;
+  }
+  return out;
+}
 
 const count   = (fn) => db.filter(fn).length;
 const tier    = (name) => count((t) => t.classification === name);
@@ -104,6 +114,48 @@ const CLAIMS = [
       const tokens = Math.round(evals.reduce((n, r) => n + (r.tools_payload_bytes || 0), 0) / 4 / 1000);
       return [tools.toLocaleString('en-US'), String(tokens)];
     },
+  },
+  {
+    what:  'derived trust distribution',
+    file:  'README.md',
+    re:    /\*\*(\d+) verified \/ (\d+) candidate \/ (\d+) unverified\*\* today/,
+    expected: () => {
+      const by = (word) => count((t) => t.trust === word);
+      return [by('verified'), by('candidate'), by('unverified')];
+    },
+  },
+  {
+    what:  'capability counts across the scanned packages',
+    file:  'README.md',
+    re:    /env_access\s+(\d+)\s+shell\s+(\d+)/,
+    expected: () => {
+      const caps = capabilityCounts();
+      return [caps.env_access, caps.shell];
+    },
+  },
+  {
+    what:  'how many packages can both shell out and reach the network',
+    file:  'README.md',
+    re:    /(\d+) of those packages can both run other programs and reach the network/,
+    expected: () => {
+      const pkgs = Object.values(capabilities.packages || {});
+      return [pkgs.filter((p) => p.found && p.found.shell && p.found.network).length];
+    },
+  },
+  {
+    what:  'how many packages were scanned, and how many are minified',
+    file:  'README.md',
+    re:    /(\d+) of\n(\d+) ship a minified bundle/,
+    expected: () => {
+      const pkgs = Object.values(capabilities.packages || {});
+      return [pkgs.filter((p) => p.coverage && p.coverage.minified).length, pkgs.length];
+    },
+  },
+  {
+    what:  'entries listed in the official registry',
+    file:  'README.md',
+    re:    /(\d+) entries are listed today and all of them agree/,
+    expected: () => [count((t) => t.trust_evidence?.dimensions?.registry?.status === 'listed')],
   },
   {
     what:  'DB entry count (SKILL.md)',
