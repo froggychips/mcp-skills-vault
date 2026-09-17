@@ -16,6 +16,7 @@
     "deny": ["BUSL-1.1", "SSPL-1.0", "Elastic-2.0", "Proprietary"]
   },
   "minHealthScore": 60,
+  "maxEvidenceAgeDays": 30,
   "trust": ["verified"],
 
   "deep": false,

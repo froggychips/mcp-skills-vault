@@ -22,6 +22,7 @@
  *     "docker": "digest",              // digest | tag      (default digest)
  *     "licenses": { "allow": ["MIT", "Apache-2.0"], "deny": ["BUSL-1.1"] },
  *     "minHealthScore": 60,
+ *     "maxEvidenceAgeDays": 30,       // stored evidence older than this is stale
  *     "trust": ["verified"],           // acceptable trust tiers
  *     "deep": true,                    // hash artifacts locally
  *     "deps": true                     // resolve and check dependency trees
@@ -54,6 +55,7 @@ const DEFAULTS = {
   docker:               'digest',
   licenses:             null,
   minHealthScore:       null,
+  maxEvidenceAgeDays:   null,
   trust:                null,
   deep:                 false,
   deps:                 false,
@@ -114,6 +116,13 @@ function normalizePolicy(raw) {
       if (allow !== null && !Array.isArray(allow)) { errors.push('"licenses.allow" must be an array'); continue; }
       if (deny  !== null && !Array.isArray(deny))  { errors.push('"licenses.deny" must be an array'); continue; }
       policy.licenses = { allow: allow ? allow.map(String) : null, deny: deny ? deny.map(String) : null };
+      continue;
+    }
+    if (key === 'maxEvidenceAgeDays') {
+      if (value === null) { policy.maxEvidenceAgeDays = null; continue; }
+      const n = Number(value);
+      if (!Number.isInteger(n) || n < 1) { errors.push('"maxEvidenceAgeDays" must be a positive whole number of days'); continue; }
+      policy.maxEvidenceAgeDays = n;
       continue;
     }
     if (key === 'minHealthScore') {

@@ -141,6 +141,7 @@ Flags:
 | `--update` | Refresh `version` + `pkg_integrity` from registries |
 | `--strict` | Treat WARNs (hooks, repo mismatch, unpinned docker) as hard failures |
 | `--no-audit` | Skip advisory APIs; still fetch registry metadata for live hash/repo/hook checks |
+| `--record-evidence` | Write what this run established back into the DB, dated per dimension (`trust_evidence`), and recompute `trust` from it |
 | `--no-policy` | Ignore `.mcp-vault.policy.json` |
 | `--show-policy` | Print the policy in force and the switches it implies |
 | `--offline` | True offline mode; no network calls, validates stored DB pins only |
@@ -190,6 +191,40 @@ alone, and a config that exists but does not parse is never overwritten — it i
 more likely a file worth keeping than a file worth clobbering. Codex keeps TOML;
 rewriting that without a TOML parser would destroy comments and formatting, so
 `mcp-vault` prints the three correct lines and lets you paste them.
+
+### Trust as dated evidence
+
+`trust: "verified"` collapsed several claims with different lifetimes into one
+word: that a hash matched, that the repo URL agreed, that the licence was OSI,
+that no advisory applied, that the server booted. Those were true on different
+days, and read as one word the oldest claim inherits the confidence of the
+newest. A hash match is good until the pin changes; "no advisories" is good
+until the next disclosure.
+
+`verify --record-evidence` writes each dimension with the date it was
+established:
+
+```json
+"trust_evidence": {
+  "artifact_id": "npm:@mapbox/mcp-server@0.11.0",
+  "dimensions": {
+    "artifact":       { "status": "verified", "checked_at": "2026-09-17", "method": "deep-hash" },
+    "signature":      { "status": "verified", "checked_at": "2026-09-17", "keyid": "SHA256:…" },
+    "source_binding": { "status": "verified", "checked_at": "2026-09-17" }
+  }
+}
+```
+
+`trust` becomes a derived value. Evidence is keyed to an artifact id including
+the version, so it is dropped rather than inherited when the version moves —
+what was learned about 1.2.3 says nothing about 1.2.4. A run records only what
+it actually examined: a `--no-audit` run writes nothing about advisories rather
+than writing "clean". Each dimension has its own shelf life (advisories 7 days,
+a hash 90), overridable with `maxEvidenceAgeDays`; evidence past it is reported
+as `UNVERIFIED` — "verified, eight months ago" is a different claim from
+"verified".
+
+The weekly refresh job records evidence as part of its run.
 
 ### Policy file
 

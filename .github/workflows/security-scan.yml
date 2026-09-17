@@ -176,8 +176,11 @@ jobs:
           node-version: '20'
       - name: verify_integrity --update
         run: node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --update
-      - name: Re-verify with refreshed hashes
-        run: node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs
+      - name: Re-verify with refreshed hashes, recording dated evidence
+        # --record-evidence writes per-dimension results with the date they were
+        # established, so `trust` becomes derived rather than asserted. This job
+        # is the right place for it: it is the one that talks to every feed.
+        run: node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --deep --record-evidence
       - name: refresh_scores --write
         run: node mcp-ecosystem-intelligence/scripts/refresh_scores.cjs --write
       # The `mcp-eval-pr` gate below can never see the PR this job opens:

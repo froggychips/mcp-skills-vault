@@ -30,6 +30,8 @@
  *   node scripts/verify_integrity.cjs --fail-unverified  UNVERIFIED → hard failure
  *   node scripts/verify_integrity.cjs --deps       resolve and check dependency trees
  *   node scripts/verify_integrity.cjs --no-policy  ignore .mcp-vault.policy.json
+ *   node scripts/verify_integrity.cjs --record-evidence  write dated per-dimension
+ *                                                  evidence back into the DB
  *   node scripts/verify_integrity.cjs --deep       download artifacts and hash them locally
  *   node scripts/verify_integrity.cjs --require-signatures  unsigned npm release = failure
  *   node scripts/verify_integrity.cjs --require-provenance  no provenance attestation = failure
@@ -60,6 +62,10 @@ const {
   resolveNpmTreeCached, pypiDirectDependencies, summarizeTree,
 } = require('./lib/deps.cjs');
 const { loadPolicy, evaluateEntry } = require('./lib/policy.cjs');
+const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
+const {
+  buildEvidence, mergeEvidence, staleDimensions, deriveTrust, DEFAULT_MAX_AGE_DAYS,
+} = require('./lib/evidence.cjs');
 const https       = require('https');
 const fs          = require('fs');
 const path        = require('path');
@@ -87,9 +93,20 @@ const CWD = (() => {
 // explicit flag is someone saying what they want right now. A policy can only
 // raise the bar here, never lower it.
 const NO_POLICY = process.argv.includes('--no-policy');
+// --record-evidence: write what this run established back into the DB, dated
+// per dimension. Trust then becomes a derived value instead of a word someone
+// typed once.
+const RECORD_EVIDENCE = process.argv.includes('--record-evidence');
 const POLICY = NO_POLICY
   ? { ok: true, policy: null, path: null, errors: [], found: false }
   : loadPolicy(CWD);
+
+// Per-dimension age limits: the policy's number overrides every dimension,
+// otherwise each dimension keeps its own default (advisories perish fastest).
+function evidenceMaxAge() {
+  const fromPolicy = POLICY.ok && POLICY.policy ? POLICY.policy.maxEvidenceAgeDays : null;
+  return Number.isFinite(fromPolicy) ? fromPolicy : DEFAULT_MAX_AGE_DAYS;
+}
 
 function policySays(predicate) {
   return Boolean(POLICY.ok && POLICY.policy && predicate(POLICY.policy));
@@ -1389,10 +1406,58 @@ async function main() {
   // Process docker.
   for (const { tool } of dockerTools) await processDocker(tool, results);
 
+  // Evidence: what this run established, dated, per dimension. Written only on
+  // request — a scan is read-only unless asked otherwise.
+  if (RECORD_EVIDENCE) {
+    if (INSTALLED) {
+      console.error('--record-evidence applies to DB entries, not to --installed subjects.');
+      return exitAfterFlush(2);
+    }
+    const draft = toJsonReport({ results, meta: { mode: OFFLINE ? 'offline' : (NO_AUDIT ? 'no-audit' : 'full') } });
+    let recorded = 0;
+    for (let i = 0; i < results.length; i++) {
+      const tool = results[i].tool;
+      if (!tool || !tool.name) continue;
+      const typed = toTypedEntry(tool);
+      const fresh = buildEvidence(draft.entries[i], {
+        artifactId: typed ? artifactId(typed.artifact) : null,
+        mode: draft.mode,
+      });
+      if (!Object.keys(fresh.dimensions).length) continue;
+      tool.trust_evidence = mergeEvidence(tool.trust_evidence, fresh);
+      // The word stays, but it is now computed from the dated evidence.
+      tool.trust = deriveTrust(tool.trust_evidence, { maxAgeDays: evidenceMaxAge() });
+      recorded++;
+    }
+    if (recorded) {
+      writeDb(DB_PATH, db);
+      progress(`Recorded evidence for ${recorded} entr${recorded === 1 ? 'y' : 'ies'} in ${DB_PATH}\n`);
+    }
+  }
+
   // Policy rules that are not facts about the artifact — license lists, trust
   // tiers, a health-score floor — are judged here, once each entry has its
   // findings. They ride along as ordinary findings so every output mode
   // (text, JSON, SARIF) shows them without special-casing.
+  // Evidence that has aged out. An advisory result especially: "clean" means
+  // clean as of that date, and disclosures don't wait.
+  for (const r of results) {
+    const evidence = r.tool && r.tool.trust_evidence;
+    if (!evidence) continue;
+    const stale = staleDimensions(evidence, evidenceMaxAge());
+    if (!stale.length) continue;
+    r.lines = r.lines || [];
+    const worst = stale.sort((a, b) => b.age_days - a.age_days).slice(0, 3)
+      .map((sd) => `${sd.dimension} ${sd.age_days}d old (max ${sd.max_age_days})`).join(', ');
+    r.lines.push(['UNVERIFIED', `stored evidence has aged out: ${worst}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+    if (FAIL_UNVERIFIED) {
+      r.failures = (r.failures || 0) + 1;
+      r.status = 'FAIL';
+    } else if (r.status === 'OK') {
+      r.status = 'UNVERIFIED';
+    }
+  }
+
   if (POLICY.ok && POLICY.policy) {
     const draft = toJsonReport({ results });
     for (let i = 0; i < results.length; i++) {
