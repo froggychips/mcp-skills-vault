@@ -234,7 +234,7 @@ async function osvFor(ecosystem, name, version) {
 /** Every version the registry has published, for picking the shortest hop. */
 async function publishedVersions(ecosystem, name) {
   if (ecosystem === 'npm') {
-    const res = await getJson(`https://registry.npmjs.org/${name.replace('/', '%2f')}`, { cacheTtlMs: CACHE_TTL_MS, timeoutMs: 20000 });
+    const res = await getJson(`https://registry.npmjs.org/${name.replace(/\//g, '%2f')}`, { cacheTtlMs: CACHE_TTL_MS, timeoutMs: 20000 });
     if (!res.ok) return { ok: false, versions: [], error: res.error || `HTTP ${res.status}` };
     return { ok: true, versions: Object.keys((res.data && res.data.versions) || {}) };
   }

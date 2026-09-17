@@ -133,7 +133,12 @@ function successorFrom(message) {
 
 /** github.com/owner/repo → "owner/repo", for comparing two URLs' identity. */
 function repoSlug(url) {
-  const m = String(url || '').match(/github\.com[:/]+([^/]+)\/([^/#?]+?)(?:\.git)?(?:[/#?].*)?$/i);
+  // Anchored at the start of the string on purpose. An unanchored
+// `github\.com[:/]+…` matched anywhere, so
+// `https://evil.example/github.com/acme/server` produced the slug
+// `acme/server` — an attacker-chosen URL in a DB entry could borrow another
+// project's identity for every check that compares repositories.
+  const m = String(url || '').match(/^(?:git\+)?(?:https?:\/\/|ssh:\/\/git@|git@)?(?:www\.)?github\.com[:/]+([^/]+)\/([^/#?]+?)(?:\.git)?(?:[/#?].*)?$/i);
   return m ? `${m[1]}/${m[2]}`.toLowerCase() : null;
 }
 
@@ -148,7 +153,7 @@ function repoSlug(url) {
 async function checkNpm(tool, pkg, { get = getJson } = {}) {
   const version = tool.version || null;
   const base    = 'https://registry.npmjs.org';
-  const encoded = pkg.replace('/', '%2f');
+  const encoded = pkg.replace(/\//g, '%2f');
 
   const verUrl = `${base}/${encoded}/${version || 'latest'}`;
   const ver    = await get(verUrl, { cacheTtlMs: CACHE_TTL_MS });

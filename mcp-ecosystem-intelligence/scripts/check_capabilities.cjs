@@ -61,6 +61,13 @@ const CONCURRENCY = 4;
 // (the largest is under 3 MB) and refuses a package that is mostly fixtures.
 const MAX_TARBALL_BYTES = 16 * 1024 * 1024;
 const MAX_SCAN_BYTES    = 6 * 1024 * 1024;
+// Where a tarball may come from. npm serves them from the registry itself; the
+// CDN host is included because the registry has redirected there historically.
+const ALLOWED_TARBALL_HOSTS = new Set([
+  'registry.npmjs.org',
+  'registry.npmjs.com',
+  'npm.pkg.github.com',
+]);
 
 const T  = process.stdout.isTTY;
 const B  = T ? '\x1b[1m'  : '';
@@ -111,11 +118,22 @@ function fetchTarball(url, { maxBytes = MAX_TARBALL_BYTES, timeoutMs = 30000 } =
     try { u = new URL(url); } catch { resolve({ ok: false, error: 'bad tarball url' }); return; }
     if (u.protocol !== 'https:') { resolve({ ok: false, error: 'refusing a non-https tarball' }); return; }
 
+    // The URL comes out of registry metadata, which is data, not a decision.
+    // `dist.tarball` pointing at somebody else's host would make this a fetch
+    // of an attacker-chosen resource on the strength of a package name — so the
+    // host is checked against the registries we are willing to download from.
+    if (!ALLOWED_TARBALL_HOSTS.has(u.hostname)) {
+      resolve({ ok: false, error: `refusing a tarball from ${u.hostname}` });
+      return;
+    }
+
     const req = https.get(url, { timeout: timeoutMs }, (res) => {
       if (res.statusCode === 301 || res.statusCode === 302) {
         res.resume();
         const next = res.headers.location;
         if (!next) { resolve({ ok: false, error: `redirect with no location (${res.statusCode})` }); return; }
+        // Recursing through fetchTarball re-applies the host check, so a
+        // redirect cannot walk out of the allowlist.
         resolve(fetchTarball(new URL(next, url).toString(), { maxBytes, timeoutMs }));
         return;
       }
@@ -192,7 +210,7 @@ async function scanEntry(tool, history) {
     return row;
   }
 
-  const meta = await getJson(`https://registry.npmjs.org/${pkg.replace('/', '%2f')}/${tool.version}`, { cacheTtlMs: 60 * 60 * 1000 });
+  const meta = await getJson(`https://registry.npmjs.org/${pkg.replace(/\//g, '%2f')}/${tool.version}`, { cacheTtlMs: 60 * 60 * 1000 });
   const tarballUrl = meta.ok && meta.data && meta.data.dist && meta.data.dist.tarball;
   if (!tarballUrl) {
     row.state = 'unknown';
@@ -350,4 +368,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseArgs, fetchTarball, previousScan, scanEntry, CAPABILITIES };
+module.exports = { parseArgs, fetchTarball, previousScan, scanEntry, CAPABILITIES, ALLOWED_TARBALL_HOSTS };

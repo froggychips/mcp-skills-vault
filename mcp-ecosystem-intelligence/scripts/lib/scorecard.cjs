@@ -101,7 +101,12 @@ function mapChecks(scorecard) {
 
 /** github.com/owner/repo (any URL form) → "owner/repo". */
 function repoSlug(url) {
-  const m = String(url || '').match(/github\.com[:/]+([^/]+)\/([^/#?]+?)(?:\.git)?(?:[/#?].*)?$/i);
+  // Anchored at the start of the string on purpose. An unanchored
+// `github\.com[:/]+…` matched anywhere, so
+// `https://evil.example/github.com/acme/server` produced the slug
+// `acme/server` — an attacker-chosen URL in a DB entry could borrow another
+// project's identity for every check that compares repositories.
+  const m = String(url || '').match(/^(?:git\+)?(?:https?:\/\/|ssh:\/\/git@|git@)?(?:www\.)?github\.com[:/]+([^/]+)\/([^/#?]+?)(?:\.git)?(?:[/#?].*)?$/i);
   return m ? `${m[1]}/${m[2]}` : null;
 }
 

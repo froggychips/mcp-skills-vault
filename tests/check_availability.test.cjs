@@ -171,3 +171,15 @@ test('BLOCKING is exactly the set that means "there is nothing to install"', () 
   assert.ok(!a.BLOCKING.has('deprecated'));
   assert.ok(!a.BLOCKING.has('unknown'));
 });
+
+test('repoSlug is anchored: github.com inside someone else\'s URL is not a match', () => {
+  // An unanchored `github\.com[:/]+…` matched anywhere in a string, so
+  // `https://evil.example/github.com/acme/server` produced the slug
+  // `acme/server`. A URL in a DB entry could then borrow another project's
+  // identity in every check that compares repositories.
+  assert.equal(a.repoSlug('https://evil.example/github.com/acme/server'), null);
+  assert.equal(a.repoSlug('https://github.com.evil.example/acme/server'), null);
+  assert.equal(a.repoSlug('https://github.com/acme/server'), 'acme/server');
+  assert.equal(a.repoSlug('git+ssh://git@github.com/acme/server.git'), 'acme/server');
+  assert.equal(a.repoSlug('git@github.com:acme/server.git'), 'acme/server');
+});
