@@ -1,6 +1,6 @@
 {
   "$schema": "describes shape; not enforced",
-  "generated_at": "2026-09-17T09:16:32.330Z",
+  "generated_at": "2026-09-17T09:33:22.727Z",
   "generator": "mcp_eval.cjs v0.1.0",
   "results": [
     {
@@ -13,11 +13,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm warn deprecated whatwg-encoding@3.1.1: Use @exodus/bytes instead for a more spec-conformant and faster implementation",
-      "error_code": "timeout",
-      "failure_class": "TIMEOUT",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
+      "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:08:36.827Z"
+      "checked_at": "2026-09-17T09:33:22.300Z"
     },
     {
       "name": "@alchemy/mcp-server",
@@ -29,11 +29,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:02:23.407Z"
+      "checked_at": "2026-09-17T09:33:21.898Z"
     },
     {
       "name": "@anyproto/anytype-mcp",
@@ -45,11 +45,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:15:59.213Z"
+      "checked_at": "2026-09-17T09:33:22.690Z"
     },
     {
       "name": "@azure-devops/mcp",
@@ -61,11 +61,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
-      "failure_class": "CRASH",
+      "stderr_tail": null,
+      "error_code": "timeout",
+      "failure_class": "TIMEOUT",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:49:27.462Z"
+      "checked_at": "2026-09-17T09:31:44.548Z"
     },
     {
       "name": "@azure/mcp",
@@ -77,11 +77,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:08:24.978Z"
+      "checked_at": "2026-09-17T09:33:22.266Z"
     },
     {
       "name": "@bitwarden/mcp-server",
@@ -93,11 +93,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:54:39.367Z"
+      "checked_at": "2026-09-17T09:33:21.504Z"
     },
     {
       "name": "@brave/brave-search-mcp-server",
@@ -109,11 +109,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:52:36.772Z"
+      "checked_at": "2026-09-17T09:33:21.406Z"
     },
     {
       "name": "@browserstack/mcp-server",
@@ -129,7 +129,7 @@
       "error_code": "timeout",
       "failure_class": "TIMEOUT",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:47:53.115Z"
+      "checked_at": "2026-09-17T09:30:10.126Z"
     },
     {
       "name": "@cap-js/mcp-server",
@@ -141,11 +141,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:01:09.303Z"
+      "checked_at": "2026-09-17T09:33:21.828Z"
     },
     {
       "name": "@circleci/mcp-server-circleci",
@@ -157,11 +157,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:11:22.528Z"
+      "checked_at": "2026-09-17T09:33:22.473Z"
     },
     {
       "name": "@contentful/mcp-server",
@@ -173,11 +173,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": null,
-      "error_code": "timeout",
-      "failure_class": "TIMEOUT",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
+      "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:05:16.450Z"
+      "checked_at": "2026-09-17T09:33:22.038Z"
     },
     {
       "name": "@contextlint/mcp-server",
@@ -189,11 +189,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:07:42.031Z"
+      "checked_at": "2026-09-17T09:33:22.180Z"
     },
     {
       "name": "@currents/mcp",
@@ -205,11 +205,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:10:43.593Z"
+      "checked_at": "2026-09-17T09:33:22.422Z"
     },
     {
       "name": "@cyanheads/git-mcp-server",
@@ -221,11 +221,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:57:17.570Z"
+      "checked_at": "2026-09-17T09:33:21.652Z"
     },
     {
       "name": "@delorenj/mcp-server-trello",
@@ -237,11 +237,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:54:57.168Z"
+      "checked_at": "2026-09-17T09:33:21.541Z"
     },
     {
       "name": "@diskd-ai/email-mcp",
@@ -253,11 +253,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice\nnpm error A complete log of this run can be found in: /home/node/.npm/_logs/2026-09-17T09_07_39_603Z-debug-0.log",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
       "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:07:39.344Z"
+      "checked_at": "2026-09-17T09:33:22.162Z"
     },
     {
       "name": "@drawio/mcp",
@@ -269,11 +269,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:59:09.331Z"
+      "checked_at": "2026-09-17T09:33:21.725Z"
     },
     {
       "name": "@dynatrace-oss/dynatrace-mcp-server",
@@ -286,10 +286,10 @@
       "tool_count_drift": false,
       "schema_errors": [],
       "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:47:40.658Z"
+      "checked_at": "2026-09-17T09:29:57.333Z"
     },
     {
       "name": "@esaio/esa-mcp-server",
@@ -301,11 +301,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:06:03.658Z"
+      "checked_at": "2026-09-17T09:33:22.057Z"
     },
     {
       "name": "@eslint/mcp",
@@ -317,11 +317,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "time=\"2026-09-17T12:33:21+03:00\" level=error msg=\"error waiting for container: unexpected EOF\"\ndocker: error during connect: Post \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/v1.52/containers/46ebc565081e18822da57ab6410993f30dbf3de067424ef9d154ca3ebee8cf33/start\": EOF\nRun 'docker run --help' for more information",
+      "error_code": "exit 125",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:50:39.940Z"
+      "checked_at": "2026-09-17T09:33:18.973Z"
     },
     {
       "name": "@google-cloud/observability-mcp",
@@ -333,11 +333,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:59:20.863Z"
+      "checked_at": "2026-09-17T09:33:21.743Z"
     },
     {
       "name": "@growthbook/mcp",
@@ -349,11 +349,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:10:16.411Z"
+      "checked_at": "2026-09-17T09:33:22.385Z"
     },
     {
       "name": "@heroku/mcp-server",
@@ -365,11 +365,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:02:53.628Z"
+      "checked_at": "2026-09-17T09:33:21.933Z"
     },
     {
       "name": "@instantdb/mcp",
@@ -381,11 +381,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:00:28.263Z"
+      "checked_at": "2026-09-17T09:33:21.806Z"
     },
     {
       "name": "@kintone/mcp-server",
@@ -397,11 +397,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:07:22.317Z"
+      "checked_at": "2026-09-17T09:33:22.144Z"
     },
     {
       "name": "@knip/mcp",
@@ -413,11 +413,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:55:46.159Z"
+      "checked_at": "2026-09-17T09:33:21.618Z"
     },
     {
       "name": "@last9/mcp-server",
@@ -429,11 +429,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:05:08.255Z"
+      "checked_at": "2026-09-17T09:33:22.022Z"
     },
     {
       "name": "@mapbox/mcp-server",
@@ -449,7 +449,7 @@
       "error_code": "timeout",
       "failure_class": "TIMEOUT",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:46:53.451Z"
+      "checked_at": "2026-09-17T09:29:10.123Z"
     },
     {
       "name": "@memberjunction/ai-mcp-server",
@@ -461,11 +461,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": null,
-      "error_code": "timeout",
-      "failure_class": "TIMEOUT",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
+      "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:11:36.629Z"
+      "checked_at": "2026-09-17T09:33:22.495Z"
     },
     {
       "name": "@mondaydotcomorg/monday-api-mcp",
@@ -477,11 +477,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": null,
-      "error_code": "timeout",
-      "failure_class": "TIMEOUT",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
+      "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:58:22.124Z"
+      "checked_at": "2026-09-17T09:33:21.708Z"
     },
     {
       "name": "@nexus2520/bitbucket-mcp-server",
@@ -493,11 +493,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:10:24.867Z"
+      "checked_at": "2026-09-17T09:33:22.405Z"
     },
     {
       "name": "@pandacss/mcp",
@@ -509,11 +509,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": null,
-      "error_code": "timeout",
-      "failure_class": "TIMEOUT",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
+      "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:56:30.328Z"
+      "checked_at": "2026-09-17T09:33:21.635Z"
     },
     {
       "name": "@penpot/mcp",
@@ -525,11 +525,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:08:34.247Z"
+      "checked_at": "2026-09-17T09:33:22.283Z"
     },
     {
       "name": "@phantom/mcp-server",
@@ -545,7 +545,7 @@
       "error_code": "timeout",
       "failure_class": "TIMEOUT",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:48:40.253Z"
+      "checked_at": "2026-09-17T09:30:57.335Z"
     },
     {
       "name": "@postman/postman-mcp-server",
@@ -557,11 +557,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:51:57.495Z"
+      "checked_at": "2026-09-17T09:33:21.387Z"
     },
     {
       "name": "@professional-wiki/mediawiki-mcp-server",
@@ -573,11 +573,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:01:50.215Z"
+      "checked_at": "2026-09-17T09:33:21.865Z"
     },
     {
       "name": "@qase/mcp-server",
@@ -589,11 +589,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:09:27.666Z"
+      "checked_at": "2026-09-17T09:33:22.334Z"
     },
     {
       "name": "@regle/mcp-server",
@@ -605,11 +605,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:53:37.532Z"
+      "checked_at": "2026-09-17T09:33:21.464Z"
     },
     {
       "name": "@renseiai/agentfactory-mcp-server",
@@ -621,11 +621,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice\nnpm error A complete log of this run can be found in: /home/node/.npm/_logs/2026-09-17T09_06_22_582Z-debug-0.log",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
       "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:06:22.326Z"
+      "checked_at": "2026-09-17T09:33:22.092Z"
     },
     {
       "name": "@roychri/mcp-server-asana",
@@ -637,11 +637,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
-      "failure_class": "CRASH",
+      "stderr_tail": null,
+      "error_code": "timeout",
+      "failure_class": "TIMEOUT",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:50:05.979Z"
+      "checked_at": "2026-09-17T09:32:31.759Z"
     },
     {
       "name": "@salesforce/mcp",
@@ -653,11 +653,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me\nnpm warn deprecated eslint@8.57.1: This version is no longer supported. Please see https://eslint.org/version-support for other options.\nnpm warn deprecated @sinonjs/text-encoding@0.7.3: Deprecated: no longer maintained and no longer used by Sinon packages. See\nnpm warn deprecated   https://github.com/sinonjs/nise/issues/243 for replacement details.",
-      "error_code": "exit 137",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:51:34.931Z"
+      "checked_at": "2026-09-17T09:33:21.366Z"
     },
     {
       "name": "@sap-ux/fiori-mcp-server",
@@ -669,11 +669,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:08:09.017Z"
+      "checked_at": "2026-09-17T09:33:22.216Z"
     },
     {
       "name": "@skillsmith/mcp-server",
@@ -685,11 +685,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": null,
-      "error_code": "timeout",
-      "failure_class": "TIMEOUT",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
+      "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:12:32.273Z"
+      "checked_at": "2026-09-17T09:33:22.531Z"
     },
     {
       "name": "@socketsecurity/mcp",
@@ -701,11 +701,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:57:28.230Z"
+      "checked_at": "2026-09-17T09:33:21.670Z"
     },
     {
       "name": "@softeria/ms-365-mcp-server",
@@ -717,11 +717,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:53:02.256Z"
+      "checked_at": "2026-09-17T09:33:21.446Z"
     },
     {
       "name": "@supabase/mcp-server-supabase",
@@ -733,11 +733,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:08:12.344Z"
+      "checked_at": "2026-09-17T09:33:22.232Z"
     },
     {
       "name": "@taazkareem/clickup-mcp-server",
@@ -749,11 +749,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": null,
-      "error_code": "timeout",
-      "failure_class": "TIMEOUT",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
+      "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:13:19.482Z"
+      "checked_at": "2026-09-17T09:33:22.549Z"
     },
     {
       "name": "@tankpkg/mcp-server",
@@ -765,11 +765,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:10:05.530Z"
+      "checked_at": "2026-09-17T09:33:22.368Z"
     },
     {
       "name": "@theia/ai-mcp-server",
@@ -781,11 +781,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice\nnpm error A complete log of this run can be found in: /home/node/.npm/_logs/2026-09-17T09_14_07_175Z-debug-0.log",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
       "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:14:06.722Z"
+      "checked_at": "2026-09-17T09:33:22.566Z"
     },
     {
       "name": "@tocharianou/mcp-server-kibana",
@@ -797,11 +797,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:04:14.319Z"
+      "checked_at": "2026-09-17T09:33:21.987Z"
     },
     {
       "name": "@translated/lara-mcp",
@@ -813,11 +813,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:02:40.638Z"
+      "checked_at": "2026-09-17T09:33:21.916Z"
     },
     {
       "name": "@transloadit/mcp-server",
@@ -829,11 +829,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:03:11.384Z"
+      "checked_at": "2026-09-17T09:33:21.951Z"
     },
     {
       "name": "@ui5/mcp-server",
@@ -845,11 +845,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:02:09.628Z"
+      "checked_at": "2026-09-17T09:33:21.882Z"
     },
     {
       "name": "@upstash/mcp-server",
@@ -861,11 +861,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:06:16.685Z"
+      "checked_at": "2026-09-17T09:33:22.074Z"
     },
     {
       "name": "@vapi-ai/mcp-server",
@@ -877,11 +877,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:07:01.937Z"
+      "checked_at": "2026-09-17T09:33:22.128Z"
     },
     {
       "name": "@vibeframe/mcp-server",
@@ -893,11 +893,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm warn deprecated boolean@3.2.0: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.",
-      "error_code": "exit 137",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:53:55.067Z"
+      "checked_at": "2026-09-17T09:33:21.485Z"
     },
     {
       "name": "@voltagent/mcp-server",
@@ -909,11 +909,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice\nnpm error A complete log of this run can be found in: /home/node/.npm/_logs/2026-09-17T08_54_55_765Z-debug-0.log",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
       "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:54:55.473Z"
+      "checked_at": "2026-09-17T09:33:21.523Z"
     },
     {
       "name": "@yoda.digital/gitlab-mcp-server",
@@ -925,11 +925,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:06:50.692Z"
+      "checked_at": "2026-09-17T09:33:22.110Z"
     },
     {
       "name": "actors-mcp-server",
@@ -945,7 +945,7 @@
       "error_code": "timeout",
       "failure_class": "TIMEOUT",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:45:36.449Z"
+      "checked_at": "2026-09-17T09:27:49.525Z"
     },
     {
       "name": "argocd-mcp",
@@ -957,11 +957,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:51:15.965Z"
+      "checked_at": "2026-09-17T09:33:21.335Z"
     },
     {
       "name": "brave-search-mcp",
@@ -977,7 +977,7 @@
       "error_code": "timeout",
       "failure_class": "TIMEOUT",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:43:58.013Z"
+      "checked_at": "2026-09-17T09:25:25.931Z"
     },
     {
       "name": "chrome-devtools-mcp",
@@ -989,11 +989,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:08:05.644Z"
+      "checked_at": "2026-09-17T09:33:22.197Z"
     },
     {
       "name": "clinicaltrialsgov-mcp-server",
@@ -1005,11 +1005,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:03:36.008Z"
+      "checked_at": "2026-09-17T09:33:21.969Z"
     },
     {
       "name": "codex-mcp-server",
@@ -1021,27 +1021,27 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:11:14.532Z"
+      "checked_at": "2026-09-17T09:33:22.456Z"
     },
     {
       "name": "context7",
-      "status": "fail",
-      "boot_ms": null,
-      "list_latency_ms": null,
-      "tool_count": null,
-      "tools_payload_bytes": null,
+      "status": "pass",
+      "boot_ms": 17739,
+      "list_latency_ms": 5,
+      "tool_count": 2,
+      "tools_payload_bytes": 4610,
       "tool_count_db": 4,
-      "tool_count_drift": false,
+      "tool_count_drift": true,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
-      "failure_class": "CRASH",
+      "stderr_tail": null,
+      "error_code": null,
+      "failure_class": null,
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:40:49.618Z"
+      "checked_at": "2026-09-17T09:21:22.517Z"
     },
     {
       "name": "datadog-mcp",
@@ -1053,11 +1053,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:15:28.257Z"
+      "checked_at": "2026-09-17T09:33:22.634Z"
     },
     {
       "name": "dataforseo-mcp-server",
@@ -1069,11 +1069,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": null,
-      "error_code": "timeout",
-      "failure_class": "TIMEOUT",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
+      "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:59:36.325Z"
+      "checked_at": "2026-09-17T09:33:21.770Z"
     },
     {
       "name": "deepl-mcp-server",
@@ -1085,11 +1085,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:55:34.651Z"
+      "checked_at": "2026-09-17T09:33:21.600Z"
     },
     {
       "name": "duckduckgo-mcp-server",
@@ -1101,27 +1101,27 @@
       "tool_count_db": 2,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "docker: Error response from daemon: unable to find user node: no matching entries in passwd file\nRun 'docker run --help' for more information",
-      "error_code": "exit 125",
-      "failure_class": "CRASH",
+      "stderr_tail": "    from mcp.server.fastmcp import FastMCP, Context\n  File \"/home/uv/.cache/uv/archive-v0/NC9LGGl0CQW-OFb2MAhO-/lib/python3.12/site-packages/mcp/server/fastmcp.py\", line 16, in <module>\n    raise ModuleNotFoundError(_MESSAGE, name=__name__)\nModuleNotFoundError: No module named 'mcp.server.fastmcp'. This is mcp 2.x, where FastMCP was renamed to MCPServer (from mcp.server.mcpserver import MCPServer) and other APIs changed; see the migration guide at https://py.sdk.modelcontextprotocol.io/v2/migration/#fastmcp-renamed-to-mcpserver or pin 'mcp<2' to keep running v1 code.",
+      "error_code": "exit 1",
+      "failure_class": "NEEDS_NET",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:44:45.226Z"
+      "checked_at": "2026-09-17T09:26:13.142Z"
     },
     {
       "name": "exa-mcp-server",
-      "status": "fail",
-      "boot_ms": null,
-      "list_latency_ms": null,
-      "tool_count": null,
-      "tools_payload_bytes": null,
+      "status": "pass",
+      "boot_ms": 24485,
+      "list_latency_ms": 6,
+      "tool_count": 2,
+      "tools_payload_bytes": 2199,
       "tool_count_db": 5,
-      "tool_count_drift": false,
+      "tool_count_drift": true,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
-      "failure_class": "CRASH",
+      "stderr_tail": null,
+      "error_code": null,
+      "failure_class": null,
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:44:45.409Z"
+      "checked_at": "2026-09-17T09:26:17.828Z"
     },
     {
       "name": "firecrawl-mcp-server",
@@ -1134,10 +1134,10 @@
       "tool_count_drift": false,
       "schema_errors": [],
       "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:46:23.656Z"
+      "checked_at": "2026-09-17T09:28:36.732Z"
     },
     {
       "name": "fsb-mcp-server",
@@ -1149,11 +1149,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:12:23.862Z"
+      "checked_at": "2026-09-17T09:33:22.513Z"
     },
     {
       "name": "github-mcp-server",
@@ -1169,7 +1169,7 @@
       "error_code": "exit 1",
       "failure_class": "NEEDS_ENV",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:45:18.039Z"
+      "checked_at": "2026-09-17T09:27:09.737Z"
     },
     {
       "name": "gitlab-mcp",
@@ -1182,10 +1182,10 @@
       "tool_count_drift": false,
       "schema_errors": [],
       "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:45:18.573Z"
+      "checked_at": "2026-09-17T09:27:20.598Z"
     },
     {
       "name": "godot-mcp-server",
@@ -1197,11 +1197,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:55:09.348Z"
+      "checked_at": "2026-09-17T09:33:21.558Z"
     },
     {
       "name": "hostinger-api-mcp",
@@ -1213,11 +1213,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:01:35.203Z"
+      "checked_at": "2026-09-17T09:33:21.847Z"
     },
     {
       "name": "ios-simulator-mcp",
@@ -1229,11 +1229,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:00:23.582Z"
+      "checked_at": "2026-09-17T09:33:21.788Z"
     },
     {
       "name": "kafka-mcp-server",
@@ -1245,11 +1245,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "[WARN] unable to open connection to broker; addr: localhost:9092, broker: seed_0, err: dial tcp [::1]:9092: connect: connection refused\n[INFO] assigning partitions; why: invalidating all assignments in LeaveGroup, how: unassigning everything, input: \n[INFO] tried to leave group but we have no member ID yet, returning early; group: kafka-mcp-server\n2026/09/17 09:15:58 ERROR Failed to create Kafka client error=\"failed to ping Kafka brokers: unable to dial: dial tcp [::1]:9092: connect: connection refused\"",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
       "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:15:58.693Z"
+      "checked_at": "2026-09-17T09:33:22.673Z"
     },
     {
       "name": "kubernetes-mcp-server",
@@ -1261,11 +1261,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:08:19.702Z"
+      "checked_at": "2026-09-17T09:33:22.249Z"
     },
     {
       "name": "linear-mcp-server",
@@ -1278,10 +1278,10 @@
       "tool_count_drift": false,
       "schema_errors": [],
       "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:43:35.430Z"
+      "checked_at": "2026-09-17T09:24:54.654Z"
     },
     {
       "name": "linkup-mcp-server",
@@ -1293,11 +1293,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:09:52.674Z"
+      "checked_at": "2026-09-17T09:33:22.351Z"
     },
     {
       "name": "lsp-mcp-server",
@@ -1309,59 +1309,59 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:11:01.576Z"
+      "checked_at": "2026-09-17T09:33:22.439Z"
     },
     {
       "name": "mcp-atlassian",
-      "status": "fail",
-      "boot_ms": null,
-      "list_latency_ms": null,
-      "tool_count": null,
-      "tools_payload_bytes": null,
+      "status": "pass",
+      "boot_ms": 13775,
+      "list_latency_ms": 3,
+      "tool_count": 0,
+      "tools_payload_bytes": 2,
       "tool_count_db": 72,
-      "tool_count_drift": false,
+      "tool_count_drift": true,
       "schema_errors": [],
-      "stderr_tail": "docker: Error response from daemon: unable to find user node: no matching entries in passwd file\nRun 'docker run --help' for more information",
-      "error_code": "exit 125",
-      "failure_class": "CRASH",
+      "stderr_tail": null,
+      "error_code": null,
+      "failure_class": "NO_TOOLS",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:41:17.253Z"
+      "checked_at": "2026-09-17T09:21:57.126Z"
     },
     {
       "name": "mcp-clickhouse",
-      "status": "fail",
-      "boot_ms": null,
-      "list_latency_ms": null,
-      "tool_count": null,
-      "tools_payload_bytes": null,
+      "status": "pass",
+      "boot_ms": 36931,
+      "list_latency_ms": 4,
+      "tool_count": 3,
+      "tools_payload_bytes": 2036,
       "tool_count_db": 4,
-      "tool_count_drift": false,
+      "tool_count_drift": true,
       "schema_errors": [],
-      "stderr_tail": "Digest: sha256:e5b65587bce7de595f299855d7385fe7fca39b8a74baa261ba1b7147afa78e58\nStatus: Downloaded newer image for ghcr.io/astral-sh/uv:python3.12-bookworm-slim\ndocker: Error response from daemon: unable to find user node: no matching entries in passwd file\nRun 'docker run --help' for more information",
-      "error_code": "exit 125",
-      "failure_class": "CRASH",
+      "stderr_tail": null,
+      "error_code": null,
+      "failure_class": null,
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:40:20.866Z"
+      "checked_at": "2026-09-17T09:20:14.296Z"
     },
     {
       "name": "mcp-installer",
-      "status": "fail",
-      "boot_ms": null,
-      "list_latency_ms": null,
-      "tool_count": null,
-      "tools_payload_bytes": null,
+      "status": "pass",
+      "boot_ms": 11967,
+      "list_latency_ms": 3,
+      "tool_count": 2,
+      "tools_payload_bytes": 932,
       "tool_count_db": 3,
-      "tool_count_drift": false,
+      "tool_count_drift": true,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
-      "failure_class": "CRASH",
+      "stderr_tail": null,
+      "error_code": null,
+      "failure_class": null,
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:42:34.969Z"
+      "checked_at": "2026-09-17T09:24:02.559Z"
     },
     {
       "name": "mcp-searxng",
@@ -1373,11 +1373,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:55:18.322Z"
+      "checked_at": "2026-09-17T09:33:21.580Z"
     },
     {
       "name": "mcp-server-aws",
@@ -1389,11 +1389,11 @@
       "tool_count_db": 20,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "docker: Error response from daemon: unable to find user node: no matching entries in passwd file\nRun 'docker run --help' for more information",
-      "error_code": "exit 125",
+      "stderr_tail": "      And because awslabs-core-mcp-server==1.0.27 depends on\n      awslabs-aws-diagram-mcp-server>=1.0.5 and you require\n      awslabs-core-mcp-server==1.0.27, we can conclude that your requirements\n      are unsatisfiable.",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:41:31.148Z"
+      "checked_at": "2026-09-17T09:22:38.060Z"
     },
     {
       "name": "mcp-server-cloudflare",
@@ -1406,26 +1406,26 @@
       "tool_count_drift": false,
       "schema_errors": [],
       "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "error_code": null,
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:41:31.327Z"
+      "checked_at": "2026-09-17T09:22:52.535Z"
     },
     {
       "name": "mcp-server-everything",
-      "status": "fail",
-      "boot_ms": null,
-      "list_latency_ms": null,
-      "tool_count": null,
-      "tools_payload_bytes": null,
+      "status": "pass",
+      "boot_ms": 15182,
+      "list_latency_ms": 9,
+      "tool_count": 13,
+      "tools_payload_bytes": 6556,
       "tool_count_db": 18,
-      "tool_count_drift": false,
+      "tool_count_drift": true,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
-      "failure_class": "CRASH",
+      "stderr_tail": null,
+      "error_code": null,
+      "failure_class": null,
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:40:35.998Z"
+      "checked_at": "2026-09-17T09:21:06.470Z"
     },
     {
       "name": "mcp-server-fetch",
@@ -1437,11 +1437,11 @@
       "tool_count_db": 1,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "docker: Error response from daemon: unable to find user node: no matching entries in passwd file\nRun 'docker run --help' for more information",
-      "error_code": "exit 125",
+      "stderr_tail": "    from .server import serve\n  File \"/home/uv/.cache/uv/archive-v0/TAyR2oH4YADHoVCG85Ati/lib/python3.12/site-packages/mcp_server_fetch/server.py\", line 6, in <module>\n    from mcp.shared.exceptions import McpError\nImportError: cannot import name 'McpError' from 'mcp.shared.exceptions' (/home/uv/.cache/uv/archive-v0/TAyR2oH4YADHoVCG85Ati/lib/python3.12/site-packages/mcp/shared/exceptions.py). Did you mean: 'MCPError'?",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:41:30.662Z"
+      "checked_at": "2026-09-17T09:22:25.932Z"
     },
     {
       "name": "mcp-server-filesystem",
@@ -1454,10 +1454,10 @@
       "tool_count_drift": false,
       "schema_errors": [],
       "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:41:17.354Z"
+      "checked_at": "2026-09-17T09:22:11.586Z"
     },
     {
       "name": "mcp-server-git",
@@ -1469,11 +1469,11 @@
       "tool_count_db": 9,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "docker: Error response from daemon: unable to find user node: no matching entries in passwd file\nRun 'docker run --help' for more information",
-      "error_code": "exit 125",
+      "stderr_tail": "    - warn|w|warning|log|l|1: for a warning message (logging level CRITICAL, displayed by default)\n    - error|e|exception|raise|r|2: for a raised exception\nExample:\n    export GIT_PYTHON_REFRESH=quiet",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:45:18.500Z"
+      "checked_at": "2026-09-17T09:27:10.385Z"
     },
     {
       "name": "mcp-server-kubernetes",
@@ -1489,23 +1489,23 @@
       "error_code": "timeout",
       "failure_class": "TIMEOUT",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:41:38.656Z"
+      "checked_at": "2026-09-17T09:22:59.408Z"
     },
     {
       "name": "mcp-server-memory",
-      "status": "fail",
-      "boot_ms": null,
-      "list_latency_ms": null,
-      "tool_count": null,
-      "tools_payload_bytes": null,
+      "status": "pass",
+      "boot_ms": 15510,
+      "list_latency_ms": 11,
+      "tool_count": 9,
+      "tools_payload_bytes": 9808,
       "tool_count_db": 9,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
-      "failure_class": "CRASH",
+      "stderr_tail": null,
+      "error_code": null,
+      "failure_class": null,
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:42:25.877Z"
+      "checked_at": "2026-09-17T09:23:46.638Z"
     },
     {
       "name": "mcp-server-mysql",
@@ -1517,11 +1517,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": null,
-      "error_code": "timeout",
-      "failure_class": "TIMEOUT",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
+      "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:14:41.028Z"
+      "checked_at": "2026-09-17T09:33:22.617Z"
     },
     {
       "name": "mcp-server-neon",
@@ -1537,23 +1537,23 @@
       "error_code": "timeout",
       "failure_class": "TIMEOUT",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:38:46.433Z"
+      "checked_at": "2026-09-17T09:18:39.752Z"
     },
     {
       "name": "mcp-server-sequentialthinking",
-      "status": "fail",
-      "boot_ms": null,
-      "list_latency_ms": null,
-      "tool_count": null,
-      "tools_payload_bytes": null,
+      "status": "pass",
+      "boot_ms": 12003,
+      "list_latency_ms": 7,
+      "tool_count": 1,
+      "tools_payload_bytes": 4503,
       "tool_count_db": 1,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
-      "failure_class": "CRASH",
+      "stderr_tail": null,
+      "error_code": null,
+      "failure_class": null,
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:43:46.449Z"
+      "checked_at": "2026-09-17T09:25:13.491Z"
     },
     {
       "name": "mcp-server-time",
@@ -1565,11 +1565,11 @@
       "tool_count_db": 2,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "docker: Error response from daemon: unable to find user node: no matching entries in passwd file\nRun 'docker run --help' for more information",
-      "error_code": "exit 125",
+      "stderr_tail": "    from .server import serve\n  File \"/home/uv/.cache/uv/archive-v0/3YK7yFGK4CiHAfrf5--gl/lib/python3.12/site-packages/mcp_server_time/server.py\", line 12, in <module>\n    from mcp.shared.exceptions import McpError\nImportError: cannot import name 'McpError' from 'mcp.shared.exceptions' (/home/uv/.cache/uv/archive-v0/3YK7yFGK4CiHAfrf5--gl/lib/python3.12/site-packages/mcp/shared/exceptions.py). Did you mean: 'MCPError'?",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:45:17.956Z"
+      "checked_at": "2026-09-17T09:26:53.957Z"
     },
     {
       "name": "mongodb-mcp-server",
@@ -1585,23 +1585,56 @@
       "error_code": "timeout",
       "failure_class": "TIMEOUT",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:39:33.657Z"
+      "checked_at": "2026-09-17T09:19:26.971Z"
     },
     {
       "name": "notion-mcp-server",
-      "status": "fail",
-      "boot_ms": null,
-      "list_latency_ms": null,
-      "tool_count": null,
-      "tools_payload_bytes": null,
+      "status": "pass",
+      "boot_ms": 15987,
+      "list_latency_ms": 12,
+      "tool_count": 22,
+      "tools_payload_bytes": 68253,
       "tool_count_db": 22,
       "tool_count_drift": false,
-      "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
-      "failure_class": "CRASH",
+      "schema_errors": [
+        {
+          "tool": "API-patch-block-children",
+          "error": "property \"children[]\" uses $ref — unresolved external schemas are rejected"
+        },
+        {
+          "tool": "API-post-page",
+          "error": "property \"parent\" uses $ref — unresolved external schemas are rejected"
+        },
+        {
+          "tool": "API-query-data-source",
+          "error": "property \"sorts[]\" uses $ref — unresolved external schemas are rejected"
+        },
+        {
+          "tool": "API-update-a-data-source",
+          "error": "property \"title[]\" uses $ref — unresolved external schemas are rejected"
+        },
+        {
+          "tool": "API-update-a-data-source",
+          "error": "property \"description[]\" uses $ref — unresolved external schemas are rejected"
+        },
+        {
+          "tool": "API-create-a-data-source",
+          "error": "property \"parent\" uses $ref — unresolved external schemas are rejected"
+        },
+        {
+          "tool": "API-create-a-data-source",
+          "error": "property \"title[]\" uses $ref — unresolved external schemas are rejected"
+        },
+        {
+          "tool": "API-move-page",
+          "error": "property \"parent\" uses $ref — unresolved external schemas are rejected"
+        }
+      ],
+      "stderr_tail": null,
+      "error_code": null,
+      "failure_class": null,
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:41:00.541Z"
+      "checked_at": "2026-09-17T09:21:40.681Z"
     },
     {
       "name": "obsidian-mcp-server",
@@ -1613,11 +1646,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:58:00.390Z"
+      "checked_at": "2026-09-17T09:33:21.688Z"
     },
     {
       "name": "openapi-mcp-generator",
@@ -1629,27 +1662,27 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:52:48.302Z"
+      "checked_at": "2026-09-17T09:33:21.427Z"
     },
     {
       "name": "playwright-mcp",
-      "status": "fail",
-      "boot_ms": null,
-      "list_latency_ms": null,
-      "tool_count": null,
-      "tools_payload_bytes": null,
+      "status": "pass",
+      "boot_ms": 4421,
+      "list_latency_ms": 13,
+      "tool_count": 23,
+      "tools_payload_bytes": 17084,
       "tool_count_db": 64,
-      "tool_count_drift": false,
+      "tool_count_drift": true,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
-      "failure_class": "CRASH",
+      "stderr_tail": null,
+      "error_code": null,
+      "failure_class": null,
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:38:40.951Z"
+      "checked_at": "2026-09-17T09:18:35.021Z"
     },
     {
       "name": "prometheus-mcp",
@@ -1661,11 +1694,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:14:27.978Z"
+      "checked_at": "2026-09-17T09:33:22.600Z"
     },
     {
       "name": "sentry-mcp",
@@ -1678,10 +1711,10 @@
       "tool_count_drift": false,
       "schema_errors": [],
       "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:42:55.127Z"
+      "checked_at": "2026-09-17T09:24:14.968Z"
     },
     {
       "name": "slack-mcp-server",
@@ -1693,11 +1726,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:09:24.037Z"
+      "checked_at": "2026-09-17T09:33:22.317Z"
     },
     {
       "name": "stripe-agent-toolkit",
@@ -1710,10 +1743,10 @@
       "tool_count_drift": false,
       "schema_errors": [],
       "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:43:21.239Z"
+      "checked_at": "2026-09-17T09:24:44.112Z"
     },
     {
       "name": "supabase-mcp",
@@ -1725,27 +1758,27 @@
       "tool_count_db": 8,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "docker: Error response from daemon: unable to find user node: no matching entries in passwd file\nRun 'docker run --help' for more information",
-      "error_code": "exit 125",
-      "failure_class": "CRASH",
+      "stderr_tail": "    from mcp.server.fastmcp import FastMCP\n  File \"/home/uv/.cache/uv/archive-v0/REgtjnC3f5W-KmCXtzHms/lib/python3.12/site-packages/mcp/server/fastmcp.py\", line 16, in <module>\n    raise ModuleNotFoundError(_MESSAGE, name=__name__)\nModuleNotFoundError: No module named 'mcp.server.fastmcp'. This is mcp 2.x, where FastMCP was renamed to MCPServer (from mcp.server.mcpserver import MCPServer) and other APIs changed; see the migration guide at https://py.sdk.modelcontextprotocol.io/v2/migration/#fastmcp-renamed-to-mcpserver or pin 'mcp<2' to keep running v1 code.",
+      "error_code": "exit 1",
+      "failure_class": "NEEDS_NET",
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:40:35.829Z"
+      "checked_at": "2026-09-17T09:20:51.913Z"
     },
     {
       "name": "tavily-mcp",
-      "status": "fail",
-      "boot_ms": null,
-      "list_latency_ms": null,
-      "tool_count": null,
-      "tools_payload_bytes": null,
+      "status": "pass",
+      "boot_ms": 10686,
+      "list_latency_ms": 5,
+      "tool_count": 5,
+      "tools_payload_bytes": 7694,
       "tool_count_db": 2,
-      "tool_count_drift": false,
+      "tool_count_drift": true,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
-      "failure_class": "CRASH",
+      "stderr_tail": null,
+      "error_code": null,
+      "failure_class": null,
       "sandboxed": true,
-      "checked_at": "2026-09-17T08:45:08.050Z"
+      "checked_at": "2026-09-17T09:26:42.801Z"
     },
     {
       "name": "teamcity-mcp",
@@ -1757,27 +1790,27 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:14:08.940Z"
+      "checked_at": "2026-09-17T09:33:22.583Z"
     },
     {
       "name": "terraform-mcp-server",
-      "status": "pass",
-      "boot_ms": 433,
-      "list_latency_ms": 6,
-      "tool_count": 9,
-      "tools_payload_bytes": 9710,
+      "status": "fail",
+      "boot_ms": null,
+      "list_latency_ms": null,
+      "tool_count": null,
+      "tools_payload_bytes": null,
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": null,
-      "error_code": null,
-      "failure_class": null,
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
+      "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:15:57.938Z"
+      "checked_at": "2026-09-17T09:33:22.652Z"
     },
     {
       "name": "todoist-mcp",
@@ -1789,11 +1822,11 @@
       "tool_count_db": null,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:04:48.253Z"
+      "checked_at": "2026-09-17T09:33:22.004Z"
     },
     {
       "name": "touchdesigner-mcp-server",
@@ -1805,11 +1838,11 @@
       "tool_count_db": 13,
       "tool_count_drift": false,
       "schema_errors": [],
-      "stderr_tail": "npm notice New major version of npm available! 10.9.8 -> 12.0.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2\nnpm notice To update run: npm install -g npm@12.0.2\nnpm notice",
-      "error_code": "exit 126",
+      "stderr_tail": "error during connect: Get \"http://%2FUsers%2Fyaroslav%2F.rd%2Fdocker.sock/_ping\": EOF",
+      "error_code": "exit 1",
       "failure_class": "CRASH",
       "sandboxed": true,
-      "checked_at": "2026-09-17T09:16:16.134Z"
+      "checked_at": "2026-09-17T09:33:22.708Z"
     }
   ]
 }

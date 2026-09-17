@@ -600,3 +600,26 @@ test('sandboxWrap: each runtime gets a writable HOME its package manager can use
   assert.ok(uvx.args.includes('HOME=/home/uv'));
   assert.ok(uvx.args.some(a => a.startsWith('UV_CACHE_DIR=')), 'uv needs its cache pointed somewhere writable');
 });
+
+test('classifyFailure: a dead sandbox is not a crashed server', () => {
+  const stdio = require('../mcp-ecosystem-intelligence/scripts/lib/mcp_stdio.cjs');
+  // A whole-DB run once reported 76 CRASHes that were all the docker daemon
+  // buckling under 113 consecutive container starts. Blaming the entries for
+  // that is the report lying about the DB.
+  const sandboxNoise = [
+    'error during connect: Get "http://%2FUsers%2Fy%2F.rd%2Fdocker.sock/v1.51/containers": EOF',
+    'Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?',
+    'docker: not found',
+    'error waiting for container: context canceled',
+    'toomanyrequests: You have reached your pull rate limit',
+  ];
+  for (const stderr of sandboxNoise) {
+    assert.equal(stdio.classifyFailure({ status: 'fail', stderr }), 'SANDBOX_UNAVAILABLE', stderr.slice(0, 40));
+  }
+  // And the real classes still work: the sandbox pattern is checked first
+  // because "error during connect" would otherwise read as a network failure.
+  assert.equal(stdio.classifyFailure({ status: 'fail', stderr: 'Error: API_KEY is not set' }), 'NEEDS_ENV');
+  assert.equal(stdio.classifyFailure({ status: 'fail', stderr: 'getaddrinfo ENOTFOUND registry.npmjs.org' }), 'NEEDS_NET');
+  assert.equal(stdio.classifyFailure({ status: 'fail', stderr: 'TypeError: x is not a function' }), 'CRASH');
+  assert.equal(stdio.classifyFailure({ status: 'fail', errorCode: 'timeout after 30000ms' }), 'TIMEOUT');
+});

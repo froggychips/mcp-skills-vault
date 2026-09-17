@@ -258,6 +258,12 @@ const FAILURE_CLASS = {
   NEEDS_ENV: 'NEEDS_ENV',  // server demanded credentials/config and bailed
   NEEDS_NET: 'NEEDS_NET',  // server failed reaching the network
   NO_TOOLS:  'NO_TOOLS',   // handshake fine, zero tools advertised
+  // The sandbox itself could not run: the docker daemon went away, the socket
+  // refused, the image could not be pulled. This says nothing about the server
+  // under test, and calling it CRASH puts the blame on the entry. A whole-DB
+  // run once reported 76 CRASHes that were all this — the daemon buckling under
+  // 113 consecutive container starts.
+  SANDBOX:   'SANDBOX_UNAVAILABLE',
   CRASH:     'CRASH',      // exited / protocol error for some other reason
 };
 
@@ -272,6 +278,11 @@ function classifyFailure({ status, errorCode = '', stderr = '', toolCount = null
   const ec = String(errorCode || '');
   if (/timeout/i.test(ec)) return FAILURE_CLASS.TIMEOUT;
   const s = `${ec}\n${stderr}`.toLowerCase();
+  // Checked before the credential and network patterns, which it would
+  // otherwise match: a dead docker socket says "error during connect".
+  if (/error during connect|cannot connect to the docker daemon|docker daemon is not running|is the docker daemon running|docker\.sock|docker: not found|error waiting for container|pull access denied|toomanyrequests/.test(s)) {
+    return FAILURE_CLASS.SANDBOX;
+  }
   if (/api[_ ]?key|token|credential|unauthor|forbidden|missing .*(key|token|secret)|env(ironment)? var|not set/.test(s)) return FAILURE_CLASS.NEEDS_ENV;
   if (/econnrefused|enotfound|etimedout|eai_again|network|fetch failed|getaddrinfo|socket hang up|dns/.test(s)) return FAILURE_CLASS.NEEDS_NET;
   return FAILURE_CLASS.CRASH;

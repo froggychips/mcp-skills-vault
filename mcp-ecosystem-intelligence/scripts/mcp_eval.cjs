@@ -732,9 +732,28 @@ async function main() {
   const kept = (payload.results || []).filter(r => !touched.has(r.name));
 
   const newResults = [];
+  let consecutiveSandboxFailures = 0;
   for (const tool of picked) {
     if (!opts.json) process.stderr.write(`smoking ${tool.name}…\n`);
     const r = await smokeEntry(tool, opts);
+    // "The sandbox could not run" is not a finding about the entry. Report it
+    // as a skip, and give up once it is plainly the environment: continuing
+    // produces a report that blames 100 entries for one broken daemon.
+    if (r.failure_class === stdio.classifyFailure.SANDBOX_UNAVAILABLE
+        || r.failure_class === 'SANDBOX_UNAVAILABLE') {
+      r.status = 'skip';
+      consecutiveSandboxFailures++;
+      if (consecutiveSandboxFailures >= 3) {
+        newResults.push(r);
+        process.stderr.write(
+          `\nStopping: the sandbox failed ${consecutiveSandboxFailures} times in a row ` +
+          `(${r.error_code || 'docker unavailable'}). That is the environment, not these servers.\n`
+        );
+        break;
+      }
+    } else {
+      consecutiveSandboxFailures = 0;
+    }
     newResults.push(r);
     if (!opts.json) {
       const tag = r.status === 'pass' ? 'PASS' : (r.status === 'fail' ? 'FAIL' : 'SKIP');
