@@ -152,6 +152,15 @@ const CLAIMS = [
     },
   },
   {
+    what:  'provenance dimension counts',
+    file:  'README.md',
+    re:    /provenance\s+bound (\d+), absent (\d+)/,
+    expected: () => {
+      const by = (status) => count((t) => t.trust_evidence?.dimensions?.provenance?.status === status);
+      return [by('bound'), by('absent')];
+    },
+  },
+  {
     what:  'entries listed in the official registry',
     file:  'README.md',
     re:    /(\d+) entries are listed today and all of them agree/,

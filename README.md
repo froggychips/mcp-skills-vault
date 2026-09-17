@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@froggychips/mcp-vault.svg)](https://www.npmjs.com/package/@froggychips/mcp-vault)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Zero deps](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](./PHILOSOPHY.md)
-[![Tests](https://img.shields.io/badge/tests-710%20pass-brightgreen.svg)](./tests)
+[![Tests](https://img.shields.io/badge/tests-711%20pass-brightgreen.svg)](./tests)
 
 **Homepage:** [mcp.froggychips.xyz](https://mcp.froggychips.xyz) · **npm:** [`@froggychips/mcp-vault`](https://www.npmjs.com/package/@froggychips/mcp-vault)
 

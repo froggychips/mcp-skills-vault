@@ -1,6 +1,6 @@
 {
   "$schema": "mcp-vault/policy@1",
-  "comment": "Copy to .mcp-vault.policy.json and adjust. Every key is optional; an unknown key is an error, so a typo can't quietly enforce nothing. A policy can only raise the bar — flags still win where given.",
+  "comment": "Copy to .mcp-vault.policy.json and adjust. Every key is optional; an unknown key is an error, so a typo can't quietly enforce nothing (this file has exactly two non-policy keys: $schema and comment). A policy can only raise the bar — flags still win where given. 'signatures': require | prefer. 'provenance': bound | require | prefer, where 'bound' demands an attestation whose subject digest is the artifact, signed by npm's own registry key, with a certificate naming the recorded repository. 'contextBudget': fail | warn, against maxContextTokens or maxContextPercent.",
 
   "unverified": "fail",
   "installHooks": "warn",
