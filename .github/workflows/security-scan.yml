@@ -612,6 +612,11 @@ jobs:
           git fetch --no-tags origin "+$HEAD_SHA:refs/mcp-vault/pr-head"
           git checkout refs/mcp-vault/pr-head -- mcp-ecosystem-intelligence/assets/tools_database.json
           git --no-pager diff --stat -- mcp-ecosystem-intelligence/assets/tools_database.json
+      # Note the consequence of checking out the base commit above: the actions
+      # this job uses come from base too, so a change to them takes effect after
+      # merge, not in the PR that makes it. That is the intended direction — the
+      # PR must not be able to redefine the machinery that contains it — but it
+      # does mean this step fails in the PR that first adds the action.
       - name: Docker preflight
         uses: ./.github/actions/docker-preflight
         with:
