@@ -58,6 +58,9 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 15
     needs: unit-tests
+    permissions:
+      contents: read
+      security-events: write   # upload-sarif
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -65,6 +68,19 @@ jobs:
           node-version: '20'
       - name: verify_integrity --offline
         run: node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --offline
+      # Same run, machine-readable: each finding lands on the tools_database.json
+      # line that caused it, so a PR that adds an entry with no pin gets the
+      # annotation on that entry instead of a red check with prose in the log.
+      - name: verify_integrity --sarif
+        if: always()
+        run: node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --offline --sarif > verify.sarif
+      - name: Upload to code scanning
+        if: always()
+        continue-on-error: true   # code scanning may be off; never block the gate on it
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: verify.sarif
+          category: mcp-vault-verify
 
   refresh-hashes:
     name: Weekly hash refresh PR

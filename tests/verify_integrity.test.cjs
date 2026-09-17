@@ -347,3 +347,35 @@ test('CLI: --json output of the sibling CLIs stays parseable', () => {
     assert.doesNotThrow(() => JSON.parse(r.stdout), `${script} --json must be a single JSON document`);
   }
 });
+
+test('CLI --json: a single document on stdout, chatter on stderr', () => {
+  const r = runVerify(['--offline', '--json']);
+  assert.equal(r.status, 0, r.stderr);
+  const report = JSON.parse(r.stdout);
+  assert.equal(report.schema, 'mcp-vault/verify-report@1');
+  assert.equal(report.mode, 'offline');
+  assert.equal(report.checked, report.entries.length);
+  assert.equal(report.entries.length > 100, true);
+  // Progress lines must not land in the document.
+  assert.match(r.stderr, /Offline mode/);
+  assert.doesNotMatch(r.stdout, /Offline mode/);
+});
+
+test('CLI --sarif: valid enough for code scanning to ingest', () => {
+  const r = runVerify(['--offline', '--sarif']);
+  assert.equal(r.status, 0, r.stderr);
+  const sarif = JSON.parse(r.stdout);
+  assert.equal(sarif.version, '2.1.0');
+  const run = sarif.runs[0];
+  assert.equal(run.tool.driver.name, 'mcp-vault verify');
+  for (const res of run.results) {
+    assert.ok(['error', 'warning'].includes(res.level), res.level);
+    assert.ok(res.locations[0].physicalLocation.region.startLine >= 1);
+    assert.match(res.locations[0].physicalLocation.artifactLocation.uri, /tools_database\.json$/);
+  }
+});
+
+test('CLI --json: exit code still reflects the verdict', () => {
+  assert.equal(runVerify(['--offline', '--json']).status, 0);
+  assert.equal(runVerify(['--offline', '--json', '--fail-unverified']).status, 1);
+});

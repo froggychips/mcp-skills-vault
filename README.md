@@ -144,6 +144,8 @@ Flags:
 | `--offline` | True offline mode; no network calls, validates stored DB pins only |
 | `--fail-unverified` | Treat `UNVERIFIED` (registry unreachable, unparsable install command, wheel-only PyPI release) as a hard failure. Implied by `--strict` |
 | `--entry <name>` | Check a single DB entry instead of all of them |
+| `--json` | Structured report on stdout (progress goes to stderr); exit code unchanged |
+| `--sarif` | SARIF 2.1.0 for GitHub code scanning — each finding anchored to its `tools_database.json` line |
 
 An entry the gate could not actually compare against a registry reports
 `UNVERIFIED`, never `OK` — "the feed was down" is not "the pin is good". It is

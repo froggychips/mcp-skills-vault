@@ -26,6 +26,8 @@
  *   node scripts/verify_integrity.cjs --offline    true offline mode; validate DB pins only
  *   node scripts/verify_integrity.cjs --entry NAME  check a single DB entry by name
  *   node scripts/verify_integrity.cjs --fail-unverified  UNVERIFIED → hard failure
+ *   node scripts/verify_integrity.cjs --json       structured report on stdout
+ *   node scripts/verify_integrity.cjs --sarif      SARIF 2.1.0 (GitHub code scanning)
  *
  * Exit codes:
  *   0  all checks passed
@@ -50,6 +52,7 @@ const { exitAfterFlush } = require('./lib/exit.cjs');
 const {
   npmPkgName, pypiPkgName, dockerImageRef, dockerDigestPinned,
 } = require('./lib/install_cmd.cjs');
+const { toJsonReport, toSarif, dbLineIndex } = require('./lib/report.cjs');
 
 const DB_PATH   = path.resolve(__dirname, '../assets/tools_database.json');
 const UPDATE    = process.argv.includes('--update');
@@ -68,6 +71,10 @@ const ENTRY     = (() => {
 // --strict implies --fail-unverified; an install gate wants the latter without
 // necessarily refusing every entry that ships a postinstall hook.
 const FAIL_UNVERIFIED = STRICT || process.argv.includes('--fail-unverified');
+// Machine-readable output. --sarif is SARIF 2.1.0 for GitHub code scanning,
+// which puts each finding on the tools_database.json line that caused it.
+const AS_JSON  = process.argv.includes('--json');
+const AS_SARIF = process.argv.includes('--sarif');
 
 const INSTALL_HOOKS = ['preinstall', 'install', 'postinstall', 'prepare', 'prepack'];
 
@@ -75,6 +82,14 @@ const INSTALL_HOOKS = ['preinstall', 'install', 'postinstall', 'prepare', 'prepa
 const PYPI_SOURCE_KEYS = ['Source', 'Source Code', 'Repository', 'Homepage', 'Home', 'Bug Tracker'];
 
 // ── helpers ────────────────────────────────────────────────────────────────
+
+// Progress chatter. In --json/--sarif mode stdout belongs to the document, so
+// this goes to stderr instead of interleaving with it.
+function progress(line) {
+  if (AS_JSON || AS_SARIF) process.stderr.write(line);
+  else                     process.stdout.write(line);
+}
+
 
 function normalizeGitUrl(url) {
   if (!url || typeof url !== 'string') return null;
@@ -749,7 +764,7 @@ async function main() {
     const npmQueries  = npmTools.map(({ pkg, tool })  => ({ ecosystem: 'npm',  name: pkg, version: tool.version || '0.0.0' }));
     const pypiQueries = pypiTools.map(({ pkg, tool }) => ({ ecosystem: 'PyPI', name: pkg, version: tool.version || '0.0.0' }));
     const allQueries  = [...npmQueries, ...pypiQueries];
-    process.stdout.write(`Querying npm bulk (${npmTools.length}), OSV.dev (${allQueries.length}), GHSA (${allQueries.length}), Snyk... `);
+    progress(`Querying npm bulk (${npmTools.length}), OSV.dev (${allQueries.length}), GHSA (${allQueries.length}), Snyk... `);
     [npmAdvisories, osvNpm, osvPypi, ghsa, snyk] = await Promise.all([
       fetchNpmAdvisories(npmMap),
       fetchOsvAdvisories(npmQueries),
@@ -757,15 +772,15 @@ async function main() {
       fetchGhsaAdvisories(allQueries),
       fetchSnykAdvisories(allQueries),
     ]);
-    console.log(`done — sources: ${summarizeFeedSources({ npm: npmAdvisories, osvNpm, osvPypi, ghsa, snyk }).join(', ')}.`);
+    progress(`done — sources: ${summarizeFeedSources({ npm: npmAdvisories, osvNpm, osvPypi, ghsa, snyk }).join(', ')}.\n`);
   }
   const health = { npm: npmAdvisories, osvNpm, osvPypi, ghsa, snyk };
 
   // Process npm.
   if (OFFLINE) {
-    console.log('Offline mode: validating stored pins only; no registry/advisory network calls.');
+    progress('Offline mode: validating stored pins only; no registry/advisory network calls.\n');
   } else if (NO_AUDIT && !UPDATE) {
-    console.log('No-audit mode: checking live registry metadata; advisory feeds skipped.');
+    progress('No-audit mode: checking live registry metadata; advisory feeds skipped.\n');
   }
 
   // Process npm.
@@ -796,6 +811,33 @@ async function main() {
   }
   // Process docker.
   for (const { tool } of dockerTools) processDocker(tool, results);
+
+  // Machine-readable modes: one document on stdout, nothing else. Everything
+  // human-facing has gone to stderr already, so `--json` stays pipeable.
+  if (AS_JSON || AS_SARIF) {
+    totalFails = results.reduce((n, r) => n + (r.failures || 0), 0);
+    const report = toJsonReport({
+      results,
+      meta: {
+        mode: OFFLINE ? 'offline' : (UPDATE ? 'update' : (NO_AUDIT ? 'no-audit' : 'full')),
+        entry: ENTRY,
+        fail_unverified: FAIL_UNVERIFIED,
+        strict: STRICT,
+        feeds: (UPDATE || NO_AUDIT || OFFLINE) ? null : summarizeFeedSources(health),
+      },
+    });
+    if (AS_SARIF) {
+      const raw = fs.readFileSync(DB_PATH, 'utf8');
+      process.stdout.write(JSON.stringify(toSarif(report, {
+        dbPath: path.relative(process.cwd(), DB_PATH).split(path.sep).join('/'),
+        lineOf: dbLineIndex(raw),
+      }), null, 2) + '\n');
+    } else {
+      process.stdout.write(JSON.stringify(report, null, 2) + '\n');
+    }
+    if (UPDATE && results.some((r) => r.status === 'UPD')) writeDb(DB_PATH, db);
+    return exitAfterFlush(totalFails > 0 ? 1 : 0);
+  }
 
   // Print results, grouped per tool.
   for (const r of results) {

@@ -67,6 +67,7 @@ COMMANDS
 
 COMMON OPTIONS
   --json            Machine-readable output
+  --sarif           SARIF 2.1.0 for code scanning (verify)
   --strict          Treat warnings as failures (exit 1)
   --no-audit        Skip advisory APIs; verify still checks live registries
   --offline         True offline verify mode; validate stored DB pins only
