@@ -29,6 +29,42 @@ const path = require('path');
 const os   = require('os');
 
 /**
+ * Codex keeps TOML. Rather than take on a TOML parser, this reads the one shape
+ * that matters here — `[mcp_servers.<name>]` blocks with `command` and `args` —
+ * and ignores everything else. Narrow on purpose: a half-understood parse of
+ * someone's whole config would invite acting on a misreading.
+ */
+function parseCodexToml(text) {
+  const out = {};
+  let current = null;
+  for (const line of String(text).split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const section = trimmed.match(/^\[mcp_servers\.(.+)\]$/);
+    if (section) {
+      const name = section[1].trim().replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1');
+      current = name;
+      out[current] = { command: null, args: [] };
+      continue;
+    }
+    if (/^\[/.test(trimmed)) { current = null; continue; }   // some other table
+    if (!current) continue;
+    const kv = trimmed.match(/^(\w+)\s*=\s*(.+)$/);
+    if (!kv) continue;
+    const [, key, rawValue] = kv;
+    if (key === 'command') {
+      out[current].command = rawValue.trim().replace(/^["'](.*)["']$/, '$1');
+    } else if (key === 'args') {
+      const inner = rawValue.trim().replace(/^\[/, '').replace(/\]$/, '');
+      out[current].args = inner
+        ? inner.split(',').map((v) => v.trim().replace(/^["'](.*)["']$/, '$1')).filter(Boolean)
+        : [];
+    }
+  }
+  return { mcpServers: out };
+}
+
+/**
  * Where each host keeps its MCP server list. `scope` distinguishes a config
  * that travels with the project from one that applies to every project — a
  * global entry is the more interesting one to get wrong.
@@ -47,7 +83,7 @@ function hostConfigPaths({ cwd = process.cwd(), home = os.homedir(), platform = 
     { host: 'cursor',         scope: 'project', path: path.join(cwd, '.cursor', 'mcp.json') },
     { host: 'cursor',         scope: 'user',    path: path.join(home, '.cursor', 'mcp.json') },
     { host: 'vscode',         scope: 'project', path: path.join(cwd, '.vscode', 'mcp.json') },
-    { host: 'codex',          scope: 'user',    path: path.join(home, '.codex', 'config.json') },
+    { host: 'codex',          scope: 'user',    path: path.join(home, '.codex', 'config.toml') },
   ];
 }
 
@@ -115,8 +151,9 @@ function readInstalledServers({ cwd = process.cwd(), home = os.homedir(), platfo
     try { raw = fs.readFileSync(loc.path, 'utf8'); }
     catch { continue; }                       // not configured on this machine
     let doc;
-    try { doc = JSON.parse(raw); }
-    catch (e) {
+    try {
+      doc = loc.path.endsWith('.toml') ? parseCodexToml(raw) : JSON.parse(raw);
+    } catch (e) {
       if (onUnreadable) onUnreadable({ ...loc, error: e.message });
       continue;
     }
@@ -127,4 +164,4 @@ function readInstalledServers({ cwd = process.cwd(), home = os.homedir(), platfo
   return servers;
 }
 
-module.exports = { hostConfigPaths, parseConfig, toInstallCmd, readInstalledServers };
+module.exports = { hostConfigPaths, parseConfig, toInstallCmd, readInstalledServers, parseCodexToml };

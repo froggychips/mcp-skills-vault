@@ -108,3 +108,32 @@ test('readInstalledServers: reads several configs, flags unreadable ones', () =>
   assert.equal(problems[0].path, bad);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('parseCodexToml: reads mcp_servers blocks, ignores the rest of the file', () => {
+  const toml = [
+    '# my codex config',
+    'model = "gpt-5"',
+    '',
+    '[mcp_servers.teamcity]',
+    'command = "/opt/bin/teamcity-mcp"',
+    '',
+    '[mcp_servers."@scope/pkg"]',
+    'command = "npx"',
+    'args = ["-y", "@scope/pkg@1.2.3"]',
+    '',
+    '[other_table]',
+    'command = "not-a-server"',
+  ].join('\n');
+  const doc = inst.parseCodexToml(toml);
+  assert.deepEqual(Object.keys(doc.mcpServers), ['teamcity', '@scope/pkg']);
+  assert.equal(doc.mcpServers.teamcity.command, '/opt/bin/teamcity-mcp');
+  assert.deepEqual(doc.mcpServers['@scope/pkg'].args, ['-y', '@scope/pkg@1.2.3']);
+  // A key in an unrelated table must not leak into a server definition.
+  assert.equal(Object.keys(doc.mcpServers).includes('other_table'), false);
+});
+
+test('parseCodexToml: empty and malformed input yield no servers', () => {
+  assert.deepEqual(inst.parseCodexToml('').mcpServers, {});
+  assert.deepEqual(inst.parseCodexToml('just = "keys"').mcpServers, {});
+  assert.deepEqual(inst.parseCodexToml('[mcp_servers.x]\nargs = []').mcpServers, { x: { command: null, args: [] } });
+});

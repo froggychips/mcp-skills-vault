@@ -10,6 +10,9 @@
  *   node scripts/orchestrate.cjs [--cwd <path>] [--query <text>]
  *   node scripts/orchestrate.cjs --install <name> [--global] [--cwd <path>]
  *                                 [--strict] [--allow-unpinned]
+ *                                 [--host claude-code|claude-desktop|cursor|vscode|codex]
+ *                                 [--scope project|user]
+ *   node scripts/orchestrate.cjs --list-hosts
  *   node scripts/orchestrate.cjs --json   (machine-readable, for Claude)
  *
  * Exit codes:
@@ -24,6 +27,7 @@ const fs            = require('fs');
 const path          = require('path');
 const { spawnSync } = require('child_process');
 const { exitAfterFlush } = require('./lib/exit.cjs');
+const { listHosts, resolveTarget, writeServerEntry } = require('./lib/hosts.cjs');
 // Reuse the gate's parsers so "what gets pinned" and "what gets checked" can
 // never drift apart — they were two independent regexes before.
 const {
@@ -49,6 +53,11 @@ const STRICT     = argv.includes('--strict');
 // Off by default: writing an unpinned command into .mcp.json means the thing
 // that runs is not the thing the gate checked.
 const ALLOW_UNPINNED = argv.includes('--allow-unpinned');
+// Which host's config to write. The same vault entry is just as useful in
+// Cursor, VS Code, Claude Desktop or Codex; only the path (and in two cases the
+// shape) differs.
+const HOST   = argVal('--host') || 'claude-code';
+const SCOPE  = argv.includes('--global') ? 'user' : (argVal('--scope') || 'project');
 
 function argVal(flag) {
   const i = argv.indexOf(flag);
@@ -453,11 +462,37 @@ function installTool(tool, cwd, global_) {
   // Build the server config entry
   const serverEntry = buildServerEntry(tool);
 
-  if (global_) {
-    writeGlobal(tool.name, serverEntry);
-  } else {
-    writeProjectMcp(cwd, tool.name, serverEntry);
+  const target = resolveTarget(HOST, SCOPE, { cwd });
+  if (!target) {
+    const hosts = listHosts().map((h) => `${h.id} (${h.scopes.join('/')})`).join(', ');
+    process.stderr.write(`${RD}No such host/scope: ${HOST}/${SCOPE}.${RS}\nAvailable: ${hosts}\n`);
+    process.exit(2);
   }
+
+  const diff = JSON.stringify({ [target.key]: { [tool.name]: serverEntry } }, null, 2);
+  process.stderr.write(`\nWill add to ${target.path} (${target.label}, ${SCOPE} scope):\n${DM}${diff}${RS}\n\n`);
+
+  let result;
+  try {
+    result = writeServerEntry(target, tool.name, serverEntry);
+  } catch (e) {
+    process.stderr.write(`${RD}${e.message}${RS}\n`);
+    process.exit(2);
+  }
+
+  if (result.action === 'manual') {
+    // Codex keeps TOML. Rewriting it without a TOML parser would destroy
+    // comments and formatting, so hand over the three correct lines instead.
+    process.stdout.write(
+      `${target.label} keeps its config in TOML (${target.path}).\n` +
+      `Add this block yourself — mcp-vault does not rewrite TOML:\n\n${result.snippet}\n`
+    );
+    return;
+  }
+
+  if (result.replaced) process.stderr.write(`${YL}NOTE: ${tool.name} was already configured here — replaced.${RS}\n`);
+  if (result.backup)   process.stderr.write(`Backup: ${result.backup}\n`);
+  process.stdout.write(`Added ${tool.name} to ${result.path}\nRestart ${target.label} to pick up the new server.\n`);
 }
 
 // Pin the package token of an install command to the version the DB records —
@@ -552,45 +587,6 @@ function buildServerEntry(tool) {
   }
 
   return { command: parts[0], args: parts.slice(1) };
-}
-
-function writeProjectMcp(cwd, serverName, entry) {
-  const mcpPath = path.join(cwd, '.mcp.json');
-  let cfg = {};
-  try { cfg = JSON.parse(fs.readFileSync(mcpPath, 'utf8')); } catch {}
-  cfg.mcpServers = cfg.mcpServers || {};
-
-  if (cfg.mcpServers[serverName]) {
-    process.stderr.write(`\n${YL}NOTE: ${serverName} already in .mcp.json — overwriting.${RS}\n`);
-  }
-
-  cfg.mcpServers[serverName] = entry;
-
-  const diff = JSON.stringify({ mcpServers: { [serverName]: entry } }, null, 2);
-  process.stderr.write(`\nWill add to ${mcpPath}:\n${DM}${diff}${RS}\n\n`);
-
-  fs.writeFileSync(mcpPath, JSON.stringify(cfg, null, 2) + '\n');
-  process.stdout.write(`Added ${serverName} to .mcp.json\nRestart Claude Code to pick up the new server.\n`);
-}
-
-function writeGlobal(serverName, entry) {
-  const cfgPath = path.join(process.env.HOME || '', '.claude.json');
-  let cfg = {};
-  try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch {
-    process.stderr.write(`${RD}~/.claude.json not found — cannot write global config.${RS}\n`);
-    process.exit(2);
-  }
-
-  // backup
-  const bak = cfgPath + `.bak.${Date.now()}`;
-  fs.copyFileSync(cfgPath, bak);
-  process.stderr.write(`Backup: ${bak}\n`);
-
-  cfg.mcpServers = cfg.mcpServers || {};
-  cfg.mcpServers[serverName] = entry;
-
-  fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2) + '\n');
-  process.stdout.write(`Added ${serverName} to ~/.claude.json\nRestart Claude Code to pick up the new server.\n`);
 }
 
 // ── Report formatting ───────────────────────────────────────────────────────
@@ -696,6 +692,15 @@ function printReport(stack, matched, installed, db, unmapped) {
 // ── Main ────────────────────────────────────────────────────────────────────
 
 if (require.main === module) {
+  if (argv.includes('--list-hosts')) {
+    for (const h of listHosts()) {
+      process.stdout.write(`${h.id.padEnd(16)} ${h.label.padEnd(16)} scopes: ${h.scopes.join(', ').padEnd(14)} ${h.format === 'toml' ? '(snippet only — TOML config)' : ''}\n`);
+    }
+    // `return` as well as the exit: exitAfterFlush() queues the exit behind a
+    // stdout drain, so execution would otherwise carry on into the scan.
+    return exitAfterFlush(0);
+  }
+
   const db        = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
   const stack     = detectStack(CWD);
   const matched   = matchDB(db, stack, QUERY);
