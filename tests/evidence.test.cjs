@@ -183,17 +183,48 @@ test('a confirmed vulnerability is not softened by another feed being down', () 
   assert.equal(ev.deriveTrust({ artifact_id: 'x', dimensions: { artifact: { status: 'verified', checked_at: '2026-09-17', verified_at: '2026-09-17' }, ...e.dimensions } }, { now: NOW }), 'unverified');
 });
 
-test('mergeEvidence: an unknown id is not a different id', () => {
-  // A run that could not compute an artifact name must not wipe the history;
-  // only a name that actually differs means a different release.
-  const stored = { artifact_id: 'npm:p@1', dimensions: { artifact: { status: 'verified', checked_at: '2026-09-17', verified_at: '2026-09-17' } } };
-  const anonymous = { artifact_id: null, dimensions: { smoke: { status: 'pass', checked_at: '2026-09-17' } } };
-  const merged = ev.mergeEvidence(stored, anonymous);
-  assert.equal(merged.dimensions.artifact.status, 'verified');
-  assert.equal(merged.dimensions.smoke.status, 'pass');
-  assert.equal(merged.artifact_id, 'npm:p@1');
 
-  // A different id still discards.
-  const other = { artifact_id: 'npm:p@2', dimensions: { smoke: { status: 'pass', checked_at: '2026-09-17' } } };
-  assert.equal(ev.mergeEvidence(stored, other).dimensions.artifact, undefined);
+test('mergeEvidence: unidentified history does not attach itself to a new artifact', () => {
+  // Stored evidence with no id used to merge into whatever came next and take
+  // its identity, handing the new version an advisory result nothing checked.
+  const anonymous = { artifact_id: null, dimensions: { advisories: { status: 'clean', checked_at: '2026-09-17', verified_at: '2026-09-17' } } };
+  const named = { artifact_id: 'npm:other@2.0.0', dimensions: { artifact: { status: 'verified', checked_at: '2026-09-17', verified_at: '2026-09-17' } } };
+  const merged = ev.mergeEvidence(anonymous, named);
+  assert.equal(merged.artifact_id, 'npm:other@2.0.0');
+  assert.equal(merged.dimensions.advisories, undefined, 'the unidentified advisory result must not transfer');
+  assert.equal(ev.deriveTrust(merged, { now: NOW, require: ev.requiredFor('npm') }), 'candidate');
+});
+
+test('mergeEvidence: a record written before verified_at existed keeps its date', () => {
+  // Legacy shape: positive status, only checked_at.
+  const legacy = { artifact_id: 'npm:p@1', dimensions: { artifact: { status: 'verified', checked_at: '2024-01-01' } } };
+  const looked = { artifact_id: 'npm:p@1', dimensions: { artifact: { status: 'unverified', checked_at: '2026-09-17', method: 'offline-pin-present' } } };
+  const merged = ev.mergeEvidence(legacy, looked);
+  assert.equal(merged.dimensions.artifact.verified_at, '2024-01-01');
+  const stale = ev.staleDimensions(merged, ev.DEFAULT_MAX_AGE_DAYS, NOW);
+  assert.deepEqual(stale.map(s => s.dimension), ['artifact'], 'a 2024 confirmation is not current in 2026');
+});
+
+test('mergeEvidence: inheriting requires a positive identity match', () => {
+  // Earlier this treated a missing id as "probably the same entry", which let
+  // unidentified evidence attach itself to whatever was merged next. Nothing
+  // inherits without both sides naming the same artifact.
+  const stored = { artifact_id: 'npm:p@1', dimensions: { artifact: { status: 'verified', checked_at: '2026-09-17', verified_at: '2026-09-17' } } };
+
+  const same = ev.mergeEvidence(stored, { artifact_id: 'npm:p@1', dimensions: { smoke: { status: 'pass', checked_at: '2026-09-17' } } });
+  assert.equal(same.dimensions.artifact.status, 'verified');
+  assert.equal(same.dimensions.smoke.status, 'pass');
+
+  const different = ev.mergeEvidence(stored, { artifact_id: 'npm:p@2', dimensions: { smoke: { status: 'pass', checked_at: '2026-09-17' } } });
+  assert.equal(different.dimensions.artifact, undefined);
+
+  const unnamed = ev.mergeEvidence(stored, { artifact_id: null, dimensions: { smoke: { status: 'pass', checked_at: '2026-09-17' } } });
+  assert.equal(unnamed.dimensions.artifact, undefined, 'an unnamed run cannot claim the stored evidence');
+
+  // Two unidentified records belong to the same entry the caller is holding.
+  const bothUnnamed = ev.mergeEvidence(
+    { artifact_id: null, dimensions: { smoke: { status: 'pass', checked_at: '2026-09-01' } } },
+    { artifact_id: null, dimensions: { artifact: { status: 'unverified', checked_at: '2026-09-17' } } },
+  );
+  assert.equal(bothUnnamed.dimensions.smoke.status, 'pass');
 });

@@ -133,14 +133,18 @@ function smokeEvidence(evalResult, { now = Date.now() } = {}) {
  * examine keeps its previous (dated) answer — that is the point of the dates.
  */
 function mergeEvidence(existing, fresh) {
-  // An id that differs means a different release, and the old evidence goes.
-  // An id that is *missing* means we could not tell — which is not the same
-  // statement, and discarding the history on it would throw away real answers
-  // because one side failed to compute a name.
+  // Inheriting requires a positive match. Treating a missing id as "probably
+  // the same" let evidence recorded with no identity — an older format, or a
+  // run that could not name the artifact — attach itself to whatever came
+  // next: stored `{artifact_id: null, advisories: clean}` merged into
+  // `npm:other@2.0.0` and handed it an advisory result nothing had checked.
   const freshId = fresh && fresh.artifact_id;
   const existingId = existing && existing.artifact_id;
-  const differentArtifact = Boolean(freshId && existingId && freshId !== existingId);
-  const base = differentArtifact ? {} : ((existing && existing.dimensions) || {});
+  const sameArtifact = Boolean(freshId && existingId && freshId === existingId)
+    // Both unknown: nothing has been asserted about identity either way, and
+    // the caller is looking at one entry.
+    || (!freshId && !existingId && Boolean(existing));
+  const base = sameArtifact ? ((existing && existing.dimensions) || {}) : {};
   const merged = { ...base };
   for (const [name, value] of Object.entries((fresh && fresh.dimensions) || {})) {
     if (!value) continue;
@@ -150,7 +154,14 @@ function mergeEvidence(existing, fresh) {
       // Carry the last confirmation forward. A fresh negative or inconclusive
       // result replaces the status but must not erase when the thing last
       // actually checked out — that date is what staleness is measured on.
-      const carried = value.verified_at || (prev && prev.verified_at) || null;
+      // Records written before `verified_at` existed only have `checked_at`,
+      // and for a positive status that date *was* the confirmation; without
+      // this, a two-year-old `verified` became current the moment an offline
+      // run looked at it.
+      const priorConfirmation = prev
+        ? (prev.verified_at || (POSITIVE_STATUSES.has(prev.status) ? prev.checked_at : null))
+        : null;
+      const carried = value.verified_at || priorConfirmation || null;
       merged[name] = carried ? { ...value, verified_at: carried } : { ...value };
     }
   }

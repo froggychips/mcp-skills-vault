@@ -246,8 +246,21 @@ test('a pull_request build refuses to fall back to the host when it cannot isola
   // the only two options are "check nothing" and "run PR code on the host" —
   // and the second must never be reachable by accident.
   const src = sources.get('.github/workflows/security-scan.yml');
-  assert.match(src, /Isolation preflight/, 'no preflight for the PR isolation');
-  assert.match(src, /docker info/, 'the preflight does not actually probe the runtime');
+  const action = sources.get('.github/actions/docker-preflight/action.yml');
+  assert.ok(action, 'the shared docker preflight action is missing');
+  assert.match(action, /docker info/, 'the preflight does not actually probe the runtime');
+  assert.match(action, /checks nothing rather than running it on the host/, 'the refusal must be explicit');
+
+  // Every job that shells out to docker needs its own: GITHUB_ENV does not
+  // cross job boundaries, so one job finding the socket says nothing about
+  // the next one.
+  const jobsNeedingDocker = ['unit-tests', 'smoke', 'mcp-eval-pr', 'mcp-eval-smoke'];
+  const jobBlocks = src.split(/\n  (?=[a-z0-9_-]+:\n)/i).slice(1);
+  for (const job of jobsNeedingDocker) {
+    const block = jobBlocks.find((b) => b.startsWith(`${job}:`));
+    assert.ok(block, `job ${job} not found`);
+    assert.match(block, /docker-preflight/, `${job} uses docker without a preflight`);
+  }
   // The guarded steps still take the host path only when this is not a PR.
   const hostFallbacks = src.split('\n').filter((l) => /^\s+node (--test|mcp-ecosystem)/.test(l));
   assert.ok(hostFallbacks.length > 0, 'expected the trusted-context branches to exist');

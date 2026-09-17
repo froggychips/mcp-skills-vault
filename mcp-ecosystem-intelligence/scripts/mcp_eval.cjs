@@ -70,6 +70,26 @@ const { readInstalledServers } = require('./lib/installed.cjs');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Is the container runtime actually unavailable?
+ *
+ * Text matching alone cannot answer this: a server can print "Cannot connect to
+ * the Docker daemon" and exit 1 before ever answering initialize, and be
+ * recorded as an infrastructure failure — skipped rather than failed, with
+ * three of them stopping the run. The runtime itself is the authority, so ask
+ * it. Cached per process: the answer does not change mid-run in a way worth
+ * paying for repeatedly, and a genuine outage is confirmed once.
+ */
+let dockerAliveCache = null;
+function dockerIsAlive() {
+  if (dockerAliveCache !== null) return dockerAliveCache;
+  const probe = require('child_process').spawnSync('docker', ['version', '--format', '{{.Server.Version}}'], {
+    encoding: 'utf8', timeout: 10000, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  dockerAliveCache = probe.status === 0 && /\S/.test(probe.stdout || '');
+  return dockerAliveCache;
+}
+
 // Is this launch spec a single, immutable version? `latest`, a range, or a tag
 // is not, and a smoke result against one cannot be attributed to a release.
 function isExactVersion(installCmd, version) {
@@ -385,6 +405,12 @@ async function smokeEntry(tool, opts) {
   // pre-resolved {command, args} so the fake server (which doesn't
   // look like npx/uvx/docker) can drive the smoke loop end-to-end
   // without forking the parser. Production DB entries never carry it.
+  // Captured before anything is launched: re-reading the DB afterwards can see
+  // a different version than the one that actually ran.
+  result.launched = {
+    install_cmd: tool.install_cmd || null,
+    db_version:  tool.version || null,
+  };
   const parsed = tool._evalSpawn || parseInstallCmd(tool.install_cmd);
   if (!parsed) {
     result.error_code = 'unrecognized install method';
@@ -581,6 +607,13 @@ async function smokeEntry(tool, opts) {
     // failure and be skipped.
     handshakeReached: result.boot_ms !== null || result.tool_count !== null,
   });
+
+  // A claimed infrastructure failure is only believed if the infrastructure
+  // agrees. Otherwise it is a crashing server that found the magic words.
+  if (result.failure_class === 'SANDBOX_UNAVAILABLE' && opts.sandbox && dockerIsAlive()) {
+    result.failure_class = 'CRASH';
+    result.error_code = `${result.error_code || 'exit failure'} (claimed a docker failure, but docker is up)`;
+  }
 
   return result;
 }
@@ -825,9 +858,16 @@ async function main() {
         // says was verified. `npx -y pkg@latest` satisfied the old check while
         // running anything at all, and a command pinned to 2.0.0 recorded its
         // result against the DB's 1.0.0.
-        const launched = versionFromInstallCmd(tool.install_cmd);
-        const attributable = launched !== null
-          && isExactVersion(tool.install_cmd, launched)
+        // Attribute against what was launched, recorded at spawn time — not
+        // against whatever the DB says now. A refresh landing mid-run would
+        // otherwise file this result under a version that never started.
+        const launchedCmd = (r.launched && r.launched.install_cmd) || tool.install_cmd;
+        const launchedDbVersion = r.launched ? r.launched.db_version : tool.version;
+        const stillSameEntry = launchedCmd === tool.install_cmd && launchedDbVersion === tool.version;
+        const launched = versionFromInstallCmd(launchedCmd);
+        const attributable = stillSameEntry
+          && launched !== null
+          && isExactVersion(launchedCmd, launched)
           && (!tool.version || launched === tool.version || launched === `sha256:${String(tool.pkg_integrity || '').replace(/^sha256-/, '')}`);
 
         if (attributable && typed) {

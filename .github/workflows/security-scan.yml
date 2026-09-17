@@ -68,32 +68,15 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v7.0.0
         with:
           node-version: '20'
-      # The PR path needs a container to isolate PR-authored code. If the
-      # daemon is not there, the honest outcome is "not checked" — running the
+      # The PR path needs a container to isolate PR-authored code. If no
+      # runtime answers, the honest outcome is "not checked" — running the
       # suite on the host instead would quietly drop the isolation exactly when
-      # nobody is looking. Say which of the two happened, in one line, rather
-      # than leaving a raw dial-unix error in the log.
-      - name: Isolation preflight
+      # nobody is looking.
+      - name: Docker preflight
         if: github.event_name == 'pull_request'
-        run: |
-          set -uo pipefail
-          if docker info >/dev/null 2>&1; then
-            echo "docker is available — PR code will run jailed"
-            exit 0
-          fi
-          # A launchd-spawned runner does not get the user's docker context, so
-          # the CLI falls back to /var/run/docker.sock and finds nothing even
-          # though the engine is running. Try the socket Rancher Desktop
-          # actually publishes before declaring the isolation unavailable.
-          for sock in "$HOME/.rd/docker.sock" "$HOME/.docker/run/docker.sock" "/var/run/docker.sock"; do
-            if [ -S "$sock" ] && DOCKER_HOST="unix://$sock" docker info >/dev/null 2>&1; then
-              echo "DOCKER_HOST=unix://$sock" >> "$GITHUB_ENV"
-              echo "docker reachable at $sock — PR code will run jailed"
-              exit 0
-            fi
-          done
-          echo "::error::Docker is unavailable on this runner, so pull-request code cannot be isolated. This job checks nothing rather than running PR code on the host. Start the container runtime and re-run." >&2
-          exit 1
+        uses: ./.github/actions/docker-preflight
+        with:
+          required: 'true'
       - name: node --test
         env:
           # Pinned by digest, like everything else this project consumes.
@@ -126,6 +109,11 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v7.0.0
         with:
           node-version: '20'
+      - name: Docker preflight
+        if: github.event_name == 'pull_request'
+        uses: ./.github/actions/docker-preflight
+        with:
+          required: 'true'
       - name: verify_integrity --offline
         env:
           JAIL_IMAGE: node:22-alpine
@@ -473,6 +461,10 @@ jobs:
       # ghcr.io/astral-sh/uv, which ships it. The step this replaces was
       # `curl -LsSf https://astral.sh/uv/install.sh | sh`, in a tool whose pitch
       # is that installing an MCP server stops feeling like curl | bash.
+      - name: Docker preflight
+        uses: ./.github/actions/docker-preflight
+        with:
+          required: 'true'
       - name: mcp_eval --json
         # Long timeout per entry — npx cold-fetches can take 20–30s in CI;
         # the script's per-entry timeout (default 30s) is the inner gate.
@@ -620,6 +612,10 @@ jobs:
           git fetch --no-tags origin "+$HEAD_SHA:refs/mcp-vault/pr-head"
           git checkout refs/mcp-vault/pr-head -- mcp-ecosystem-intelligence/assets/tools_database.json
           git --no-pager diff --stat -- mcp-ecosystem-intelligence/assets/tools_database.json
+      - name: Docker preflight
+        uses: ./.github/actions/docker-preflight
+        with:
+          required: 'true'
       - name: Smoke changed entries
         uses: ./.github/actions/smoke-changed-entries
         with:
