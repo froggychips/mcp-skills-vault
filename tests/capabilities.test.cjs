@@ -184,3 +184,25 @@ test('every detector explains why it matters', () => {
     assert.ok(Array.isArray(spec.patterns), `${name} has no pattern list`);
   }
 });
+
+test('coverage that one side never recorded is not a change, it is unknown', () => {
+  // A stored record without `coverage` produced an invented transition —
+  // "readable → readable, 0 → 38 bytes" — stated as fact. Same failure as a
+  // surface comparison treating a missing identity as a change: a missing
+  // input silently became a value.
+  const after = c.detect([file('a.js', 'const { exec } = require("child_process");')]);
+  const legacy = { found: { network: [{ file: 'a.js', line: 1, match: 'https' }] } };
+  const d = c.diffCapabilities(legacy, after);
+  assert.equal(d.coverage_changed, null);
+  assert.match(d.coverage_note, /cannot be compared/);
+  // The capability addition is still reported: that part *is* comparable.
+  assert.deepEqual(d.added.map((a) => a.capability), ['shell']);
+});
+
+test('coverage comparisons still work when both sides have one', () => {
+  const readable = c.detect([file('a.js', 'const x = 1;')]);
+  const bundle   = c.detect([file('d.js', 'x'.repeat(9000))]);
+  assert.equal(c.diffCapabilities(readable, readable).coverage_changed, false);
+  assert.equal(c.diffCapabilities(readable, bundle).coverage_changed, true);
+  assert.match(c.diffCapabilities(readable, bundle).coverage_note, /readable → minified/);
+});

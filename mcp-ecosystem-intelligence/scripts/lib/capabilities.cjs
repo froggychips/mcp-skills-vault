@@ -27,6 +27,8 @@
  * API:
  *   detect(files, packageJson)   -> { found, coverage, notes }
  *   diffCapabilities(a, b)       -> { added, removed, coverage_changed }
+ *                                   coverage_changed is true / false / null,
+ *                                   null meaning one side recorded no coverage
  *   CAPABILITIES                 -> the detectors, with what each one means
  *   HIGH_RISK                    -> the subset worth failing a build over
  */
@@ -281,10 +283,19 @@ function diffCapabilities(before, after) {
   const added = [...b].filter((cap) => !a.has(cap)).sort();
   const removed = [...a].filter((cap) => !b.has(cap)).sort();
 
-  const beforeCov = (before && before.coverage) || {};
-  const afterCov  = (after && after.coverage) || {};
-  const coverageChanged = Boolean(beforeCov.minified !== afterCov.minified)
-    || (beforeCov.bytes && afterCov.bytes && Math.abs(afterCov.bytes - beforeCov.bytes) / beforeCov.bytes > 0.5);
+  // Coverage can only be compared when both sides recorded it. A stored record
+  // without it produced an invented transition — "readable → readable, 0 → 38
+  // bytes" — stated as fact, which is the same failure as the surface
+  // comparison that treated a missing identity as a change. Missing means
+  // *unknown*, and unknown is its own answer.
+  const beforeCov = (before && before.coverage) || null;
+  const afterCov  = (after && after.coverage) || null;
+  const comparable = Boolean(beforeCov && afterCov
+    && typeof beforeCov.minified === 'boolean' && typeof afterCov.minified === 'boolean');
+  const coverageChanged = comparable
+    ? (beforeCov.minified !== afterCov.minified
+      || Boolean(beforeCov.bytes && afterCov.bytes && Math.abs(afterCov.bytes - beforeCov.bytes) / beforeCov.bytes > 0.5))
+    : null;
 
   return {
     added: added.map((cap) => ({
@@ -299,10 +310,12 @@ function diffCapabilities(before, after) {
       note: 'stopped matching — this may mean the code changed, or only that it became harder to read',
     })),
     coverage_changed: coverageChanged,
-    coverage_note: coverageChanged
-      ? `what was scanned changed shape (${beforeCov.minified ? 'minified' : 'readable'} → ${afterCov.minified ? 'minified' : 'readable'}, `
-        + `${beforeCov.bytes || 0} → ${afterCov.bytes || 0} bytes), so the comparison is weaker than usual`
-      : null,
+    coverage_note: coverageChanged === null
+      ? 'one of the two scans recorded no coverage, so how much of the code was readable cannot be compared'
+      : (coverageChanged
+        ? `what was scanned changed shape (${beforeCov.minified ? 'minified' : 'readable'} → ${afterCov.minified ? 'minified' : 'readable'}, `
+          + `${beforeCov.bytes || 0} → ${afterCov.bytes || 0} bytes), so the comparison is weaker than usual`
+        : null),
   };
 }
 
