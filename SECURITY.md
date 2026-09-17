@@ -76,6 +76,46 @@ Mitigations:
 
 `scripts/check_docker_drift.cjs` compares pinned `@sha256:` against the registry digest for `tracked_tag`. The `docker-drift` weekly job fails on any drift. A maintainer reviews the upstream change BEFORE refreshing the pin — a routine rebuild and a registry hijack look identical from here, and the human gate is the differentiator.
 
+## CI isolation model
+
+This project's own CI is part of its attack surface, and for a while it was the
+weakest part of it: a supply-chain scanner whose pull-request builds ran
+attacker-authored code on a persistent machine.
+
+GitHub-hosted runners do not start on this account (billing lock, documented in
+`.github/workflows/runner-health.yml`), so every job runs on one self-hosted
+macOS machine. Isolation therefore happens *inside* that machine:
+
+| Input | Where it runs |
+|---|---|
+| PR-authored code (tests, scripts) | container: `--network none`, repo mounted read-only, `--cap-drop ALL`, `no-new-privileges`, no docker socket |
+| PR-authored data (`tools_database.json`) | evaluated by **base-commit** code; every docker launch is rebuilt from its pinned digest, so flags in an entry cannot reach the host |
+| Third-party MCP servers | always `mcp_eval --sandbox`; `--unsafe` is not used in CI |
+| Our own code (push, cron) | directly on the runner |
+
+Outputs are written under `RUNNER_TEMP`, never to a path inside the checkout: a
+redirect performed by the host shell follows whatever that path is, and a PR can
+commit a name as a symlink. Mounting the workspace read-only does not prevent
+that.
+
+`tests/ci_manifest.test.cjs` asserts these properties against the manifests —
+per step, not per job — so a later one-line edit cannot quietly remove them.
+
+### Known limitation
+
+For a `pull_request` event, GitHub uses the workflow file **from the pull
+request**. The isolation is therefore described by the thing being isolated, and
+a test that greps the manifests is a regression check, not a security boundary.
+
+The mitigation is a repository setting rather than code: workflow runs from fork
+pull requests require maintainer approval (Settings → Actions → *Require
+approval for all external contributors*). Approve a run only after reading the
+diff, including changes to `.github/`.
+
+If GitHub-hosted runners become available on this account, the PR jobs should
+move to a disposable VM, and the container jail becomes defence in depth rather
+than the boundary.
+
 ## What this project is NOT
 
 - Not a sandbox. Installing an MCP server runs whatever the server's `command` does, with whatever permissions Claude Code has. The integrity gate guarantees you ran the artifact you expected; it does not guarantee the artifact is benign.
