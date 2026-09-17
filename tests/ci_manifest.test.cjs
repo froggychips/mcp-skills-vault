@@ -112,6 +112,7 @@ test('no host-side redirect writes into the checkout on a pull_request path', ()
       if (target.startsWith('$RUNNER_TEMP') || target.startsWith('"$RUNNER_TEMP')) continue;
       if (target.startsWith('$GITHUB_') || target.includes('GITHUB_OUTPUT') || target.includes('GITHUB_STEP_SUMMARY')) continue;
       if (target.startsWith('/dev/')) continue;
+      if (target === '&2' || target === '&1') continue;   // stream redirect, not a file
       if (target.startsWith('$out') || target.startsWith('"$out')) continue;
       if (target.includes('$RUNNER_TEMP')) continue;
       offenders.push(`${file}: > ${target}`);
@@ -238,4 +239,16 @@ test('the publish job runs the suite before it ships anything', () => {
   const publishIdx = code.findIndex((l) => /npm publish/.test(l));
   assert.ok(testsIdx !== -1, 'the publish job never runs the suite');
   assert.ok(testsIdx < publishIdx, 'tests must run before anything is published');
+});
+
+test('a pull_request build refuses to fall back to the host when it cannot isolate', () => {
+  // The isolation depends on a container runtime. If that runtime is missing,
+  // the only two options are "check nothing" and "run PR code on the host" —
+  // and the second must never be reachable by accident.
+  const src = sources.get('.github/workflows/security-scan.yml');
+  assert.match(src, /Isolation preflight/, 'no preflight for the PR isolation');
+  assert.match(src, /docker info/, 'the preflight does not actually probe the runtime');
+  // The guarded steps still take the host path only when this is not a PR.
+  const hostFallbacks = src.split('\n').filter((l) => /^\s+node (--test|mcp-ecosystem)/.test(l));
+  assert.ok(hostFallbacks.length > 0, 'expected the trusted-context branches to exist');
 });

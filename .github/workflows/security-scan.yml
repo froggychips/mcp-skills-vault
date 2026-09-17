@@ -68,6 +68,21 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v7.0.0
         with:
           node-version: '20'
+      # The PR path needs a container to isolate PR-authored code. If the
+      # daemon is not there, the honest outcome is "not checked" — running the
+      # suite on the host instead would quietly drop the isolation exactly when
+      # nobody is looking. Say which of the two happened, in one line, rather
+      # than leaving a raw dial-unix error in the log.
+      - name: Isolation preflight
+        if: github.event_name == 'pull_request'
+        run: |
+          set -uo pipefail
+          if docker info >/dev/null 2>&1; then
+            echo "docker is available — PR code will run jailed"
+            exit 0
+          fi
+          echo "::error::Docker is unavailable on this runner, so pull-request code cannot be isolated. This job checks nothing rather than running PR code on the host. Start the container runtime and re-run." >&2
+          exit 1
       - name: node --test
         env:
           # Pinned by digest, like everything else this project consumes.
