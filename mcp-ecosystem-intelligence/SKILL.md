@@ -345,6 +345,7 @@ node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs
 | `--update` | refresh `version` + `pkg_integrity` fields from registries |
 | `--fail-unverified` | `UNVERIFIED` (registry unreachable / unparsable cmd / no sdist) becomes a hard failure; implied by `--strict` |
 | `--entry <name>` | check one DB entry instead of the whole DB |
+| `--installed` | verify the servers local host configs launch, not the DB |
 | `--deep` | download the artifact and hash it locally (npm tarball sha512, PyPI sdist sha256, OCI manifest sha256) |
 | `--require-signatures` | an npm release with no verifiable registry signature fails |
 | `--require-provenance` | an npm release with no provenance attestation fails |

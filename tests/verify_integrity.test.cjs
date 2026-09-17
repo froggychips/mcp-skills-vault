@@ -388,3 +388,44 @@ test('npmManifestUrl: scoped names keep their slash encoded', () => {
   // address the document.
   assert.equal(v.npmManifestUrl('pkg', '1.0.0-rc.1', 'https://r'), 'https://r/pkg/1.0.0-rc.1');
 });
+
+test('versionFromInstallCmd: what a launch command actually asks for', () => {
+  assert.equal(v.versionFromInstallCmd('npx -y pkg@1.2.3'), '1.2.3');
+  assert.equal(v.versionFromInstallCmd('npx -y @scope/pkg@1.2.3'), '1.2.3');
+  assert.equal(v.versionFromInstallCmd('npx -y pkg'), null);            // resolves latest at start
+  assert.equal(v.versionFromInstallCmd('npx -y pkg@latest'), 'latest');
+  assert.equal(v.versionFromInstallCmd('uvx pkg==2.0.0'), '2.0.0');
+  assert.equal(v.versionFromInstallCmd('uvx pkg'), null);
+  const d = 'a'.repeat(64);
+  assert.equal(v.versionFromInstallCmd(`docker run -i img@sha256:${d}`), `sha256:${d}`);
+  assert.equal(v.versionFromInstallCmd('docker run -i img:latest'), null);
+  assert.equal(v.versionFromInstallCmd(null), null);
+  assert.equal(v.versionFromInstallCmd('node ./server.js'), null);
+});
+
+test('CLI --installed: verifies configured servers, not the DB', () => {
+  const fs = require('node:fs'), os = require('node:os'), pathMod = require('node:path');
+  const proj = fs.mkdtempSync(pathMod.join(os.tmpdir(), 'mcp-installed-cli-'));
+  // A project config with one unpinned server. Offline so no network is needed:
+  // the point is that the subject list comes from the config.
+  fs.writeFileSync(pathMod.join(proj, '.mcp.json'), JSON.stringify({
+    mcpServers: { 'some-server': { command: 'npx', args: ['-y', 'some-server'] } },
+  }));
+  const r = spawnSync(process.execPath, [
+    'mcp-ecosystem-intelligence/scripts/verify_integrity.cjs',
+    '--installed', '--offline', '--cwd', proj, '--json',
+  ], { cwd: REPO, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  const report = JSON.parse(r.stdout);
+  assert.equal(report.subject, 'installed');
+  const found = report.entries.find(e => e.name === 'some-server');
+  assert.ok(found, 'the configured server must be in the report');
+  assert.equal(found.status, 'UNVERIFIED');
+  fs.rmSync(proj, { recursive: true, force: true });
+});
+
+test('CLI --installed: refuses --update, which would write the DB from a config', () => {
+  const r = runVerify(['--installed', '--update']);
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /cannot be combined with --update/);
+});

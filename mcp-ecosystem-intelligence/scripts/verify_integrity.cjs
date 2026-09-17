@@ -25,6 +25,8 @@
  *   node scripts/verify_integrity.cjs --no-audit   skip advisory APIs; still checks live registries
  *   node scripts/verify_integrity.cjs --offline    true offline mode; validate DB pins only
  *   node scripts/verify_integrity.cjs --entry NAME  check a single DB entry by name
+ *   node scripts/verify_integrity.cjs --installed  check the servers local hosts launch
+ *                                                  (.mcp.json, ~/.claude.json, Cursor, …)
  *   node scripts/verify_integrity.cjs --fail-unverified  UNVERIFIED → hard failure
  *   node scripts/verify_integrity.cjs --deep       download artifacts and hash them locally
  *   node scripts/verify_integrity.cjs --require-signatures  unsigned npm release = failure
@@ -51,6 +53,7 @@ const { parseImageRef, fetchManifest, ALLOWED_REGISTRIES } = require('./lib/oci.
 const {
   verifyRegistrySignature, provenanceClaim, keysUrl,
 } = require('./lib/npm_signatures.cjs');
+const { readInstalledServers } = require('./lib/installed.cjs');
 const https       = require('https');
 const fs          = require('fs');
 const path        = require('path');
@@ -95,6 +98,14 @@ const DEEP_MAX_BYTES   = Math.max(1, Number(process.env.MCP_VAULT_DEEP_MAX_BYTES
 // "absent" into a failure for anyone who wants that bar.
 const REQUIRE_SIGNATURES = process.argv.includes('--require-signatures');
 const REQUIRE_PROVENANCE = process.argv.includes('--require-provenance');
+// --installed: verify what the local hosts are configured to launch, instead of
+// what the DB says. The DB is still consulted — for a pin to compare against —
+// but the subjects are the configured servers.
+const INSTALLED = process.argv.includes('--installed');
+const CWD = (() => {
+  const i = process.argv.indexOf('--cwd');
+  return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : process.cwd();
+})();
 
 const INSTALL_HOOKS = ['preinstall', 'install', 'postinstall', 'prepare', 'prepack'];
 
@@ -301,6 +312,37 @@ async function deepCheckArtifact({ url, algo, registryIntegrity, storedIntegrity
     };
   }
   return { state: 'ok', message: `hashed ${hashed.bytes} bytes locally: ${hashed.sri.slice(0, 24)}…`, sri: hashed.sri, bytes: hashed.bytes };
+}
+
+// Why there is no pin to compare against, phrased for the subject at hand.
+function missingPinAdvice(tool) {
+  const inst = tool._installed;
+  if (!inst) return 'no stored pkg_integrity — run --update';
+  if (!inst.in_vault) return `not in the vault DB — no stored hash to compare this artifact against`;
+  return `this version is not the one the vault pinned — no stored hash for it`;
+}
+
+// The version a configured launch command actually asks for: `pkg@1.2.3` for
+// npm, `pkg==1.2.3` for PyPI, the digest for an image. null means unpinned —
+// the server runs whatever the registry resolves at startup.
+function versionFromInstallCmd(cmd) {
+  if (!cmd) return null;
+  if (/^docker\s+run/.test(cmd)) {
+    const ref = dockerImageRef(cmd);
+    const m = ref && ref.match(/@(sha256:[a-f0-9]{64})$/);
+    return m ? m[1] : null;
+  }
+  const npm = npmPkgName(cmd);
+  if (npm) {
+    const token = cmd.split(/\s+/).find((t) => t === npm || t.startsWith(`${npm}@`));
+    return token && token !== npm ? token.slice(npm.length + 1) : null;
+  }
+  const py = pypiPkgName(cmd);
+  if (py) {
+    const token = cmd.split(/\s+/).find((t) => t.startsWith(`${py}==`));
+    return token ? token.slice(py.length + 2) : null;
+  }
+  return null;
 }
 
 // npm's signing keys. One request per run, cached for a day — they rotate on
@@ -592,7 +634,7 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
     // No stored hash means nothing was compared. That is UNVERIFIED, not a
     // cosmetic MISS: an install used to sail through on an entry with a
     // version and no hash at all.
-    lines.push(['UNVERIFIED', `no stored pkg_integrity — run --update${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+    lines.push(['UNVERIFIED', `${missingPinAdvice(tool)}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
     if (FAIL_UNVERIFIED) failures++;
   } else if (tool.pkg_integrity !== npmIntegrity) {
     lines.push(['FAIL', `integrity mismatch\n        stored: ${tool.pkg_integrity}\n        npm   : ${npmIntegrity}`]);
@@ -605,6 +647,14 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
   } else if (storedRepo && npmRepo.toLowerCase() !== storedRepo.toLowerCase() && !storedRepo.includes('/tree/')) {
     lines.push(['WARN', `repo mismatch\n        source_url: ${tool.source_url}\n        npm repo  : ${npmRepoRaw}`]);
     if (STRICT) failures++;
+  }
+
+  // An installed server with no version in its launch command resolves `latest`
+  // at every start. For the DB that is a pin to add; for a live config it is the
+  // thing that actually runs being unknown.
+  if (tool._installed && !tool.version) {
+    lines.push(['UNVERIFIED', `launch command has no version pin — this resolves "latest" at every start${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+    if (FAIL_UNVERIFIED) failures++;
   }
 
   // Registry signature. npm signs `<name>@<version>:<integrity>` with a
@@ -703,7 +753,9 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
   results.push({
     tool,
     status: verdictFor(failures, lines),
-    msg: `${tool.name}@${npmVersion}`,
+    msg: tool._installed && !tool.version
+      ? `${tool.name}@${npmVersion} (unpinned — that is just today's latest)`
+      : `${tool.name}@${npmVersion}`,
     lines,
     failures,
   });
@@ -745,7 +797,7 @@ async function processPypi(tool, pkg, meta, advisoriesForTool, degraded, results
   // Two independent conditions, not a chain: an entry with no stored hash AND a
   // wheel-only release used to report only the first and still come back OK.
   if (!tool.pkg_integrity) {
-    lines.push(['UNVERIFIED', `no stored pkg_integrity — run --update${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+    lines.push(['UNVERIFIED', `${missingPinAdvice(tool)}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
     if (FAIL_UNVERIFIED) failures++;
   }
   if (!expected) {
@@ -909,10 +961,53 @@ async function main() {
   let updated     = 0;
 
   const allTools = Array.isArray(db.tools) ? db.tools : [];
-  const scope    = ENTRY ? allTools.filter((t) => t.name === ENTRY) : allTools;
+  let scope = ENTRY ? allTools.filter((t) => t.name === ENTRY) : allTools;
   if (ENTRY && scope.length === 0) {
     console.error(`--entry: no DB entry named "${ENTRY}"`);
     process.exit(2);
+  }
+
+  // --installed replaces the subject list with the configured servers, each
+  // turned into a DB-entry shape so the same checks apply. A version pin only
+  // gets a stored hash to compare against when the DB has that exact version;
+  // otherwise the run still verifies the registry signature, which is the part
+  // that doesn't depend on us having seen the release before.
+  const installedNotes = [];
+  if (INSTALLED) {
+    if (UPDATE) {
+      console.error('--installed cannot be combined with --update (the DB is not the subject).');
+      process.exit(2);
+    }
+    const servers = readInstalledServers({
+      cwd: CWD,
+      onUnreadable: (loc) => installedNotes.push({ ...loc, kind: 'unreadable' }),
+    });
+    if (!servers.length) {
+      console.error(`No configured MCP servers found (looked in ${CWD} and the usual host config paths).`);
+      return exitAfterFlush(0);
+    }
+    const byName = new Map(allTools.map((t) => [t.name, t]));
+    scope = servers.map((srv) => {
+      const known = byName.get(srv.name) || null;
+      const pinnedVersion = versionFromInstallCmd(srv.install_cmd);
+      const sameVersion = known && pinnedVersion && known.version === pinnedVersion;
+      return {
+        name:          srv.name,
+        install_cmd:   srv.install_cmd || `(${srv.remote ? `remote: ${srv.remote}` : srv.command || 'no command'})`,
+        version:       pinnedVersion,
+        // Only the DB's hash for the *same* version is evidence about this artifact.
+        pkg_integrity: sameVersion ? known.pkg_integrity : null,
+        source_url:    known ? known.source_url : null,
+        trust:         known ? known.trust : 'not-in-vault',
+        license:       known ? known.license : null,
+        _installed: {
+          host: srv.host, scope: srv.scope, source: srv.source, in_vault: !!known, remote: srv.remote,
+          // What kind of thing this is decides what "unverifiable" means.
+          kind: srv.remote ? 'remote' : (srv.install_cmd ? 'registry' : 'local'),
+          command: srv.command,
+        },
+      };
+    });
   }
 
   // Bucket tools by ecosystem.
@@ -922,12 +1017,22 @@ async function main() {
 
   // An entry we can't route to a registry is UNVERIFIED, not SKIP: nothing about
   // its pin was ever checked, so --strict must refuse to call the run clean.
-  const unroutable = (tool, why) => results.push({
-    tool,
-    status: 'UNVERIFIED',
-    msg: `${tool.name}: ${why}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`,
-    failures: FAIL_UNVERIFIED ? 1 : 0,
-  });
+  const unroutable = (tool, why) => {
+    // For an installed server, "we can't check this" has three quite different
+    // causes, and saying "unknown install method" for a local binary is just
+    // wrong. Name the actual situation.
+    const inst = tool._installed;
+    const reason = !inst ? why
+      : inst.kind === 'remote' ? `remote server (${inst.remote}) — no artifact to verify, trust is in the endpoint`
+      : inst.kind === 'local'  ? `launched from a local command (${inst.command}) — nothing published to verify against`
+      : why;
+    results.push({
+      tool,
+      status: 'UNVERIFIED',
+      msg: `${tool.name}: ${reason}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`,
+      failures: FAIL_UNVERIFIED ? 1 : 0,
+    });
+  };
 
   for (const tool of scope) {
     if (/^npx\s+-y/.test(tool.install_cmd)) {
@@ -1033,6 +1138,8 @@ async function main() {
       results,
       meta: {
         mode: OFFLINE ? 'offline' : (UPDATE ? 'update' : (NO_AUDIT ? 'no-audit' : 'full')),
+        subject: INSTALLED ? 'installed' : 'database',
+        installed_config_problems: INSTALLED ? installedNotes : undefined,
         entry: ENTRY,
         fail_unverified: FAIL_UNVERIFIED,
         strict: STRICT,
@@ -1103,6 +1210,7 @@ module.exports = {
   dockerDigestPinned,
   npmManifestUrl,
   verdictFor,
+  versionFromInstallCmd,
   osvSeverity,
   unifyAdvisories,
   degradedFeedsFor,

@@ -144,6 +144,7 @@ Flags:
 | `--offline` | True offline mode; no network calls, validates stored DB pins only |
 | `--fail-unverified` | Treat `UNVERIFIED` (registry unreachable, unparsable install command, wheel-only PyPI release) as a hard failure. Implied by `--strict` |
 | `--entry <name>` | Check a single DB entry instead of all of them |
+| `--installed` | Verify what the local hosts are configured to launch (`.mcp.json`, `~/.claude.json`, Claude Desktop, Cursor, VS Code, Codex) instead of the DB. Unpinned launch commands, servers not in the vault, and remote endpoints are each reported as what they are |
 | `--deep` | Download each artifact and hash it locally, instead of comparing the DB pin against metadata from the same registry that serves the tarball. Docker digests are verified by hashing the manifest |
 | `--require-signatures` | An npm release with no verifiable registry signature is a failure |
 | `--require-provenance` | An npm release with no provenance attestation is a failure |

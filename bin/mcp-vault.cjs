@@ -55,6 +55,7 @@ COMMANDS
   doctor            Check local Node / gh / Docker / uvx / Claude MCP config readiness
   audit             Diff installed MCP servers against the vault DB
   verify            Integrity gate (hashes + advisories) over the whole DB
+                    (--installed: over what your hosts actually launch)
   install <pkg>     Integrity gate, then write .mcp.json
   discover          Harvest fresh MCP candidates from npm / gh / README
   eval              Behavioural smoke (handshake + tools/list + schema lint)
