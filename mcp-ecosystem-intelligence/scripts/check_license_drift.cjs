@@ -34,7 +34,7 @@
  *
  * Usage:
  *   node scripts/check_license_drift.cjs                  human-readable summary
- *   node scripts/check_license_drift.cjs --strict         exit 1 on osi-to-restrictive
+ *   node scripts/check_license_drift.cjs --strict   (drifts AND fetch errors fail)         exit 1 on osi-to-restrictive
  *   node scripts/check_license_drift.cjs --json           machine-readable
  *   node scripts/check_license_drift.cjs --no-fetch       offline self-consistency only
  *   node scripts/check_license_drift.cjs --db <path>      override DB path
@@ -53,7 +53,8 @@
 
 'use strict';
 
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
+const { exitAfterFlush } = require('./lib/exit.cjs');
 const fs           = require('fs');
 const https        = require('https');
 const path         = require('path');
@@ -172,7 +173,11 @@ function pypiClassifierToSpdx(classifier) {
     'GNU Lesser General Public License v3 (LGPLv3)': 'LGPL-3.0-or-later',
     'GNU Affero General Public License v3':       'AGPL-3.0-or-later',
     'GNU Affero General Public License v3 or later (AGPLv3+)': 'AGPL-3.0-or-later',
-    'Other/Proprietary License':                  null,  // we treat as unknown
+    // Not an SPDX id, but it is a definite statement: the package is no longer
+    // open source. Mapping it to null made an MIT → proprietary relicensing
+    // read as `drift-to-unknown`, which --strict does not fail on — the exact
+    // event this gate exists to catch. 'Proprietary' classifies as restrictive.
+    'Other/Proprietary License':                  'Proprietary',
     'Public Domain':                              'CC0-1.0',
     'The Unlicense (Unlicense)':                  'Unlicense',
   };
@@ -231,8 +236,9 @@ async function defaultFetcher(tool) {
     const spec = tool.version ? `${npmName}@${tool.version}` : `${npmName}@latest`;
     try {
       // --json prints the field as a JSON string when present; missing → "".
-      const raw = execSync(`npm view "${spec}" license --json`,
-                           { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+      // argv form, not a shell string: `spec` embeds DB-controlled `version`.
+      const raw = execFileSync('npm', ['view', spec, 'license', '--json'],
+                               { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
       const parsed = raw.trim() ? JSON.parse(raw) : null;
       const lic = typeof parsed === 'string' ? parsed : null;
       return { source: 'npm', license: lic };
@@ -259,8 +265,8 @@ async function defaultFetcher(tool) {
   const repo = githubOwnerRepo(tool.source_url);
   if (repo) {
     try {
-      const meta = JSON.parse(execSync(`gh api "repos/${repo}"`,
-                                       { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }));
+      const meta = JSON.parse(execFileSync('gh', ['api', `repos/${repo}`],
+                                           { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }));
       const spdx = meta?.license?.spdx_id || null;
       const norm = spdx && spdx !== 'NOASSERTION' ? (GITHUB_SPDX_MAP[spdx] || spdx) : null;
       return { source: 'github', license: norm };
@@ -407,19 +413,31 @@ async function main() {
     console.log(`\n${report.checked} entries checked — ${report.drifts.length} drift(s), ${report.errors.length} error(s)`);
   }
 
-  if (opts.strict && report.drifts.some((d) => isHardFail(d.classification))) {
-    process.exit(1);
-  }
-  process.exit(0);
+  exitAfterFlush(licenseExitCode(report, opts.strict));
 }
 
 if (require.main === module) {
   main().catch((e) => { console.error(e.stack || e.message); process.exit(1); });
 }
 
+/**
+ * --strict exit code for a drift report.
+ *
+ * A run that couldn't read any license is not a run that found no drift: under
+ * --strict, fetch errors fail alongside real drifts. Without that, a total
+ * outage (npm + PyPI + GitHub all unreachable) exited 0 and the weekly gate
+ * reported green having checked nothing.
+ */
+function licenseExitCode(report, strict) {
+  if (!strict) return 0;
+  const hardDrift = (report.drifts || []).some((d) => isHardFail(d.classification));
+  return (hardDrift || (report.errors || []).length > 0) ? 1 : 0;
+}
+
 module.exports = {
   // Pure helpers — easy to unit-test.
   normalizeLicense,
+  licenseExitCode,
   diffLicense,
   isHardFail,
   pypiClassifierToSpdx,

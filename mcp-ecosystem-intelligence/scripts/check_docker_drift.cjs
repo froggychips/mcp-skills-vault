@@ -29,7 +29,8 @@
  *
  * Exit codes:
  *   0  all pins match upstream (or --strict not set and only drifts found)
- *   1  --strict + at least one drift, or hard error during fetch
+ *   1  --strict + at least one drift, or a hard error during fetch (any mode —
+ *      a registry we couldn't read is not a registry that agrees with us)
  *   2  bad arguments
  */
 
@@ -38,6 +39,8 @@
 const fs    = require('fs');
 const https = require('https');
 const path  = require('path');
+const { exitAfterFlush } = require('./lib/exit.cjs');
+const { dockerImageRef } = require('./lib/install_cmd.cjs');
 
 const DB_PATH = path.resolve(__dirname, '../assets/tools_database.json');
 const argv    = process.argv.slice(2);
@@ -52,26 +55,6 @@ const MANIFEST_ACCEPT = [
 ].join(', ');
 
 // ── helpers ────────────────────────────────────────────────────────────────
-
-// "docker run ... <image> [args]" → image reference token.
-// Mirrors the parser in verify_integrity.cjs but lives here to keep this
-// script self-contained.
-function dockerImageRef(cmd) {
-  if (!/^docker\s+run/.test(cmd)) return null;
-  const tokens = cmd.split(/\s+/).slice(2);
-  const FLAG_WITH_VAL = new Set(['-e', '--env', '-v', '--volume', '--cap-drop', '--cap-add',
-                                  '--security-opt', '-p', '--publish', '--name', '--user',
-                                  '--network', '--mount', '--tmpfs']);
-  for (let i = 0; i < tokens.length; i++) {
-    const t = tokens[i];
-    if (t.startsWith('-')) {
-      if (FLAG_WITH_VAL.has(t)) i++;
-      continue;
-    }
-    return t;
-  }
-  return null;
-}
 
 // "ghcr.io/owner/repo@sha256:abc" → { registry, repo, digest }
 // "owner/repo:latest"             → { registry: docker.io, repo: library/.. , digest: null }
@@ -129,6 +112,9 @@ function parseBearerChallenge(header) {
 }
 
 async function fetchToken(challenge) {
+  // The realm arrives in a response header: treat it as untrusted input and
+  // refuse to follow it off the allowlisted registries.
+  if (!realmAllowed(challenge.realm)) return null;
   const u = new URL(challenge.realm);
   if (challenge.service) u.searchParams.set('service', challenge.service);
   if (challenge.scope)   u.searchParams.set('scope',   challenge.scope);
@@ -155,6 +141,30 @@ const REGISTRY_API_HOST = {
   'docker.io':       'registry-1.docker.io',
   'index.docker.io': 'registry-1.docker.io',
 };
+
+// The "Supported registries" list in this file's header, enforced rather than
+// documented. A DB entry is enough to point this prober at an arbitrary host:
+// `docker run internal.corp:5000/x@sha256:…` would have it open connections
+// into whatever network the runner sits in (ours is a self-hosted box on a
+// home LAN). Anything outside the list is an ERROR a human resolves — either
+// the entry is wrong or the registry belongs on this list.
+const ALLOWED_REGISTRIES = new Set([
+  'docker.io',
+  'index.docker.io',
+  'registry-1.docker.io',
+  'ghcr.io',
+  'quay.io',
+  'mcr.microsoft.com',
+]);
+
+// Bearer realms live on the registry's own domain (auth.docker.io for Hub,
+// ghcr.io/token, quay.io/v2/auth, mcr.microsoft.com/oauth2/token).
+function realmAllowed(realm) {
+  let u;
+  try { u = new URL(realm); } catch { return false; }
+  if (u.protocol !== 'https:') return false;
+  return [...ALLOWED_REGISTRIES].some((h) => u.hostname === h || u.hostname.endsWith(`.${h}`));
+}
 
 // Keep the namespace for display/DB purposes; only requests get rewritten.
 function apiHostFor(registry) {
@@ -203,6 +213,17 @@ async function fetchManifestDigest(registry, repo, tag) {
   return { digest: d };
 }
 
+// Errors fail in every mode, as this file's header promises: an unreachable or
+// unexpected registry means the pin was never compared to anything, and
+// `drifts: 0` in such a run reads as "clean" to the CI step consuming the JSON.
+// Drift alone stays advisory unless --strict — upstream rebuilding a tag is
+// routine, and the workflow has its own explicit "fail if drift" step.
+function driftExitCode({ drifts = 0, errors = 0, strict = false } = {}) {
+  if (errors > 0) return 1;
+  if (strict && drifts > 0) return 1;
+  return 0;
+}
+
 // ── main ───────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -215,6 +236,14 @@ async function main() {
     if (!ref) { items.push({ name: tool.name, status: 'SKIP', reason: 'cannot parse image reference' }); continue; }
 
     const parsed = parseImageRef(ref);
+    if (!ALLOWED_REGISTRIES.has(parsed.registry)) {
+      items.push({
+        name: tool.name, status: 'ERROR',
+        registry: parsed.registry, repo: parsed.repo, tag: tool.tracked_tag || 'latest',
+        reason: `registry "${parsed.registry}" is not in the supported allowlist`,
+      });
+      continue;
+    }
     if (!parsed.digest) {
       items.push({ name: tool.name, status: 'SKIP', reason: 'image not pinned by digest (verify_integrity flags this)' });
       continue;
@@ -262,8 +291,7 @@ async function main() {
     if (drifts.length) console.log('Refresh with: node scripts/verify_integrity.cjs --update (after reviewing the upstream change).');
   }
 
-  if (STRICT && (drifts.length || errors.length)) process.exit(1);
-  process.exit(0);
+  exitAfterFlush(driftExitCode({ drifts: drifts.length, errors: errors.length, strict: STRICT }));
 }
 
 if (require.main === module) {
@@ -275,5 +303,8 @@ module.exports = {
   parseImageRef,
   parseBearerChallenge,
   apiHostFor,
+  realmAllowed,
+  driftExitCode,
   REGISTRY_API_HOST,
+  ALLOWED_REGISTRIES,
 };
