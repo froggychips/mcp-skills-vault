@@ -81,6 +81,17 @@ jobs:
             echo "docker is available — PR code will run jailed"
             exit 0
           fi
+          # A launchd-spawned runner does not get the user's docker context, so
+          # the CLI falls back to /var/run/docker.sock and finds nothing even
+          # though the engine is running. Try the socket Rancher Desktop
+          # actually publishes before declaring the isolation unavailable.
+          for sock in "$HOME/.rd/docker.sock" "$HOME/.docker/run/docker.sock" "/var/run/docker.sock"; do
+            if [ -S "$sock" ] && DOCKER_HOST="unix://$sock" docker info >/dev/null 2>&1; then
+              echo "DOCKER_HOST=unix://$sock" >> "$GITHUB_ENV"
+              echo "docker reachable at $sock — PR code will run jailed"
+              exit 0
+            fi
+          done
           echo "::error::Docker is unavailable on this runner, so pull-request code cannot be isolated. This job checks nothing rather than running PR code on the host. Start the container runtime and re-run." >&2
           exit 1
       - name: node --test
