@@ -28,6 +28,7 @@ const path          = require('path');
 const { spawnSync } = require('child_process');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { listHosts, resolveTarget, writeServerEntry } = require('./lib/hosts.cjs');
+const { trustScore, fitScore, recommend } = require('./lib/scores.cjs');
 // Reuse the gate's parsers so "what gets pinned" and "what gets checked" can
 // never drift apart — they were two independent regexes before.
 const {
@@ -77,113 +78,151 @@ const RS = T ? '\x1b[0m'  : '';
 // ── Stack detection ─────────────────────────────────────────────────────────
 
 function detectStack(cwd) {
+  // Signals are recorded with where they came from and how much they imply.
+  // The sets below are derived from them, which is the way round that lets a
+  // recommendation be explained: "aws, because .env has an AWS_ prefix" is a
+  // different statement from "aws, because boto3 is a dependency", and only one
+  // of them means the project actually talks to AWS.
+  //
+  //   detected — the project declares it (a manifest dependency, a config file)
+  //   inferred — something suggests it (an env var name, a directory)
+  const signals = [];
+  let src = 'unknown';
+  let kind = 'detected';
+  let conf = 0.9;
+  const from = (source, confidence, k = 'detected') => { src = source; conf = confidence; kind = k; };
+  const note = (dimension, value) => {
+    const existing = signals.find((x) => x.dimension === dimension && x.value === value);
+    // Two sources agreeing is stronger evidence than either alone, but never
+    // certainty: keep the best, and record that it was seen more than once.
+    if (existing) {
+      existing.sources = [...new Set([...existing.sources, src])];
+      if (conf > existing.confidence) { existing.confidence = conf; existing.kind = kind; }
+      return;
+    }
+    signals.push({ dimension, value, kind, sources: [src], confidence: conf });
+  };
+
   const langs  = new Set();
   const dbs    = new Set();
   const infra  = new Set();
   const cats   = new Set();
   const keys   = [];
+  const addLang  = (v) => { langs.add(v);  note('lang', v); };
+  const addDb    = (v) => { dbs.add(v);    note('db', v); };
+  const addInfra = (v) => { infra.add(v);  note('infra', v); };
+  const addCat   = (v) => { cats.add(v);   note('category', v); };
 
   // package.json
+  from('package.json dependency', 0.95);
   try {
     const pkg  = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf8'));
     const deps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
-    langs.add('Node');
-    if (deps.some(d => ['next','react','remix','nuxt','vue','svelte'].includes(d))) langs.add('Next.js/React');
-    if (deps.some(d => ['express','fastify','koa','hono'].includes(d)))             langs.add('Node HTTP');
-    if (deps.some(d => d === 'pg' || d === 'postgres' || d.includes('prisma') || d.includes('sequelize') || d === 'knex')) { dbs.add('postgres'); cats.add('database'); }
-    if (deps.some(d => d === 'mongoose' || d.includes('mongodb') || d === '@typegoose/typegoose')) { dbs.add('mongodb');  cats.add('database'); }
-    if (deps.some(d => d === 'redis' || d === 'ioredis' || d === '@upstash/redis'))  { dbs.add('redis');    cats.add('database'); }
-    if (deps.some(d => d.includes('clickhouse')))                                    { dbs.add('clickhouse'); cats.add('database'); }
-    if (deps.some(d => d.includes('stripe')))                                        { infra.add('stripe');     cats.add('payments'); }
-    if (deps.some(d => d.includes('@sentry')))                                       { infra.add('sentry');     cats.add('observability'); }
-    if (deps.some(d => d.includes('cloudflare') || d === 'wrangler'))                { infra.add('cloudflare'); cats.add('infra'); }
-    if (deps.some(d => d.startsWith('@aws-sdk') || d === 'aws-sdk'))                 { infra.add('aws');        cats.add('infra'); }
-    if (deps.some(d => d.includes('@kubernetes') || d === 'kubernetes-client'))      { infra.add('kubernetes'); cats.add('infra'); }
+    addLang('Node');
+    if (deps.some(d => ['next','react','remix','nuxt','vue','svelte'].includes(d))) addLang('Next.js/React');
+    if (deps.some(d => ['express','fastify','koa','hono'].includes(d)))             addLang('Node HTTP');
+    if (deps.some(d => d === 'pg' || d === 'postgres' || d.includes('prisma') || d.includes('sequelize') || d === 'knex')) { addDb('postgres'); addCat('database'); }
+    if (deps.some(d => d === 'mongoose' || d.includes('mongodb') || d === '@typegoose/typegoose')) { addDb('mongodb');  addCat('database'); }
+    if (deps.some(d => d === 'redis' || d === 'ioredis' || d === '@upstash/redis'))  { addDb('redis');    addCat('database'); }
+    if (deps.some(d => d.includes('clickhouse')))                                    { addDb('clickhouse'); addCat('database'); }
+    if (deps.some(d => d.includes('stripe')))                                        { addInfra('stripe');     addCat('payments'); }
+    if (deps.some(d => d.includes('@sentry')))                                       { addInfra('sentry');     addCat('observability'); }
+    if (deps.some(d => d.includes('cloudflare') || d === 'wrangler'))                { addInfra('cloudflare'); addCat('infra'); }
+    if (deps.some(d => d.startsWith('@aws-sdk') || d === 'aws-sdk'))                 { addInfra('aws');        addCat('infra'); }
+    if (deps.some(d => d.includes('@kubernetes') || d === 'kubernetes-client'))      { addInfra('kubernetes'); addCat('infra'); }
   } catch { /* no package.json */ }
 
   // pyproject.toml / requirements.txt
+  from('python requirements', 0.95);
   for (const f of ['pyproject.toml', 'requirements.txt']) {
     try {
       const txt = fs.readFileSync(path.join(cwd, f), 'utf8').toLowerCase();
-      langs.add('Python');
-      if (/psycopg2|sqlalchemy|asyncpg|databases/.test(txt)) { dbs.add('postgres');   cats.add('database'); }
-      if (/pymongo|motor/.test(txt))                          { dbs.add('mongodb');    cats.add('database'); }
-      if (/\bredis\b/.test(txt))                              { dbs.add('redis');      cats.add('database'); }
-      if (/clickhouse/.test(txt))                             { dbs.add('clickhouse'); cats.add('database'); }
-      if (/boto3|aiobotocore/.test(txt))                      { infra.add('aws');        cats.add('infra'); }
-      if (/\bstripe\b/.test(txt))                             { infra.add('stripe');     cats.add('payments'); }
-      if (/\bsentry\b/.test(txt))                             { infra.add('sentry');     cats.add('observability'); }
+      addLang('Python');
+      if (/psycopg2|sqlalchemy|asyncpg|databases/.test(txt)) { addDb('postgres');   addCat('database'); }
+      if (/pymongo|motor/.test(txt))                          { addDb('mongodb');    addCat('database'); }
+      if (/\bredis\b/.test(txt))                              { addDb('redis');      addCat('database'); }
+      if (/clickhouse/.test(txt))                             { addDb('clickhouse'); addCat('database'); }
+      if (/boto3|aiobotocore/.test(txt))                      { addInfra('aws');        addCat('infra'); }
+      if (/\bstripe\b/.test(txt))                             { addInfra('stripe');     addCat('payments'); }
+      if (/\bsentry\b/.test(txt))                             { addInfra('sentry');     addCat('observability'); }
     } catch {}
   }
 
   // go.mod / Cargo.toml
-  if (fs.existsSync(path.join(cwd, 'go.mod')))    langs.add('Go');
-  if (fs.existsSync(path.join(cwd, 'Cargo.toml'))) langs.add('Rust');
+  from('language manifest', 0.95);
+  if (fs.existsSync(path.join(cwd, 'go.mod')))    addLang('Go');
+  if (fs.existsSync(path.join(cwd, 'Cargo.toml'))) addLang('Rust');
 
   // Swift — Package.swift (SwiftPM) or Project.swift (Tuist)
-  if (fs.existsSync(path.join(cwd, 'Package.swift')))  langs.add('swift');
-  if (fs.existsSync(path.join(cwd, 'Project.swift')))  langs.add('swift');
+  from('language manifest', 0.95);
+  if (fs.existsSync(path.join(cwd, 'Package.swift')))  addLang('swift');
+  if (fs.existsSync(path.join(cwd, 'Project.swift')))  addLang('swift');
 
   // JVM — pom.xml / build.gradle / build.gradle.kts. Dep parsing skipped:
   // pom.xml is XML, build.gradle is Groovy/Kotlin DSL — out of scope here.
-  if (fs.existsSync(path.join(cwd, 'pom.xml')))             langs.add('jvm');
-  if (fs.existsSync(path.join(cwd, 'build.gradle')))        langs.add('jvm');
-  if (fs.existsSync(path.join(cwd, 'build.gradle.kts')))    langs.add('jvm');
+  if (fs.existsSync(path.join(cwd, 'pom.xml')))             addLang('jvm');
+  if (fs.existsSync(path.join(cwd, 'build.gradle')))        addLang('jvm');
+  if (fs.existsSync(path.join(cwd, 'build.gradle.kts')))    addLang('jvm');
 
   // Ruby — Gemfile (preferred) with line-by-line gem scan; Gemfile.lock fallback.
+  from('Gemfile', 0.9);
   for (const f of ['Gemfile', 'Gemfile.lock']) {
     try {
       const txt = fs.readFileSync(path.join(cwd, f), 'utf8');
-      langs.add('ruby');
+      addLang('ruby');
       // Simple string-contains lookup — no real parser. Matches both
       // `gem "pg"` and Gemfile.lock dependency lines.
-      if (/\bpg\b/.test(txt))         { dbs.add('postgres');   cats.add('database'); }
-      if (/\bmysql2\b/.test(txt))     { dbs.add('mysql');      cats.add('database'); }
-      if (/\bredis\b/.test(txt))      { dbs.add('redis');      cats.add('database'); }
-      if (/\bmongo\b/.test(txt))      { dbs.add('mongodb');    cats.add('database'); }
-      if (/\bdalli\b/.test(txt))      { infra.add('memcached'); cats.add('database'); }
-      if (/\baws-sdk\b/.test(txt))    { infra.add('aws');      cats.add('infra'); }
+      if (/\bpg\b/.test(txt))         { addDb('postgres');   addCat('database'); }
+      if (/\bmysql2\b/.test(txt))     { addDb('mysql');      addCat('database'); }
+      if (/\bredis\b/.test(txt))      { addDb('redis');      addCat('database'); }
+      if (/\bmongo\b/.test(txt))      { addDb('mongodb');    addCat('database'); }
+      if (/\bdalli\b/.test(txt))      { addInfra('memcached'); addCat('database'); }
+      if (/\baws-sdk\b/.test(txt))    { addInfra('aws');      addCat('infra'); }
       break; // Gemfile wins over Gemfile.lock — don't double-scan.
     } catch {}
   }
 
   // PHP — composer.json with JSON `require` map scan.
+  from('composer.json require', 0.95);
   try {
     const composer = JSON.parse(fs.readFileSync(path.join(cwd, 'composer.json'), 'utf8'));
-    langs.add('php');
+    addLang('php');
     const req = { ...(composer.require || {}), ...(composer['require-dev'] || {}) };
     const reqKeys = Object.keys(req);
-    if (reqKeys.some(k => k === 'mongodb/mongodb' || k.startsWith('mongodb/')))    { dbs.add('mongodb');  cats.add('database'); }
-    if (reqKeys.some(k => k === 'predis/predis' || k.startsWith('predis/')))       { dbs.add('redis');    cats.add('database'); }
-    if (reqKeys.some(k => k.startsWith('aws/aws-sdk-php')))                         { infra.add('aws');    cats.add('infra'); }
+    if (reqKeys.some(k => k === 'mongodb/mongodb' || k.startsWith('mongodb/')))    { addDb('mongodb');  addCat('database'); }
+    if (reqKeys.some(k => k === 'predis/predis' || k.startsWith('predis/')))       { addDb('redis');    addCat('database'); }
+    if (reqKeys.some(k => k.startsWith('aws/aws-sdk-php')))                         { addInfra('aws');    addCat('infra'); }
     if (reqKeys.some(k => k === 'firebase/php-jwt'))                                { /* auth dep, no MCP signal */ }
-    if (reqKeys.some(k => k.startsWith('stripe/')))                                 { infra.add('stripe'); cats.add('payments'); }
-    if (reqKeys.some(k => k.startsWith('sentry/')))                                 { infra.add('sentry'); cats.add('observability'); }
+    if (reqKeys.some(k => k.startsWith('stripe/')))                                 { addInfra('stripe'); addCat('payments'); }
+    if (reqKeys.some(k => k.startsWith('sentry/')))                                 { addInfra('sentry'); addCat('observability'); }
   } catch { /* no composer.json or invalid JSON */ }
 
   // .NET — *.csproj / *.sln. Skip parsing; flag the language only.
+  from('project file', 0.95);
   try {
     const entries = fs.readdirSync(cwd);
-    if (entries.some(f => f.endsWith('.csproj') || f.endsWith('.sln'))) langs.add('dotnet');
+    if (entries.some(f => f.endsWith('.csproj') || f.endsWith('.sln'))) addLang('dotnet');
   } catch {}
 
   // Elixir — mix.exs. Skip dep parsing (Elixir DSL).
-  if (fs.existsSync(path.join(cwd, 'mix.exs'))) langs.add('elixir');
+  from('mix.exs', 0.95);
+  if (fs.existsSync(path.join(cwd, 'mix.exs'))) addLang('elixir');
 
   // docker-compose.yml
+  from('docker-compose service', 0.85);
   try {
     const txt = fs.readFileSync(path.join(cwd, 'docker-compose.yml'), 'utf8').toLowerCase();
-    if (/image:\s*(postgres|pg[^s])/.test(txt))     { dbs.add('postgres');   cats.add('database'); }
-    if (/image:\s*(mysql|mariadb)/.test(txt))        { dbs.add('mysql');      cats.add('database'); }
-    if (/image:\s*mongo/.test(txt))                  { dbs.add('mongodb');    cats.add('database'); }
-    if (/image:\s*redis/.test(txt))                  { dbs.add('redis');      cats.add('database'); }
-    if (/clickhouse/.test(txt))                      { dbs.add('clickhouse'); cats.add('database'); }
-    if (/image:\s*(confluentinc\/|bitnami\/kafka|apache\/kafka)/.test(txt)) { infra.add('kafka');      cats.add('streaming'); }
-    if (/image:\s*(prom\/prometheus|prometheus)/.test(txt))                 { infra.add('prometheus'); cats.add('observability'); }
-    if (/image:\s*grafana/.test(txt))                                       { infra.add('grafana');    cats.add('observability'); }
-    if (/image:\s*grafana\/loki/.test(txt))                                 { infra.add('loki');       cats.add('observability'); }
-    if (/image:\s*nginx/.test(txt))                                         { infra.add('nginx');      cats.add('infra'); }
-    if (/image:\s*hashicorp\/vault/.test(txt))                              { infra.add('vault');      cats.add('infra'); }
+    if (/image:\s*(postgres|pg[^s])/.test(txt))     { addDb('postgres');   addCat('database'); }
+    if (/image:\s*(mysql|mariadb)/.test(txt))        { addDb('mysql');      addCat('database'); }
+    if (/image:\s*mongo/.test(txt))                  { addDb('mongodb');    addCat('database'); }
+    if (/image:\s*redis/.test(txt))                  { addDb('redis');      addCat('database'); }
+    if (/clickhouse/.test(txt))                      { addDb('clickhouse'); addCat('database'); }
+    if (/image:\s*(confluentinc\/|bitnami\/kafka|apache\/kafka)/.test(txt)) { addInfra('kafka');      addCat('streaming'); }
+    if (/image:\s*(prom\/prometheus|prometheus)/.test(txt))                 { addInfra('prometheus'); addCat('observability'); }
+    if (/image:\s*grafana/.test(txt))                                       { addInfra('grafana');    addCat('observability'); }
+    if (/image:\s*grafana\/loki/.test(txt))                                 { addInfra('loki');       addCat('observability'); }
+    if (/image:\s*nginx/.test(txt))                                         { addInfra('nginx');      addCat('infra'); }
+    if (/image:\s*hashicorp\/vault/.test(txt))                              { addInfra('vault');      addCat('infra'); }
   } catch {}
 
   // Infra files at well-known paths (one-shot existence check, no content scan)
@@ -204,19 +243,24 @@ function detectStack(cwd) {
     [['k8s', 'kubernetes', 'manifests'],  'kubernetes','infra'],
     [['Dockerfile'],                      'docker',   'infra'],
   ];
+  from('project file or directory', 0.85);
   for (const [paths, signal, cat] of fileSignals) {
     if (paths.some(p => fs.existsSync(path.join(cwd, p)))) {
-      infra.add(signal); cats.add(cat);
+      addInfra(signal); addCat(cat);
     }
   }
 
   // Surface .tf files anywhere in the repo root as a terraform signal
   // (covers projects that don't put them in a dedicated dir).
   try {
-    if (fs.readdirSync(cwd).some(f => f.endsWith('.tf'))) { infra.add('terraform'); cats.add('infra'); }
+    from('.tf file in the repo root', 0.85);
+    if (fs.readdirSync(cwd).some(f => f.endsWith('.tf'))) { addInfra('terraform'); addCat('infra'); }
   } catch {}
 
-  // .env / .env.example / .env.local — key names only, never values
+  // .env / .env.example / .env.local — key names only, never values.
+  // Weakest signal of the lot, and marked `inferred`: a configured credential
+  // says someone has an account, not that this project calls that service.
+  from('.env key name', 0.6, 'inferred');
   for (const f of ['.env.example', '.env.local', '.env']) {
     try {
       for (const line of fs.readFileSync(path.join(cwd, f), 'utf8').split('\n')) {
@@ -224,55 +268,61 @@ function detectStack(cwd) {
         if (!m) continue;
         const k = m[1];
         keys.push(k);
-        if (/^GITHUB_/.test(k))                              { infra.add('github');     cats.add('vcs'); }
-        if (/^GITLAB_/.test(k))                              { infra.add('gitlab');     cats.add('vcs'); }
-        if (/^LINEAR_/.test(k))                              { infra.add('linear');     cats.add('pm'); }
-        if (/^NOTION_/.test(k))                              { infra.add('notion');     cats.add('docs'); }
-        if (/^SENTRY_/.test(k))                              { infra.add('sentry');     cats.add('observability'); }
-        if (/^STRIPE_/.test(k))                              { infra.add('stripe');     cats.add('payments'); }
-        if (/^SUPABASE_/.test(k))                            { dbs.add('supabase');     cats.add('database'); }
-        if (/^NEON_/.test(k) || k === 'NEON_DATABASE_URL')  { dbs.add('neon');         cats.add('database'); }
-        if (/^(CLOUDFLARE_|CF_API_TOKEN)/.test(k))          { infra.add('cloudflare'); cats.add('infra'); }
-        if (/^AWS_/.test(k))                                 { infra.add('aws');        cats.add('infra'); }
-        if (/^MONGO/.test(k))                                { dbs.add('mongodb');      cats.add('database'); }
-        if (/^CLICKHOUSE_/.test(k))                          { dbs.add('clickhouse');   cats.add('database'); }
-        if (/^(KUBE_|KUBERNETES_)/.test(k))                  { infra.add('kubernetes'); cats.add('infra'); }
-        if (/^(MYSQL_|MARIADB_)/.test(k))                    { dbs.add('mysql');        cats.add('database'); }
-        if (/^(PG_|POSTGRES_|POSTGRESQL_)/.test(k))          { dbs.add('postgres');     cats.add('database'); }
-        if (/^(TEAMCITY_|TC_(URL|TOKEN|API))/.test(k))       { infra.add('teamcity');   cats.add('ci-cd'); }
-        if (/^(CIRCLECI_|CIRCLE_)/.test(k))                  { infra.add('circleci');   cats.add('ci-cd'); }
-        if (/^JENKINS_/.test(k))                             { infra.add('jenkins');    cats.add('ci-cd'); }
-        if (/^(ARGOCD_|ARGO_)/.test(k))                      { infra.add('argocd');     cats.add('infra'); }
-        if (/^HELM_/.test(k))                                { infra.add('helm');       cats.add('infra'); }
-        if (/^(TERRAFORM_|TF_(VAR|CLI))/.test(k))            { infra.add('terraform');  cats.add('infra'); }
-        if (/^VAULT_(ADDR|TOKEN|NAMESPACE)/.test(k))         { infra.add('vault');      cats.add('infra'); }
-        if (/^PROMETHEUS_/.test(k))                          { infra.add('prometheus'); cats.add('observability'); }
-        if (/^GRAFANA_/.test(k))                             { infra.add('grafana');    cats.add('observability'); }
-        if (/^LOKI_/.test(k))                                { infra.add('loki');       cats.add('observability'); }
-        if (/^DATADOG_/.test(k))                             { infra.add('datadog');    cats.add('observability'); }
-        if (/^DYNATRACE_/.test(k))                           { infra.add('dynatrace');  cats.add('observability'); }
-        if (/^NEWRELIC_/.test(k))                            { infra.add('newrelic');   cats.add('observability'); }
-        if (/^KAFKA_/.test(k))                               { infra.add('kafka');      cats.add('streaming'); }
-        if (/^(SALESFORCE_|SFDC_)/.test(k))                  { infra.add('salesforce'); cats.add('crm'); }
-        if (/^MAPBOX_/.test(k))                              { infra.add('mapbox');     cats.add('maps'); }
-        if (/^BROWSERSTACK_/.test(k))                        { infra.add('browserstack');cats.add('browser'); }
-        if (/^POSTMAN_/.test(k))                             { infra.add('postman');    cats.add('testing'); }
-        if (/^(AZURE_DEVOPS_|ADO_)/.test(k))                 { infra.add('azure-devops');cats.add('vcs'); }
-        if (/^(JIRA_|CONFLUENCE_|ATLASSIAN_)/.test(k))       { infra.add('atlassian');  cats.add('pm'); }
+        if (/^GITHUB_/.test(k))                              { addInfra('github');     addCat('vcs'); }
+        if (/^GITLAB_/.test(k))                              { addInfra('gitlab');     addCat('vcs'); }
+        if (/^LINEAR_/.test(k))                              { addInfra('linear');     addCat('pm'); }
+        if (/^NOTION_/.test(k))                              { addInfra('notion');     addCat('docs'); }
+        if (/^SENTRY_/.test(k))                              { addInfra('sentry');     addCat('observability'); }
+        if (/^STRIPE_/.test(k))                              { addInfra('stripe');     addCat('payments'); }
+        if (/^SUPABASE_/.test(k))                            { addDb('supabase');     addCat('database'); }
+        if (/^NEON_/.test(k) || k === 'NEON_DATABASE_URL')  { addDb('neon');         addCat('database'); }
+        if (/^(CLOUDFLARE_|CF_API_TOKEN)/.test(k))          { addInfra('cloudflare'); addCat('infra'); }
+        if (/^AWS_/.test(k))                                 { addInfra('aws');        addCat('infra'); }
+        if (/^MONGO/.test(k))                                { addDb('mongodb');      addCat('database'); }
+        if (/^CLICKHOUSE_/.test(k))                          { addDb('clickhouse');   addCat('database'); }
+        if (/^(KUBE_|KUBERNETES_)/.test(k))                  { addInfra('kubernetes'); addCat('infra'); }
+        if (/^(MYSQL_|MARIADB_)/.test(k))                    { addDb('mysql');        addCat('database'); }
+        if (/^(PG_|POSTGRES_|POSTGRESQL_)/.test(k))          { addDb('postgres');     addCat('database'); }
+        if (/^(TEAMCITY_|TC_(URL|TOKEN|API))/.test(k))       { addInfra('teamcity');   addCat('ci-cd'); }
+        if (/^(CIRCLECI_|CIRCLE_)/.test(k))                  { addInfra('circleci');   addCat('ci-cd'); }
+        if (/^JENKINS_/.test(k))                             { addInfra('jenkins');    addCat('ci-cd'); }
+        if (/^(ARGOCD_|ARGO_)/.test(k))                      { addInfra('argocd');     addCat('infra'); }
+        if (/^HELM_/.test(k))                                { addInfra('helm');       addCat('infra'); }
+        if (/^(TERRAFORM_|TF_(VAR|CLI))/.test(k))            { addInfra('terraform');  addCat('infra'); }
+        if (/^VAULT_(ADDR|TOKEN|NAMESPACE)/.test(k))         { addInfra('vault');      addCat('infra'); }
+        if (/^PROMETHEUS_/.test(k))                          { addInfra('prometheus'); addCat('observability'); }
+        if (/^GRAFANA_/.test(k))                             { addInfra('grafana');    addCat('observability'); }
+        if (/^LOKI_/.test(k))                                { addInfra('loki');       addCat('observability'); }
+        if (/^DATADOG_/.test(k))                             { addInfra('datadog');    addCat('observability'); }
+        if (/^DYNATRACE_/.test(k))                           { addInfra('dynatrace');  addCat('observability'); }
+        if (/^NEWRELIC_/.test(k))                            { addInfra('newrelic');   addCat('observability'); }
+        if (/^KAFKA_/.test(k))                               { addInfra('kafka');      addCat('streaming'); }
+        if (/^(SALESFORCE_|SFDC_)/.test(k))                  { addInfra('salesforce'); addCat('crm'); }
+        if (/^MAPBOX_/.test(k))                              { addInfra('mapbox');     addCat('maps'); }
+        if (/^BROWSERSTACK_/.test(k))                        { addInfra('browserstack');addCat('browser'); }
+        if (/^POSTMAN_/.test(k))                             { addInfra('postman');    addCat('testing'); }
+        if (/^(AZURE_DEVOPS_|ADO_)/.test(k))                 { addInfra('azure-devops');addCat('vcs'); }
+        if (/^(JIRA_|CONFLUENCE_|ATLASSIAN_)/.test(k))       { addInfra('atlassian');  addCat('pm'); }
         // Jira/Confluence are both served by mcp-atlassian. Keep the
         // 'atlassian' signal above for back-compat and add 'jira' →
         // 'docs' so docs-oriented callers find the same server.
-        if (/^JIRA_/.test(k) || k === 'ATLASSIAN_TOKEN')     { infra.add('jira');       cats.add('docs'); }
-        if (/^ATLASSIAN_/.test(k))                           { infra.add('jira');       cats.add('docs'); }
-        if (/^SEQ_/.test(k))                                 { infra.add('seq');        cats.add('observability'); }
-        if (/^SLACK_/.test(k))                               { infra.add('slack');      cats.add('communication'); }
-        if (/^DISCORD_/.test(k))                             { infra.add('discord');    cats.add('communication'); }
-        if (/^(MAILGUN_|SENDGRID_|POSTMARK_)/.test(k))       { infra.add('email');      cats.add('communication'); }
+        if (/^JIRA_/.test(k) || k === 'ATLASSIAN_TOKEN')     { addInfra('jira');       addCat('docs'); }
+        if (/^ATLASSIAN_/.test(k))                           { addInfra('jira');       addCat('docs'); }
+        if (/^SEQ_/.test(k))                                 { addInfra('seq');        addCat('observability'); }
+        if (/^SLACK_/.test(k))                               { addInfra('slack');      addCat('communication'); }
+        if (/^DISCORD_/.test(k))                             { addInfra('discord');    addCat('communication'); }
+        if (/^(MAILGUN_|SENDGRID_|POSTMARK_)/.test(k))       { addInfra('email');      addCat('communication'); }
       }
     } catch {}
   }
 
-  return { langs, dbs, infra, cats, keys: [...new Set(keys)] };
+  return {
+    langs, dbs, infra, cats,
+    keys: [...new Set(keys)],
+    // Ordered strongest-first, so a report can lead with what the project
+    // actually declares rather than with what an env var hinted at.
+    signals: signals.sort((a, b) => b.confidence - a.confidence || a.value.localeCompare(b.value)),
+  };
 }
 
 // ── DB matching ─────────────────────────────────────────────────────────────
@@ -745,10 +795,13 @@ if (require.main === module) {
         infra:      [...stack.infra],
         categories: [...stack.cats],
         keys:       stack.keys.slice(0, 20),
+        // Each signal with where it came from and how much it implies, so a
+        // recommendation can be explained rather than asserted.
+        signals:    stack.signals,
         unmapped_signals: unmapped,
       },
-      recommended: matched.filter(t => t.est_tools_count < HEAVY).map(slim),
-      heavy:       matched.filter(t => t.est_tools_count >= HEAVY).map(slim),
+      recommended: matched.filter(t => t.est_tools_count < HEAVY).map(t => slim(t, stack)),
+      heavy:       matched.filter(t => t.est_tools_count >= HEAVY).map(t => slim(t, stack)),
       installed,
       db_entry_count: db.tools.length,
     }, null, 2) + '\n');
@@ -773,7 +826,13 @@ module.exports = {
   UNIVERSAL_TOOLS,
 };
 
-function slim(t) {
+function slim(t, stack = null) {
+  // health / trust / fit, kept apart on purpose: health says the project is
+  // maintained, trust says we know which bytes we would run, fit says this
+  // project has a use for it. A recommendation is a policy over the three —
+  // trust gates, the others rank — so popularity cannot outvote a bad pin.
+  const trust = trustScore(t.trust_evidence);
+  const fit   = stack ? fitScore(t, stack, { signalToTools: SIGNAL_TO_TOOLS, universal: UNIVERSAL_TOOLS }) : null;
   return {
     name:            t.name,
     category:        t.category,
@@ -784,5 +843,11 @@ function slim(t) {
     trust:           t.trust,
     install_cmd:     t.install_cmd,
     last_checked:    t.last_checked,
+    scores: {
+      health: Number.isFinite(t.health_score) ? t.health_score : null,
+      trust:  { score: trust.score, gate: trust.gate, reasons: trust.reasons.slice(0, 4) },
+      fit:    fit ? { score: fit.score, reasons: fit.reasons.slice(0, 4) } : null,
+      recommendation: recommend({ trust, health: t.health_score, fit }),
+    },
   };
 }

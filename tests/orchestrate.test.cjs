@@ -443,3 +443,42 @@ test('pinInstallCmd: every npm/uvx entry in the shipped DB can be pinned', () =>
   // and visible rather than asserting zero.
   assert.ok(unpinnable.length <= 2, `unpinnable entries grew:\n${unpinnable.join('\n')}`);
 });
+
+// ── signal provenance ──────────────────────────────────────────────────────
+
+test('detectStack: every signal says where it came from and how much it implies', () => {
+  const fs = require('node:fs'), os = require('node:os'), pathMod = require('node:path');
+  const dir = fs.mkdtempSync(pathMod.join(os.tmpdir(), 'mcp-signals-'));
+  // A declared dependency and a bare credential name are not the same claim.
+  fs.writeFileSync(pathMod.join(dir, 'package.json'), JSON.stringify({ dependencies: { pg: '^8' } }));
+  fs.writeFileSync(pathMod.join(dir, '.env.example'), 'AWS_ACCESS_KEY_ID=\nDATABASE_URL=\n');
+
+  const stack = o.detectStack(dir);
+  const byValue = Object.fromEntries(stack.signals.map(s => [s.value, s]));
+
+  assert.equal(byValue.postgres.kind, 'detected');
+  assert.equal(byValue.postgres.confidence, 0.95);
+  assert.deepEqual(byValue.postgres.sources, ['package.json dependency']);
+
+  // The env-derived one is weaker and marked as an inference.
+  const inferred = stack.signals.filter(s => s.kind === 'inferred');
+  assert.ok(inferred.length > 0, 'an .env key should produce an inferred signal');
+  assert.ok(inferred.every(s => s.confidence < byValue.postgres.confidence));
+
+  // The old shape still works for existing callers.
+  assert.ok(stack.dbs.has('postgres'));
+  assert.ok(stack.langs.has('Node'));
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('detectStack: two sources agreeing are recorded as both', () => {
+  const fs = require('node:fs'), os = require('node:os'), pathMod = require('node:path');
+  const dir = fs.mkdtempSync(pathMod.join(os.tmpdir(), 'mcp-signals-two-'));
+  fs.writeFileSync(pathMod.join(dir, 'package.json'), JSON.stringify({ dependencies: { redis: '^4' } }));
+  fs.writeFileSync(pathMod.join(dir, 'docker-compose.yml'), 'services:\n  cache:\n    image: redis:7\n');
+  const stack = o.detectStack(dir);
+  const redis = stack.signals.find(s => s.value === 'redis');
+  assert.equal(redis.sources.length, 2);
+  assert.equal(redis.confidence, 0.95);   // the stronger source wins
+  fs.rmSync(dir, { recursive: true, force: true });
+});

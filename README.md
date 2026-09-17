@@ -192,6 +192,44 @@ more likely a file worth keeping than a file worth clobbering. Codex keeps TOML;
 rewriting that without a TOML parser would destroy comments and formatting, so
 `mcp-vault` prints the three correct lines and lets you paste them.
 
+### Health, trust and fit
+
+`health_score` mixes stars, recency, registry presence and a licence penalty.
+That is a fair *discovery* signal — is this project maintained — and it was
+being read as a measure of trust. It is not one: a package can have 30k stars,
+weekly commits, an official listing, and also a broken pin, an unsigned release
+and seventy tools with filesystem access.
+
+`scan --json` now reports three axes per entry and a verdict over them:
+
+```json
+"scores": {
+  "health": 78,
+  "trust": { "score": 85, "gate": "ok", "reasons": ["artifact: verified", "signature: verified"] },
+  "fit":   { "score": 73, "reasons": ["maps to \"postgres\" (detected, package.json dependency, confidence 0.95)"] },
+  "recommendation": { "verdict": "recommended", "reasons": ["fits this project (fit 73/100)"] }
+}
+```
+
+Trust **gates**; health and fit **rank**. A blocking trust verdict (hash
+mismatch, known-vulnerable version) is never outweighed by the other two, which
+is precisely what adding the numbers together would do. Thin trust — nothing
+recorded yet — never reads as `recommended` either. `health_score` keeps its
+name and formula: it is consumed by discovery and policy, and renaming a field
+to make a point is a poor trade.
+
+Stack signals carry their own provenance, so a recommendation can be explained
+rather than asserted:
+
+```json
+{ "dimension": "db", "value": "postgres", "kind": "detected", "sources": ["package.json dependency"], "confidence": 0.95 }
+{ "dimension": "infra", "value": "aws",   "kind": "inferred", "sources": [".env key name"],            "confidence": 0.6 }
+```
+
+`detected` means the project declares it; `inferred` means something suggests
+it. A credential in `.env` says someone has an account, not that this repo
+calls that service — and the weaker signal produces a weaker fit.
+
 ### Trust as dated evidence
 
 `trust: "verified"` collapsed several claims with different lifetimes into one
