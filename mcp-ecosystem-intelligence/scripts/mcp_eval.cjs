@@ -64,6 +64,7 @@ const { spawn }     = require('child_process');
 const { performance } = require('perf_hooks');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { readInstalledServers } = require('./lib/installed.cjs');
+const { dockerImageRef } = require('./lib/install_cmd.cjs');
 const stdio         = require('./lib/mcp_stdio.cjs'); // shared framing + sandbox + classifier (vendored, zero-dep)
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -350,7 +351,15 @@ async function smokeEntry(tool, opts) {
 
   // Sandbox real entries when asked; the test fake-server (_evalSpawn) always
   // runs on the host. docker-run entries pass through (already containerized).
-  const launch = (opts.sandbox && !tool._evalSpawn) ? stdio.sandboxWrap(parsed) : parsed;
+  // Whether to jail is decided by the flags, never by a field in the entry.
+  // `_evalSpawn` used to disable the sandbox, which meant (a) `--installed
+  // --sandbox` ran local commands straight on the host, and (b) a DB entry
+  // carrying `_evalSpawn` — the DB is a file a PR can edit — opted itself out
+  // of the jail. `opts.hostSpawn` is the in-process escape hatch tests use; it
+  // cannot be expressed in JSON.
+  const launch = opts.sandbox && !opts.hostSpawn
+    ? stdio.sandboxWrap(parsed, { imageRef: dockerImageRef(tool.install_cmd || '') })
+    : parsed;
   result.sandboxed = !!launch.sandboxed;
 
   // sandboxWrap refuses a launch it cannot make safe — a docker entry with no

@@ -129,7 +129,11 @@ const INSTALLED = process.argv.includes('--installed');
 // --deps: resolve each package's dependency tree and check it too. An
 // install-time script is far more often in a transitive dependency than in the
 // package itself, so a one-level check is a check at the wrong depth.
-const DEPS = process.argv.includes('--deps') || policySays((p) => p.deps);
+// A policy that forbids dependency hooks or advisories cannot be judged
+// without the tree, so requiring either implies resolving it. Otherwise the
+// rule silently checked nothing.
+const DEPS = process.argv.includes('--deps')
+  || policySays((p) => p.deps || p.dependencyHooks === 'fail' || p.dependencyAdvisories === 'fail');
 // A hard failure on a transitive advisory is a policy choice, not a fact about
 // the artifact: most trees carry something. Off unless asked for.
 const FAIL_DEP_ADVISORIES = process.argv.includes('--fail-dep-advisories') || policySays((p) => p.dependencyAdvisories === 'fail');
@@ -178,8 +182,20 @@ function httpsPostJson(url, payload, timeoutMs = 10000) {
   return postJson(url, payload, { timeoutMs }).then((r) => (r.ok ? r.data : null));
 }
 
+// Returns the body, or null when the feed did not answer. A *stale* cache hit
+// is not an answer: lib/http.cjs prefers old bytes over nothing, which is the
+// right default for a fetch but the wrong one for a verdict — an old empty
+// GHSA response would read as "queried, no advisories". Callers that care
+// (all of them) use httpsGetJsonMeta and treat `stale` as a degraded feed.
+function httpsGetJsonMeta(url, timeoutMs = 10000, headers = {}, cacheTtlMs = CACHE_TTL_MS) {
+  return getJson(url, { headers, timeoutMs, cacheTtlMs })
+    .then((r) => ({ data: r.ok ? r.data : null, stale: !!r.stale, status: r.status, error: r.error }));
+}
+
 function httpsGetJson(url, timeoutMs = 10000, headers = {}, cacheTtlMs = CACHE_TTL_MS) {
-  return getJson(url, { headers, timeoutMs, cacheTtlMs }).then((r) => (r.ok ? r.data : null));
+  // Fresh-or-nothing: a stale body is reported as no answer here.
+  return httpsGetJsonMeta(url, timeoutMs, headers, cacheTtlMs)
+    .then((r) => (r.stale ? null : r.data));
 }
 
 function fetchNpmAdvisories(pkgMap) {
@@ -223,19 +239,29 @@ async function enrichOsvVulns(resultLists) {
   for (const r of resultLists || []) {
     for (const v of (r?.vulns || [])) if (v && v.id) ids.add(v.id);
   }
-  if (!ids.size) return new Map();
+  if (!ids.size) return { byId: new Map(), failed: new Set() };
   const list = [...ids];
   const fetched = await mapLimit(list, CONCURRENCY, (id) =>
     httpsGetJson(`https://api.osv.dev/v1/vulns/${encodeURIComponent(id)}`, 10000, {}, 24 * 60 * 60 * 1000));
   const byId = new Map();
-  list.forEach((id, i) => { if (fetched[i]) byId.set(id, fetched[i]); });
-  return byId;
+  const failed = new Set();
+  // An advisory we could not fetch keeps severity UNKNOWN, and UNKNOWN is not
+  // hard — so silently keeping the stub turns "we don't know how bad this is"
+  // into "not bad enough to fail". Track the misses and surface them.
+  list.forEach((id, i) => { if (fetched[i]) byId.set(id, fetched[i]); else failed.add(id); });
+  return { byId, failed };
 }
 
 // Replace each stub with its full record where we have one, so severity is
-// read from something that actually carries it.
-function withOsvDetail(vulns, byId) {
-  return (vulns || []).map((v) => (byId && byId.get(v.id)) || v);
+// read from something that actually carries it. Anything still a stub is
+// flagged so the caller can report it as unverified rather than as mild.
+function withOsvDetail(vulns, detail) {
+  const byId = detail && detail.byId;
+  return (vulns || []).map((v) => {
+    const full = byId && byId.get(v.id);
+    if (full) return full;
+    return { ...v, _severityUnresolved: true };
+  });
 }
 
 // GitHub Advisory Database (public REST). One request per (ecosystem, pkg).
@@ -586,6 +612,7 @@ function unifyAdvisories({ npmList, osvList, ghsaList, snykList }) {
   for (const v of (osvList || [])) {
     push({
       id:       v.id,
+      unresolved: v._severityUnresolved === true,
       severity: osvSeverity(v),
       title:    v.summary || v.id,
       url:      v.id ? `https://osv.dev/vulnerability/${v.id}` : null,
@@ -647,7 +674,7 @@ function verdictFor(failures, lines) {
 
 // ── per-tool processors ────────────────────────────────────────────────────
 
-async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, results, tree = null, depAdvisories = null) {
+async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, results, tree = null, depAdvisories = null, depAdvisoriesUnknown = null) {
   if (OFFLINE) {
     processOfflinePackage(tool, pkg, 'npm', results);
     return;
@@ -749,7 +776,14 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
     const att = await httpsGetJson(attestationsUrl, 10000, {}, CACHE_TTL_MS);
     const claim = att ? provenanceClaim(att) : null;
     if (!claim) {
-      lines.push(['NOTE', 'provenance attestation present but unreadable']);
+      // "There is an attestation but we could not read it" is not evidence of
+      // provenance. Under --require-provenance it fails like an absent one.
+      if (REQUIRE_PROVENANCE) {
+        lines.push(['FAIL', 'provenance attestation present but unreadable']);
+        failures++;
+      } else {
+        lines.push(['NOTE', 'provenance attestation present but unreadable']);
+      }
     } else {
       const claimedRepo = normalizeGitUrl(claim.repository);
       if (storedRepo && claimedRepo && claimedRepo.toLowerCase() !== storedRepo.toLowerCase()) {
@@ -799,6 +833,17 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
         lines.push(['DEPHOOK', `install scripts in dependencies (${nested.length}): ${shown}${nested.length > 8 ? ', …' : ''}`]);
       }
 
+      // Dependencies whose advisory state we never established.
+      if (depAdvisoriesUnknown && depAdvisoriesUnknown.size) {
+        const blind = tree.packages
+          .filter((d) => depAdvisoriesUnknown.has(`${d.name}@${d.version}`))
+          .map((d) => `${d.name}@${d.version}`);
+        if (blind.length) {
+          lines.push(['UNVERIFIED', `advisory state unknown for ${blind.length} package${blind.length === 1 ? '' : 's'} in the tree (OSV batch failed)${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+          if (FAIL_UNVERIFIED) failures++;
+        }
+      }
+
       // Advisories affecting anything in the tree.
       if (depAdvisories && depAdvisories.size) {
         const hits = [];
@@ -839,6 +884,12 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
     lines.push(['CVE', `[${a.severity}] (${a.source}) ${a.title || a.url || a.id}`]);
   }
   if (advisoriesForTool.some((a) => severityIsHard(a.severity))) failures++;
+  // An advisory whose severity we could not read is not a mild advisory.
+  const unresolved = advisoriesForTool.filter((a) => a.unresolved).map((a) => a.id).filter(Boolean);
+  if (unresolved.length) {
+    lines.push(['UNVERIFIED', `severity unknown for ${unresolved.length} advisor${unresolved.length === 1 ? 'y' : 'ies'} (${unresolved.slice(0, 4).join(', ')}${unresolved.length > 4 ? ', …' : ''}) — OSV detail fetch failed${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+    if (FAIL_UNVERIFIED) failures++;
+  }
 
   // Unreachable advisory feeds: we cannot assert "no known CVEs" when a feed was
   // down. Surface it loudly; hard-fail under --strict (never silently pass).
@@ -950,6 +1001,12 @@ async function processPypi(tool, pkg, meta, advisoriesForTool, degraded, results
     lines.push(['CVE', `[${a.severity}] (${a.source}) ${a.title || a.url || a.id}`]);
   }
   if (advisoriesForTool.some((a) => severityIsHard(a.severity))) failures++;
+  // An advisory whose severity we could not read is not a mild advisory.
+  const unresolved = advisoriesForTool.filter((a) => a.unresolved).map((a) => a.id).filter(Boolean);
+  if (unresolved.length) {
+    lines.push(['UNVERIFIED', `severity unknown for ${unresolved.length} advisor${unresolved.length === 1 ? 'y' : 'ies'} (${unresolved.slice(0, 4).join(', ')}${unresolved.length > 4 ? ', …' : ''}) — OSV detail fetch failed${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+    if (FAIL_UNVERIFIED) failures++;
+  }
 
   // Unreachable advisory feeds: we cannot assert "no known CVEs" when a feed was
   // down. Surface it loudly; hard-fail under --strict (never silently pass).
@@ -1013,11 +1070,15 @@ async function processDocker(tool, results) {
       failures,
     });
   } else {
+    // A structured finding, so a policy rule (docker: "digest") and the SARIF
+    // output can both see it. As a bare headline it existed only in prose, and
+    // the policy rule that looks for it never fired.
     const failures = STRICT ? 1 : 0;
     results.push({
       tool,
       status: STRICT ? 'FAIL' : 'WARN',
       msg: `${tool.name}: docker image not pinned by digest (${ref})`,
+      lines: [['DIGEST', `image ${ref} is referenced by tag, not by @sha256 digest`]],
       failures,
     });
   }
@@ -1108,8 +1169,16 @@ async function main() {
       cwd: CWD,
       onUnreadable: (loc) => installedNotes.push({ ...loc, kind: 'unreadable' }),
     });
-    if (!servers.length) {
-      console.error(`No configured MCP servers found (looked in ${CWD} and the usual host config paths).`);
+    if (!servers.length && !installedNotes.length) {
+      const note = `No configured MCP servers found (looked in ${CWD} and the usual host config paths).`;
+      if (AS_JSON || AS_SARIF) {
+        // A machine-readable mode always emits a document, even an empty one:
+        // "no output" is not something a caller can distinguish from a crash.
+        const empty = toJsonReport({ results: [], meta: { mode: 'installed', subject: 'installed', note } });
+        process.stdout.write(JSON.stringify(AS_SARIF ? toSarif(empty, {}) : empty, null, 2) + '\n');
+      } else {
+        console.error(note);
+      }
       return exitAfterFlush(0);
     }
     const byName = new Map(allTools.map((t) => [t.name, t]));
@@ -1134,6 +1203,18 @@ async function main() {
         },
       };
     });
+    // A config that exists but does not parse is a finding: it may be the file
+    // that holds the servers nobody is checking. It used to vanish into a
+    // stderr note while the run exited 0 with an empty document.
+    for (const problem of installedNotes) {
+      scope.push({
+        name: `${problem.host || 'host'} config (${problem.path})`,
+        install_cmd: '(unreadable config)',
+        version: null, pkg_integrity: null, source_url: null, trust: 'not-in-vault',
+        _installed: { host: problem.host, scope: problem.scope, source: problem.path, in_vault: false, kind: 'unreadable', command: null },
+        _configError: problem.error,
+      });
+    }
   }
 
   // Bucket tools by ecosystem.
@@ -1150,6 +1231,7 @@ async function main() {
     const inst = tool._installed;
     const reason = !inst ? why
       : inst.kind === 'remote' ? `remote server (${inst.remote}) — no artifact to verify, trust is in the endpoint`
+      : inst.kind === 'unreadable' ? `host config could not be parsed (${tool._configError}) — the servers it lists were not checked`
       : inst.kind === 'local'  ? `launched from a local command (${inst.command}) — nothing published to verify against`
       : why;
     results.push({
@@ -1206,7 +1288,7 @@ async function main() {
   // Severity for OSV hits comes from the full records, not the batch stubs.
   const osvDetail = (!UPDATE && !NO_AUDIT && !OFFLINE)
     ? await enrichOsvVulns([...(osvNpm.data || []), ...(osvPypi.data || [])])
-    : new Map();
+    : { byId: new Map(), failed: new Set() };
 
   const health = { npm: npmAdvisories, osvNpm, osvPypi, ghsa, snyk };
 
@@ -1237,6 +1319,8 @@ async function main() {
   // rather than one request per dependency.
   let npmTrees = [];
   let depAdvisories = new Map();
+  // Packages whose advisory state we could not establish at all.
+  const depAdvisoriesUnknown = new Set();
   if (DEPS && !OFFLINE && npmTools.length) {
     progress(`Resolving dependency trees for ${npmTools.length} npm entries (${DEPS_CONCURRENCY} at a time)... `);
     npmTrees = await mapLimit(npmTools, DEPS_CONCURRENCY, ({ tool, pkg }) =>
@@ -1257,6 +1341,13 @@ async function main() {
     for (let i = 0; i < queries.length; i += BATCH) {
       const chunk = queries.slice(i, i + BATCH);
       const res = await fetchOsvAdvisories(chunk);
+      if (!res.ok) {
+        // The batch did not answer. Coalescing that into "no advisories" is
+        // the fail-open this whole pass exists to remove, so mark every
+        // package in the batch as unknown instead.
+        for (const q of chunk) depAdvisoriesUnknown.add(`${q.name}@${q.version}`);
+        continue;
+      }
       chunk.forEach((q, j) => {
         const vulns = res.data?.[j]?.vulns || [];
         if (vulns.length) batched.push([`${q.name}@${q.version}`, vulns]);
@@ -1281,7 +1372,7 @@ async function main() {
       snykList: snyk.data[`npm:${pkg}`] || [],
     });
     const degraded = (UPDATE || NO_AUDIT) ? [] : degradedFeedsFor('npm', `npm:${pkg}`, health);
-    await processNpm(tool, pkg, npmMetas[i], advs, degraded, results, npmTrees[i], depAdvisories);
+    await processNpm(tool, pkg, npmMetas[i], advs, degraded, results, npmTrees[i], depAdvisories, depAdvisoriesUnknown);
   }
   // Process PyPI.
   for (let i = 0; i < pypiTools.length; i++) {

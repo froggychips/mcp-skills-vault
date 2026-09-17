@@ -437,7 +437,10 @@ function installTool(tool, cwd, global_) {
   // no `version` made `l.includes(tool.version || '')` true for *every* line,
   // so an unrelated entry's FAIL aborted this install.
   // --fail-unverified: for an install, "couldn't check" is a refusal.
-  const verifyArgs = [VERIFY_CJS, '--entry', tool.name, '--fail-unverified'];
+  // --cwd matters: the policy file that applies is the one belonging to the
+  // project we are about to write into, not the directory this process happens
+  // to have been started from.
+  const verifyArgs = [VERIFY_CJS, '--entry', tool.name, '--fail-unverified', '--cwd', cwd];
   if (OFFLINE) verifyArgs.push('--offline');
   if (STRICT)  verifyArgs.push('--strict');
 
@@ -512,7 +515,18 @@ function installTool(tool, cwd, global_) {
 // `pkg@latest`, `pkg@^1.2` and a stale `pkg@1.0.0` all launch something other
 // than the artifact whose hash was compared, so they get rewritten to the DB's
 // version rather than trusted.
-const EXACT_VERSION = /^[0-9][\w.+!-]*$/;
+// "Exact" has to mean exact. `1`, `1.2` and `1.x` all satisfied the old
+// pattern, so `pinInstallCmd` happily produced `pkg@1.x` and called it pinned —
+// a range dressed as a pin.
+//   npm:  semver, three components, optional pre-release/build
+//   PyPI: PEP 440 release segment, optional pre/post/dev/local
+const EXACT_NPM_VERSION  = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+const EXACT_PYPI_VERSION = /^\d+(?:\.\d+)*(?:(?:a|b|rc)\d+)?(?:\.post\d+)?(?:\.dev\d+)?(?:\+[0-9A-Za-z.]+)?$/;
+
+function isExactVersion(runner, version) {
+  if (typeof version !== 'string' || !version) return false;
+  return runner === 'npx' ? EXACT_NPM_VERSION.test(version) : EXACT_PYPI_VERSION.test(version);
+}
 
 function pinInstallCmd(cmd, version) {
   const raw    = String(cmd).trim();
@@ -559,8 +573,11 @@ function pinInstallCmd(cmd, version) {
         : 'no `version` in the DB entry — run verify_integrity.cjs --update',
     };
   }
-  if (!EXACT_VERSION.test(version)) {
-    return { parts, pinned: false, reason: `DB version "${version}" is not an exact version — nothing safe to pin to` };
+  if (!isExactVersion(runner, version)) {
+    return {
+      parts, pinned: false,
+      reason: `DB version "${version}" is not an exact ${runner === 'npx' ? 'semver' : 'PEP 440'} version — a range is not a pin`,
+    };
   }
   if (current === version) return { parts, pinned: true, reason: null };
 
@@ -751,6 +768,7 @@ module.exports = {
   unmappedSignals,
   fallbackBySignal,
   pinInstallCmd,
+  isExactVersion,
   SIGNAL_TO_TOOLS,
   UNIVERSAL_TOOLS,
 };

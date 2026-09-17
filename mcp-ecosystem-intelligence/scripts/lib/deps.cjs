@@ -37,9 +37,16 @@ const { execFile } = require('child_process');
 
 const DEFAULT_TIMEOUT_MS = 120000;
 // Resolution is the slow part — tens of seconds per package, because npm has to
-// walk the whole graph. The answer for a *pinned* version never changes, so it
-// is worth keeping for a week.
-const DEFAULT_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// walk the whole graph. But a pinned root does NOT pin its tree: `server@1.0.0`
+// depending on `dep: ^1` resolves to whatever `dep` published most recently, so
+// a cached tree goes stale the moment any dependency ships. A day is a
+// compromise between the cost of resolving and the age of the answer; callers
+// that must not be wrong (an install gate) pass cacheTtlMs: 0.
+const DEFAULT_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+// Only an exact version makes the *request* reproducible. A range or a tag is
+// never cached, because the thing it names changes underneath.
+const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
 /**
  * Flatten a package-lock v2/v3 `packages` map.
@@ -54,10 +61,16 @@ function parseLockTree(lock) {
   for (const [key, node] of Object.entries(packages)) {
     if (!key || key === '') continue;                       // the root project itself
     const segments = key.split('node_modules/').slice(1);
-    const name = segments[segments.length - 1]?.replace(/\/$/, '');
-    if (!name) continue;
+    const pathName = segments[segments.length - 1]?.replace(/\/$/, '');
+    if (!pathName) continue;
+    // `"alias": "npm:real-package@1.2.3"` installs real-package at
+    // node_modules/alias, and the lockfile records the real name in `name`.
+    // Taking the path segment meant asking OSV about a package that does not
+    // exist, so the real package's advisories were never seen.
+    const name = typeof node.name === 'string' && node.name ? node.name : pathName;
     out.push({
       name,
+      installed_as:     name === pathName ? undefined : pathName,
       version:          node.version || null,
       integrity:        node.integrity || null,
       resolved:         node.resolved || null,
@@ -172,14 +185,17 @@ function treeCacheKey(pkg, version) {
  */
 async function resolveNpmTreeCached(pkg, version, opts = {}) {
   const { cacheTtlMs = DEFAULT_CACHE_TTL_MS, ...rest } = opts;
-  const cacheable = Boolean(version) && cacheTtlMs > 0;
+  const cacheable = typeof version === 'string' && EXACT_VERSION.test(version) && cacheTtlMs > 0;
   const file = cacheable ? path.join(treeCacheDir(), `${treeCacheKey(pkg, version)}.json`) : null;
 
   if (file) {
     try {
       const rec = JSON.parse(fs.readFileSync(file, 'utf8'));
-      if (rec && Date.now() - (rec.stored_at || 0) < cacheTtlMs && Array.isArray(rec.packages)) {
-        return { ok: true, packages: rec.packages, lockfileVersion: rec.lockfileVersion || null, fromCache: true };
+      const age = Date.now() - (rec.stored_at || 0);
+      if (rec && age < cacheTtlMs && Array.isArray(rec.packages)) {
+        // ageMs is reported so a caller can say how old the answer is rather
+        // than presenting it as current.
+        return { ok: true, packages: rec.packages, lockfileVersion: rec.lockfileVersion || null, fromCache: true, ageMs: age };
       }
     } catch { /* absent or corrupt: resolve again */ }
   }

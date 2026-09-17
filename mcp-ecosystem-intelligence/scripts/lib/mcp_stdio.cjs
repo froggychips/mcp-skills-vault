@@ -162,27 +162,47 @@ class Correlator {
 // outright: there is nothing to rebuild from.
 const DIGEST_RE = /^[^\s]+@sha256:[a-f0-9]{64}$/;
 
+// Runners this wrapper knows how to jail. Anything else — a local binary, a
+// wrapper script, a compiled server — cannot be put inside a container by
+// wrapping its argv, because the container does not contain it. Saying so is
+// better than running it on the host under a flag that promised a sandbox.
+const JAILABLE = new Set(['npx', 'uvx', 'docker']);
+
 function sandboxWrap(parsed, opts = {}) {
   if (!parsed || typeof parsed.command !== 'string') return parsed;
 
+  if (!JAILABLE.has(parsed.command)) {
+    return {
+      ...parsed,
+      sandboxed: false,
+      refused: true,
+      sandbox_note: `cannot sandbox "${parsed.command}": not a package runner, so there is nothing to run inside a container`,
+    };
+  }
+
   if (parsed.command === 'docker') {
-    // The image reference is the first non-flag token after `run`.
-    const tokens = (parsed.args || []).slice();
-    if (tokens[0] !== 'run') {
-      return { ...parsed, sandboxed: false, refused: true, sandbox_note: `not a "docker run" launch: cannot sandbox` };
-    }
-    const imageRef = tokens.slice(1).find((t) => !t.startsWith('-') && DIGEST_RE.test(t));
+    // The caller passes the image it parsed positionally (lib/install_cmd.cjs).
+    // Scanning the argv here for something digest-shaped picked the wrong one:
+    // `docker run --label ghcr.io/x/decoy@sha256:… ghcr.io/x/real@sha256:…`
+    // jailed the decoy and never touched the server under test.
+    const imageRef = opts.imageRef;
     if (!imageRef) {
       return {
         ...parsed,
         sandboxed: false,
         refused: true,
-        sandbox_note: 'no digest-pinned image in the launch command — refusing to run DB-supplied docker flags',
+        sandbox_note: 'no positionally-parsed image reference supplied — refusing to guess which argument is the image',
       };
     }
-    // Everything else from the entry is dropped on purpose. Any argument the
-    // server genuinely needs belongs after the image, and a smoke test only
-    // has to reach `tools/list`.
+    if (!DIGEST_RE.test(imageRef)) {
+      return {
+        ...parsed,
+        sandboxed: false,
+        refused: true,
+        sandbox_note: `image ${imageRef} is not pinned by digest — refusing to run DB-supplied docker flags`,
+      };
+    }
+    // Everything else from the entry is dropped on purpose.
     return {
       command: 'docker',
       args: dockerJail(opts).concat([imageRef]),
@@ -191,6 +211,7 @@ function sandboxWrap(parsed, opts = {}) {
       sandbox_note: 'rebuilt from the pinned digest; flags from the DB entry were discarded',
     };
   }
+
   const image = opts.image || (parsed.command === 'uvx'
     ? 'ghcr.io/astral-sh/uv:python3.12-bookworm-slim'  // ships uv/uvx
     : 'node:22-alpine');                               // ships node/npx

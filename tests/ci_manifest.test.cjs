@@ -57,9 +57,9 @@ test('there are workflow manifests to check', () => {
 });
 
 test('pull_request builds do not execute PR code unprotected on the host', () => {
-  // Either the step runs inside a container, or the job checks out the base
-  // commit (trusted code). Running `node …` straight from a PR checkout on a
-  // persistent runner is the thing this asserts against.
+  // Checked per *step*, not per job. "The job has a jail somewhere" was
+  // satisfiable by a PR that added a second, unjailed `run:` next to the
+  // jailed one — which is exactly the edit an attacker would make.
   const offenders = [];
   for (const [file, src] of sources) {
     if (!/^on:/m.test(src) || !/pull_request/.test(src)) continue;
@@ -73,21 +73,55 @@ test('pull_request builds do not execute PR code unprotected on the host', () =>
         && !/event_name == 'push'/.test(ifLine);
       if (!reachablePr) continue;
 
-      // Steps that execute repo code on the host.
-      const runsRepoCode = /^\s*run:.*\bnode\s+(mcp-ecosystem-intelligence|tests|bin)/m.test(block)
-        || /node --test/.test(block);
-      if (!runsRepoCode) continue;
+      // A job that only ever runs base-commit code is fine as a whole.
+      if (/ref:\s*\$\{\{\s*github\.event\.pull_request\.base\.sha/.test(block)) continue;
 
-      const jailed = /docker run --rm --network none/.test(block);
-      const usesBaseCommitCode = /ref:\s*\$\{\{\s*github\.event\.pull_request\.base\.sha/.test(block);
-      const guardedByEventName = /if \[ "\$\{\{ github\.event_name \}\}" = "pull_request" \]/.test(block);
-
-      if (!(usesBaseCommitCode || (jailed && guardedByEventName))) {
-        offenders.push(`${file}:${name}`);
+      // Split into steps and judge each one that executes repo code. The first
+      // chunk is the job header (runs-on, if, comments) — not a step.
+      const steps = block.split(/\n      - (?=name:|uses:|run:)/).slice(1);
+      for (const step of steps) {
+        // Comments explain; they don't execute.
+        const code = step.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+        const runsRepoCode = /node\s+(--test|mcp-ecosystem-intelligence|tests|bin)/.test(code)
+          || /npm (test|run)\b/.test(code);
+        if (!runsRepoCode) continue;
+        const jailed = /docker run --rm --network none/.test(code);
+        const guarded = /if \[ "\$\{\{ github\.event_name \}\}" = "pull_request" \]/.test(code);
+        if (!(jailed && guarded)) {
+          const stepName = (step.match(/name:\s*(.+)/) || [])[1] || '(unnamed step)';
+          offenders.push(`${file}:${name} → ${stepName.trim()}`);
+        }
       }
     }
   }
-  assert.deepEqual(offenders, [], `pull_request code executed unprotected on the runner:\n${offenders.join('\n')}`);
+  assert.deepEqual(offenders, [], `steps that execute PR code unprotected on the runner:\n${offenders.join('\n')}`);
+});
+
+test('no host-side redirect writes into the checkout on a pull_request path', () => {
+  // A PR can commit the redirect target as a symlink to any file the runner
+  // user can write; `-v …:ro` does not stop a redirect performed by the host
+  // shell. Outputs belong under RUNNER_TEMP.
+  const offenders = [];
+  for (const [file, src] of sources) {
+    if (!/pull_request/.test(src)) continue;
+    for (const m of src.matchAll(/^\s*[^#\n]*?(?<![=!<>-])>\s*("?)([^\s"|;()]+)\1\s*$/gm)) {
+      const line = m[0];
+      // `>` inside inline JavaScript (node -e '…') is not a shell redirect.
+      if (/=>|\)\s*;?\s*$|console\.|filter\(|map\(/.test(line)) continue;
+      const target = m[2];
+      if (target.startsWith('$RUNNER_TEMP') || target.startsWith('"$RUNNER_TEMP')) continue;
+      if (target.startsWith('$GITHUB_') || target.includes('GITHUB_OUTPUT') || target.includes('GITHUB_STEP_SUMMARY')) continue;
+      if (target.startsWith('/dev/')) continue;
+      if (target.startsWith('$out') || target.startsWith('"$out')) continue;
+      if (target.includes('$RUNNER_TEMP')) continue;
+      offenders.push(`${file}: > ${target}`);
+    }
+  }
+  // Trusted-context jobs (cron/dispatch) may write in the checkout; they are
+  // listed here explicitly so a new one has to be considered.
+  const allowed = new Set(['.github/workflows/security-scan.yml: > eval_results_run.json']);
+  const real = offenders.filter((o) => !allowed.has(o));
+  assert.deepEqual(real, [], `host-side redirects into the workspace:\n${real.join('\n')}`);
 });
 
 test('a jailed step drops capabilities and the network', () => {
@@ -168,11 +202,12 @@ test('the sandbox never passes a DB-supplied docker command through', () => {
   // regression would be a one-line "pass it through, it is already a container".
   const stdio = require('../mcp-ecosystem-intelligence/scripts/lib/mcp_stdio.cjs');
   const digest = 'c'.repeat(64);
+  const image = `ghcr.io/x/y@sha256:${digest}`;
   const hostile = {
     command: 'docker',
-    args: ['run', '-i', '--rm', '-v', '/:/host', '--privileged', `ghcr.io/x/y@sha256:${digest}`],
+    args: ['run', '-i', '--rm', '-v', '/:/host', '--privileged', image],
   };
-  const wrapped = stdio.sandboxWrap(hostile);
+  const wrapped = stdio.sandboxWrap(hostile, { imageRef: image });
   assert.equal(wrapped.sandboxed, true);
   assert.equal(wrapped.args.includes('-v'), false);
   assert.equal(wrapped.args.includes('--privileged'), false);

@@ -349,10 +349,34 @@ test('pinInstallCmd: a pin the gate did not verify is rewritten, not trusted', (
   assert.deepEqual(o.pinInstallCmd('uvx pkg==2.0.0', '1.2.3').parts, ['uvx', 'pkg==1.2.3']);
 });
 
-test('pinInstallCmd: a DB version that is not exact is not something to pin to', () => {
-  const r = o.pinInstallCmd('npx -y pkg', '^1.2.0');
-  assert.equal(r.pinned, false);
-  assert.match(r.reason, /not an exact version/);
+test('pinInstallCmd: a range is not a pin, whatever it looks like', () => {
+  // `1`, `1.2` and `1.x` all used to pass as "exact", so the pinner produced
+  // `pkg@1.x` and called the entry pinned.
+  for (const version of ['^1.2.0', '~1.2', '1.x', '1', '1.2', 'latest', '*']) {
+    const r = o.pinInstallCmd('npx -y pkg', version);
+    assert.equal(r.pinned, false, version);
+    assert.match(r.reason, /not an exact semver version/, version);
+  }
+  for (const version of ['1.2.3', '1.0.0-rc.1', '1.0.0+build.5']) {
+    assert.equal(o.pinInstallCmd('npx -y pkg', version).pinned, true, version);
+  }
+});
+
+test('pinInstallCmd: PyPI versions follow PEP 440, not semver', () => {
+  // The DB legitimately carries dates-as-versions for PyPI entries.
+  for (const version of ['2026.1.14', '1.0', '1.0.0', '1.0+local', '2.0rc1', '1.0.post1']) {
+    assert.equal(o.pinInstallCmd('uvx pkg', version).pinned, true, version);
+  }
+  for (const version of ['1.*', '>=1.0', 'latest']) {
+    assert.equal(o.pinInstallCmd('uvx pkg', version).pinned, false, version);
+  }
+});
+
+test('isExactVersion: the two ecosystems have different rules', () => {
+  assert.equal(o.isExactVersion('npx', '1.2'), false);      // npm wants three components
+  assert.equal(o.isExactVersion('uvx', '1.2'), true);       // PyPI does not
+  assert.equal(o.isExactVersion('npx', null), false);
+  assert.equal(o.isExactVersion('uvx', ''), false);
 });
 
 test('pinInstallCmd: refuses commands the gate itself cannot parse', () => {

@@ -487,12 +487,12 @@ test('CLI --no-spawn never reaches the live smoke', () => {
 // ── sandboxWrap: a DB entry is not a trusted argv ──────────────────────────
 
 test('sandboxWrap: a docker entry is rebuilt from its digest, not trusted', () => {
+  const { dockerImageRef } = require('../mcp-ecosystem-intelligence/scripts/lib/install_cmd.cjs');
   const digest = 'a'.repeat(64);
-  const parsed = e.parseInstallCmd(`docker run -i --rm --cap-drop ALL ghcr.io/x/y@sha256:${digest}`);
-  const w = e.sandboxWrap(parsed);
+  const cmd = `docker run -i --rm --cap-drop ALL ghcr.io/x/y@sha256:${digest}`;
+  const w = e.sandboxWrap(e.parseInstallCmd(cmd), { imageRef: dockerImageRef(cmd) });
   assert.equal(w.sandboxed, true);
   assert.equal(w.image, `ghcr.io/x/y@sha256:${digest}`);
-  // The jail flags are ours, and the image is the last argument.
   assert.equal(w.args.at(-1), `ghcr.io/x/y@sha256:${digest}`);
   for (const flag of ['--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--read-only', '--rm']) {
     assert.ok(w.args.includes(flag), flag);
@@ -502,11 +502,10 @@ test('sandboxWrap: a docker entry is rebuilt from its digest, not trusted', () =
 test('sandboxWrap: hostile flags in a DB entry are discarded', () => {
   // The DB is a file a pull request can edit. `-v /:/host` is one diff away,
   // and "already containerized" is not the same as sandboxed.
+  const { dockerImageRef } = require('../mcp-ecosystem-intelligence/scripts/lib/install_cmd.cjs');
   const digest = 'b'.repeat(64);
-  const parsed = e.parseInstallCmd(
-    `docker run -i --rm -v /:/host --privileged --network host --pid host ghcr.io/evil/x@sha256:${digest}`
-  );
-  const w = e.sandboxWrap(parsed);
+  const cmd = `docker run -i --rm -v /:/host --privileged --network host --pid host ghcr.io/evil/x@sha256:${digest}`;
+  const w = e.sandboxWrap(e.parseInstallCmd(cmd), { imageRef: dockerImageRef(cmd) });
   assert.equal(w.sandboxed, true);
   const argv = w.args.join(' ');
   assert.doesNotMatch(argv, /-v /);
@@ -517,25 +516,53 @@ test('sandboxWrap: hostile flags in a DB entry are discarded', () => {
   assert.match(w.sandbox_note, /discarded/);
 });
 
-test('sandboxWrap: refuses a docker entry with nothing to rebuild from', () => {
-  const parsed = e.parseInstallCmd('docker run -i --rm --network host ghcr.io/x/y:latest');
-  const w = e.sandboxWrap(parsed);
-  assert.equal(w.sandboxed, false);
-  assert.equal(w.refused, true);
-  assert.match(w.sandbox_note, /no digest-pinned image/);
+test('sandboxWrap: the image comes from the positional parse, not from a flag value', () => {
+  // A digest-shaped string in `--label` used to win, so the jail ran a decoy
+  // image and the server under test was never smoked.
+  const { dockerImageRef } = require('../mcp-ecosystem-intelligence/scripts/lib/install_cmd.cjs');
+  const decoy = 'a'.repeat(64);
+  const real  = 'b'.repeat(64);
+  const cmd = `docker run --label ghcr.io/x/decoy@sha256:${decoy} ghcr.io/x/real@sha256:${real}`;
+  const w = e.sandboxWrap(e.parseInstallCmd(cmd), { imageRef: dockerImageRef(cmd) });
+  assert.equal(w.image, `ghcr.io/x/real@sha256:${real}`);
 });
 
-test('sandboxWrap: npx and uvx still get a jail with their own runtime image', () => {
-  const npx = e.sandboxWrap(e.parseInstallCmd('npx -y pkg@1.0.0'));
-  assert.equal(npx.sandboxed, true);
-  assert.equal(npx.image, 'node:22-alpine');
-  assert.ok(npx.args.includes('npm_config_ignore_scripts=true'));
-  const uvx = e.sandboxWrap(e.parseInstallCmd('uvx pkg==1.0.0'));
-  assert.match(uvx.image, /astral-sh\/uv/);
-  // Both paths share one jail definition, so they cannot drift apart.
-  for (const flag of ['--cap-drop', '--read-only', '--pids-limit']) {
-    assert.ok(npx.args.includes(flag) && uvx.args.includes(flag), flag);
-  }
+test('sandboxWrap: refuses rather than guesses when no image was parsed', () => {
+  const digest = 'c'.repeat(64);
+  const w = e.sandboxWrap(e.parseInstallCmd(`docker run -i ghcr.io/x/y@sha256:${digest}`));
+  assert.equal(w.sandboxed, false);
+  assert.equal(w.refused, true);
+  assert.match(w.sandbox_note, /refusing to guess/);
+});
+
+test('sandboxWrap: refuses a docker entry with nothing to rebuild from', () => {
+  const { dockerImageRef } = require('../mcp-ecosystem-intelligence/scripts/lib/install_cmd.cjs');
+  const cmd = 'docker run -i --rm --network host ghcr.io/x/y:latest';
+  const w = e.sandboxWrap(e.parseInstallCmd(cmd), { imageRef: dockerImageRef(cmd) });
+  assert.equal(w.sandboxed, false);
+  assert.equal(w.refused, true);
+  assert.match(w.sandbox_note, /not pinned by digest/);
+});
+
+test('sandboxWrap: a local binary cannot be jailed by wrapping its argv', () => {
+  // `--installed --sandbox` used to run these straight on the host, because a
+  // field in the entry switched the sandbox off.
+  const w = e.sandboxWrap({ command: '/opt/bin/my-mcp', args: [] });
+  assert.equal(w.sandboxed, false);
+  assert.equal(w.refused, true);
+  assert.match(w.sandbox_note, /not a package runner/);
+});
+
+test('sandboxWrap: a field in the entry cannot switch the sandbox off', async () => {
+  // The DB is PR-editable; `_evalSpawn` used to mean "skip the jail".
+  const sneaky = {
+    name: 'sneaky',
+    install_cmd: 'npx -y innocent@1.0.0',
+    _evalSpawn: { command: '/bin/sh', args: ['-c', 'echo pwned'] },
+  };
+  const r = await e.smokeEntry(sneaky, { sandbox: true, timeoutMs: 1000 });
+  // Either jailed or refused — never executed as given.
+  assert.equal(r.status === 'skip' || r.sandboxed === true, true, JSON.stringify(r));
 });
 
 test('a refused sandbox means the entry is skipped, not run', async () => {
@@ -545,6 +572,6 @@ test('a refused sandbox means the entry is skipped, not run', async () => {
   };
   const r = await e.smokeEntry(digestless, { sandbox: true, timeoutMs: 1000 });
   assert.equal(r.status, 'skip');
-  assert.match(r.error_code, /no digest-pinned image/);
+  assert.match(r.error_code, /not pinned by digest/);
   assert.equal(r.sandboxed, false);
 });

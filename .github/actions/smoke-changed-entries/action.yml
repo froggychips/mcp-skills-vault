@@ -33,20 +33,22 @@ runs:
       shell: bash
       env:
         BASE_REF: ${{ inputs.base }}
-      run: node mcp-ecosystem-intelligence/scripts/changed_entries.cjs --base "$BASE_REF" > changed.txt
+      # Scratch files live under RUNNER_TEMP, not in the checkout: a path in a
+      # working tree can be a symlink someone else chose.
+      run: node mcp-ecosystem-intelligence/scripts/changed_entries.cjs --base "$BASE_REF" > "$RUNNER_TEMP/changed.txt"
 
     - name: Sandboxed smoke of changed entries
       shell: bash
       run: |
-        : > pr_eval.ndjson
-        if [ ! -s changed.txt ]; then echo "No DB entry changes — nothing to smoke."; exit 0; fi
+        : > "$RUNNER_TEMP/pr_eval.ndjson"
+        if [ ! -s "$RUNNER_TEMP/changed.txt" ]; then echo "No DB entry changes — nothing to smoke."; exit 0; fi
         while IFS= read -r name; do
           [ -z "$name" ] && continue
           echo "smoking $name (sandboxed)…"
           node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs \
             --name "$name" --sandbox --json \
-            --results "$RUNNER_TEMP/pr_results.json" >> pr_eval.ndjson || true
-        done < changed.txt
+            --results "$RUNNER_TEMP/pr_results.json" >> "$RUNNER_TEMP/pr_eval.ndjson" || true
+        done < "$RUNNER_TEMP/changed.txt"
 
     - name: Summary
       if: always()
@@ -55,10 +57,10 @@ runs:
         SECTION_TITLE: ${{ inputs.title }}
         GATE: ${{ inputs.gate }}
       run: |
-        [ -s pr_eval.ndjson ] || { echo "no results to report"; exit 0; }
+        [ -s "$RUNNER_TEMP/pr_eval.ndjson" ] || { echo "no results to report"; exit 0; }
         node -e '
           const fs = require("fs");
-          const runs = fs.readFileSync("pr_eval.ndjson","utf8").trim().split("\n").filter(Boolean).map(JSON.parse);
+          const runs = fs.readFileSync(process.env.RUNNER_TEMP + "/pr_eval.ndjson","utf8").trim().split("\n").filter(Boolean).map(JSON.parse);
           const rows = runs.flatMap(r => r.results || []);
           const out = ["## " + process.env.SECTION_TITLE, "", "| entry | status | tools | class | sandboxed |", "|---|---|---|---|---|"];
           for (const r of rows) out.push("| " + r.name + " | " + r.status + " | " + (r.tool_count ?? "-") + " | " + (r.failure_class ?? "-") + " | " + r.sandboxed + " |");

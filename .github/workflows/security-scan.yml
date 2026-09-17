@@ -117,27 +117,34 @@ jobs:
       # line that caused it, so a PR that adds an entry with no pin gets the
       # annotation on that entry instead of a red check with prose in the log.
       - name: verify_integrity --sarif
+        id: sarif
         if: always()
         env:
           JAIL_IMAGE: node:22-alpine
-        # The redirect happens on the host, so the container needs no write
-        # access to the workspace.
+        # The redirect target is a fresh file under RUNNER_TEMP, never a path
+        # inside the checkout. Redirecting to `./verify.sarif` ran on the host
+        # and followed that path wherever it led — and a PR can commit
+        # `verify.sarif` as a symlink to any file the runner user can write,
+        # which `-v …:ro` does nothing about.
         run: |
           set -euo pipefail
+          out="$RUNNER_TEMP/mcp-vault-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.sarif"
+          rm -f "$out"
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             docker run --rm --network none \
               --cap-drop ALL --security-opt no-new-privileges \
               -v "$PWD":/w:ro -w /w "$JAIL_IMAGE" \
-              node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --offline --sarif > verify.sarif
+              node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --offline --sarif > "$out"
           else
-            node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --offline --sarif > verify.sarif
+            node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --offline --sarif > "$out"
           fi
+          echo "path=$out" >> "$GITHUB_OUTPUT"
       - name: Upload to code scanning
         if: always()
         continue-on-error: true   # code scanning may be off; never block the gate on it
         uses: github/codeql-action/upload-sarif@faaca9a8f6edddba5725ffe5adefdab6669a2eca   # v3
         with:
-          sarif_file: verify.sarif
+          sarif_file: ${{ steps.sarif.outputs.path }}
           category: mcp-vault-verify
 
   refresh-hashes:
@@ -237,6 +244,8 @@ jobs:
       # registry means nothing was compared.
       - name: check_docker_drift --write
         id: drift
+        # Trusted context only (cron / manual dispatch), so writing inside the
+        # checkout is fine here — unlike the PR path above.
         run: |
           set -o pipefail
           node mcp-ecosystem-intelligence/scripts/check_docker_drift.cjs --write --json | tee drift.json
