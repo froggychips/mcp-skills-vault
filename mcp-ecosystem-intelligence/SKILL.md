@@ -347,6 +347,8 @@ node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs
 | `--entry <name>` | check one DB entry instead of the whole DB |
 | `--installed` | verify the servers local host configs launch, not the DB |
 | `--deep` | download the artifact and hash it locally (npm tarball sha512, PyPI sdist sha256, OCI manifest sha256) |
+| `--deps` | resolve the dependency tree and check it (transitive install hooks + OSV over every package in the tree) |
+| `--fail-dep-advisories` | a high/critical advisory in the tree fails the run |
 | `--require-signatures` | an npm release with no verifiable registry signature fails |
 | `--require-provenance` | an npm release with no provenance attestation fails |
 | `--json` | structured report (`mcp-vault/verify-report@1`) on stdout |

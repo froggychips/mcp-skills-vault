@@ -31,6 +31,9 @@ const TAG_LEVEL = {
   DEEP:       'note',
   SIG:        'note',
   PROV:       'note',
+  DEPS:       'note',
+  DEPHOOK:    'warning',
+  DEPCVE:     'warning',
   NOTE:       'note',
 };
 
@@ -47,6 +50,9 @@ const TAG_RULE = {
   DEEP:       'deep-verified',
   SIG:        'signature-verified',
   PROV:       'provenance-claim',
+  DEPS:       'dependency-tree',
+  DEPHOOK:    'dependency-install-hook',
+  DEPCVE:     'dependency-advisory',
   NOTE:       'note',
 };
 
@@ -61,6 +67,9 @@ const RULE_HELP = {
   'deep-verified':      'The artifact was downloaded and hashed locally; the bytes match both the registry metadata and the DB pin.',
   'signature-verified': "The registry's signature over <name>@<version>:<integrity> verifies against a published npm key.",
   'provenance-claim':   'A provenance attestation is published and names the source repository. The claim is read, not cryptographically verified.',
+  'dependency-tree':    'Size and depth of the resolved dependency tree.',
+  'dependency-install-hook': 'A transitive dependency runs code at install time. It runs whether or not the top-level package has hooks of its own.',
+  'dependency-advisory':'An advisory affects a package inside the dependency tree.',
   'note':               'Informational.',
 };
 

@@ -28,6 +28,7 @@
  *   node scripts/verify_integrity.cjs --installed  check the servers local hosts launch
  *                                                  (.mcp.json, ~/.claude.json, Cursor, …)
  *   node scripts/verify_integrity.cjs --fail-unverified  UNVERIFIED → hard failure
+ *   node scripts/verify_integrity.cjs --deps       resolve and check dependency trees
  *   node scripts/verify_integrity.cjs --deep       download artifacts and hash them locally
  *   node scripts/verify_integrity.cjs --require-signatures  unsigned npm release = failure
  *   node scripts/verify_integrity.cjs --require-provenance  no provenance attestation = failure
@@ -54,6 +55,9 @@ const {
   verifyRegistrySignature, provenanceClaim, keysUrl,
 } = require('./lib/npm_signatures.cjs');
 const { readInstalledServers } = require('./lib/installed.cjs');
+const {
+  resolveNpmTreeCached, pypiDirectDependencies, summarizeTree,
+} = require('./lib/deps.cjs');
 const https       = require('https');
 const fs          = require('fs');
 const path        = require('path');
@@ -102,6 +106,14 @@ const REQUIRE_PROVENANCE = process.argv.includes('--require-provenance');
 // what the DB says. The DB is still consulted — for a pin to compare against —
 // but the subjects are the configured servers.
 const INSTALLED = process.argv.includes('--installed');
+// --deps: resolve each package's dependency tree and check it too. An
+// install-time script is far more often in a transitive dependency than in the
+// package itself, so a one-level check is a check at the wrong depth.
+const DEPS = process.argv.includes('--deps');
+// A hard failure on a transitive advisory is a policy choice, not a fact about
+// the artifact: most trees carry something. Off unless asked for.
+const FAIL_DEP_ADVISORIES = process.argv.includes('--fail-dep-advisories');
+const DEPS_CONCURRENCY = Math.max(1, Number(process.env.MCP_VAULT_DEPS_CONCURRENCY || 4));
 const CWD = (() => {
   const i = process.argv.indexOf('--cwd');
   return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : process.cwd();
@@ -178,6 +190,35 @@ function fetchOsvAdvisories(queries) {
     payload,
     15000,
   ).then((r) => ({ ok: r !== null, data: (r && r.results) || [] }));
+}
+
+/**
+ * Fill in the detail querybatch leaves out.
+ *
+ * `/v1/querybatch` returns `{ id, modified }` per hit — no severity, no summary.
+ * Reading severity off those records makes every OSV finding UNKNOWN, which
+ * `severityIsHard()` then treats as not-hard: a critical advisory printed as a
+ * line and did not fail the gate. The full record is one GET per id, cached for
+ * a day (an advisory's severity does not churn), fetched through the pool.
+ */
+async function enrichOsvVulns(resultLists) {
+  const ids = new Set();
+  for (const r of resultLists || []) {
+    for (const v of (r?.vulns || [])) if (v && v.id) ids.add(v.id);
+  }
+  if (!ids.size) return new Map();
+  const list = [...ids];
+  const fetched = await mapLimit(list, CONCURRENCY, (id) =>
+    httpsGetJson(`https://api.osv.dev/v1/vulns/${encodeURIComponent(id)}`, 10000, {}, 24 * 60 * 60 * 1000));
+  const byId = new Map();
+  list.forEach((id, i) => { if (fetched[i]) byId.set(id, fetched[i]); });
+  return byId;
+}
+
+// Replace each stub with its full record where we have one, so severity is
+// read from something that actually carries it.
+function withOsvDetail(vulns, byId) {
+  return (vulns || []).map((v) => (byId && byId.get(v.id)) || v);
 }
 
 // GitHub Advisory Database (public REST). One request per (ecosystem, pkg).
@@ -589,7 +630,7 @@ function verdictFor(failures, lines) {
 
 // ── per-tool processors ────────────────────────────────────────────────────
 
-async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, results) {
+async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, results, tree = null, depAdvisories = null) {
   if (OFFLINE) {
     processOfflinePackage(tool, pkg, 'npm', results);
     return;
@@ -723,6 +764,45 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
     }
   }
 
+  // Dependency tree findings.
+  if (DEPS && tree) {
+    if (!tree.ok) {
+      lines.push(['UNVERIFIED', `could not resolve the dependency tree: ${tree.error}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+      if (FAIL_UNVERIFIED) failures++;
+    } else {
+      const sum = summarizeTree(tree.packages);
+      lines.push(['DEPS', `${sum.count} transitive package${sum.count === 1 ? '' : 's'}, max depth ${sum.maxDepth}`]);
+
+      // Install scripts anywhere in the tree. This is the finding the one-level
+      // check could not see: a postinstall three levels down runs just as much
+      // as one in the package itself.
+      const nested = sum.withInstallScripts.filter((id) => !id.startsWith(`${pkg}@`));
+      if (nested.length) {
+        const shown = nested.slice(0, 8).join(', ');
+        lines.push(['DEPHOOK', `install scripts in dependencies (${nested.length}): ${shown}${nested.length > 8 ? ', …' : ''}`]);
+      }
+
+      // Advisories affecting anything in the tree.
+      if (depAdvisories && depAdvisories.size) {
+        const hits = [];
+        for (const dep of tree.packages) {
+          const vulns = depAdvisories.get(`${dep.name}@${dep.version}`);
+          for (const vuln of (vulns || [])) {
+            const sev = osvSeverity(vuln);
+            hits.push({ id: vuln.id, sev, dep: `${dep.name}@${dep.version}`, hard: severityIsHard(sev) });
+          }
+        }
+        const hard = hits.filter((h) => h.hard);
+        if (hits.length) {
+          const worst = hard.length ? hard : hits;
+          const shown = worst.slice(0, 5).map((h) => `${h.dep} ${h.id} [${h.sev}]`).join(', ');
+          lines.push(['DEPCVE', `${hits.length} advisor${hits.length === 1 ? 'y' : 'ies'} in the tree (${hard.length} high/critical): ${shown}${worst.length > 5 ? ', …' : ''}`]);
+          if (hard.length && FAIL_DEP_ADVISORIES) failures += 1;
+        }
+      }
+    }
+  }
+
   // Hooks
   const hooks = INSTALL_HOOKS.filter((h) => meta.scripts?.[h]);
   if (hooks.length > 0) {
@@ -808,6 +888,13 @@ async function processPypi(tool, pkg, meta, advisoriesForTool, degraded, results
   } else if (tool.pkg_integrity && tool.pkg_integrity !== expected) {
     lines.push(['FAIL', `integrity mismatch\n        stored: ${tool.pkg_integrity}\n        pypi  : ${expected}`]);
     failures++;
+  }
+
+  if (DEPS) {
+    const direct = pypiDirectDependencies(meta);
+    lines.push(['DEPS', direct.length
+      ? `${direct.length} declared direct requirement${direct.length === 1 ? '' : 's'} (PyPI metadata only — no resolved tree)`
+      : 'no declared requirements in PyPI metadata']);
   }
 
   if (DEEP) {
@@ -1077,6 +1164,11 @@ async function main() {
     ]);
     progress(`done — sources: ${summarizeFeedSources({ npm: npmAdvisories, osvNpm, osvPypi, ghsa, snyk }).join(', ')}.\n`);
   }
+  // Severity for OSV hits comes from the full records, not the batch stubs.
+  const osvDetail = (!UPDATE && !NO_AUDIT && !OFFLINE)
+    ? await enrichOsvVulns([...(osvNpm.data || []), ...(osvPypi.data || [])])
+    : new Map();
+
   const health = { npm: npmAdvisories, osvNpm, osvPypi, ghsa, snyk };
 
   // Process npm.
@@ -1101,6 +1193,43 @@ async function main() {
     if (npmTools.length || pypiTools.length) progress('done.\n');
   }
 
+  // --deps: resolve every npm tree (concurrently, cached on disk), then ask OSV
+  // about every distinct package in all of them in a handful of batch queries
+  // rather than one request per dependency.
+  let npmTrees = [];
+  let depAdvisories = new Map();
+  if (DEPS && !OFFLINE && npmTools.length) {
+    progress(`Resolving dependency trees for ${npmTools.length} npm entries (${DEPS_CONCURRENCY} at a time)... `);
+    npmTrees = await mapLimit(npmTools, DEPS_CONCURRENCY, ({ tool, pkg }) =>
+      resolveNpmTreeCached(pkg, tool.version, { registry: NPM_REGISTRY === 'https://registry.npmjs.org' ? null : NPM_REGISTRY }));
+    const distinct = new Map();
+    for (const tree of npmTrees) {
+      for (const dep of (tree.ok ? tree.packages : [])) {
+        if (!dep.version) continue;
+        distinct.set(`${dep.name}@${dep.version}`, { ecosystem: 'npm', name: dep.name, version: dep.version });
+      }
+    }
+    const queries = [...distinct.values()];
+    progress(`${queries.length} distinct packages; querying OSV... `);
+    // OSV's querybatch takes a list; keep the batches modest so one failure
+    // costs one batch rather than the whole set.
+    const BATCH = 500;
+    const batched = [];
+    for (let i = 0; i < queries.length; i += BATCH) {
+      const chunk = queries.slice(i, i + BATCH);
+      const res = await fetchOsvAdvisories(chunk);
+      chunk.forEach((q, j) => {
+        const vulns = res.data?.[j]?.vulns || [];
+        if (vulns.length) batched.push([`${q.name}@${q.version}`, vulns]);
+      });
+    }
+    // Same as above: the stubs carry no severity, so "0 high/critical" would be
+    // a guess. Fetch the records the severity actually lives in.
+    const detail = await enrichOsvVulns(batched.map(([, vulns]) => ({ vulns })));
+    for (const [key, vulns] of batched) depAdvisories.set(key, withOsvDetail(vulns, detail));
+    progress('done.\n');
+  }
+
   // Process npm.
   for (let i = 0; i < npmTools.length; i++) {
     const { tool, pkg } = npmTools[i];
@@ -1108,19 +1237,19 @@ async function main() {
     // the raw null below so the outage is reported rather than read as "clean".
     const advs = unifyAdvisories({
       npmList:  npmAdvisories.data[pkg] || [],
-      osvList:  osvNpm.data[i]?.vulns || [],
+      osvList:  withOsvDetail(osvNpm.data[i]?.vulns, osvDetail),
       ghsaList: ghsa.data[`npm:${pkg}`] || [],
       snykList: snyk.data[`npm:${pkg}`] || [],
     });
     const degraded = (UPDATE || NO_AUDIT) ? [] : degradedFeedsFor('npm', `npm:${pkg}`, health);
-    await processNpm(tool, pkg, npmMetas[i], advs, degraded, results);
+    await processNpm(tool, pkg, npmMetas[i], advs, degraded, results, npmTrees[i], depAdvisories);
   }
   // Process PyPI.
   for (let i = 0; i < pypiTools.length; i++) {
     const { tool, pkg } = pypiTools[i];
     const advs = unifyAdvisories({
       npmList:  [],
-      osvList:  osvPypi.data[i]?.vulns || [],
+      osvList:  withOsvDetail(osvPypi.data[i]?.vulns, osvDetail),
       ghsaList: ghsa.data[`pip:${pkg}`] || [],
       snykList: snyk.data[`pip:${pkg}`] || [],
     });

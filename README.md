@@ -146,6 +146,8 @@ Flags:
 | `--entry <name>` | Check a single DB entry instead of all of them |
 | `--installed` | Verify what the local hosts are configured to launch (`.mcp.json`, `~/.claude.json`, Claude Desktop, Cursor, VS Code, Codex) instead of the DB. Unpinned launch commands, servers not in the vault, and remote endpoints are each reported as what they are |
 | `--deep` | Download each artifact and hash it locally, instead of comparing the DB pin against metadata from the same registry that serves the tarball. Docker digests are verified by hashing the manifest |
+| `--deps` | Resolve each package's dependency tree (`npm install --package-lock-only --ignore-scripts`, nothing is installed or executed) and check it: transitive install scripts, and every package in the tree against OSV |
+| `--fail-dep-advisories` | A high/critical advisory anywhere in the tree is a failure |
 | `--require-signatures` | An npm release with no verifiable registry signature is a failure |
 | `--require-provenance` | An npm release with no provenance attestation is a failure |
 
