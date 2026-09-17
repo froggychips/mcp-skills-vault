@@ -70,9 +70,10 @@ test('resolveNpmTree: runs npm in resolve-only mode, never installs or executes'
   let seenCmd = null, seenArgs = null, seenCwd = null;
   const fakeRun = (cmd, args, opts, cb) => {
     seenCmd = cmd; seenArgs = args; seenCwd = opts.cwd;
-    // Emulate npm writing the lockfile into the prefix it was given.
-    const prefix = args[args.indexOf('--prefix') + 1];
-    fs.writeFileSync(path.join(prefix, 'package-lock.json'), JSON.stringify(LOCK));
+    // Emulate npm writing the lockfile into the directory it runs in. There is
+    // no `--prefix`: passing it alongside cwd made npm write absolute temp-dir
+    // paths as the lockfile's package keys, which `npm ci` then rejected.
+    fs.writeFileSync(path.join(opts.cwd, 'package-lock.json'), JSON.stringify(LOCK));
     cb(null, '', '');
   };
   const r = await d.resolveNpmTree('pkg', '1.2.3', { run: fakeRun });
@@ -84,6 +85,7 @@ test('resolveNpmTree: runs npm in resolve-only mode, never installs or executes'
   assert.ok(seenArgs.includes('--package-lock-only'), seenArgs.join(' '));
   assert.ok(seenArgs.includes('--ignore-scripts'), seenArgs.join(' '));
   assert.ok(seenArgs.includes('pkg@1.2.3'));
+  assert.ok(!seenArgs.includes('--prefix'), 'a prefix alongside cwd corrupts the lockfile\'s paths');
   // Resolution happens in a throwaway directory, not in the user's project.
   assert.notEqual(seenCwd, process.cwd());
   assert.equal(fs.existsSync(seenCwd), false, 'the working directory is cleaned up');
@@ -106,9 +108,9 @@ test('resolveNpmTree: a missing lockfile is an error', async () => {
 
 test('resolveNpmTreeCached: second call skips npm; unpinned is never cached', async () => {
   let calls = 0;
-  const run = (_c, args, _o, cb) => {
+  const run = (_c, _args, opts, cb) => {
     calls++;
-    fs.writeFileSync(path.join(args[args.indexOf('--prefix') + 1], 'package-lock.json'), JSON.stringify(LOCK));
+    fs.writeFileSync(path.join(opts.cwd, 'package-lock.json'), JSON.stringify(LOCK));
     cb(null, '', '');
   };
   const first  = await d.resolveNpmTreeCached('cachepkg', '1.0.0', { run });

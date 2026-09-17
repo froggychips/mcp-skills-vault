@@ -18,6 +18,7 @@
  *   pypiPkgName(cmd)        -> "pkg" | null
  *   dockerImageRef(cmd)     -> "ghcr.io/o/r@sha256:…" | null
  *   dockerDigestPinned(ref) -> boolean
+ *   isExactVersion(runner, version) -> boolean
  */
 
 // "npx -y @scope/pkg@1.2.3 args" → "@scope/pkg"
@@ -97,7 +98,23 @@ function dockerDigestPinned(ref) {
   return /@sha256:[a-f0-9]{64}$/.test(String(ref || ''));
 }
 
+// "Exact" has to mean exact. `1`, `1.2` and `1.x` are ranges wearing a pin's
+// clothes: they resolve to whatever was published most recently, so a command
+// carrying one launches something other than the artifact that was verified.
+//   npm:  semver, three components, optional pre-release/build
+//   PyPI: PEP 440 release segment, optional pre/post/dev/local
+const EXACT_NPM_VERSION  = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+const EXACT_PYPI_VERSION = /^\d+(?:\.\d+)*(?:(?:a|b|rc)\d+)?(?:\.post\d+)?(?:\.dev\d+)?(?:\+[0-9A-Za-z.]+)?$/;
+
+function isExactVersion(runner, version) {
+  if (typeof version !== 'string' || !version) return false;
+  return runner === 'npx' ? EXACT_NPM_VERSION.test(version) : EXACT_PYPI_VERSION.test(version);
+}
+
 module.exports = {
+  isExactVersion,
+  EXACT_NPM_VERSION,
+  EXACT_PYPI_VERSION,
   npmPkgName,
   pypiPkgName,
   dockerImageRef,

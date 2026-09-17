@@ -34,6 +34,7 @@
  *   mcp_eval.cjs --timeout <ms>         per-entry timeout (default 30000)
  *   mcp_eval.cjs --json                 machine-readable summary on stdout
  *   mcp_eval.cjs --no-spawn             schema-lint over existing eval_results.json (offline)
+ *   mcp_eval.cjs --fail-surface-drift   exit 1 if a server's tool surface changed
  *   mcp_eval.cjs --sandbox              run each server in a locked-down container (needs docker)
  *   mcp_eval.cjs --unsafe               run servers directly on the host (explicit opt-out of the sandbox)
  *   mcp_eval.cjs --db <path>            override DB path
@@ -124,6 +125,7 @@ function versionFromInstallCmd(cmd) {
 const { readDb, writeDb } = require('./lib/db_io.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { smokeEvidence, mergeEvidence } = require('./lib/evidence.cjs');
+const { fingerprintTools, diffSurface, describeDiff, isEmpty: surfaceUnchanged } = require('./lib/surface.cjs');
 const stdio         = require('./lib/mcp_stdio.cjs'); // shared framing + sandbox + classifier (vendored, zero-dep)
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -158,6 +160,10 @@ function parseArgs(argv) {
     paceMs: 400,
     cwd:      process.cwd(),
     strict:   false,
+    // A surface change on an unchanged artifact is the rug-pull shape. Off by
+    // default because an upgrade legitimately changes the surface; CI turns it
+    // on to make the unexplained case loud.
+    failSurfaceDrift: false,
     help:     false,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -178,6 +184,7 @@ function parseArgs(argv) {
       case '--cwd':     opts.cwd     = next; i++; break;
       case '--results': opts.results = next; i++; break;
       case '--strict':  opts.strict  = true; break;
+      case '--fail-surface-drift': opts.failSurfaceDrift = true; break;
       case '-h':
       case '--help':    opts.help    = true; break;
       default:
@@ -391,6 +398,9 @@ async function smokeEntry(tool, opts) {
     // into the system prompt on every request, so `token_budget` can measure a
     // config's cost instead of estimating it from a tool count.
     tools_payload_bytes: null,
+    // { sha256, count, tools: { name: { description, schema } } } — hashes.
+    surface:          null,
+    surface_drift:    null,
     tool_count_db:    typeof tool.est_tools_count === 'number' ? tool.est_tools_count : null,
     tool_count_drift: false,
     schema_errors:    [],
@@ -563,6 +573,12 @@ async function smokeEntry(tool, opts) {
     // The payload, not the count: what the server injects into the system
     // prompt is this JSON, so its size is the honest input to a token budget.
     try { result.tools_payload_bytes = Buffer.byteLength(JSON.stringify(tools)); } catch { /* keep null */ }
+    // The surface itself, as hashes. A count catches "how many"; this catches
+    // "which, called what, taking what" — a renamed tool, a rewritten
+    // description or a widened schema all keep the count and change what
+    // reaches the model. Hashes only: a tool description is attacker-controlled
+    // text and does not belong committed in this repository.
+    result.surface = fingerprintTools(tools);
     if (typeof result.tool_count_db === 'number') {
       result.tool_count_drift = result.tool_count !== result.tool_count_db;
     }
@@ -802,12 +818,45 @@ async function main() {
   const touched = new Set();
   const priorResults = payload.results || [];
 
+  const priorByName = new Map(priorResults.map((r) => [r.name, r]));
+
+  /**
+   * Did this server's tool surface change since the last recorded run, and did
+   * the artifact change with it?
+   *
+   * The pairing is the point. An upgrade that changes the surface is expected.
+   * The *same* artifact presenting a different surface is the case with no
+   * innocent explanation: for a local pinned server it means the launch is not
+   * deterministic, and for a remote one it means the server was changed under
+   * whoever trusted it.
+   */
+  function surfaceDrift(prior, fresh) {
+    if (!fresh.surface || !prior || !prior.surface) return null;
+    const diff = diffSurface(prior.surface, fresh.surface);
+    if (surfaceUnchanged(diff)) return null;
+    const before = prior.launched || {};
+    const after  = fresh.launched || {};
+    const artifactChanged = before.install_cmd !== after.install_cmd
+      || before.db_version !== after.db_version;
+    return {
+      since:            prior.checked_at || null,
+      artifact_changed: artifactChanged,
+      previous_sha256:  prior.surface.sha256,
+      sha256:           fresh.surface.sha256,
+      added:            diff.added,
+      removed:          diff.removed,
+      changed:          diff.changed,
+      lines:            describeDiff(diff),
+    };
+  }
+
   const newResults = [];
   let consecutiveSandboxFailures = 0;
   let runAborted = false;
   for (const tool of picked) {
     if (!opts.json) process.stderr.write(`smoking ${tool.name}…\n`);
     const r = await smokeEntry(tool, opts);
+    r.surface_drift = surfaceDrift(priorByName.get(tool.name), r);
     touched.add(tool.name);
     // "The sandbox could not run" is not a finding about the entry. Retry once
     // after a pause — a daemon under load recovers — then report it as a skip,
@@ -847,6 +896,13 @@ async function main() {
         ? ` — ${r.error_code || 'unknown error'}`
         : (r.status === 'skip' ? ` — ${r.error_code || ''}` : ` — ${r.tool_count} tools, boot ${r.boot_ms}ms${drift}`);
       process.stderr.write(`  ${tag} ${tool.name}${detail}\n`);
+      if (r.surface_drift) {
+        const how = r.surface_drift.artifact_changed
+          ? 'the artifact changed too'
+          : 'THE ARTIFACT DID NOT CHANGE';
+        process.stderr.write(`       tool surface changed since ${r.surface_drift.since || 'the last run'} — ${how}\n`);
+        for (const line of r.surface_drift.lines) process.stderr.write(`         ${line}\n`);
+      }
     }
   }
 
@@ -931,6 +987,10 @@ async function main() {
   // of "no failures". `runAborted` covers the early stop, where most entries
   // were never attempted at all.
   const sandboxUnavailable = newResults.filter(r => r.failure_class === 'SANDBOX_UNAVAILABLE').length;
+  const surfaceDrifted = newResults.filter(r => r.surface_drift);
+  // Split on the one distinction that matters: an upgrade changing its surface
+  // is expected, the same artifact changing its surface is not.
+  const unexplainedDrift = surfaceDrifted.filter(r => !r.surface_drift.artifact_changed);
   const attempted = newResults.length;
   const notAttempted = Math.max(0, picked.length - attempted);
 
@@ -942,6 +1002,8 @@ async function main() {
       pass, fail, skip,
       skipped_launcher: skippedLauncher,
       sandbox_unavailable: sandboxUnavailable,
+      surface_drift: surfaceDrifted.length,
+      surface_drift_unexplained: unexplainedDrift.length,
       aborted: runAborted,
       planned: picked.length,
       not_attempted: notAttempted,
@@ -950,7 +1012,22 @@ async function main() {
   } else {
     process.stderr.write(`\n${newResults.length} checked — ${pass} pass, ${fail} fail, ${skip} skip\n`);
     if (notAttempted) process.stderr.write(`${notAttempted} of ${picked.length} entries were never attempted\n`);
+    if (surfaceDrifted.length) {
+      process.stderr.write(
+        `${surfaceDrifted.length} server${surfaceDrifted.length === 1 ? '' : 's'} changed tool surface` +
+        `${unexplainedDrift.length ? `, ${unexplainedDrift.length} of them without the artifact changing` : ''}\n`
+      );
+    }
     process.stderr.write(`Results written to ${opts.results}\n`);
+  }
+  if (unexplainedDrift.length) {
+    // Said loudly and separately: for a pinned local server this means the
+    // launch is not deterministic, and for a remote one it means the server was
+    // changed under whoever trusted it.
+    process.stderr.write(
+      `\nWARNING: ${unexplainedDrift.map(r => r.name).join(', ')} presented a different tool surface ` +
+      `from the same artifact. Nothing about the package changed.\n`
+    );
   }
   if (sandboxUnavailable > 0) {
     process.stderr.write(
@@ -974,7 +1051,8 @@ async function main() {
   // produced the evidence it was asked for — under --strict that is a failure
   // regardless of how few entries got as far as failing.
   const incomplete = runAborted || notAttempted > 0 || sandboxUnavailable > 0;
-  exitAfterFlush(opts.strict && (fail > 0 || skippedLauncher > 0 || incomplete) ? 1 : 0);
+  const driftFails = opts.failSurfaceDrift && surfaceDrifted.length > 0;
+  exitAfterFlush((opts.strict && (fail > 0 || skippedLauncher > 0 || incomplete)) || driftFails ? 1 : 0);
 }
 
 if (require.main === module) {

@@ -44,6 +44,7 @@ const COMMANDS = {
   wrap:            "generate_wrapper.cjs",
   "site-registry": "generate_registry_page.cjs",
   budget:          "token_budget.cjs",
+  lock:            "lock.cjs",
 };
 
 const HELP = `mcp-vault — make MCP supply-chain boring.
@@ -70,6 +71,8 @@ COMMANDS
   wrap              Generate MCP wrapper boilerplate for a CLI / API tool
   site-registry     Generate docs/site/registry.html from tools_database.json
   budget            What your configured servers cost in context tokens
+  lock              Freeze the verified dependency tree + tool surface (mcp.lock.json)
+                    (--check: diff a fresh resolve against it; --vendor: install it)
 
 COMMON OPTIONS
   --json            Machine-readable output

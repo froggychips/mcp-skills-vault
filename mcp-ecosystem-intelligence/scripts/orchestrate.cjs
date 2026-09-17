@@ -35,6 +35,7 @@ const { readInstalledServers } = require('./lib/installed.cjs');
 const { estimateServer, matchDbEntry, wouldExceed, DEFAULT_CONTEXT } = require('./lib/budget.cjs');
 // Reuse the gate's parsers so "what gets pinned" and "what gets checked" can
 // never drift apart — they were two independent regexes before.
+const { isExactVersion } = require('./lib/install_cmd.cjs');
 const {
   npmPkgName, pypiPkgName, dockerImageRef, dockerDigestPinned,
 } = require('./verify_integrity.cjs');
@@ -640,19 +641,6 @@ function installTool(tool, cwd, global_) {
 // `pkg@latest`, `pkg@^1.2` and a stale `pkg@1.0.0` all launch something other
 // than the artifact whose hash was compared, so they get rewritten to the DB's
 // version rather than trusted.
-// "Exact" has to mean exact. `1`, `1.2` and `1.x` all satisfied the old
-// pattern, so `pinInstallCmd` happily produced `pkg@1.x` and called it pinned —
-// a range dressed as a pin.
-//   npm:  semver, three components, optional pre-release/build
-//   PyPI: PEP 440 release segment, optional pre/post/dev/local
-const EXACT_NPM_VERSION  = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
-const EXACT_PYPI_VERSION = /^\d+(?:\.\d+)*(?:(?:a|b|rc)\d+)?(?:\.post\d+)?(?:\.dev\d+)?(?:\+[0-9A-Za-z.]+)?$/;
-
-function isExactVersion(runner, version) {
-  if (typeof version !== 'string' || !version) return false;
-  return runner === 'npx' ? EXACT_NPM_VERSION.test(version) : EXACT_PYPI_VERSION.test(version);
-}
-
 function pinInstallCmd(cmd, version) {
   const raw    = String(cmd).trim();
   const parts  = raw.split(/\s+/);
