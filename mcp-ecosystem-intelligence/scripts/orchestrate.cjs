@@ -9,6 +9,7 @@
  * Usage:
  *   node scripts/orchestrate.cjs [--cwd <path>] [--query <text>]
  *   node scripts/orchestrate.cjs --install <name> [--global] [--cwd <path>]
+ *                                 [--strict] [--allow-unpinned]
  *   node scripts/orchestrate.cjs --json   (machine-readable, for Claude)
  *
  * Exit codes:
@@ -21,7 +22,13 @@
 
 const fs            = require('fs');
 const path          = require('path');
-const { execSync, spawnSync } = require('child_process');
+const { spawnSync } = require('child_process');
+const { exitAfterFlush } = require('./lib/exit.cjs');
+// Reuse the gate's parsers so "what gets pinned" and "what gets checked" can
+// never drift apart — they were two independent regexes before.
+const {
+  npmPkgName, pypiPkgName, dockerImageRef, dockerDigestPinned,
+} = require('./verify_integrity.cjs');
 
 const DB_PATH    = path.resolve(__dirname, '../assets/tools_database.json');
 const VERIFY_CJS = path.resolve(__dirname, 'verify_integrity.cjs');
@@ -37,6 +44,11 @@ const GLOBAL     = argv.includes('--global');
 // Skip the network-bound advisory feeds during install — useful for CI /
 // air-gapped runs / integration tests. Hash check still runs.
 const OFFLINE    = argv.includes('--offline');
+const STRICT     = argv.includes('--strict');
+// Escape hatch for installing an entry whose DB record has no pinned version.
+// Off by default: writing an unpinned command into .mcp.json means the thing
+// that runs is not the thing the gate checked.
+const ALLOW_UNPINNED = argv.includes('--allow-unpinned');
 
 function argVal(flag) {
   const i = argv.indexOf(flag);
@@ -409,27 +421,32 @@ function getInstalled(cwd) {
 function installTool(tool, cwd, global_) {
   process.stderr.write(`\nRunning integrity scan for ${tool.name}…\n`);
 
-  const verifyArgs = OFFLINE ? [VERIFY_CJS, '--no-audit'] : [VERIFY_CJS];
-  const res = spawnSync('node', verifyArgs, { encoding: 'utf8' });
-  const out  = res.stdout + res.stderr;
+  // Scan this one entry and trust the exit code, instead of scraping the
+  // report for lines that mention the tool. The old text match had two holes:
+  // a `SKIP` line (registry unreachable, unparsable name) matched neither the
+  // FAIL nor the WARN pattern and read as "nothing wrong", and an entry with
+  // no `version` made `l.includes(tool.version || '')` true for *every* line,
+  // so an unrelated entry's FAIL aborted this install.
+  // --fail-unverified: for an install, "couldn't check" is a refusal.
+  const verifyArgs = [VERIFY_CJS, '--entry', tool.name, '--fail-unverified'];
+  if (OFFLINE) verifyArgs.push('--offline');
+  if (STRICT)  verifyArgs.push('--strict');
 
-  // Find this tool's line in the output
-  const toolLines = out.split('\n').filter(l => l.includes(tool.name) || l.includes(tool.version || ''));
-  const isFail    = toolLines.some(l => /^(FAIL|CVE)\b/.test(l));
-  const isWarn    = toolLines.some(l => /^(WARN|HOOK)\b/.test(l));
-
-  if (toolLines.length) {
-    for (const l of toolLines) process.stderr.write(`  ${l}\n`);
-  } else {
-    process.stderr.write(`  (no integrity entry for ${tool.name} — MISS)\n`);
+  const res = spawnSync(process.execPath, verifyArgs, { encoding: 'utf8' });
+  const out = `${res.stdout || ''}${res.stderr || ''}`;
+  for (const l of out.split('\n')) {
+    if (l.trim()) process.stderr.write(`  ${l}\n`);
   }
 
-  if (isFail) {
-    process.stderr.write(`\n${RD}ABORT: integrity check failed for ${tool.name}. Do not install.${RS}\n`);
+  if (res.error) {
+    process.stderr.write(`\n${RD}ABORT: could not run the integrity gate: ${res.error.message}${RS}\n`);
     process.exit(1);
   }
-
-  if (isWarn) {
+  if (res.status !== 0) {
+    process.stderr.write(`\n${RD}ABORT: integrity gate did not clear ${tool.name} (verify exit ${res.status}). Do not install.${RS}\n`);
+    process.exit(1);
+  }
+  if (/^(WARN|HOOK)\b|\[(WARN|HOOK)\]/m.test(out)) {
     process.stderr.write(`\n${YL}WARN: review the issue above before proceeding.${RS}\n`);
   }
 
@@ -443,29 +460,97 @@ function installTool(tool, cwd, global_) {
   }
 }
 
+// Pin the package token of an install command to the version the DB records —
+// and that verify_integrity actually hashed.
+//
+// Most DB entries store the command unpinned (`npx -y @scope/mcp-server`) with
+// the checked version in a separate `version` field. Copying that command into
+// .mcp.json verbatim means npx resolves `latest` every time the server starts:
+// the artifact that runs is not the artifact whose sha512 the gate compared, so
+// a compromised release published after our last refresh installs itself
+// silently. Synthesise the pin instead.
+//
+// Returns { parts, pinned, reason } — `parts` is the argv-style token list.
+//
+// "Pinned" means: the launch command names the exact version the gate verified.
+// A command that already carries *some* specifier is not automatically fine —
+// `pkg@latest`, `pkg@^1.2` and a stale `pkg@1.0.0` all launch something other
+// than the artifact whose hash was compared, so they get rewritten to the DB's
+// version rather than trusted.
+const EXACT_VERSION = /^[0-9][\w.+!-]*$/;
+
+function pinInstallCmd(cmd, version) {
+  const raw    = String(cmd).trim();
+  const parts  = raw.split(/\s+/);
+  const runner = parts[0];
+
+  if (runner === 'docker') {
+    // The image is the first non-flag token; a digest sitting in some other
+    // argument (`-e REF=img@sha256:…`) is not a pin on the image that runs.
+    const ref = dockerImageRef(raw);
+    if (!ref) return { parts, pinned: false, reason: 'cannot parse the docker image reference' };
+    const ok = dockerDigestPinned(ref);
+    return { parts, pinned: ok, reason: ok ? null : `docker image ${ref} is not pinned by @sha256 digest` };
+  }
+
+  if (runner !== 'npx' && runner !== 'uvx') {
+    return { parts, pinned: false, reason: `unknown runner "${runner}" — cannot pin` };
+  }
+
+  // Resolve the package with the gate's own parser: a command shaped in a way
+  // the gate declines to check (flags before the package, --package, uvx
+  // --from/--with) must not be pinnable here either.
+  const pkg = runner === 'npx' ? npmPkgName(raw) : pypiPkgName(raw);
+  if (!pkg) {
+    return {
+      parts, pinned: false,
+      reason: runner === 'npx'
+        ? 'not a plain `npx -y <pkg>` command — the gate cannot check it either'
+        : 'not a plain `uvx <pkg>` command (--from / --with / flags) — the gate cannot check it either',
+    };
+  }
+
+  const sep = runner === 'npx' ? '@' : '==';
+  const idx = parts.findIndex((p) => p === pkg || p.startsWith(pkg + sep));
+  if (idx === -1) return { parts, pinned: false, reason: 'cannot locate the package token in install_cmd' };
+
+  const current = parts[idx] === pkg ? null : parts[idx].slice(pkg.length + sep.length);
+
+  if (!version) {
+    return {
+      parts, pinned: false,
+      reason: current
+        ? `install_cmd asks for "${current}", but the DB entry has no verified \`version\` — run verify_integrity.cjs --update`
+        : 'no `version` in the DB entry — run verify_integrity.cjs --update',
+    };
+  }
+  if (!EXACT_VERSION.test(version)) {
+    return { parts, pinned: false, reason: `DB version "${version}" is not an exact version — nothing safe to pin to` };
+  }
+  if (current === version) return { parts, pinned: true, reason: null };
+
+  // Unpinned, or pinned to something the gate did not verify: rewrite it.
+  const pinnedParts = [...parts];
+  pinnedParts[idx] = `${pkg}${sep}${version}`;
+  return { parts: pinnedParts, pinned: true, reason: null };
+}
+
 function buildServerEntry(tool) {
-  // Parse install_cmd into command + args
-  const cmd = tool.install_cmd.trim();
+  const { parts, pinned, reason } = pinInstallCmd(tool.install_cmd, tool.version);
 
-  if (cmd.startsWith('docker ')) {
-    // docker run -i --rm … <image>
-    const parts = cmd.split(/\s+/);
-    return { command: 'docker', args: parts.slice(1) };
+  if (!pinned) {
+    if (!ALLOW_UNPINNED) {
+      process.stderr.write(
+        `\n${RD}ABORT: refusing to write an unpinned launch command for ${tool.name}.${RS}\n` +
+        `  ${reason}\n` +
+        `  The gate verifies a specific version; an unpinned command runs whatever\n` +
+        `  the registry serves at startup. Pass --allow-unpinned to override.\n`
+      );
+      process.exit(1);
+    }
+    process.stderr.write(`\n${YL}WARN: writing an unpinned launch command (${reason}).${RS}\n`);
   }
 
-  if (cmd.startsWith('npx ')) {
-    // npx -y <pkg>[@ver] [extra args]
-    const parts = cmd.split(/\s+/);
-    return { command: 'npx', args: parts.slice(1) };
-  }
-
-  if (cmd.startsWith('uvx ')) {
-    const parts = cmd.split(/\s+/);
-    return { command: 'uvx', args: parts.slice(1) };
-  }
-
-  // fallback
-  const parts = cmd.split(/\s+/);
   return { command: parts[0], args: parts.slice(1) };
 }
 
@@ -645,7 +730,10 @@ if (require.main === module) {
       installed,
       db_entry_count: db.tools.length,
     }, null, 2) + '\n');
-    process.exit(0);
+    // `return` matters: exitAfterFlush() is asynchronous, so execution would
+    // otherwise fall through to printReport() and append a human-readable
+    // report after the JSON document.
+    return exitAfterFlush(0);
   }
 
   // -- default: human-readable report --
@@ -657,6 +745,7 @@ module.exports = {
   matchDB,
   unmappedSignals,
   fallbackBySignal,
+  pinInstallCmd,
   SIGNAL_TO_TOOLS,
   UNIVERSAL_TOOLS,
 };

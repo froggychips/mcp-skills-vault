@@ -319,3 +319,103 @@ test('detectStack: SEQ_API_KEY env-key adds seq signal + observability category'
   assert.ok(stack.infra.has('seq'), `infra=${[...stack.infra]}`);
   assert.ok(stack.cats.has('observability'));
 });
+
+// ── pinInstallCmd ───────────────────────────────────────────────────────────
+// The gate hashes `pkg@version` from the DB; .mcp.json must launch that exact
+// artifact. Most DB entries store the command unpinned, so `npx -y pkg` in a
+// config resolved `latest` at every server start — a different tarball than the
+// one whose sha512 was compared.
+
+test('pinInstallCmd: npm entry gets the DB version pinned in', () => {
+  const r = o.pinInstallCmd('npx -y @mapbox/mcp-server', '0.11.0');
+  assert.equal(r.pinned, true);
+  assert.deepEqual(r.parts, ['npx', '-y', '@mapbox/mcp-server@0.11.0']);
+});
+
+test('pinInstallCmd: a matching pin is left alone', () => {
+  const r = o.pinInstallCmd('npx -y @scope/pkg@1.2.3', '1.2.3');
+  assert.equal(r.pinned, true);
+  assert.deepEqual(r.parts, ['npx', '-y', '@scope/pkg@1.2.3']);
+});
+
+test('pinInstallCmd: a pin the gate did not verify is rewritten, not trusted', () => {
+  // `@latest`, a range, or a stale pin all launch something other than the
+  // artifact whose hash was compared. Carrying *a* specifier is not enough.
+  for (const spec of ['@latest', '@^1.2', '@~1', '@1.0.0', '']) {
+    const r = o.pinInstallCmd(`npx -y pkg${spec}`, '1.2.3');
+    assert.equal(r.pinned, true, spec);
+    assert.deepEqual(r.parts, ['npx', '-y', 'pkg@1.2.3'], spec);
+  }
+  assert.deepEqual(o.pinInstallCmd('uvx pkg==2.0.0', '1.2.3').parts, ['uvx', 'pkg==1.2.3']);
+});
+
+test('pinInstallCmd: a DB version that is not exact is not something to pin to', () => {
+  const r = o.pinInstallCmd('npx -y pkg', '^1.2.0');
+  assert.equal(r.pinned, false);
+  assert.match(r.reason, /not an exact version/);
+});
+
+test('pinInstallCmd: refuses commands the gate itself cannot parse', () => {
+  // Flags before the package name: the old parser pinned "--cache" and the
+  // gate checked a package that does not exist.
+  for (const cmd of ['npx -y --cache /tmp/c pkg', 'npx -y --package pkg server']) {
+    const r = o.pinInstallCmd(cmd, '1.2.3');
+    assert.equal(r.pinned, false, cmd);
+    assert.match(r.reason, /not a plain `npx -y <pkg>` command/);
+  }
+  for (const cmd of ['uvx --with extra server', 'uvx --from git+https://x/y z']) {
+    const r = o.pinInstallCmd(cmd, '1.2.3');
+    assert.equal(r.pinned, false, cmd);
+    assert.match(r.reason, /not a plain `uvx <pkg>` command/);
+  }
+});
+
+test('pinInstallCmd: a digest in some other argument is not a pin on the image', () => {
+  const digest = 'a'.repeat(64);
+  const r = o.pinInstallCmd(`docker run -e REF=img@sha256:${digest} img:latest`, null);
+  assert.equal(r.pinned, false);
+  assert.match(r.reason, /img:latest is not pinned/);
+  // …while a value-taking flag before the image is handled.
+  const ok = o.pinInstallCmd(`docker run --pull always ghcr.io/x/y@sha256:${digest}`, null);
+  assert.equal(ok.pinned, true);
+});
+
+test('pinInstallCmd: pins the package token, not trailing args', () => {
+  const r = o.pinInstallCmd('npx -y mcp-server-foo --toolsets repos,issues', '1.0.0');
+  assert.deepEqual(r.parts, ['npx', '-y', 'mcp-server-foo@1.0.0', '--toolsets', 'repos,issues']);
+});
+
+test('pinInstallCmd: uvx uses == for the PyPI pin', () => {
+  assert.deepEqual(
+    o.pinInstallCmd('uvx mcp-server-git', '2026.1.14').parts,
+    ['uvx', 'mcp-server-git==2026.1.14'],
+  );
+  assert.equal(o.pinInstallCmd('uvx mcp-server-git==2026.1.14', '9.9').pinned, true);
+});
+
+test('pinInstallCmd: docker is pinned by its digest, or not at all', () => {
+  const digest = 'a'.repeat(64);
+  assert.equal(o.pinInstallCmd(`docker run -i --rm ghcr.io/x/y@sha256:${digest}`, null).pinned, true);
+  const loose = o.pinInstallCmd('docker run -i --rm ghcr.io/x/y:latest', '1.0');
+  assert.equal(loose.pinned, false);
+  assert.match(loose.reason, /not pinned by @sha256/);
+});
+
+test('pinInstallCmd: unpinnable cases report why', () => {
+  assert.match(o.pinInstallCmd('npx -y @scope/pkg', null).reason, /no `version` in the DB entry/);
+  assert.match(o.pinInstallCmd('npx -y pkg@1.0.0', null).reason, /asks for "1.0.0".*no verified/s);
+  assert.match(o.pinInstallCmd('pipx run something', '1.0').reason, /unknown runner/);
+});
+
+test('pinInstallCmd: every npm/uvx entry in the shipped DB can be pinned', () => {
+  const db = require('../mcp-ecosystem-intelligence/assets/tools_database.json');
+  const unpinnable = db.tools
+    .filter(t => /^(npx|uvx)\s/.test(t.install_cmd || ''))
+    .map(t => ({ name: t.name, ...o.pinInstallCmd(t.install_cmd, t.version) }))
+    .filter(r => !r.pinned)
+    .map(r => `${r.name}: ${r.reason}`);
+  // Entries that can't be pinned are exactly the ones verify_integrity reports
+  // as UNVERIFIED (no version, or a --from source install). Keep the list small
+  // and visible rather than asserting zero.
+  assert.ok(unpinnable.length <= 2, `unpinnable entries grew:\n${unpinnable.join('\n')}`);
+});
