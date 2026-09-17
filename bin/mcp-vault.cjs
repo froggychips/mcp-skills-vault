@@ -42,6 +42,7 @@ const COMMANDS = {
   posture:         "check_posture.cjs",
   explain:         "explain.cjs",
   upgrade:         "suggest_upgrade.cjs",
+  capabilities:    "check_capabilities.cjs",
   "license-drift": "check_license_drift.cjs",
   health:          "calculate_health.cjs",
   refresh:         "refresh_scores.cjs",
@@ -73,6 +74,7 @@ COMMANDS
   posture           How each upstream repo is run (OpenSSF Scorecard via deps.dev)
   explain <name>    Why this entry is allowed or denied, with the evidence and the rule
   upgrade           Shortest version that clears the advisories against a pin
+  capabilities      What a package can do, and what it gained since the last scan
   docker-drift      Detect upstream Docker @sha256 drift
   license-drift     Detect MIT → BSL / SSPL relicensing
   health <args>     Score a candidate by stars / recency / license / registry
