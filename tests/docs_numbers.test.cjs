@@ -73,16 +73,15 @@ const CLAIMS = [
     what:  'server count and the tool-surface spread',
     file:  'README.md',
     re:    /With (\d+) servers in the DB the spread is wide: `([\w-]+)` = (\d+) tool vs\. `([\w-]+)` = (\d+) tools/,
-    expected: () => {
-      const lightest = withTools.find((t) => t.est_tools_count === 1);
-      return [db.length, lightest.name, 1, heaviest.name, heaviest.est_tools_count];
-    },
-    // The two named entries are examples: any entry with one tool will do for
-    // the light end, so the name is checked against "an entry that has one
-    // tool" rather than against a specific one.
+    // The two named entries are *examples*, and several entries have one tool —
+    // so the names are echoed back and checked by `nameCheck` against what they
+    // claim to be, rather than compared to one arbitrarily chosen entry. The
+    // first version of this test picked its own example and then failed because
+    // the README had named an equally correct one.
+    expected: (captured) => [db.length, captured[1], 1, captured[3], heaviest.est_tools_count],
     nameCheck: (captured) => {
       const light = db.find((t) => t.name === captured[1]);
-      assert.ok(light, `README names \`${captured[1]}\` as the lightest server; there is no such entry`);
+      assert.ok(light, `README names \`${captured[1]}\` as a one-tool server; there is no such entry`);
       assert.equal(light.est_tools_count, 1, `${captured[1]} no longer has 1 tool`);
       const heavy = db.find((t) => t.name === captured[3]);
       assert.ok(heavy, `README names \`${captured[3]}\` as the heaviest server; there is no such entry`);
@@ -109,8 +108,11 @@ const CLAIMS = [
   {
     what:  'DB entry count (SKILL.md)',
     file:  'mcp-ecosystem-intelligence/SKILL.md',
-    re:    /(\d+) entries/,
-    expected: () => [db.length],
+    // Anchored on the sentence, not on "entries": a bare `(\d+) entries`
+    // matched "~30–300 entries" from a paragraph about registry pagination and
+    // cheerfully reported that the DB should hold 300.
+    re:    /canonical example, (\d+) entries across ~(\d+) categories/,
+    expected: () => [db.length, new Set(db.map((x) => x.category)).size],
   },
 ];
 
@@ -122,7 +124,7 @@ for (const claim of CLAIMS) {
       + 'Update the pattern in tests/docs_numbers.test.cjs so the claim keeps being checked.');
 
     const captured = m.slice(1);
-    const expected = claim.expected().map(String);
+    const expected = claim.expected(captured).map(String);
     assert.deepEqual(captured, expected,
       `${claim.file} says ${JSON.stringify(captured)}, the data says ${JSON.stringify(expected)}`);
 

@@ -337,6 +337,10 @@ Drift = upstream rebuilt the tag under a new digest. The weekly CI job (`docker-
 
 [`scripts/mcp_eval.cjs`](./mcp-ecosystem-intelligence/scripts/mcp_eval.cjs) — closes the "did the artifact actually start?" gap. The integrity gate verifies the *file* you downloaded; this script verifies that spawning the server produces a usable tool surface.
 
+**What the last full run found.** 40 of the 113 entries with a runnable launch command complete a handshake in a clean container; 39 of them list at least one tool, listing 1,021 tools between them, ≈294k tokens of `tools/list` payload if every one were enabled at once. The rest fail for their own reasons — 62 crash, 7 exceed a 90-second deadline, 2 want network access they are not given, 1 wants credentials, 1 needs an argument you have to supply by hand. Those results live in [`assets/eval_results.json`](./mcp-ecosystem-intelligence/assets/eval_results.json) and feed the `behaviour` axis of a recommendation: an entry nothing has ever seen start cannot read as "recommended". 8 entries report a tool count that differs from the DB's (`tool_count_drift`), which is a reviewer's decision rather than an automatic correction.
+
+Each passing run also records a **tool-surface fingerprint** — every tool's name with its description and input schema hashed separately (hashes only: a tool description is attacker-controlled text, and it reaches the model's system prompt). A later run compares against it, which is what makes a rug pull visible: the same artifact presenting a different surface is the case with no innocent explanation, and `tool_count` alone never saw a rename or a rewritten description.
+
 For each DB entry with a recognized install method (`npx -y`, `uvx`, `docker run`), the script spawns the subprocess and runs the canonical JSON-RPC handshake — `initialize` → `notifications/initialized` → `tools/list` — then lints each returned tool's `inputSchema` with a minimal validator (intentionally narrower than full JSON Schema Draft 2020-12; covers only what Claude Code actually reads: `type`, `properties`, `required`, `enum`, `description`, plus nested objects + array items).
 
 ```bash
@@ -447,7 +451,7 @@ maps      memory    meta       mobile     observability   payments
 pm        reasoning search     testing    utility         vcs       web-scraping
 ```
 
-Distribution: **20 Core / 76 Recommended / 18 Experimental**.
+Distribution: **20 Core / 71 Recommended / 23 Experimental**.
 
 **Verified hand-curated core** (the original 30): the seven official `modelcontextprotocol/servers` (filesystem, fetch, git, memory, sequentialthinking, time, everything) plus vendor-maintained servers (`github`, `microsoft/playwright`, `cloudflare`, `notion`, `sentry`, `stripe`, `neon`, `mongodb`, `redis`, `clickhouse`, `awslabs/mcp`, `context7`, …) and high-quality community entries (`mcp-atlassian`, `firecrawl`, `tavily`, `exa`, `brave`, `kubernetes`, `duckduckgo`, …).
 
