@@ -56,7 +56,8 @@ COMMANDS
   audit             Diff installed MCP servers against the vault DB
   verify            Integrity gate (hashes + advisories) over the whole DB
                     (--installed: over what your hosts actually launch)
-  install <pkg>     Integrity gate, then write .mcp.json
+  install <pkg>     Integrity gate, then write the host config
+                    (--host claude-code|claude-desktop|cursor|vscode|codex)
   discover          Harvest fresh MCP candidates from npm / gh / README
   eval              Behavioural smoke (handshake + tools/list + schema lint)
   docker-drift      Detect upstream Docker @sha256 drift
@@ -80,6 +81,8 @@ COMMON OPTIONS
   --require-provenance  No provenance attestation = failure (verify)
   --allow-unpinned  Allow install to write a launch command with no version pin
   --cwd <path>      Target project directory (scan / audit)
+  --host <id>       Which host config to write (install; --list-hosts to see them)
+  --scope <s>       project or user (install; --global means --scope user)
 
   Each command also accepts its own flags — run with --help for details.
 
@@ -136,7 +139,9 @@ function main(argv) {
         "  mcp-vault scan --cwd ./your-project     # stack-aware recommendations\n\n" +
         "Then:\n" +
         "  mcp-vault install <name>                # writes ./.mcp.json\n" +
-        "  mcp-vault install <name> --global       # writes ~/.claude.json\n"
+        "  mcp-vault install <name> --global       # writes ~/.claude.json\n" +
+        "  mcp-vault install <name> --host cursor  # Cursor, VS Code, Claude Desktop, Codex\n" +
+        "  mcp-vault install --list-hosts          # supported hosts and scopes\n"
       );
       process.exit(2);
     }
