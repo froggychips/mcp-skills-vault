@@ -37,6 +37,7 @@ const COMMANDS = {
   discover:        "discover.cjs",
   eval:            "mcp_eval.cjs",
   "docker-drift":  "check_docker_drift.cjs",
+  availability:    "check_availability.cjs",
   "license-drift": "check_license_drift.cjs",
   health:          "calculate_health.cjs",
   refresh:         "refresh_scores.cjs",
@@ -61,6 +62,7 @@ COMMANDS
                     (--host claude-code|claude-desktop|cursor|vscode|codex)
   discover          Harvest fresh MCP candidates from npm / gh / README
   eval              Behavioural smoke (handshake + tools/list + schema lint)
+  availability      Is every entry still published, and still the same thing?
   docker-drift      Detect upstream Docker @sha256 drift
   license-drift     Detect MIT → BSL / SSPL relicensing
   health <args>     Score a candidate by stars / recency / license / registry

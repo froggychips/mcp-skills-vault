@@ -14,6 +14,7 @@
  * becomes a derived value:
  *
  *   trust_evidence: {
+ *     availability:   { status: 'present',   checked_at: '2026-09-17' },
  *     artifact:       { status: 'verified',  checked_at: '2026-09-17', method: 'deep-hash' },
  *     signature:      { status: 'verified',  checked_at: '2026-09-17', keyid: 'SHA256:…' },
  *     provenance:     { status: 'bound',     checked_at: '2026-09-17', identity: '…' },
@@ -37,6 +38,7 @@
  */
 
 const DIMENSIONS = [
+  'availability',    // the package is still published at all
   'artifact',        // the bytes match the pin
   'signature',       // the registry vouched for that pin
   'provenance',      // a build claims to have produced it
@@ -51,6 +53,9 @@ const DIMENSIONS = [
 // the perishable one: "clean" means "clean as of that date", and disclosures
 // do not wait. A hash match, by contrast, is about bytes that do not change.
 const DEFAULT_MAX_AGE_DAYS = {
+  // As perishable as an advisory: a package can be unpublished today, and the
+  // name then becomes claimable by someone else.
+  availability:   7,
   artifact:       90,
   signature:      90,
   provenance:     90,
@@ -66,7 +71,7 @@ const today = (now = Date.now()) => new Date(now).toISOString().slice(0, 10);
 // What counts as an answer in the affirmative, per dimension vocabulary. Used
 // where "did this actually check out?" is being asked, so that a new status
 // added later defaults to "not established" rather than to "fine".
-const POSITIVE_STATUSES = new Set(['verified', 'clean', 'claimed', 'bound', 'pass', 'hooks', 'advisories-present', 'osi']);
+const POSITIVE_STATUSES = new Set(['verified', 'clean', 'claimed', 'bound', 'present', 'pass', 'hooks', 'advisories-present', 'osi']);
 
 /**
  * Turn one run's *typed check results* into dated evidence.
@@ -95,6 +100,12 @@ function buildEvidence(checks, { now = Date.now(), artifactId = null } = {}) {
 
   const c = checks || {};
 
+  if (c.availability) {
+    const extra = {};
+    if (c.availability.detail)  extra.detail = c.availability.detail;
+    if (c.availability.replacement) extra.replacement = c.availability.replacement;
+    put('availability', c.availability.state, extra);
+  }
   if (c.artifact) {
     put('artifact', c.artifact.state, c.artifact.method ? { method: c.artifact.method } : {});
   }
@@ -219,7 +230,11 @@ function requiredFor(ecosystem) {
 
 function deriveTrust(evidence, { maxAgeDays = DEFAULT_MAX_AGE_DAYS, now = Date.now(), require: required = ['artifact'] } = {}) {
   const dims = (evidence && evidence.dimensions) || {};
-  const bad = ['mismatch', 'vulnerable', 'fail'];   // actively wrong, not merely unknown
+  // Actively wrong, not merely unknown. A package that is no longer published
+  // belongs here rather than in 'candidate': candidate means "not vetted yet",
+  // and an unpublished name is worse than unvetted — it may now belong to
+  // somebody else.
+  const bad = ['mismatch', 'vulnerable', 'fail', 'gone', 'version-gone', 'yanked'];
   for (const value of Object.values(dims)) {
     if (bad.includes(value.status)) return 'unverified';
   }

@@ -2,7 +2,8 @@ name: security-scan
 
 # Five responsibilities:
 #   smoke               — fast offline check on every PR / push to master
-#   refresh-hashes      — weekly cron, opens PR with:
+#   refresh-hashes      — weekly cron, opens PR with (incl. availability
+#                         evidence: gone / yanked / relocated packages):
 #                           1. refreshed integrity hashes (verify_integrity --update)
 #                           2. refreshed GitHub metrics + recalculated health scores
 #                              (refresh_scores --write)
@@ -201,6 +202,39 @@ jobs:
         run: node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --deep --record-evidence
       - name: refresh_scores --write
         run: node mcp-ecosystem-intelligence/scripts/refresh_scores.cjs --write
+      # Whether each entry is still published at all. This is the one question
+      # the gate structurally cannot answer: a 404 and a network failure arrive
+      # on the same code path, so both read as "could not check" and an entry
+      # that npm had stopped serving kept its `trust: verified`. Exit 1 here
+      # means something is gone or yanked, which belongs in the PR rather than
+      # in a failed job — the evidence write is the useful output.
+      - name: Availability + relocation check
+        id: availability
+        continue-on-error: true
+        run: |
+          node mcp-ecosystem-intelligence/scripts/check_availability.cjs --write --repos --json > /tmp/availability.json || true
+          node -e '
+            const r = require("/tmp/availability.json");
+            const s = r.summary;
+            const rows = r.entries.filter(e => ["gone","version-gone","yanked","deprecated"].includes(e.availability.state) || (e.identity && e.identity.state === "relocated"));
+            const lines = [
+              "## Availability",
+              "",
+              `${r.checked} entries — ${s.present} present, ${s.gone} gone, ${s.version_gone} version-gone, ${s.yanked} yanked, ${s.deprecated} deprecated, ${s.relocated} relocated, ${s.unknown} not checkable`,
+              "",
+            ];
+            if (rows.length) {
+              lines.push("| entry | state | detail |", "| --- | --- | --- |");
+              for (const e of rows) {
+                const state = e.availability.state === "present" ? e.identity.state : e.availability.state;
+                const detail = (e.availability.detail || (e.identity && e.identity.detail) || "").replace(/\|/g, "\\|").slice(0, 160);
+                lines.push(`| ${e.name} | ${state} | ${detail} |`);
+              }
+            } else {
+              lines.push("Everything the DB pins is still published where it says it is.");
+            }
+            require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+          '
       # The `mcp-eval-pr` gate below can never see the PR this job opens:
       # GitHub doesn't trigger workflows for PRs created with GITHUB_TOKEN, so
       # `on: pull_request` never fires and the PR lands showing
@@ -231,6 +265,9 @@ jobs:
             - [ ] Confirm no entry switched maintainer / org silently
             - [ ] Check tier changes (Recommended → Experimental, etc.) — may need manual follow-up
             - [ ] Large star-count drops may indicate repo transfer or star-farming removal
+            - [ ] Read the **Availability** table in the job summary: `gone` / `version-gone`
+                  / `yanked` entries have had their trust downgraded and need re-pinning or
+                  removal; `relocated` means the registry now points somewhere else
             - [ ] Re-run `verify_integrity.cjs` locally — should exit 0
 
             > ⚠️ This PR is the **only** human gate between npm/PyPI publishing

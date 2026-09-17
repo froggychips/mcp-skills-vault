@@ -42,6 +42,9 @@ const { staleDimensions, DEFAULT_MAX_AGE_DAYS } = require('./evidence.cjs');
 // loaded on the artifact: knowing *which bytes* you are running is the claim
 // everything else qualifies.
 const TRUST_WEIGHTS = {
+  // Being published at all is worth nothing on its own — it is the floor, not
+  // an achievement — but its negative states are findings that block.
+  availability:   { present: 0, deprecated: -5, gone: -100, 'version-gone': -100, yanked: -100 },
   artifact:       { verified: 40, unverified: 0, mismatch: -100 },
   signature:      { verified: 20, absent: 0 },
   // 'bound' means the attestation's subject digest is the artifact we verified
@@ -55,7 +58,7 @@ const TRUST_WEIGHTS = {
 };
 
 // A negative weight is a finding, not a deduction: it blocks.
-const BLOCKING = new Set(['mismatch', 'vulnerable']);
+const BLOCKING = new Set(['mismatch', 'vulnerable', 'gone', 'version-gone', 'yanked']);
 
 /**
  * Trust from recorded evidence.
