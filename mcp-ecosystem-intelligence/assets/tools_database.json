@@ -17,7 +17,50 @@
       "version": "0.0.75",
       "pkg_integrity": "sha512-oBjzVXfEGZ9Ev45tKKQULNDVdF83B82lg0uPejEK3xsp/zWmdNdNVnPi032fmd/o20ZZXs+LX7cr77qRNbV4VA==",
       "trust": "verified",
-      "license": "Apache-2.0"
+      "license": "Apache-2.0",
+      "trust_evidence": {
+        "artifact_id": "npm:@playwright/mcp@0.0.75",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/microsoft/playwright-mcp",
+            "identity": "https://github.com/microsoft/playwright-mcp/.github/workflows/publish.yml@refs/tags/v0.0.75",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "mcp-redis",
@@ -37,7 +80,17 @@
       "pkg_integrity": null,
       "trust": "candidate",
       "license": "MIT",
-      "notes": "Installed via uvx --from git+... \u2014 pkg_integrity cannot be verified through PyPI; git commit SHA is not pinned. Downgraded to candidate until a PyPI release or pinned commit is available.\n\n[HOLD 2026-05-22] Still installed via uvx --from git+... (no PyPI release / no pinned commit SHA). pkg_integrity unverifiable \u2014 pre-existing hold continues."
+      "notes": "Installed via uvx --from git+... \u2014 pkg_integrity cannot be verified through PyPI; git commit SHA is not pinned. Downgraded to candidate until a PyPI release or pinned commit is available.\n\n[HOLD 2026-05-22] Still installed via uvx --from git+... (no PyPI release / no pinned commit SHA). pkg_integrity unverifiable \u2014 pre-existing hold continues.",
+      "trust_evidence": {
+        "artifact_id": "git:git+https://github.com/redis/mcp-redis",
+        "dimensions": {
+          "artifact": {
+            "status": "unverified",
+            "checked_at": "2026-09-17",
+            "method": "unroutable"
+          }
+        }
+      }
     },
     {
       "name": "mcp-server-neon",
@@ -57,7 +110,46 @@
       "pkg_integrity": "sha512-sTqHMpAKKWL4IzAM2yjd5Q/VKnrHF0MxqidZpKoDhKBKvnOw6jAnb2nqgadY5wBA3kNv7JybCOu2h33A8eW6dw==",
       "trust": "verified",
       "notes": "npm does not publish a repository.url field \u2014 source_url verified manually.",
-      "license": "MIT"
+      "license": "MIT",
+      "trust_evidence": {
+        "artifact_id": "npm:@neondatabase/mcp-server-neon@0.6.5",
+        "dimensions": {
+          "availability": {
+            "status": "deprecated",
+            "checked_at": "2026-09-17",
+            "detail": "This package is deprecated. Use the remote MCP server at mcp.neon.tech instead. See https://neon.tech/docs/ai/neon-mcp-server for more details."
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "unverified",
+            "checked_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "mongodb-mcp-server",
@@ -76,7 +168,52 @@
       "version": "1.10.0",
       "pkg_integrity": "sha512-ai4605IiaA6BMiVY2danIthgfZaQkyiRW9tNW+866iPcWtZfGHKxhiQoDw1lUDGa28wUoZf616ug8ChlW5e8Tg==",
       "trust": "verified",
-      "license": "Apache-2.0"
+      "license": "Apache-2.0",
+      "trust_evidence": {
+        "artifact_id": "npm:mongodb-mcp-server@1.10.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/mongodb-js/mongodb-mcp-server",
+            "identity": "https://github.com/mongodb-js/mongodb-mcp-server/.github/workflows/publish.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "listed",
+            "checked_at": "2026-09-17",
+            "server_id": "io.github.mongodb-js/mongodb-mcp-server",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "mcp-clickhouse",
@@ -95,7 +232,39 @@
       "version": "0.3.0",
       "pkg_integrity": "sha256-4c38d5f6bed6b99c030b0db386f987b220e5b49be9ab44c95d4a588fd74fad5d",
       "trust": "verified",
-      "license": "Apache-2.0"
+      "license": "Apache-2.0",
+      "trust_evidence": {
+        "artifact_id": "pypi:mcp-clickhouse@0.3.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "listed",
+            "checked_at": "2026-09-17",
+            "server_id": "io.github.ClickHouse/mcp-clickhouse",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "supabase-mcp",
@@ -115,7 +284,37 @@
       "pkg_integrity": "sha256-f374b96e019ace4d793cd6bc22a8e500d7fc0c10659ba893f904497c66283fb2",
       "trust": "verified",
       "notes": "PyPI publishes alexander-zuev/supabase-mcp-server, not supabase-community/supabase-mcp \u2014 community package, not the official Supabase one.",
-      "license": "Apache-2.0"
+      "license": "Apache-2.0",
+      "trust_evidence": {
+        "artifact_id": "pypi:supabase-mcp-server@0.4",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "mcp-server-everything",
@@ -135,7 +334,47 @@
       "version": "2026.1.26",
       "pkg_integrity": "sha512-RIEXAQuKZeXZqFzJMqLDlzmMmG5sjq2uhS/VqzF4HIZ3w1V73YcWf+UXkxJueJuHMBO3Z8ceBrQ5wI6o/plZ+Q==",
       "trust": "verified",
-      "license": "MIT"
+      "license": "MIT",
+      "trust_evidence": {
+        "artifact_id": "npm:@modelcontextprotocol/server-everything@2026.1.26",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "context7",
@@ -154,7 +393,47 @@
       "version": "2.2.4",
       "pkg_integrity": "sha512-6kpjAxif2w+HhxSPmyi+SUsVPgFKBi+xtFgKRc9f0fhLpZGTBX1QKWFmleAIZ4T69Ykynzxc4nHGEDrr219noA==",
       "trust": "verified",
-      "license": "MIT"
+      "license": "MIT",
+      "trust_evidence": {
+        "artifact_id": "npm:@upstash/context7-mcp@2.2.4",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "notion-mcp-server",
@@ -173,7 +452,47 @@
       "version": "2.2.1",
       "pkg_integrity": "sha512-Fw3ErV73sEI+ZrnOycR+5Lk8Ig6hEBy3EuyMlIEpb+DS18i3X1sxTWeyIC4ph1RjPVfoDAPrAREhnmMMzlG/oQ==",
       "trust": "verified",
-      "license": "MIT"
+      "license": "MIT",
+      "trust_evidence": {
+        "artifact_id": "npm:@notionhq/notion-mcp-server@2.2.1",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "mcp-atlassian",
@@ -191,9 +510,37 @@
       "last_checked": "2026-07-31",
       "version": "0.21.1",
       "pkg_integrity": "sha256-dff6c81541506cb0cc80d7ac9900ffdcb246fec7808e41e8df73c09dd4a28074",
-      "trust": "verified",
+      "trust": "unverified",
       "notes": "PyPI declares no project_urls and no license metadata \u2014 both sourced manually from GitHub.",
-      "license": "MIT"
+      "license": "MIT",
+      "trust_evidence": {
+        "artifact_id": "pypi:mcp-atlassian@0.21.1",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "unverified",
+            "checked_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "vulnerable",
+            "checked_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "mcp-server-filesystem",
@@ -213,7 +560,47 @@
       "version": "2026.1.14",
       "pkg_integrity": "sha512-bGAfu3fWRVeF10NxvPhFBDlRen6ExSx6YkKJzoVgQMNrbdVVV4okfGGQ3KBRu9ygXYfw5/N9ermHAJXA0uys+g==",
       "trust": "verified",
-      "license": "MIT"
+      "license": "MIT",
+      "trust_evidence": {
+        "artifact_id": "npm:@modelcontextprotocol/server-filesystem@2026.1.14",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "mcp-server-fetch",
@@ -233,7 +620,36 @@
       "version": "2025.4.7",
       "pkg_integrity": "sha256-56279e3c55cb1e506b958ca9bb23ed4413944a6f230bca21e044aee51734fe47",
       "trust": "verified",
-      "license": "MIT"
+      "license": "MIT",
+      "trust_evidence": {
+        "artifact_id": "pypi:mcp-server-fetch@2025.4.7",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "unverified",
+            "checked_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "mcp-server-aws",
@@ -251,9 +667,56 @@
       "last_checked": "2026-07-31",
       "version": "1.0.27",
       "pkg_integrity": "sha256-a75febfe46bf80b63c7e2530ace1bd915e283ce5eae9316c74a1e52f61047381",
-      "trust": "verified",
+      "trust": "unverified",
       "notes": "Original entry referenced awslabs.aws-mcp-server which does not exist on PyPI. Replaced with awslabs.core-mcp-server (the entry-point package for the awslabs MCP suite).",
-      "license": "Apache-2.0"
+      "license": "Apache-2.0",
+      "trust_evidence": {
+        "artifact_id": "pypi:awslabs.core-mcp-server@1.0.27",
+        "dimensions": {
+          "availability": {
+            "status": "yanked",
+            "checked_at": "2026-09-17",
+            "detail": "awslabs.core-mcp-server==1.0.27 is yanked: load individual MCPs"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "repository_posture": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "checks": {
+              "maintained": "found",
+              "code_review": "found",
+              "dangerous_workflows": "absent",
+              "token_permissions": "found",
+              "actions_pinned": "found",
+              "release_signing": "unknown",
+              "branch_protection": "found",
+              "security_policy": "found",
+              "sast": "found"
+            },
+            "report_date": "2026-08-24",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "mcp-server-cloudflare",
@@ -273,7 +736,46 @@
       "pkg_integrity": "sha512-506bCOY2ZI7AINJLULbqyDRLymLag2pRuKFGBPP1yFr9+wAfqHS9fk8UkDdUYCeU5MYdv8FUWHVhdg62cMXdXg==",
       "trust": "verified",
       "notes": "npm does not publish a repository.url field \u2014 source_url verified manually.",
-      "license": "Apache-2.0"
+      "license": "Apache-2.0",
+      "trust_evidence": {
+        "artifact_id": "npm:@cloudflare/mcp-server-cloudflare@0.2.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "unverified",
+            "checked_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "mcp-server-kubernetes",
@@ -291,8 +793,50 @@
       "last_checked": "2026-07-31",
       "version": "3.5.1",
       "pkg_integrity": "sha512-4+KxkNRJ8RGjK9083Zy/FtmG6Oy0j9nDmVgePG41rLw5Fa6aB+elzJUxjcb7ctCvGo9gDPEFCEVTJztJDyU1sw==",
-      "trust": "verified",
-      "license": "MIT"
+      "trust": "unverified",
+      "license": "MIT",
+      "trust_evidence": {
+        "artifact_id": "npm:mcp-server-kubernetes@3.5.1",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/Flux159/mcp-server-kubernetes",
+            "identity": "https://github.com/Flux159/mcp-server-kubernetes/.github/workflows/cd.yml@refs/tags/v3.5.1",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "vulnerable",
+            "checked_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "mcp-server-memory",
@@ -312,7 +856,47 @@
       "version": "2026.1.26",
       "pkg_integrity": "sha512-7F0hbaEB4lVqkYhNWmrC5jJjEWPCofgXd7OIk3h97HyvJL6aTAhlUNYaH8lCDxAzlK9sr2pLCkZEYI+m4HSOiA==",
       "trust": "verified",
-      "license": "MIT"
+      "license": "MIT",
+      "trust_evidence": {
+        "artifact_id": "npm:@modelcontextprotocol/server-memory@2026.1.26",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "mcp-installer",
@@ -332,7 +916,44 @@
       "pkg_integrity": "sha512-dSjBO7wmurLM58Dme/+SBJJxVTvh8zTkvGWgRVpWjn8QSeuUM89Ob4B5Ij5ZB8oHjyBdypvtkMw492ZTmAIXVw==",
       "trust": "verified",
       "notes": "npm does not publish a repository.url field \u2014 source_url verified manually. Last commit 527 days ago; effectively unmaintained. Score 40 = Experimental floor (popular but stale).",
-      "license": "MIT"
+      "license": "MIT",
+      "trust_evidence": {
+        "artifact_id": "npm:@anaisbetts/mcp-installer@0.5.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "unverified",
+            "checked_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "sentry-mcp",
@@ -351,7 +972,47 @@
       "version": "0.33.0",
       "pkg_integrity": "sha512-vVxmGXjVoMT/VebmRf7lHlx9UexGrrVW8a7GbeoFTh1tHbNI25FmrcsB1qMLI7BCaXEriKmbVQRN5ZAeE2DviA==",
       "trust": "verified",
-      "license": "FSL-1.1-ALv2"
+      "license": "FSL-1.1-ALv2",
+      "trust_evidence": {
+        "artifact_id": "npm:@sentry/mcp-server@0.33.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "stripe-agent-toolkit",
@@ -371,7 +1032,50 @@
       "pkg_integrity": "sha512-Ra7keWg5GKDQ7RUIDa8L3ClKMsmhsJVAXG2/rYeaICEHjyMHYhD9KL2BWVqOqr1IjQwhnA8qbf+Tnb4x09DLyQ==",
       "trust": "verified",
       "notes": "Project moved from stripe/agent-toolkit to stripe/ai.",
-      "license": "MIT"
+      "license": "MIT",
+      "trust_evidence": {
+        "artifact_id": "npm:@stripe/mcp@0.3.3",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/stripe/ai",
+            "identity": "https://github.com/stripe/ai/.github/workflows/npm_release_shared.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "linear-mcp-server",
@@ -389,9 +1093,48 @@
       "last_checked": "2026-07-31",
       "version": "0.1.0",
       "pkg_integrity": "sha512-HNk4aB9VZzT/BYBYSe0NlbwTukJAp0PyreoQCqff+avNkaHllJq0hGuBO5W2Sk8zbBwwtj5E93b35/6gcvbp4A==",
-      "trust": "verified",
+      "trust": "unverified",
       "notes": "npm repository.url points to modelcontextprotocol/linear-server (404 \u2014 repo deleted). Real source is jerhadf/linear-mcp-server (original author, 374 days stale). Verifier will WARN on repo mismatch \u2014 this is expected. Best available Linear MCP option but effectively unmaintained.",
-      "license": "MIT"
+      "license": "MIT",
+      "trust_evidence": {
+        "artifact_id": "npm:linear-mcp-server@0.1.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "mismatch",
+            "checked_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "mcp-server-sequentialthinking",
@@ -411,7 +1154,47 @@
       "version": "2025.12.18",
       "pkg_integrity": "sha512-eFR5I9Z9czXQhDn05wahetZU83YNPO+p1HLSEZZEM5q9U1CLF7zv9+TrmSBfRoPaksEAoM8pTWQ33lRCScSFeQ==",
       "trust": "verified",
-      "license": "MIT"
+      "license": "MIT",
+      "trust_evidence": {
+        "artifact_id": "npm:@modelcontextprotocol/server-sequential-thinking@2025.12.18",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "brave-search-mcp",
@@ -431,7 +1214,50 @@
       "pkg_integrity": "sha512-GoEfIa+jOIYQNvctyA67qRx4mX2ocdty0OYRsAoBvDpnX3wEqnscRumCkhOfdSOfwSjrw+Exo1BRCwZrVSLjNA==",
       "trust": "verified",
       "notes": "Community package by mikechao \u2014 not the official Brave SDK. Star count dropped from ~994 to 116 (likely star-farming cleanup by GitHub). Functional but low-signal popularity; 40-day cadence.",
-      "license": "GPL-3.0-or-later"
+      "license": "GPL-3.0-or-later",
+      "trust_evidence": {
+        "artifact_id": "npm:brave-search-mcp@2.1.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/mikechao/brave-search-mcp",
+            "identity": "https://github.com/mikechao/brave-search-mcp/.github/workflows/publish.yml@refs/tags/v2.1.0",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "duckduckgo-mcp-server",
@@ -451,7 +1277,37 @@
       "pkg_integrity": "sha256-4338b05321bcc8809aadd3b1db808e42ebe7736c5dfa74981770e7d8acf07455",
       "trust": "verified",
       "notes": "PyPI declares no license metadata; MIT sourced from GitHub repo.",
-      "license": "MIT"
+      "license": "MIT",
+      "trust_evidence": {
+        "artifact_id": "pypi:duckduckgo-mcp-server@0.4.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "exa-mcp-server",
@@ -471,7 +1327,47 @@
       "pkg_integrity": "sha512-JUcqdfvOh/szKM8iZk//Bm2De4eDiNOud3tZqHSOBK8EgMKJQoXRcLKzWzHLroTwVEfxGL1aB9UdFUiXibV/5A==",
       "trust": "verified",
       "notes": "npm declares no license metadata; MIT sourced from GitHub repo.",
-      "license": "MIT"
+      "license": "MIT",
+      "trust_evidence": {
+        "artifact_id": "npm:exa-mcp-server@3.2.1",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "tavily-mcp",
@@ -490,7 +1386,49 @@
       "version": "0.2.19",
       "pkg_integrity": "sha512-mn6koWMQJRhtDFZ6kjW/knD23gBjPufNKNxbPMqe/bbSOkvnlVQgJjg54fkqt7WA9UtVPcmSx/XbcgS7/diDDQ==",
       "trust": "verified",
-      "license": "MIT"
+      "license": "MIT",
+      "trust_evidence": {
+        "artifact_id": "npm:tavily-mcp@0.2.19",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "listed",
+            "checked_at": "2026-09-17",
+            "server_id": "io.github.tavily-ai/tavily-mcp",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "mcp-server-time",
@@ -510,7 +1448,36 @@
       "version": "2026.1.26",
       "pkg_integrity": "sha256-fcef6991e8d8480ed7d9be8016cb853f8c697d146322d3e698f45b586d86f1c1",
       "trust": "verified",
-      "license": "MIT"
+      "license": "MIT",
+      "trust_evidence": {
+        "artifact_id": "pypi:mcp-server-time@2026.1.26",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "unverified",
+            "checked_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "github-mcp-server",
@@ -530,7 +1497,22 @@
       "pkg_integrity": "sha256-2ac27ef03461ef2b877031b838a7d1fd7f12b12d4ace7796d8cad91446d55959",
       "trust": "verified",
       "notes": "Docker image pinned by digest. Refresh with: docker manifest inspect ghcr.io/github/github-mcp-server.",
-      "license": "MIT"
+      "license": "MIT",
+      "trust_evidence": {
+        "artifact_id": "oci:ghcr.io/github/github-mcp-server@sha256:2ac27ef03461ef2b877031b838a7d1fd7f12b12d4ace7796d8cad91446d55959",
+        "dimensions": {
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "mcp-server-git",
@@ -550,7 +1532,36 @@
       "version": "2026.1.14",
       "pkg_integrity": "sha256-2cd74704c7b271ab1ed7be266120c20ae8ae7cc01e52dc6c549790402bad2b44",
       "trust": "verified",
-      "license": "MIT"
+      "license": "MIT",
+      "trust_evidence": {
+        "artifact_id": "pypi:mcp-server-git@2026.1.14",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "unverified",
+            "checked_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "gitlab-mcp",
@@ -568,9 +1579,51 @@
       "last_checked": "2026-07-31",
       "version": "2.1.10",
       "pkg_integrity": "sha512-HHDxwge67zbyMREYOPTg821qBBe6ITlo1bs2sZg3UrBzmKORJSpS2yEgcdHDJc6tmjpDHLrz/p+EeeGUXkoxMg==",
-      "trust": "verified",
+      "trust": "unverified",
       "notes": "Comprehensive GitLab platform API (MRs, issues, pipelines, wiki, releases, tags, milestones); supports self-hosted instances and PAT/OAuth. Top community choice; gitlab-org/* has no equivalent open-source MCP.",
-      "license": "MIT"
+      "license": "MIT",
+      "trust_evidence": {
+        "artifact_id": "npm:@zereight/mcp-gitlab@2.1.10",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/zereight/gitlab-mcp",
+            "identity": "https://github.com/zereight/gitlab-mcp/.github/workflows/npm-publish.yml@refs/tags/v2.1.10",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "vulnerable",
+            "checked_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "actors-mcp-server",
@@ -588,9 +1641,51 @@
       "last_checked": "2026-07-31",
       "version": "0.10.1",
       "pkg_integrity": "sha512-pj5bN9KV5A+QN+K9eAOcP5t/z7WwTtw1qhtMgi4D7Rp98eeOFGBV8XWzE9NmjP9Myhbyj/O98fyp6g2fO898Ww==",
-      "trust": "verified",
+      "trust": "unverified",
       "notes": "GitHub repo is apify/apify-mcp-server (npm field); actors-mcp-server is the npm package name.",
-      "license": "MIT"
+      "license": "MIT",
+      "trust_evidence": {
+        "artifact_id": "npm:@apify/actors-mcp-server@0.10.1",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/apify/apify-mcp-server",
+            "identity": "https://github.com/apify/apify-mcp-server/.github/workflows/manual_publish_to_npm.yaml@refs/heads/master",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "vulnerable",
+            "checked_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "firecrawl-mcp-server",
@@ -610,7 +1705,49 @@
       "pkg_integrity": "sha512-JdPOrbywZrSFX2X84fCqOcx+cTUg5gqqEqbiRvD320UFVeulKeionr6C8P8bPNdCa7FmnISIiCMB0c85riU0oQ==",
       "trust": "verified",
       "notes": "GitHub org renamed from mendableai to firecrawl.",
-      "license": "MIT"
+      "license": "MIT",
+      "trust_evidence": {
+        "artifact_id": "npm:firecrawl-mcp@3.15.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "listed",
+            "checked_at": "2026-09-17",
+            "server_id": "io.github.firecrawl/firecrawl-mcp-server",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@mapbox/mcp-server",
@@ -619,7 +1756,7 @@
       "source_url": "https://github.com/mapbox/mcp-server",
       "version": "0.11.0",
       "pkg_integrity": "sha512-5ZFOfordbtKrV2GERYm2lPrmWXIeHyG+Qdmg9meOAFX70vRrgnPaewypelUJnLWwFJeomyXOZGAZsUZm46PZ4Q==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 80,
       "classification": "Recommended",
@@ -629,7 +1766,47 @@
       "stars": 351,
       "last_commit_days": 0,
       "open_issues": 3,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@mapbox/mcp-server@0.11.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@dynatrace-oss/dynatrace-mcp-server",
@@ -638,7 +1815,7 @@
       "source_url": "https://github.com/dynatrace-oss/dynatrace-mcp",
       "version": "1.8.5",
       "pkg_integrity": "sha512-HXaNyjyf7MY5PYE+KkK0SH0dpeiDgQNXM8IEIBiKJNeXwMfkZQCzfd81smmeZs872PmW/IgGn7QWVyarHltn0g==",
-      "trust": "verified",
+      "trust": "unverified",
       "license": "MIT",
       "health_score": 80,
       "classification": "Recommended",
@@ -648,7 +1825,49 @@
       "stars": 133,
       "last_commit_days": 7,
       "open_issues": 1,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@dynatrace-oss/dynatrace-mcp-server@1.8.5",
+        "dimensions": {
+          "availability": {
+            "status": "deprecated",
+            "checked_at": "2026-09-17",
+            "detail": "Package no longer supported. Contact Support at https://www.npmjs.com/support for more info."
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/dynatrace-oss/dynatrace-mcp",
+            "identity": "https://github.com/dynatrace-oss/dynatrace-mcp/.github/workflows/release.yml@refs/tags/v1.8.5",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "vulnerable",
+            "checked_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@browserstack/mcp-server",
@@ -667,7 +1886,47 @@
       "stars": 146,
       "last_commit_days": 1,
       "open_issues": 40,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@browserstack/mcp-server@1.2.16",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@phantom/mcp-server",
@@ -686,7 +1945,50 @@
       "stars": 151,
       "last_commit_days": 94,
       "open_issues": 14,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@phantom/mcp-server@1.2.7",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/phantom/phantom-connect-sdk",
+            "identity": "https://github.com/phantom/phantom-connect-sdk/.github/workflows/release.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@azure-devops/mcp",
@@ -695,7 +1997,7 @@
       "source_url": "https://github.com/microsoft/azure-devops-mcp",
       "version": "2.7.0",
       "pkg_integrity": "sha512-nQG/D4EM9faYOecvdLuGVG84Au0t9rAxzLCwOlMUqWJpTk8ywKBDZ23mgpUFgjyaiMUI+vEoU8opB2yHhSpJYw==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 80,
       "classification": "Recommended",
@@ -705,7 +2007,47 @@
       "stars": 1932,
       "last_commit_days": 0,
       "open_issues": 8,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@azure-devops/mcp@2.7.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@roychri/mcp-server-asana",
@@ -724,7 +2066,47 @@
       "stars": 145,
       "last_commit_days": 81,
       "open_issues": 10,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@roychri/mcp-server-asana@1.8.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@eslint/mcp",
@@ -743,7 +2125,50 @@
       "stars": 343,
       "last_commit_days": 0,
       "open_issues": 7,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@eslint/mcp@0.3.5",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/eslint/rewrite",
+            "identity": "https://github.com/eslint/rewrite/.github/workflows/release-please.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "argocd-mcp",
@@ -762,7 +2187,50 @@
       "stars": 549,
       "last_commit_days": 21,
       "open_issues": 62,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:argocd-mcp@0.7.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/argoproj-labs/mcp-for-argocd",
+            "identity": "https://github.com/argoproj-labs/mcp-for-argocd/.github/workflows/release.yml@refs/tags/v0.7.0",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@salesforce/mcp",
@@ -781,7 +2249,47 @@
       "stars": 449,
       "last_commit_days": 3,
       "open_issues": 32,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@salesforce/mcp@0.30.9",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@postman/postman-mcp-server",
@@ -790,7 +2298,7 @@
       "source_url": "https://github.com/postmanlabs/postman-mcp-server",
       "version": "2.8.9",
       "pkg_integrity": "sha512-B75NPyCgyQkI/P/xwJHniurVyOnpGQhLrKkzkLdurlcAmFecJc6I7bk8JzYjsdCCA8wvl8DxtJ3b86yAtwuhug==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 80,
       "classification": "Recommended",
@@ -800,7 +2308,50 @@
       "stars": 291,
       "last_commit_days": 6,
       "open_issues": 13,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@postman/postman-mcp-server@2.8.9",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/postmanlabs/postman-mcp-server",
+            "identity": "https://github.com/postmanlabs/postman-mcp-server/.github/workflows/pkg-release.yml@refs/tags/v2.8.9",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@brave/brave-search-mcp-server",
@@ -819,7 +2370,47 @@
       "stars": 1337,
       "last_commit_days": 0,
       "open_issues": 30,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@brave/brave-search-mcp-server@2.0.80",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "openapi-mcp-generator",
@@ -838,7 +2429,47 @@
       "stars": 629,
       "last_commit_days": 46,
       "open_issues": 7,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:openapi-mcp-generator@3.3.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@softeria/ms-365-mcp-server",
@@ -857,7 +2488,47 @@
       "stars": 888,
       "last_commit_days": 1,
       "open_issues": 5,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@softeria/ms-365-mcp-server@0.107.2",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@regle/mcp-server",
@@ -876,7 +2547,50 @@
       "stars": 487,
       "last_commit_days": 0,
       "open_issues": 14,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@regle/mcp-server@1.25.2",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/victorgarciaesgi/regle",
+            "identity": "https://github.com/victorgarciaesgi/regle/.github/workflows/publish.yml@refs/tags/v1.25.2",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@vibeframe/mcp-server",
@@ -895,7 +2609,47 @@
       "stars": 163,
       "last_commit_days": 4,
       "open_issues": 0,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@vibeframe/mcp-server@0.104.3",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@bitwarden/mcp-server",
@@ -904,7 +2658,7 @@
       "source_url": "https://github.com/bitwarden/mcp-server",
       "version": "2026.2.0",
       "pkg_integrity": "sha512-6FjjVQIOMbyLwrSL1LdXDEjnJev6f2ubhWB5Asn2VOMDBGy+FlJAKTHqbfFygI1a+5HSqH2vb14EEiWbWx1gdQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "GPL-3.0",
       "health_score": 80,
       "classification": "Recommended",
@@ -914,7 +2668,50 @@
       "stars": 215,
       "last_commit_days": 1,
       "open_issues": 4,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@bitwarden/mcp-server@2026.2.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/bitwarden/mcp-server",
+            "identity": "https://github.com/bitwarden/mcp-server/.github/workflows/publish.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@voltagent/mcp-server",
@@ -933,7 +2730,47 @@
       "stars": 10237,
       "last_commit_days": 17,
       "open_issues": 76,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@voltagent/mcp-server@2.0.2",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@delorenj/mcp-server-trello",
@@ -952,7 +2789,46 @@
       "stars": 427,
       "last_commit_days": 5,
       "open_issues": 21,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@delorenj/mcp-server-trello@1.7.1",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "unverified",
+            "checked_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "godot-mcp-server",
@@ -971,7 +2847,47 @@
       "stars": 399,
       "last_commit_days": 101,
       "open_issues": 15,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:godot-mcp-server@0.5.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "mcp-searxng",
@@ -980,7 +2896,7 @@
       "source_url": "https://github.com/ihor-sokoliuk/mcp-searxng",
       "version": "1.0.3",
       "pkg_integrity": "sha512-lX7YeZyuzax28s5IR0AgEWqDhm+O6ah9+CKFlQzSs/WeDQ+yTWiQGvy4C4Jia6VEpm7n0Vllo7tnrhu0LBpUmg==",
-      "trust": "verified",
+      "trust": "unverified",
       "license": "MIT",
       "health_score": 80,
       "classification": "Recommended",
@@ -990,7 +2906,51 @@
       "stars": 1089,
       "last_commit_days": 0,
       "open_issues": 6,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:mcp-searxng@1.0.3",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/ihor-sokoliuk/mcp-searxng",
+            "identity": "https://github.com/ihor-sokoliuk/mcp-searxng/.github/workflows/npm-publish.yml@refs/tags/v1.0.3",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "listed",
+            "checked_at": "2026-09-17",
+            "server_id": "io.github.ihor-sokoliuk/mcp-searxng",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "vulnerable",
+            "checked_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "deepl-mcp-server",
@@ -1009,7 +2969,47 @@
       "stars": 109,
       "last_commit_days": 0,
       "open_issues": 3,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:deepl-mcp-server@1.1.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@knip/mcp",
@@ -1028,7 +3028,47 @@
       "stars": 11862,
       "last_commit_days": 0,
       "open_issues": 11,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@knip/mcp@0.0.28",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@pandacss/mcp",
@@ -1047,7 +3087,47 @@
       "stars": 6143,
       "last_commit_days": 1,
       "open_issues": 10,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@pandacss/mcp@1.11.1",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@cyanheads/git-mcp-server",
@@ -1056,7 +3136,7 @@
       "source_url": "https://github.com/cyanheads/git-mcp-server",
       "version": "2.15.1",
       "pkg_integrity": "sha512-IuBjTfFhyNCceNwfTWcda2SPiQaGqyo3fw2OVwXzRzPT+vKAybFH4ntZTbZt5VRlpdTIpVevUkmGC0ZY09roLQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 80,
       "classification": "Recommended",
@@ -1066,7 +3146,47 @@
       "stars": 229,
       "last_commit_days": 0,
       "open_issues": 9,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@cyanheads/git-mcp-server@2.15.1",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@socketsecurity/mcp",
@@ -1085,7 +3205,50 @@
       "stars": 121,
       "last_commit_days": 0,
       "open_issues": 6,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@socketsecurity/mcp@0.0.17",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/SocketDev/socket-mcp",
+            "identity": "https://github.com/SocketDev/socket-mcp/.github/workflows/provenance.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "obsidian-mcp-server",
@@ -1104,7 +3267,49 @@
       "stars": 645,
       "last_commit_days": 31,
       "open_issues": 25,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:obsidian-mcp-server@3.1.9",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "listed",
+            "checked_at": "2026-09-17",
+            "server_id": "io.github.cyanheads/obsidian-mcp-server",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@mondaydotcomorg/monday-api-mcp",
@@ -1113,7 +3318,7 @@
       "source_url": "https://github.com/mondaycom/monday-ai",
       "version": "3.1.2",
       "pkg_integrity": "sha512-wIV7MAjswiuOU54L08dOflmah+InETFS2/zf6QEfn8Vf4zsMyfZTNfT1QtKXBBRiWg5j4WWEfw6XKQ2/u554jw==",
-      "trust": "verified",
+      "trust": "unverified",
       "license": "MIT",
       "health_score": 80,
       "classification": "Recommended",
@@ -1123,7 +3328,46 @@
       "stars": 418,
       "last_commit_days": 3,
       "open_issues": 43,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@mondaydotcomorg/monday-api-mcp@3.1.2",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "mismatch",
+            "checked_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@drawio/mcp",
@@ -1132,7 +3376,7 @@
       "source_url": "https://github.com/jgraph/drawio-mcp",
       "version": "1.2.7",
       "pkg_integrity": "sha512-S2VWhXqJdgvuLzTdRJAg6RtZmnmf4nsVAuiQJmer0hbkEtBzurixbdgblV/483MWaVarzT6sk5oTlc/FVD+/Fw==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 80,
       "classification": "Recommended",
@@ -1142,7 +3386,47 @@
       "stars": 5043,
       "last_commit_days": 6,
       "open_issues": 1,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@drawio/mcp@1.2.7",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@google-cloud/observability-mcp",
@@ -1161,7 +3445,47 @@
       "stars": 875,
       "last_commit_days": 5,
       "open_issues": 52,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@google-cloud/observability-mcp@0.2.3",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "dataforseo-mcp-server",
@@ -1180,7 +3504,50 @@
       "stars": 233,
       "last_commit_days": 0,
       "open_issues": 3,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:dataforseo-mcp-server@2.9.2",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/dataforseo/mcp-server-typescript",
+            "identity": "https://github.com/dataforseo/mcp-server-typescript/.github/workflows/npm.yaml@refs/tags/v2.9.2",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "ios-simulator-mcp",
@@ -1199,7 +3566,50 @@
       "stars": 2114,
       "last_commit_days": 100,
       "open_issues": 31,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:ios-simulator-mcp@1.6.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/joshuayoes/ios-simulator-mcp",
+            "identity": "https://github.com/joshuayoes/ios-simulator-mcp/.github/workflows/publish.yml@refs/tags/1.6.0",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@instantdb/mcp",
@@ -1218,7 +3628,50 @@
       "stars": 10368,
       "last_commit_days": 0,
       "open_issues": 18,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@instantdb/mcp@1.0.32",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/instantdb/instant",
+            "identity": "https://github.com/instantdb/instant/.github/workflows/js.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@cap-js/mcp-server",
@@ -1237,7 +3690,50 @@
       "stars": 106,
       "last_commit_days": 0,
       "open_issues": 16,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@cap-js/mcp-server@0.0.5",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/cap-js/mcp-server",
+            "identity": "https://github.com/cap-js/mcp-server/.github/workflows/release.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "hostinger-api-mcp",
@@ -1256,7 +3752,52 @@
       "stars": 135,
       "last_commit_days": 0,
       "open_issues": 3,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:hostinger-api-mcp@0.1.43",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/hostinger/api-mcp-server",
+            "identity": "https://github.com/hostinger/api-mcp-server/.github/workflows/build-release.yaml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "listed",
+            "checked_at": "2026-09-17",
+            "server_id": "io.github.hostinger/hostinger-api-mcp",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@professional-wiki/mediawiki-mcp-server",
@@ -1265,7 +3806,7 @@
       "source_url": "https://github.com/ProfessionalWiki/MediaWiki-MCP-Server",
       "version": "0.9.1",
       "pkg_integrity": "sha512-bmnSuASaLxcHAiInNXo2Uy/b54gpnMYQ64vJX49sZ2wldgPKSyoWDsOqRnWco+i57GJUg7pG3iU/N+Nz6OeS7g==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 80,
       "classification": "Recommended",
@@ -1275,7 +3816,50 @@
       "stars": 115,
       "last_commit_days": 0,
       "open_issues": 5,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@professional-wiki/mediawiki-mcp-server@0.9.1",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/ProfessionalWiki/MediaWiki-MCP-Server",
+            "identity": "https://github.com/ProfessionalWiki/MediaWiki-MCP-Server/.github/workflows/release.yml@refs/tags/v0.9.1",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@ui5/mcp-server",
@@ -1284,7 +3868,7 @@
       "source_url": "https://github.com/UI5/mcp-server",
       "version": "0.2.11",
       "pkg_integrity": "sha512-wT353pXcJkePmXJkc6nOslfd9z5HgVYuStX0rXUcCCULKnfshSnhL1LwQyYrSkpuRvpRag6AvtxbRe0N8YPvTQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 79.82,
       "classification": "Recommended",
@@ -1294,7 +3878,50 @@
       "stars": 95,
       "last_commit_days": 2,
       "open_issues": 8,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@ui5/mcp-server@0.2.11",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/UI5/mcp-server",
+            "identity": "https://github.com/UI5/mcp-server/.github/workflows/release-please.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@alchemy/mcp-server",
@@ -1313,7 +3940,50 @@
       "stars": 88,
       "last_commit_days": 31,
       "open_issues": 10,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@alchemy/mcp-server@0.3.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/alchemyplatform/alchemy-mcp-server",
+            "identity": "https://github.com/alchemyplatform/alchemy-mcp-server/.github/workflows/publish.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@translated/lara-mcp",
@@ -1332,7 +4002,47 @@
       "stars": 94,
       "last_commit_days": 50,
       "open_issues": 1,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@translated/lara-mcp@1.0.2",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@heroku/mcp-server",
@@ -1341,7 +4051,7 @@
       "source_url": "https://github.com/heroku/heroku-mcp-server",
       "version": "1.2.2",
       "pkg_integrity": "sha512-LJ2f/5RHXrFiVl9eBh0sbuSf15/EL0TGQm8l2pgsMCsuPoYWifGTuMvPSIYyWh5puDu42Ff0khEK21/pr84RlA==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 79.08,
       "classification": "Recommended",
@@ -1351,7 +4061,50 @@
       "stars": 80,
       "last_commit_days": 4,
       "open_issues": 24,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@heroku/mcp-server@1.2.2",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/heroku/heroku-mcp-server",
+            "identity": "https://github.com/heroku/heroku-mcp-server/.github/workflows/release.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@transloadit/mcp-server",
@@ -1360,7 +4113,7 @@
       "source_url": "https://github.com/transloadit/node-sdk",
       "version": "0.3.21",
       "pkg_integrity": "sha512-GovQJSUyTdrQOGCk5ywW1fv6jdS4uDIDoHtQsdpUwqWQ8rdzRlW2RXg99E4B7XuNPzOWwKz2vkK/lCZVlg98TA==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 78.69,
       "classification": "Recommended",
@@ -1370,7 +4123,66 @@
       "stars": 73,
       "last_commit_days": 4,
       "open_issues": 18,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@transloadit/mcp-server@0.3.21",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/transloadit/node-sdk",
+            "identity": "https://github.com/transloadit/node-sdk/.github/workflows/release.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "repository_posture": {
+            "status": "weak",
+            "checked_at": "2026-09-17",
+            "checks": {
+              "code_review": "absent",
+              "maintained": "found",
+              "dangerous_workflows": "absent",
+              "token_permissions": "absent",
+              "security_policy": "absent",
+              "actions_pinned": "absent",
+              "release_signing": "unknown",
+              "branch_protection": "absent",
+              "sast": "absent"
+            },
+            "report_date": "2026-08-24"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "clinicaltrialsgov-mcp-server",
@@ -1379,7 +4191,7 @@
       "source_url": "https://github.com/cyanheads/clinicaltrialsgov-mcp-server",
       "version": "2.4.7",
       "pkg_integrity": "sha512-p3/McGAF3CDCpKqT1L4LwSML5mrFIaY8tipOoMrYtf/XzIoWTnjtcbArTm7V5M++edhH1vBwQjEhAuwX7EGE5w==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 79.24,
       "classification": "Recommended",
@@ -1389,7 +4201,49 @@
       "stars": 83,
       "last_commit_days": 4,
       "open_issues": 2,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:clinicaltrialsgov-mcp-server@2.4.7",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "listed",
+            "checked_at": "2026-09-17",
+            "server_id": "io.github.cyanheads/clinicaltrialsgov-mcp-server",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@tocharianou/mcp-server-kibana",
@@ -1408,7 +4262,47 @@
       "stars": 76,
       "last_commit_days": 11,
       "open_issues": 1,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@tocharianou/mcp-server-kibana@0.8.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "todoist-mcp",
@@ -1427,7 +4321,47 @@
       "stars": 64,
       "last_commit_days": 31,
       "open_issues": 10,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:todoist-mcp@1.3.4",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@last9/mcp-server",
@@ -1436,7 +4370,7 @@
       "source_url": "https://github.com/last9/last9-mcp-server",
       "version": "0.7.1",
       "pkg_integrity": "sha512-DprwVOZ+20X8inIImU0puZHTvJk51I8/gLt7WpsIczdqLgcrZvr7cQa7mZB4Azm/cHuBOIiiWZR1Z3LNAkNRiQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 77.78,
       "classification": "Recommended",
@@ -1446,7 +4380,47 @@
       "stars": 59,
       "last_commit_days": 0,
       "open_issues": 5,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@last9/mcp-server@0.7.1",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@contentful/mcp-server",
@@ -1455,7 +4429,7 @@
       "source_url": "https://github.com/contentful/contentful-mcp-server",
       "version": "1.7.15",
       "pkg_integrity": "sha512-lNC8ybethkCVKoIS1nQZ52uFV1X7phkWf5Air7mOagDZTqoyXyFSHm5VUPqUaM6M0tLdfqHmW5EAYQZoAsyIBQ==",
-      "trust": "verified",
+      "trust": "unverified",
       "license": "MIT",
       "health_score": 77.71,
       "classification": "Recommended",
@@ -1465,7 +4439,46 @@
       "stars": 58,
       "last_commit_days": 0,
       "open_issues": 20,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@contentful/mcp-server@1.7.15",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "vulnerable",
+            "checked_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@esaio/esa-mcp-server",
@@ -1484,7 +4497,50 @@
       "stars": 61,
       "last_commit_days": 1,
       "open_issues": 7,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@esaio/esa-mcp-server@0.7.5",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/esaio/esa-mcp-server",
+            "identity": "https://github.com/esaio/esa-mcp-server/.github/workflows/publish.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@upstash/mcp-server",
@@ -1503,7 +4559,50 @@
       "stars": 56,
       "last_commit_days": 3,
       "open_issues": 3,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@upstash/mcp-server@0.2.3",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/upstash/mcp-server",
+            "identity": "https://github.com/upstash/mcp-server/.github/workflows/release.yaml@refs/tags/v0.2.3",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@renseiai/agentfactory-mcp-server",
@@ -1522,7 +4621,51 @@
       "stars": 60,
       "last_commit_days": 10,
       "open_issues": 7,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@renseiai/agentfactory-mcp-server@0.9.0",
+        "dimensions": {
+          "availability": {
+            "status": "deprecated",
+            "checked_at": "2026-09-17",
+            "detail": "Renamed to @donmai/mcp-server. See https://donmai.dev/docs/migration.",
+            "replacement": "@donmai/mcp-server"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/RenseiAI/agentfactory",
+            "identity": "https://github.com/RenseiAI/agentfactory/.github/workflows/release.yml@refs/tags/v0.9.0",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@yoda.digital/gitlab-mcp-server",
@@ -1531,7 +4674,7 @@
       "source_url": "https://github.com/yoda-digital/mcp-gitlab-server",
       "version": null,
       "pkg_integrity": null,
-      "trust": "verified",
+      "trust": "unverified",
       "license": "MIT",
       "health_score": 77.92,
       "classification": "Recommended",
@@ -1541,7 +4684,49 @@
       "stars": 61,
       "last_commit_days": 5,
       "open_issues": 22,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@yoda.digital/gitlab-mcp-server",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/yoda-digital/mcp-gitlab-server",
+            "identity": "https://github.com/yoda-digital/mcp-gitlab-server/.github/workflows/publish.yml@refs/tags/v0.9.1",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "vulnerable",
+            "checked_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@vapi-ai/mcp-server",
@@ -1560,7 +4745,47 @@
       "stars": 56,
       "last_commit_days": 57,
       "open_issues": 12,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@vapi-ai/mcp-server@0.0.9",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@kintone/mcp-server",
@@ -1579,7 +4804,50 @@
       "stars": 52,
       "last_commit_days": 0,
       "open_issues": 36,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@kintone/mcp-server@1.3.12",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/kintone/mcp-server",
+            "identity": "https://github.com/kintone/mcp-server/.github/workflows/release.yaml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@diskd-ai/email-mcp",
@@ -1588,7 +4856,7 @@
       "source_url": "https://github.com/codefuturist/email-mcp",
       "version": "0.3.8",
       "pkg_integrity": "sha512-LLGiI9Silqacj4uvhjxp6pXqg7woouzNvH9Kkh+SpB4xIFRyBZ1lFemFd5+jc51eGqZjyx/fbOtN8adqi01y+Q==",
-      "trust": "candidate",
+      "trust": "unverified",
       "license": "LGPL-3.0",
       "health_score": 59.4,
       "classification": "Experimental",
@@ -1598,7 +4866,26 @@
       "stars": 86,
       "last_commit_days": 71,
       "open_issues": 29,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@diskd-ai/email-mcp@0.3.8",
+        "dimensions": {
+          "availability": {
+            "status": "gone",
+            "checked_at": "2026-09-17",
+            "detail": "@diskd-ai/email-mcp returns 404 from the npm registry \u2014 unpublished, renamed or taken down; the name is claimable"
+          },
+          "artifact": {
+            "status": "unverified",
+            "checked_at": "2026-09-17",
+            "method": "registry-404"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@contextlint/mcp-server",
@@ -1617,7 +4904,47 @@
       "stars": 41,
       "last_commit_days": 12,
       "open_issues": 0,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@contextlint/mcp-server@1.1.1",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "chrome-devtools-mcp",
@@ -1626,7 +4953,7 @@
       "source_url": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
       "version": "0.26.0",
       "pkg_integrity": "sha512-tSU6E8mmlki9mmfPy3aHlXKkGCcKXVXjAWF4Y/KZIslW7fQy0PalrsUoe8J4FQpEhxbh9vv2TkO08fFLDenMmA==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 75,
       "classification": "Recommended",
@@ -1636,7 +4963,52 @@
       "stars": 48251,
       "last_commit_days": 0,
       "open_issues": 106,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:chrome-devtools-mcp@0.26.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
+            "identity": "https://github.com/ChromeDevTools/chrome-devtools-mcp/.github/workflows/publish-to-npm-on-tag.yml@refs/tags/chrome-devtools-mcp-v0.26.0",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "listed",
+            "checked_at": "2026-09-17",
+            "server_id": "io.github.ChromeDevTools/chrome-devtools-mcp",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "advisories-present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@sap-ux/fiori-mcp-server",
@@ -1655,7 +5027,47 @@
       "stars": 153,
       "last_commit_days": 0,
       "open_issues": 363,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@sap-ux/fiori-mcp-server@0.6.58",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@supabase/mcp-server-supabase",
@@ -1674,7 +5086,50 @@
       "stars": 2843,
       "last_commit_days": 0,
       "open_issues": 103,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@supabase/mcp-server-supabase@0.8.1",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/supabase-community/supabase-mcp",
+            "identity": "https://github.com/supabase-community/supabase-mcp/.github/workflows/release.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "kubernetes-mcp-server",
@@ -1693,7 +5148,52 @@
       "stars": 1870,
       "last_commit_days": 0,
       "open_issues": 89,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:kubernetes-mcp-server@0.0.62",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/containers/kubernetes-mcp-server",
+            "identity": "https://github.com/containers/kubernetes-mcp-server/.github/workflows/release.yaml@refs/tags/v0.0.62",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "listed",
+            "checked_at": "2026-09-17",
+            "server_id": "io.github.containers/kubernetes-mcp-server",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@azure/mcp",
@@ -1702,7 +5202,7 @@
       "source_url": "https://github.com/microsoft/mcp",
       "version": "3.0.0-beta.10",
       "pkg_integrity": "sha512-xW47hDIJazF2w+SKg+qyzMuFetmYSmo5sCP8Qnwve6gURtVh1EvtnPIuM/xgMBs0yQ9MN8d4lrszdLfPziGmpA==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 75,
       "classification": "Recommended",
@@ -1712,7 +5212,47 @@
       "stars": 3516,
       "last_commit_days": 0,
       "open_issues": 298,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@azure/mcp@3.0.0-beta.10",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@penpot/mcp",
@@ -1731,7 +5271,63 @@
       "stars": 57847,
       "last_commit_days": 0,
       "open_issues": 725,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@penpot/mcp@2.15.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "repository_posture": {
+            "status": "weak",
+            "checked_at": "2026-09-17",
+            "checks": {
+              "code_review": "absent",
+              "maintained": "found",
+              "security_policy": "found",
+              "dangerous_workflows": "absent",
+              "token_permissions": "absent",
+              "branch_protection": "absent",
+              "release_signing": "unknown",
+              "sast": "absent",
+              "actions_pinned": "absent"
+            },
+            "report_date": "2026-08-24"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@agent-infra/mcp-server-browser",
@@ -1750,7 +5346,47 @@
       "stars": 38375,
       "last_commit_days": 30,
       "open_issues": 412,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@agent-infra/mcp-server-browser@1.2.29",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "slack-mcp-server",
@@ -1769,7 +5405,47 @@
       "stars": 1762,
       "last_commit_days": 14,
       "open_issues": 56,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:slack-mcp-server@1.2.3",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@qase/mcp-server",
@@ -1778,7 +5454,7 @@
       "source_url": "https://github.com/qase-tms/qase-mcp-server",
       "version": "1.1.7",
       "pkg_integrity": "sha512-dP6yOF0aWWo92kGtMloxoROeeHG3D9d768TwQPwl1Qj6XblSrYUiV+dkYmtedOM+D08ZyK1yROugCOKvh3tGOQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 75.05,
       "classification": "Recommended",
@@ -1788,7 +5464,50 @@
       "stars": 31,
       "last_commit_days": 2,
       "open_issues": 3,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@qase/mcp-server@1.1.7",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/qase-tms/qase-mcp-server",
+            "identity": "https://github.com/qase-tms/qase-mcp-server/.github/workflows/npm.yml@refs/tags/v1.1.7",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "linkup-mcp-server",
@@ -1797,7 +5516,7 @@
       "source_url": "https://github.com/LinkupPlatform/linkup-mcp-server",
       "version": "3.2.0",
       "pkg_integrity": "sha512-MAw7md5agV2lCTRv9cdy8zbZ/DBZTDzgxoExf+HfyyVHyvAd6bAp/UiR1m88sRJVJshOgVa1c9C+Dxk1PrVZPw==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 54.77,
       "classification": "Experimental",
@@ -1807,7 +5526,47 @@
       "stars": 29,
       "last_commit_days": 52,
       "open_issues": 3,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:linkup-mcp-server@3.2.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@tankpkg/mcp-server",
@@ -1826,7 +5585,47 @@
       "stars": 36,
       "last_commit_days": 19,
       "open_issues": 15,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@tankpkg/mcp-server@0.15.7",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@growthbook/mcp",
@@ -1845,7 +5644,50 @@
       "stars": 24,
       "last_commit_days": 0,
       "open_issues": 21,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@growthbook/mcp@1.8.1",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/growthbook/growthbook-mcp",
+            "identity": "https://github.com/growthbook/growthbook-mcp/.github/workflows/publish-mcp.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@nexus2520/bitbucket-mcp-server",
@@ -1864,7 +5706,47 @@
       "stars": 24,
       "last_commit_days": 22,
       "open_issues": 11,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@nexus2520/bitbucket-mcp-server@2.1.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@currents/mcp",
@@ -1883,7 +5765,50 @@
       "stars": 19,
       "last_commit_days": 0,
       "open_issues": 1,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@currents/mcp@2.2.18",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/currents-dev/currents-mcp",
+            "identity": "https://github.com/currents-dev/currents-mcp/.github/workflows/publish.yaml@refs/heads/release/2.2.18",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "lsp-mcp-server",
@@ -1902,7 +5827,47 @@
       "stars": 20,
       "last_commit_days": 49,
       "open_issues": 3,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:lsp-mcp-server@1.1.17",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "codex-mcp-server",
@@ -1921,7 +5886,50 @@
       "stars": 612,
       "last_commit_days": 67,
       "open_issues": 29,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:codex-mcp-server@1.4.10",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/tuannvm/codex-mcp-server",
+            "identity": "https://github.com/tuannvm/codex-mcp-server/.github/workflows/release.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@circleci/mcp-server-circleci",
@@ -1940,7 +5948,47 @@
       "stars": 86,
       "last_commit_days": 1,
       "open_issues": 31,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@circleci/mcp-server-circleci@0.15.1",
+        "dimensions": {
+          "availability": {
+            "status": "deprecated",
+            "checked_at": "2026-09-17",
+            "detail": "Deprecated: use CircleCI's hosted MCP server or CircleCI CLI MCP instead. See https://circleci.com/docs/guides/toolkit/circleci-mcp-overview/"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@memberjunction/ai-mcp-server",
@@ -1959,7 +6007,50 @@
       "stars": 28,
       "last_commit_days": 0,
       "open_issues": 217,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@memberjunction/ai-mcp-server@5.34.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/MemberJunction/MJ",
+            "identity": "https://github.com/MemberJunction/MJ/.github/workflows/publish.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "fsb-mcp-server",
@@ -1978,7 +6069,47 @@
       "stars": 186,
       "last_commit_days": 7,
       "open_issues": 1,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:fsb-mcp-server@0.9.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@skillsmith/mcp-server",
@@ -1997,7 +6128,47 @@
       "stars": 74,
       "last_commit_days": 0,
       "open_issues": 38,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@skillsmith/mcp-server@0.5.1",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@taazkareem/clickup-mcp-server",
@@ -2016,7 +6187,47 @@
       "stars": 49,
       "last_commit_days": 0,
       "open_issues": 3,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@taazkareem/clickup-mcp-server@0.14.4",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@theia/ai-mcp-server",
@@ -2035,7 +6246,66 @@
       "stars": 21616,
       "last_commit_days": 0,
       "open_issues": 1486,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@theia/ai-mcp-server@1.71.1",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/eclipse-theia/theia",
+            "identity": "https://github.com/eclipse-theia/theia/.github/workflows/publish-ci.yml@refs/heads/release/1.71.x",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "repository_posture": {
+            "status": "weak",
+            "checked_at": "2026-09-17",
+            "checks": {
+              "maintained": "found",
+              "security_policy": "found",
+              "code_review": "found",
+              "dangerous_workflows": "found",
+              "token_permissions": "absent",
+              "branch_protection": "unknown",
+              "release_signing": "absent",
+              "actions_pinned": "found",
+              "sast": "absent"
+            },
+            "report_date": "2026-08-24"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "teamcity-mcp",
@@ -2054,7 +6324,50 @@
       "stars": 27,
       "last_commit_days": 30,
       "open_issues": 1,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@daghis/teamcity-mcp@2.12.1",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/Daghis/teamcity-mcp",
+            "identity": "https://github.com/Daghis/teamcity-mcp/.github/workflows/publish.yml@refs/tags/teamcity-mcp-v2.12.1",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "prometheus-mcp",
@@ -2073,7 +6386,50 @@
       "stars": 27,
       "last_commit_days": 172,
       "open_issues": 4,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:prometheus-mcp@1.1.3",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/idanfishman/prometheus-mcp",
+            "identity": "https://github.com/idanfishman/prometheus-mcp/.github/workflows/release.yaml@refs/tags/v1.1.3",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "mcp-server-mysql",
@@ -2092,7 +6448,46 @@
       "stars": 1997,
       "last_commit_days": 3,
       "open_issues": 42,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@benborla29/mcp-server-mysql@2.0.8",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "unverified",
+            "checked_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "datadog-mcp",
@@ -2111,7 +6506,50 @@
       "stars": 143,
       "last_commit_days": 38,
       "open_issues": 28,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "npm:@winor30/mcp-server-datadog@1.7.0",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/winor30/mcp-server-datadog",
+            "identity": "https://github.com/winor30/mcp-server-datadog/.github/workflows/publish.yml@refs/tags/v1.7.0",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "terraform-mcp-server",
@@ -2131,7 +6569,22 @@
       "stars": 1491,
       "last_commit_days": 0,
       "open_issues": 52,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "oci:hashicorp/terraform-mcp-server@sha256:67b4d3d39aa2c32c5ee280b21d67fb6513dab463af6c93c2ae0cdd4af09d4603",
+        "dimensions": {
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "kafka-mcp-server",
@@ -2151,7 +6604,22 @@
       "stars": 53,
       "last_commit_days": 143,
       "open_issues": 20,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "oci:ghcr.io/tuannvm/kafka-mcp-server@sha256:3ac9f77f81933b2be290fefc3d6e069f74751a4ac5c17ce1d0ab120f196ca9ac",
+        "dimensions": {
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@anyproto/anytype-mcp",
@@ -2169,9 +6637,52 @@
       "last_checked": "2026-07-31",
       "version": "1.2.8",
       "pkg_integrity": "sha512-Qf6Jyg+qYHOhHntgf4r/2vNRajrXJqJ/shhM/UNSEQSF2Hdq016Unyrm6H4eDTmXwomlxsNPWbDfy2Y+vw9x2A==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
-      "notes": "Official Anytype MCP server (registry id io.github.anyproto/anytype-mcp). Tools generated from Anytype's OpenAPI spec: search, spaces, members, objects, lists, properties, tags, types, templates. est_tools_count not yet measured (needs the Anytype desktop app + API key to smoke-test). Promoted from discovery candidates 2026-06-20."
+      "notes": "Official Anytype MCP server (registry id io.github.anyproto/anytype-mcp). Tools generated from Anytype's OpenAPI spec: search, spaces, members, objects, lists, properties, tags, types, templates. est_tools_count not yet measured (needs the Anytype desktop app + API key to smoke-test). Promoted from discovery candidates 2026-06-20.",
+      "trust_evidence": {
+        "artifact_id": "npm:@anyproto/anytype-mcp@1.2.8",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/anyproto/anytype-mcp",
+            "identity": "https://github.com/anyproto/anytype-mcp/.github/workflows/release.yml@refs/tags/v1.2.8",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "touchdesigner-mcp-server",
@@ -2189,9 +6700,54 @@
       "last_checked": "2026-07-31",
       "version": "1.4.10",
       "pkg_integrity": "sha512-q4iH/IUqw7h5qGErOifh6LtFsnUSS9gi54jNjzlohOodiK8/eB7NMWLnbRewK7eCfopo1RuYklMRW7gV7+zT1w==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
-      "notes": "Controls TouchDesigner projects via MCP, 13 tools (node create/delete, parameter read/update, Python exec, class/help introspection); registry id io.github.8beeeaaat/touchdesigner-mcp-server. category=utility: no creative/media-tooling category exists; mirrors godot-mcp-server precedent. Promoted from discovery candidates 2026-06-20."
+      "notes": "Controls TouchDesigner projects via MCP, 13 tools (node create/delete, parameter read/update, Python exec, class/help introspection); registry id io.github.8beeeaaat/touchdesigner-mcp-server. category=utility: no creative/media-tooling category exists; mirrors godot-mcp-server precedent. Promoted from discovery candidates 2026-06-20.",
+      "trust_evidence": {
+        "artifact_id": "npm:touchdesigner-mcp-server@1.4.10",
+        "dimensions": {
+          "availability": {
+            "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/8beeeaaat/touchdesigner-mcp",
+            "identity": "https://github.com/8beeeaaat/touchdesigner-mcp/.github/workflows/release.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "listed",
+            "checked_at": "2026-09-17",
+            "server_id": "io.github.8beeeaaat/touchdesigner-mcp-server",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          }
+        }
+      }
     }
   ]
 }

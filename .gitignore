@@ -7,3 +7,7 @@ node_modules/
 .env.local
 __pycache__/
 *.pyc
+
+# `mcp-vault lock --vendor` installs locked trees here. Committing them is a
+# deliberate choice (a vendored tree is reproducible but large), not a default.
+.mcp-vault/

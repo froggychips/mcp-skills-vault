@@ -1,0 +1,5764 @@
+{
+  "$schema": "mcp-vault/capabilities@1",
+  "generated_at": "2026-09-17T13:11:06.655Z",
+  "note": "Capability presence with evidence, per package version. `found` is a fact; absence is never recorded — see lib/capabilities.cjs.",
+  "packages": {
+    "npm:@agent-infra/mcp-server-browser@1.2.29": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "shell": [
+          {
+            "file": "package/dist/index.cjs",
+            "line": 4999,
+            "match": "require(\"node:child_process\")"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/index.cjs",
+            "line": 18529,
+            "match": "require(\"http\")"
+          },
+          {
+            "file": "package/dist/request-context.cjs",
+            "line": 16708,
+            "match": "require(\"http\")"
+          },
+          {
+            "file": "package/dist/server.cjs",
+            "line": 16770,
+            "match": "require(\"http\")"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/index.cjs",
+            "line": 25250,
+            "match": "readFileSync("
+          },
+          {
+            "file": "package/dist/server.cjs",
+            "line": 23491,
+            "match": "readFileSync("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/index.cjs",
+            "line": 421,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/request-context.cjs",
+            "line": 420,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/server.cjs",
+            "line": 420,
+            "match": "process.env"
+          }
+        ],
+        "dynamic_code": [
+          {
+            "file": "package/dist/index.cjs",
+            "line": 43465,
+            "match": "eval("
+          },
+          {
+            "file": "package/dist/server.cjs",
+            "line": 41690,
+            "match": "eval("
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 22,
+        "other_files": 1,
+        "bytes": 6281271,
+        "longest_line": 260089,
+        "avg_line_length": 50,
+        "minified": true,
+        "minified_files": [
+          "package/dist/index.cjs",
+          "package/dist/request-context.cjs",
+          "package/dist/server.cjs"
+        ],
+        "base64_bytes": 8124,
+        "escape_heavy_files": 0,
+        "caveat": "3 of 22 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
+        "tarball_bytes": 2187615,
+        "truncated": true
+      }
+    },
+    "npm:@alchemy/mcp-server@0.3.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/dist/api/alchemyApi.js",
+            "line": 107,
+            "match": "fetch("
+          },
+          {
+            "file": "package/dist/api/client-providers.js",
+            "line": 13,
+            "match": "axios"
+          },
+          {
+            "file": "package/dist/di/modules/clients.module.js",
+            "line": 1,
+            "match": "axios"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/di/modules/clients.module.js",
+            "line": 10,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 12,
+        "other_files": 2,
+        "bytes": 125486,
+        "longest_line": 245,
+        "avg_line_length": 47,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 23023,
+        "truncated": false
+      }
+    },
+    "npm:@anaisbetts/mcp-installer@0.5.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "fs_read": [
+          {
+            "file": "package/lib/index.mjs",
+            "line": 120,
+            "match": "fs.readFileSync"
+          },
+          {
+            "file": "package/src/index.mts",
+            "line": 135,
+            "match": "fs.readFileSync"
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/lib/index.mjs",
+            "line": 134,
+            "match": "fs.writeFileSync"
+          },
+          {
+            "file": "package/src/index.mts",
+            "line": 156,
+            "match": "fs.writeFileSync"
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: tsc && shx chmod +x ./lib/index.mjs"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 4,
+        "other_files": 1,
+        "bytes": 20112,
+        "longest_line": 153,
+        "avg_line_length": 28,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 8382,
+        "truncated": false
+      }
+    },
+    "npm:@anyproto/anytype-mcp@1.2.8": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/bin/cli.mjs",
+            "line": 25,
+            "match": "XMLHttpRequest"
+          },
+          {
+            "file": "package/src/utils/__tests__/base-url.test.ts",
+            "line": 54,
+            "match": "got"
+          },
+          {
+            "file": "package/src/utils/base-url.ts",
+            "line": 18,
+            "match": "got"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/bin/cli.mjs",
+            "line": 153,
+            "match": "createReadStream("
+          },
+          {
+            "file": "package/src/client/__tests__/http-client-upload.test.ts",
+            "line": 88,
+            "match": "fs.createReadStream"
+          },
+          {
+            "file": "package/src/client/http-client.ts",
+            "line": 89,
+            "match": "fs.createReadStream"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/bin/cli.mjs",
+            "line": 4,
+            "match": "process.env"
+          },
+          {
+            "file": "package/src/utils/__tests__/base-url.test.ts",
+            "line": 6,
+            "match": "process.env"
+          },
+          {
+            "file": "package/src/utils/base-url.ts",
+            "line": 9,
+            "match": "process.env"
+          }
+        ],
+        "dynamic_code": [
+          {
+            "file": "package/bin/cli.mjs",
+            "line": 19,
+            "match": "new Function("
+          },
+          {
+            "file": "package/src/openapi/parser.ts",
+            "line": 651,
+            "match": "eval("
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/scripts/parse-openapi.ts",
+            "line": 22,
+            "match": "writeFileSync("
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 29,
+        "other_files": 1,
+        "bytes": 902046,
+        "longest_line": 159803,
+        "avg_line_length": 153,
+        "minified": true,
+        "minified_files": [
+          "package/bin/cli.mjs"
+        ],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "1 of 29 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
+        "tarball_bytes": 270723,
+        "truncated": false
+      }
+    },
+    "npm:@apify/actors-mcp-server@0.10.1": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/dist/web/dist/actor-detail-widget.js",
+            "line": 973,
+            "match": "got"
+          },
+          {
+            "file": "package/dist/web/dist/actor-run-widget.js",
+            "line": 973,
+            "match": "got"
+          },
+          {
+            "file": "package/dist/mcp/client.js",
+            "line": 86,
+            "match": "fetch("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/web/dist/actor-detail-widget.js",
+            "line": 28,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/web/dist/actor-run-widget.js",
+            "line": 28,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/mcp/actors.js",
+            "line": 35,
+            "match": "process.env"
+          }
+        ],
+        "dynamic_code": [
+          {
+            "file": "package/dist/web/dist/actor-detail-widget.js",
+            "line": 2865,
+            "match": "new Function("
+          },
+          {
+            "file": "package/dist/web/dist/actor-run-widget.js",
+            "line": 2858,
+            "match": "new Function("
+          },
+          {
+            "file": "package/dist/web/dist/search-actors-widget.js",
+            "line": 66,
+            "match": "new Function("
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/utils/generic.js",
+            "line": 18,
+            "match": "readFileSync("
+          },
+          {
+            "file": "package/dist/resources/resource_service.js",
+            "line": 62,
+            "match": "fs.readFileSync"
+          },
+          {
+            "file": "package/dist/stdio.js",
+            "line": 45,
+            "match": "readFileSync("
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 185,
+        "other_files": 1,
+        "bytes": 5296284,
+        "longest_line": 217564,
+        "avg_line_length": 189,
+        "minified": true,
+        "minified_files": [
+          "package/dist/web/dist/actor-detail-widget.js",
+          "package/dist/web/dist/actor-run-widget.js",
+          "package/dist/web/dist/search-actors-widget.js"
+        ],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "3 of 185 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
+        "tarball_bytes": 1582072,
+        "truncated": false
+      }
+    },
+    "npm:@azure-devops/mcp@2.7.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/dist/auth.js",
+            "line": 78,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/index.js",
+            "line": 18,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/logger.js",
+            "line": 5,
+            "match": "process.env"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/tools/auth.js",
+            "line": 8,
+            "match": "fetch("
+          },
+          {
+            "file": "package/dist/tools/builds.js",
+            "line": 252,
+            "match": "fetch("
+          },
+          {
+            "file": "package/dist/org-tenants.js",
+            "line": 30,
+            "match": "fetch("
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/org-tenants.js",
+            "line": 11,
+            "match": "readFile("
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "preinstall: npm config set registry https://registry.npmjs.org/"
+          },
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: npm run build && husky"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 26,
+        "other_files": 1,
+        "bytes": 353044,
+        "longest_line": 468,
+        "avg_line_length": 55,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 61818,
+        "truncated": false
+      }
+    },
+    "npm:@azure/mcp@3.0.0-beta.10": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "shell": [
+          {
+            "file": "package/index.js",
+            "line": 43,
+            "match": "require('child_process')"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/index.js",
+            "line": 7,
+            "match": "process.env"
+          }
+        ],
+        "dynamic_require": [
+          {
+            "file": "package/index.js",
+            "line": 37,
+            "match": "require(platformPackageName)"
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "postinstall: node ./scripts/post-install-script.js"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 2,
+        "other_files": 1,
+        "bytes": 4384,
+        "longest_line": 176,
+        "avg_line_length": 33,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 12617,
+        "truncated": false
+      }
+    },
+    "npm:@bitwarden/mcp-server@2026.2.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/dist/utils/api.js",
+            "line": 22,
+            "match": "fetch("
+          }
+        ],
+        "shell": [
+          {
+            "file": "package/dist/utils/cli.js",
+            "line": 4,
+            "match": "from 'child_process'"
+          },
+          {
+            "file": "package/dist/utils/security.js",
+            "line": 31,
+            "match": "spawn("
+          },
+          {
+            "file": "package/dist/utils/cli.d.ts",
+            "line": 6,
+            "match": "spawn("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/utils/cli.js",
+            "line": 26,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/utils/config.js",
+            "line": 5,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/utils/security.js",
+            "line": 241,
+            "match": "process.env"
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: husky"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 28,
+        "other_files": 1,
+        "bytes": 207688,
+        "longest_line": 841,
+        "avg_line_length": 36,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 64644,
+        "truncated": false
+      }
+    },
+    "npm:@brave/brave-search-mcp-server@2.0.80": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/dist/config.js",
+            "line": 12,
+            "match": "process.env"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/BraveAPI/index.js",
+            "line": 82,
+            "match": "fetch("
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: npm run format && npm run build"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 32,
+        "other_files": 1,
+        "bytes": 55036,
+        "longest_line": 432,
+        "avg_line_length": 36,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 18917,
+        "truncated": false
+      }
+    },
+    "npm:@browserstack/mcp-server@1.2.16": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/dist/lib/apiClient.js",
+            "line": 4,
+            "match": "from \"https\""
+          },
+          {
+            "file": "package/dist/tools/review-agent-utils/build-counts.js",
+            "line": 4,
+            "match": "fetch("
+          },
+          {
+            "file": "package/dist/lib/error.js",
+            "line": 1,
+            "match": "axios"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/lib/apiClient.js",
+            "line": 53,
+            "match": "fs.readFileSync"
+          },
+          {
+            "file": "package/dist/tools/appautomate-utils/native-execution/appautomate.js",
+            "line": 81,
+            "match": "fs.createReadStream"
+          },
+          {
+            "file": "package/dist/tools/percy-snapshot-utils/detect-test-files.js",
+            "line": 32,
+            "match": "readFile("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/tools/appautomate-utils/native-execution/appautomate.js",
+            "line": 138,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/tools/sdk-utils/bstack/commands.js",
+            "line": 44,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/config.js",
+            "line": 26,
+            "match": "process.env"
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/dist/lib/device-cache.js",
+            "line": 30,
+            "match": "fs.mkdirSync"
+          }
+        ],
+        "shell": [
+          {
+            "file": "package/dist/lib/local.js",
+            "line": 2,
+            "match": "from \"child_process\""
+          },
+          {
+            "file": "package/dist/tools/applive-utils/start-session.js",
+            "line": 8,
+            "match": "from \"child_process\""
+          },
+          {
+            "file": "package/dist/tools/live-utils/start-session.js",
+            "line": 2,
+            "match": "from \"child_process\""
+          }
+        ],
+        "dynamic_require": [
+          {
+            "file": "package/dist/tools/sdk-utils/percy-automate/constants.d.ts",
+            "line": 6,
+            "match": "require(\\\"@percy/playwright\\\")"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 272,
+        "other_files": 1,
+        "bytes": 648912,
+        "longest_line": 3289,
+        "avg_line_length": 45,
+        "minified": true,
+        "minified_files": [
+          "package/dist/tools/sdk-utils/common/constants.d.ts",
+          "package/dist/tools/sdk-utils/percy-automate/constants.d.ts",
+          "package/dist/tools/sdk-utils/percy-bstack/constants.d.ts",
+          "package/dist/tools/sdk-utils/percy-web/constants.d.ts"
+        ],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "4 of 272 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
+        "tarball_bytes": 159512,
+        "truncated": false
+      }
+    },
+    "npm:@cap-js/mcp-server@0.0.5": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/lib/calculateEmbeddings.js",
+            "line": 33,
+            "match": "fetch("
+          },
+          {
+            "file": "package/lib/searchMarkdownDocs.js",
+            "line": 48,
+            "match": "fetch("
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/lib/calculateEmbeddings.js",
+            "line": 103,
+            "match": "fs.readFile"
+          },
+          {
+            "file": "package/lib/embeddings.js",
+            "line": 19,
+            "match": "fs.readFile"
+          },
+          {
+            "file": "package/index.js",
+            "line": 58,
+            "match": "readFile("
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/lib/calculateEmbeddings.js",
+            "line": 20,
+            "match": "fs.writeFile"
+          },
+          {
+            "file": "package/lib/embeddings.js",
+            "line": 88,
+            "match": "fs.unlink"
+          },
+          {
+            "file": "package/lib/searchMarkdownDocs.js",
+            "line": 35,
+            "match": "fs.mkdir"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/lib/calculateEmbeddings.js",
+            "line": 10,
+            "match": "process.env"
+          },
+          {
+            "file": "package/lib/getModel.js",
+            "line": 104,
+            "match": "process.env"
+          },
+          {
+            "file": "package/lib/searchMarkdownDocs.js",
+            "line": 123,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 8,
+        "other_files": 1,
+        "bytes": 36238,
+        "longest_line": 191,
+        "avg_line_length": 29,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 39436,
+        "truncated": false
+      }
+    },
+    "npm:@circleci/mcp-server-circleci@0.15.1": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/dist/clients/client.js",
+            "line": 4,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/lib/telemetry/config.js",
+            "line": 14,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/lib/usage-api/getUsageApiData.js",
+            "line": 12,
+            "match": "process.env"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/lib/usage-api/findUnderusedResourceClasses.js",
+            "line": 13,
+            "match": "fs.readFileSync"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/lib/usage-api/getUsageApiData.js",
+            "line": 27,
+            "match": "fetch("
+          },
+          {
+            "file": "package/dist/clients/circleci/httpClient.js",
+            "line": 58,
+            "match": "fetch("
+          },
+          {
+            "file": "package/dist/clients/circleci/jobs.js",
+            "line": 60,
+            "match": "fetch ("
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/dist/lib/usage-api/getUsageApiData.js",
+            "line": 37,
+            "match": "fs.mkdirSync"
+          },
+          {
+            "file": "package/dist/tools/getFlakyTests/handler.js",
+            "line": 72,
+            "match": "writeFileSync("
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 97,
+        "other_files": 1,
+        "bytes": 221496,
+        "longest_line": 435,
+        "avg_line_length": 43,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 61261,
+        "truncated": false
+      }
+    },
+    "npm:@cloudflare/mcp-server-cloudflare@0.2.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "shell": [
+          {
+            "file": "package/dist/index.js",
+            "line": 4,
+            "match": "from \"child_process\""
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/index.js",
+            "line": 138,
+            "match": "fetch("
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/index.js",
+            "line": 94,
+            "match": "readFileSync("
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/dist/index.js",
+            "line": 129,
+            "match": "writeFileSync("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/index.js",
+            "line": 25,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 2,
+        "other_files": 1,
+        "bytes": 247929,
+        "longest_line": 274,
+        "avg_line_length": 29,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 36953,
+        "truncated": false
+      }
+    },
+    "npm:@contentful/mcp-server@1.7.15": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/dist/index.js",
+            "line": 4100,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 3,
+        "other_files": 1,
+        "bytes": 132209,
+        "longest_line": 718,
+        "avg_line_length": 30,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 67377,
+        "truncated": false
+      }
+    },
+    "npm:@contextlint/mcp-server@1.1.1": {
+      "checked_at": "2026-09-17",
+      "found": {},
+      "coverage": {
+        "code_files": 2,
+        "other_files": 1,
+        "bytes": 13831,
+        "longest_line": 299,
+        "avg_line_length": 36,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 5971,
+        "truncated": false
+      }
+    },
+    "npm:@currents/mcp@2.2.18": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/build/lib/env.js",
+            "line": 1,
+            "match": "process.env"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/build/tools/context/get-context.js",
+            "line": 123,
+            "match": "fetch("
+          },
+          {
+            "file": "package/build/tools/specs/get-spec-files-performance.js",
+            "line": 49,
+            "match": "fetch ("
+          },
+          {
+            "file": "package/build/tools/tests/get-tests-performance.js",
+            "line": 54,
+            "match": "fetch ("
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 36,
+        "other_files": 1,
+        "bytes": 89757,
+        "longest_line": 572,
+        "avg_line_length": 35,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 16452,
+        "truncated": false
+      }
+    },
+    "npm:@cyanheads/git-mcp-server@2.15.1": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: bunx husky"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 0,
+        "other_files": 1,
+        "bytes": 0,
+        "longest_line": 0,
+        "avg_line_length": 0,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 1148373,
+        "truncated": true
+      }
+    },
+    "npm:@daghis/teamcity-mcp@2.12.1": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/dist/index.js",
+            "line": 39394,
+            "match": "fetch ("
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/index.js",
+            "line": 44946,
+            "match": "readFile("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/index.js",
+            "line": 607,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 1,
+        "other_files": 1,
+        "bytes": 1730753,
+        "longest_line": 396,
+        "avg_line_length": 38,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 146607,
+        "truncated": false
+      }
+    },
+    "npm:@delorenj/mcp-server-trello@1.7.1": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/build/index.js",
+            "line": 37486,
+            "match": "from \"http\""
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/build/index.js",
+            "line": 39743,
+            "match": "fs.readFile"
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/build/index.js",
+            "line": 39742,
+            "match": "fs.mkdir"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/build/index.js",
+            "line": 22129,
+            "match": "process.env"
+          }
+        ],
+        "dynamic_code": [
+          {
+            "file": "package/build/index.js",
+            "line": 2876,
+            "match": "new Function("
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 1,
+        "other_files": 1,
+        "bytes": 1347417,
+        "longest_line": 1182,
+        "avg_line_length": 32,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 251709,
+        "truncated": false
+      }
+    },
+    "npm:@drawio/mcp@1.2.7": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "shell": [
+          {
+            "file": "package/src/index.js",
+            "line": 7,
+            "match": "from \"child_process\""
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/src/index.js",
+            "line": 21,
+            "match": "readFileSync("
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/src/index.js",
+            "line": 50,
+            "match": "writeFileSync("
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 1,
+        "other_files": 1,
+        "bytes": 9569,
+        "longest_line": 107,
+        "avg_line_length": 25,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 19745,
+        "truncated": false
+      }
+    },
+    "npm:@dynatrace-oss/dynatrace-mcp-server@1.8.5": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "shell": [
+          {
+            "file": "package/index.js",
+            "line": 10346,
+            "match": "require(\"node:child_process\")"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/index.js",
+            "line": 65429,
+            "match": "require(\"node:http\")"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/index.js",
+            "line": 78147,
+            "match": "readFile("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/index.js",
+            "line": 70835,
+            "match": "process.env"
+          }
+        ],
+        "dynamic_code": [
+          {
+            "file": "package/index.js",
+            "line": 5238,
+            "match": "new Function("
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 1,
+        "other_files": 1,
+        "bytes": 5077100,
+        "longest_line": 72296,
+        "avg_line_length": 41,
+        "minified": true,
+        "minified_files": [
+          "package/index.js"
+        ],
+        "base64_bytes": 144292,
+        "escape_heavy_files": 0,
+        "caveat": "1 of 1 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
+        "tarball_bytes": 1315269,
+        "truncated": false
+      }
+    },
+    "npm:@esaio/esa-mcp-server@0.7.5": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/bin/index.js",
+            "line": 2,
+            "match": "process.env"
+          },
+          {
+            "file": "package/bin/prompts-DCaX_GcA.js",
+            "line": 1,
+            "match": "process.env"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/bin/tools-BtN_Xrp3.js",
+            "line": 1,
+            "match": "fetch("
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 16,
+        "other_files": 1,
+        "bytes": 33983,
+        "longest_line": 11307,
+        "avg_line_length": 420,
+        "minified": true,
+        "minified_files": [
+          "package/bin/mcp-response-Bo-CZwgG.js",
+          "package/bin/resources-BxzOJggA.js",
+          "package/bin/teams-0Aha0RZz.js",
+          "package/bin/tools-BtN_Xrp3.js"
+        ],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "4 of 16 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
+        "tarball_bytes": 35508,
+        "truncated": false
+      }
+    },
+    "npm:@eslint/mcp@0.3.5": {
+      "checked_at": "2026-09-17",
+      "found": {},
+      "coverage": {
+        "code_files": 2,
+        "other_files": 1,
+        "bytes": 3851,
+        "longest_line": 260,
+        "avg_line_length": 33,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 7102,
+        "truncated": false
+      }
+    },
+    "npm:@google-cloud/observability-mcp@0.2.3": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "shell": [
+          {
+            "file": "package/dist/bundle.js",
+            "line": 28139,
+            "match": "exec("
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/bundle.js",
+            "line": 22612,
+            "match": "got"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/bundle.js",
+            "line": 29369,
+            "match": "fs.readFileSync"
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/dist/bundle.js",
+            "line": 29358,
+            "match": "fs.writeFile"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/bundle.js",
+            "line": 29117,
+            "match": "process.env"
+          }
+        ],
+        "dynamic_code": [
+          {
+            "file": "package/dist/bundle.js",
+            "line": 2942,
+            "match": "new Function("
+          }
+        ],
+        "dynamic_require": [
+          {
+            "file": "package/dist/bundle.js",
+            "line": 28768,
+            "match": "require(resolvedConfigPath)"
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: npm run build"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 1,
+        "other_files": 1,
+        "bytes": 1228167,
+        "longest_line": 14133,
+        "avg_line_length": 37,
+        "minified": true,
+        "minified_files": [
+          "package/dist/bundle.js"
+        ],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "1 of 1 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
+        "tarball_bytes": 301060,
+        "truncated": false
+      }
+    },
+    "npm:@growthbook/mcp@1.8.1": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "fs_read": [
+          {
+            "file": "package/server/tools/defaults.js",
+            "line": 133,
+            "match": "readFile("
+          }
+        ],
+        "shell": [
+          {
+            "file": "package/server/tools/features.js",
+            "line": 4,
+            "match": "from \"child_process\""
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/server/index.js",
+            "line": 18,
+            "match": "process.env"
+          },
+          {
+            "file": "package/server/utils.js",
+            "line": 41,
+            "match": "process.env"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/server/utils.js",
+            "line": 379,
+            "match": "fetch ("
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 17,
+        "other_files": 1,
+        "bytes": 157861,
+        "longest_line": 12418,
+        "avg_line_length": 44,
+        "minified": true,
+        "minified_files": [
+          "package/server/prompts/experiment-prompts.js"
+        ],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "1 of 17 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
+        "tarball_bytes": 41023,
+        "truncated": false
+      }
+    },
+    "npm:@heroku/mcp-server@1.2.2": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "fs_write": [
+          {
+            "file": "package/dist/tools/ai.js",
+            "line": 131,
+            "match": "fs.writeFile"
+          },
+          {
+            "file": "package/dist/tools/deploy-to-heroku.spec.js",
+            "line": 88,
+            "match": "fs.rm"
+          },
+          {
+            "file": "package/dist/utils/read-app-json.spec.js",
+            "line": 14,
+            "match": "fs.rm"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/services/app-service.js",
+            "line": 22,
+            "match": "fetch("
+          },
+          {
+            "file": "package/dist/services/app-setup-service.js",
+            "line": 22,
+            "match": "fetch("
+          },
+          {
+            "file": "package/dist/services/build-service.js",
+            "line": 23,
+            "match": "fetch("
+          }
+        ],
+        "shell": [
+          {
+            "file": "package/dist/tools/deploy-to-heroku.js",
+            "line": 1,
+            "match": "from 'node:child_process'"
+          },
+          {
+            "file": "package/dist/repl/heroku-cli-repl.js",
+            "line": 1,
+            "match": "from 'node:child_process'"
+          },
+          {
+            "file": "package/dist/utils/plugin-detector.js",
+            "line": 1,
+            "match": "from 'node:child_process'"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/utils/generate-request-init.js",
+            "line": 13,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/repl/heroku-cli-repl.js",
+            "line": 173,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/index.js",
+            "line": 27,
+            "match": "process.env"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/utils/read-app-json.js",
+            "line": 23,
+            "match": "fs.readFile"
+          },
+          {
+            "file": "package/dist/utils/tarball.js",
+            "line": 36,
+            "match": "readFile("
+          },
+          {
+            "file": "package/dist/utils/tarball.spec.js",
+            "line": 39,
+            "match": "fs.readFile"
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: husky"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 49,
+        "other_files": 1,
+        "bytes": 269523,
+        "longest_line": 323,
+        "avg_line_length": 44,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 51594,
+        "truncated": false
+      }
+    },
+    "npm:@instantdb/mcp@1.0.32": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/dist/index.js",
+            "line": 219,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/tools.js",
+            "line": 1,
+            "match": "process.env"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/tools.js",
+            "line": 3,
+            "match": "fetch("
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 18,
+        "other_files": 1,
+        "bytes": 66312,
+        "longest_line": 234,
+        "avg_line_length": 37,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 39806,
+        "truncated": false
+      }
+    },
+    "npm:@kintone/mcp-server@1.3.12": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "fs_write": [
+          {
+            "file": "package/dist/lib/filesystem.js",
+            "line": 24,
+            "match": "fs.mkdirSync"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/client/index.js",
+            "line": 3,
+            "match": "from \"https\""
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/client/index.js",
+            "line": 53,
+            "match": "readFileSync("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/config/parser.js",
+            "line": 6,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 43,
+        "other_files": 1,
+        "bytes": 116551,
+        "longest_line": 338,
+        "avg_line_length": 36,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 35757,
+        "truncated": false
+      }
+    },
+    "npm:@knip/mcp@0.0.28": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "fs_read": [
+          {
+            "file": "package/src/server.js",
+            "line": 19,
+            "match": "readFileSync("
+          },
+          {
+            "file": "package/src/tools.js",
+            "line": 74,
+            "match": "readFileSync("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/src/server.js",
+            "line": 1,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 5,
+        "other_files": 1,
+        "bytes": 14010,
+        "longest_line": 184,
+        "avg_line_length": 36,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 125241,
+        "truncated": false
+      }
+    },
+    "npm:@last9/mcp-server@0.7.1": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "shell": [
+          {
+            "file": "package/bin/cli.js",
+            "line": 3,
+            "match": "require('child_process')"
+          },
+          {
+            "file": "package/bin/download-binary.js",
+            "line": 4,
+            "match": "require('child_process')"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/bin/cli.js",
+            "line": 13,
+            "match": "process.env"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/bin/download-binary.js",
+            "line": 1,
+            "match": "require('https')"
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/bin/download-binary.js",
+            "line": 31,
+            "match": "fs.mkdirSync"
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "postinstall: node bin/download-binary.js"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 2,
+        "other_files": 1,
+        "bytes": 3880,
+        "longest_line": 191,
+        "avg_line_length": 31,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 11882,
+        "truncated": false
+      }
+    },
+    "npm:@mapbox/mcp-server@0.11.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/dist/commonjs/resources/category-list/CategoryListResource.js",
+            "line": 35,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/esm/resources/category-list/CategoryListResource.js",
+            "line": 32,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/commonjs/tools/category-list-tool/CategoryListTool.js",
+            "line": 39,
+            "match": "process.env"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/esm/index.js",
+            "line": 29,
+            "match": "readFileSync("
+          },
+          {
+            "file": "package/dist/esm/utils/versionUtils.js",
+            "line": 15,
+            "match": "readFileSync("
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/commonjs/resources/ui-apps/StaticMapUIResource.js",
+            "line": 199,
+            "match": "fetch("
+          },
+          {
+            "file": "package/dist/esm/resources/ui-apps/StaticMapUIResource.js",
+            "line": 196,
+            "match": "fetch("
+          },
+          {
+            "file": "package/dist/commonjs/utils/tracing.js",
+            "line": 160,
+            "match": "undici"
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "postinstall: patch-package || (cd ../../.. && node ./node_modules/patch-p"
+          },
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: node -e \"try { require('fs').accessSync('.husky/setup-hooks."
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 500,
+        "other_files": 3,
+        "bytes": 4420944,
+        "longest_line": 4446,
+        "avg_line_length": 46,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 17184,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 319590,
+        "truncated": false
+      }
+    },
+    "npm:@memberjunction/ai-mcp-server@5.34.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/dist/config.js",
+            "line": 26,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/auth/JWTIssuer.js",
+            "line": 19,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/Server.js",
+            "line": 806,
+            "match": "process.env"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/index.js",
+            "line": 80,
+            "match": "fs.readFileSync"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/auth/JWTIssuer.js",
+            "line": 166,
+            "match": "got"
+          },
+          {
+            "file": "package/dist/auth/OAuthProxyRouter.js",
+            "line": 559,
+            "match": "fetch("
+          },
+          {
+            "file": "package/dist/auth/AuthGate.d.ts",
+            "line": 16,
+            "match": "from 'http'"
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/dist/Server.js",
+            "line": 1850,
+            "match": "fs.writeFile"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 44,
+        "other_files": 1,
+        "bytes": 465810,
+        "longest_line": 5498,
+        "avg_line_length": 39,
+        "minified": true,
+        "minified_files": [
+          "package/dist/auth/ConsentPage.js"
+        ],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "1 of 44 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
+        "tarball_bytes": 146232,
+        "truncated": false
+      }
+    },
+    "npm:@modelcontextprotocol/server-everything@2026.1.26": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "fs_read": [
+          {
+            "file": "package/dist/resources/files.js",
+            "line": 78,
+            "match": "readFileSync("
+          },
+          {
+            "file": "package/dist/resources/index.js",
+            "line": 27,
+            "match": "readFileSync("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/tools/get-env.js",
+            "line": 23,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/tools/gzip-file-as-resource.js",
+            "line": 5,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/transports/sse.js",
+            "line": 58,
+            "match": "process.env"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/tools/get-roots-list.js",
+            "line": 21,
+            "match": "got"
+          },
+          {
+            "file": "package/dist/tools/gzip-file-as-resource.js",
+            "line": 136,
+            "match": "fetch("
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: npm run build"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 36,
+        "other_files": 1,
+        "bytes": 129801,
+        "longest_line": 5413,
+        "avg_line_length": 43,
+        "minified": true,
+        "minified_files": [
+          "package/dist/tools/get-tiny-image.js"
+        ],
+        "base64_bytes": 5380,
+        "escape_heavy_files": 0,
+        "caveat": "1 of 36 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
+        "tarball_bytes": 43481,
+        "truncated": false
+      }
+    },
+    "npm:@modelcontextprotocol/server-filesystem@2026.1.14": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "fs_read": [
+          {
+            "file": "package/dist/index.js",
+            "line": 31,
+            "match": "fs.realpath"
+          },
+          {
+            "file": "package/dist/lib.js",
+            "line": 53,
+            "match": "fs.realpath"
+          },
+          {
+            "file": "package/dist/roots-utils.js",
+            "line": 17,
+            "match": "fs.realpath"
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/dist/index.js",
+            "line": 311,
+            "match": "fs.mkdir"
+          },
+          {
+            "file": "package/dist/lib.js",
+            "line": 100,
+            "match": "fs.writeFile"
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: npm run build"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 5,
+        "other_files": 1,
+        "bytes": 49402,
+        "longest_line": 365,
+        "avg_line_length": 42,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 16694,
+        "truncated": false
+      }
+    },
+    "npm:@modelcontextprotocol/server-memory@2026.1.26": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "fs_read": [
+          {
+            "file": "package/dist/index.js",
+            "line": 52,
+            "match": "fs.readFile"
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/dist/index.js",
+            "line": 32,
+            "match": "fs.rename"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/index.js",
+            "line": 12,
+            "match": "process.env"
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: npm run build"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 1,
+        "other_files": 1,
+        "bytes": 15407,
+        "longest_line": 128,
+        "avg_line_length": 40,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 6592,
+        "truncated": false
+      }
+    },
+    "npm:@modelcontextprotocol/server-sequential-thinking@2025.12.18": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/dist/lib.js",
+            "line": 7,
+            "match": "process.env"
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: npm run build"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 2,
+        "other_files": 1,
+        "bytes": 7994,
+        "longest_line": 127,
+        "avg_line_length": 43,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 4774,
+        "truncated": false
+      }
+    },
+    "npm:@mondaydotcomorg/monday-api-mcp@3.1.2": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/dist/utils/args/args.service.js",
+            "line": 27,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 9,
+        "other_files": 1,
+        "bytes": 15197,
+        "longest_line": 233,
+        "avg_line_length": 42,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 7112,
+        "truncated": false
+      }
+    },
+    "npm:@neondatabase/mcp-server-neon@0.6.5": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "fs_read": [
+          {
+            "file": "package/dist/server/api.js",
+            "line": 8,
+            "match": "fs.readFileSync"
+          },
+          {
+            "file": "package/dist/initConfig.js",
+            "line": 8,
+            "match": "fs.readFileSync"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/constants.js",
+            "line": 4,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/initConfig.js",
+            "line": 14,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/sentry/instrument.js",
+            "line": 6,
+            "match": "process.env"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/server/errors.js",
+            "line": 1,
+            "match": "axios"
+          },
+          {
+            "file": "package/dist/utils/polyfills.js",
+            "line": 1,
+            "match": "node-fetch"
+          },
+          {
+            "file": "package/dist/resources.js",
+            "line": 3,
+            "match": "fetch("
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/dist/initConfig.js",
+            "line": 80,
+            "match": "fs.mkdirSync"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 41,
+        "other_files": 1,
+        "bytes": 175419,
+        "longest_line": 708,
+        "avg_line_length": 38,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 47475,
+        "truncated": false
+      }
+    },
+    "npm:@nexus2520/bitbucket-mcp-server@2.1.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/build/utils/api-client.js",
+            "line": 1,
+            "match": "axios"
+          },
+          {
+            "file": "package/build/utils/api-client.d.ts",
+            "line": 1,
+            "match": "axios"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/build/index.js",
+            "line": 14,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 30,
+        "other_files": 1,
+        "bytes": 283492,
+        "longest_line": 359,
+        "avg_line_length": 42,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 108450,
+        "truncated": false
+      }
+    },
+    "npm:@notionhq/notion-mcp-server@2.2.1": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/bin/cli.mjs",
+            "line": 191,
+            "match": "fetch("
+          },
+          {
+            "file": "package/src/openapi-mcp-server/client/__tests__/http-client.integration.test.ts",
+            "line": 5,
+            "match": "from 'http'"
+          },
+          {
+            "file": "package/src/openapi-mcp-server/client/__tests__/http-client.test.ts",
+            "line": 15,
+            "match": "axios"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/bin/cli.mjs",
+            "line": 44,
+            "match": "readFileSync("
+          },
+          {
+            "file": "package/src/openapi-mcp-server/client/__tests__/http-client-upload.test.ts",
+            "line": 83,
+            "match": "fs.createReadStream"
+          },
+          {
+            "file": "package/src/openapi-mcp-server/client/http-client.ts",
+            "line": 83,
+            "match": "fs.createReadStream"
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/bin/cli.mjs",
+            "line": 191,
+            "match": "writeFileSync("
+          },
+          {
+            "file": "package/scripts/start-server.ts",
+            "line": 94,
+            "match": "fs.writeFileSync"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/bin/cli.mjs",
+            "line": 4,
+            "match": "process.env"
+          },
+          {
+            "file": "package/src/openapi-mcp-server/client/http-client.ts",
+            "line": 181,
+            "match": "process.env"
+          },
+          {
+            "file": "package/src/openapi-mcp-server/mcp/__tests__/proxy.test.ts",
+            "line": 193,
+            "match": "process.env"
+          }
+        ],
+        "dynamic_code": [
+          {
+            "file": "package/bin/cli.mjs",
+            "line": 7,
+            "match": "new Function("
+          },
+          {
+            "file": "package/src/openapi-mcp-server/openapi/parser.ts",
+            "line": 463,
+            "match": "eval("
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 21,
+        "other_files": 1,
+        "bytes": 1531834,
+        "longest_line": 581987,
+        "avg_line_length": 266,
+        "minified": true,
+        "minified_files": [
+          "package/bin/cli.mjs"
+        ],
+        "base64_bytes": 0,
+        "escape_heavy_files": 1,
+        "caveat": "1 of 21 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
+        "tarball_bytes": 1623029,
+        "truncated": false
+      }
+    },
+    "npm:@pandacss/mcp@1.11.1": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "fs_read": [
+          {
+            "file": "package/dist/index.mjs",
+            "line": 255,
+            "match": "readFileSync("
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/dist/index.mjs",
+            "line": 267,
+            "match": "writeFileSync("
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 2,
+        "other_files": 1,
+        "bytes": 20876,
+        "longest_line": 204,
+        "avg_line_length": 34,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 4966,
+        "truncated": false
+      }
+    },
+    "npm:@penpot/mcp@2.15.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "shell": [
+          {
+            "file": "package/bin/mcp-local.js",
+            "line": 3,
+            "match": "require(\"child_process\")"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/packages/server/src/ApiDocs.ts",
+            "line": 94,
+            "match": "fs.readFileSync"
+          },
+          {
+            "file": "package/packages/server/src/ConfigurationLoader.ts",
+            "line": 29,
+            "match": "readFileSync("
+          },
+          {
+            "file": "package/packages/server/src/tools/ImportImageTool.ts",
+            "line": 94,
+            "match": "fs.readFileSync"
+          }
+        ],
+        "dynamic_code": [
+          {
+            "file": "package/packages/plugin/src/task-handlers/ExecuteCodeTaskHandler.ts",
+            "line": 226,
+            "match": "new Function("
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/packages/server/src/utils/FileUtils.ts",
+            "line": 19,
+            "match": "fs.mkdirSync"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/packages/server/src/logger.ts",
+            "line": 7,
+            "match": "process.env"
+          },
+          {
+            "file": "package/packages/server/src/PenpotMcpServer.ts",
+            "line": 100,
+            "match": "process.env"
+          },
+          {
+            "file": "package/packages/plugin/vite.config.ts",
+            "line": 8,
+            "match": "process.env"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/packages/plugin/src/main.ts",
+            "line": 106,
+            "match": "new WebSocket("
+          },
+          {
+            "file": "package/packages/server/src/PluginBridge.ts",
+            "line": 2,
+            "match": "from \"http\""
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 30,
+        "other_files": 4,
+        "bytes": 123200,
+        "longest_line": 192,
+        "avg_line_length": 35,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 210045,
+        "truncated": false
+      }
+    },
+    "npm:@phantom/mcp-server@1.2.7": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/scripts/test-auth.js",
+            "line": 33,
+            "match": "process.env"
+          }
+        ],
+        "shell": [
+          {
+            "file": "package/scripts/test-pack.mjs",
+            "line": 12,
+            "match": "from \"child_process\""
+          },
+          {
+            "file": "package/scripts/test-smoke.mjs",
+            "line": 17,
+            "match": "from \"child_process\""
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/scripts/test-pack.mjs",
+            "line": 39,
+            "match": "fs.readdirSync"
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/scripts/test-pack.mjs",
+            "line": 78,
+            "match": "fs.unlinkSync"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 10,
+        "other_files": 1,
+        "bytes": 19085,
+        "longest_line": 123,
+        "avg_line_length": 32,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 14359,
+        "truncated": false
+      }
+    },
+    "npm:@playwright/mcp@0.0.75": {
+      "checked_at": "2026-09-17",
+      "found": {},
+      "coverage": {
+        "code_files": 4,
+        "other_files": 1,
+        "bytes": 9681,
+        "longest_line": 157,
+        "avg_line_length": 31,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 21334,
+        "truncated": false
+      }
+    },
+    "npm:@postman/postman-mcp-server@2.8.9": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/dist/src/env.js",
+            "line": 7,
+            "match": "process.env"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/src/tools/getCodeGenerationInstructions.js",
+            "line": 335,
+            "match": "fetch("
+          },
+          {
+            "file": "package/dist/src/clients/postman.js",
+            "line": 72,
+            "match": "fetch("
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/src/index.js",
+            "line": 138,
+            "match": "readFile("
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "preinstall: npx only-allow pnpm"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 143,
+        "other_files": 2,
+        "bytes": 500515,
+        "longest_line": 1547,
+        "avg_line_length": 43,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 85553,
+        "truncated": false
+      }
+    },
+    "npm:@professional-wiki/mediawiki-mcp-server@0.9.1": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/dist/auth/browserAuth.js",
+            "line": 2,
+            "match": "from 'node:http'"
+          },
+          {
+            "file": "package/dist/tools/extensions/bucket/bucket-query.js",
+            "line": 44,
+            "match": "axios"
+          },
+          {
+            "file": "package/dist/transport/httpConfig.js",
+            "line": 41,
+            "match": "fetch("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/auth/browserAuth.js",
+            "line": 59,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/transport/httpConfig.js",
+            "line": 11,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/index.js",
+            "line": 3,
+            "match": "process.env"
+          }
+        ],
+        "shell": [
+          {
+            "file": "package/dist/config/loadConfig.js",
+            "line": 3,
+            "match": "from 'child_process'"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/config/loadConfig.js",
+            "line": 217,
+            "match": "fs.readFileSync"
+          },
+          {
+            "file": "package/dist/auth/tokenStore.js",
+            "line": 12,
+            "match": "fs.readFile"
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/dist/auth/tokenStore.js",
+            "line": 79,
+            "match": "fs.mkdir"
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: lefthook install"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 94,
+        "other_files": 1,
+        "bytes": 249026,
+        "longest_line": 1322,
+        "avg_line_length": 39,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 74172,
+        "truncated": false
+      }
+    },
+    "npm:@qase/mcp-server@1.1.7": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "fs_read": [
+          {
+            "file": "package/build/operations/attachments.js",
+            "line": 83,
+            "match": "createReadStream("
+          }
+        ],
+        "network": [
+          {
+            "file": "package/build/utils/errors.js",
+            "line": 10,
+            "match": "axios"
+          },
+          {
+            "file": "package/build/client/index.js",
+            "line": 11,
+            "match": "axios"
+          },
+          {
+            "file": "package/build/client/index.d.ts",
+            "line": 11,
+            "match": "axios"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/build/client/index.js",
+            "line": 92,
+            "match": "process.env"
+          },
+          {
+            "file": "package/build/transports/streamableHttp.js",
+            "line": 13,
+            "match": "process.env"
+          },
+          {
+            "file": "package/build/utils/test-helpers.js",
+            "line": 34,
+            "match": "process.env"
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: husky || true"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 62,
+        "other_files": 1,
+        "bytes": 177082,
+        "longest_line": 335,
+        "avg_line_length": 35,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 76938,
+        "truncated": false
+      }
+    },
+    "npm:@regle/mcp-server@1.25.2": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/dist/regle-mcp-server.js",
+            "line": 169,
+            "match": "fetch("
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 2,
+        "other_files": 1,
+        "bytes": 294357,
+        "longest_line": 18153,
+        "avg_line_length": 118,
+        "minified": true,
+        "minified_files": [
+          "package/dist/regle-mcp-server.js"
+        ],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "1 of 2 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
+        "tarball_bytes": 67110,
+        "truncated": false
+      }
+    },
+    "npm:@renseiai/agentfactory-mcp-server@0.9.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/dist/src/auth.js",
+            "line": 16,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/src/transport.js",
+            "line": 10,
+            "match": "process.env"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/src/transport.js",
+            "line": 3,
+            "match": "from 'node:http'"
+          },
+          {
+            "file": "package/dist/src/transport.d.ts",
+            "line": 2,
+            "match": "from 'node:http'"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 16,
+        "other_files": 1,
+        "bytes": 43384,
+        "longest_line": 190,
+        "avg_line_length": 44,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 11689,
+        "truncated": false
+      }
+    },
+    "npm:@roychri/mcp-server-asana@1.8.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/dist/index.js",
+            "line": 6899,
+            "match": "process.env"
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: npm run build"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 2,
+        "other_files": 1,
+        "bytes": 270173,
+        "longest_line": 718,
+        "avg_line_length": 32,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 53202,
+        "truncated": false
+      }
+    },
+    "npm:@salesforce/mcp@0.30.9": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "shell": [
+          {
+            "file": "package/lib/tools/enable_tools.js",
+            "line": 54,
+            "match": "exec("
+          },
+          {
+            "file": "package/lib/tools/list_tools.js",
+            "line": 51,
+            "match": "exec("
+          },
+          {
+            "file": "package/lib/tools/enable_tools.d.ts",
+            "line": 22,
+            "match": "exec("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/lib/guessCI.js",
+            "line": 18,
+            "match": "process.env"
+          },
+          {
+            "file": "package/bin/run.js",
+            "line": 4,
+            "match": "process.env"
+          },
+          {
+            "file": "package/lib/telemetry.js",
+            "line": 116,
+            "match": "process.env"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/lib/tools/list_tools.js",
+            "line": 36,
+            "match": "got"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/lib/telemetry.js",
+            "line": 57,
+            "match": "readFileSync("
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 32,
+        "other_files": 1,
+        "bytes": 72159,
+        "longest_line": 300,
+        "avg_line_length": 39,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 195317,
+        "truncated": false
+      }
+    },
+    "npm:@sap-ux/fiori-mcp-server@0.6.58": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "shell": [
+          {
+            "file": "package/dist/index.js",
+            "line": 47,
+            "match": "require(\"node:child_process\")"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/index.js",
+            "line": 34,
+            "match": "require(\"http\")"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/index.js",
+            "line": 276,
+            "match": "fs.readdir"
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/dist/index.js",
+            "line": 1499,
+            "match": "fs.renameSync"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/index.js",
+            "line": 13,
+            "match": "process.env"
+          }
+        ],
+        "dynamic_code": [
+          {
+            "file": "package/dist/index.js",
+            "line": 911,
+            "match": "eval("
+          }
+        ],
+        "dynamic_require": [
+          {
+            "file": "package/dist/index.js",
+            "line": 14,
+            "match": "require(__dirname + '/../themes/generic-logging.js')"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 1,
+        "other_files": 1,
+        "bytes": 4273833,
+        "longest_line": 217695,
+        "avg_line_length": 2517,
+        "minified": true,
+        "minified_files": [
+          "package/dist/index.js"
+        ],
+        "base64_bytes": 7672,
+        "escape_heavy_files": 0,
+        "caveat": "1 of 1 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
+        "tarball_bytes": 1302619,
+        "truncated": false
+      }
+    },
+    "npm:@sentry/mcp-server@0.33.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/dist/auth-UwueZrbT.cjs",
+            "line": 18,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/index.cjs",
+            "line": 1555,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/token-cache-iqkTOca3.cjs",
+            "line": 10,
+            "match": "process.env"
+          }
+        ],
+        "shell": [
+          {
+            "file": "package/dist/device-code-flow-BMOB5yEt.cjs",
+            "line": 5,
+            "match": "require(\"node:child_process\")"
+          },
+          {
+            "file": "package/dist/device-code-flow-BJxgQqnk.js",
+            "line": 4,
+            "match": "from \"node:child_process\""
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/device-code-flow-BMOB5yEt.cjs",
+            "line": 19,
+            "match": "fetch("
+          },
+          {
+            "file": "package/dist/index.cjs",
+            "line": 3164,
+            "match": "fetch("
+          },
+          {
+            "file": "package/dist/token-util-oe0G9a-s.cjs",
+            "line": 177,
+            "match": "fetch("
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/device-code-flow-BMOB5yEt.cjs",
+            "line": 86,
+            "match": "readFileSync("
+          },
+          {
+            "file": "package/dist/token-cache-iqkTOca3.cjs",
+            "line": 18,
+            "match": "readFile("
+          },
+          {
+            "file": "package/dist/token-util-oe0G9a-s.cjs",
+            "line": 315,
+            "match": "fs.readFileSync"
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/dist/token-util-oe0G9a-s.cjs",
+            "line": 327,
+            "match": "fs.mkdirSync"
+          },
+          {
+            "file": "package/dist/token-cache-BTEUyVx2.js",
+            "line": 26,
+            "match": "fs.mkdir"
+          },
+          {
+            "file": "package/dist/token-util-VkLmCUNV.js",
+            "line": 326,
+            "match": "fs.mkdirSync"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 87,
+        "other_files": 1,
+        "bytes": 2923466,
+        "longest_line": 2016,
+        "avg_line_length": 37,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 1719767,
+        "truncated": false
+      }
+    },
+    "npm:@skillsmith/mcp-server@0.5.1": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/dist/tests/integration/analyze.integration.test.js",
+            "line": 131,
+            "match": "axios"
+          },
+          {
+            "file": "package/dist/tests/unit/apply-namespace-rename.test.js",
+            "line": 80,
+            "match": "got"
+          },
+          {
+            "file": "package/dist/tests/integration/github-api.integration.test.js",
+            "line": 25,
+            "match": "fetch("
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/dist/tests/integration/analyze.integration.test.js",
+            "line": 23,
+            "match": "fs.mkdir"
+          },
+          {
+            "file": "package/dist/tests/unit/apply-namespace-rename.test.js",
+            "line": 49,
+            "match": "fs.rmSync"
+          },
+          {
+            "file": "package/dist/tests/unit/apply-recommended-edit.test.js",
+            "line": 54,
+            "match": "fs.rmSync"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/tests/unit/apply-namespace-rename.test.js",
+            "line": 91,
+            "match": "fs.readFileSync"
+          },
+          {
+            "file": "package/dist/tests/unit/apply-recommended-edit.test.js",
+            "line": 71,
+            "match": "fs.readFileSync"
+          },
+          {
+            "file": "package/dist/src/audit/audit-history.js",
+            "line": 61,
+            "match": "fs.readFile"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/tests/unit/apply-namespace-rename.test.js",
+            "line": 40,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/tests/unit/apply-recommended-edit.test.js",
+            "line": 45,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/tests/integration/audit-roundtrip.test.js",
+            "line": 46,
+            "match": "process.env"
+          }
+        ],
+        "shell": [
+          {
+            "file": "package/dist/src/index.js",
+            "line": 10,
+            "match": "from 'child_process'"
+          },
+          {
+            "file": "package/dist/tests/unit/install-helpers.test.js",
+            "line": 378,
+            "match": "exec("
+          },
+          {
+            "file": "package/dist/src/tools/publish.helpers.js",
+            "line": 6,
+            "match": "from 'child_process'"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 536,
+        "other_files": 1,
+        "bytes": 2642586,
+        "longest_line": 725,
+        "avg_line_length": 42,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 955736,
+        "truncated": false
+      }
+    },
+    "npm:@socketsecurity/mcp@0.0.17": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "shell": [
+          {
+            "file": "package/mock-client/debug-client.js",
+            "line": 2,
+            "match": "from 'child_process'"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/mock-client/debug-client.js",
+            "line": 107,
+            "match": "axios"
+          },
+          {
+            "file": "package/mock-client/http-client.js",
+            "line": 36,
+            "match": "fetch("
+          },
+          {
+            "file": "package/index.js",
+            "line": 13,
+            "match": "from 'http'"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/mock-client/debug-client.js",
+            "line": 13,
+            "match": "process.env"
+          },
+          {
+            "file": "package/mock-client/http-client.js",
+            "line": 18,
+            "match": "process.env"
+          },
+          {
+            "file": "package/index.js",
+            "line": 34,
+            "match": "process.env"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/index.js",
+            "line": 15,
+            "match": "readFileSync("
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 8,
+        "other_files": 1,
+        "bytes": 32198,
+        "longest_line": 475,
+        "avg_line_length": 41,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 13402,
+        "truncated": false
+      }
+    },
+    "npm:@softeria/ms-365-mcp-server@0.107.2": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/dist/auth.js",
+            "line": 394,
+            "match": "fetch("
+          },
+          {
+            "file": "package/dist/graph-client.js",
+            "line": 105,
+            "match": "fetch("
+          },
+          {
+            "file": "package/dist/lib/microsoft-auth.js",
+            "line": 57,
+            "match": "fetch("
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/auth.js",
+            "line": 29,
+            "match": "readFileSync("
+          },
+          {
+            "file": "package/dist/cli.js",
+            "line": 8,
+            "match": "readFileSync("
+          },
+          {
+            "file": "package/dist/graph-tools.js",
+            "line": 15,
+            "match": "readFileSync("
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/dist/auth.js",
+            "line": 50,
+            "match": "fs.mkdirSync"
+          },
+          {
+            "file": "package/dist/logger.js",
+            "line": 9,
+            "match": "fs.mkdirSync"
+          },
+          {
+            "file": "package/remove-recursive-refs.js",
+            "line": 194,
+            "match": "fs.writeFileSync"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/auth.js",
+            "line": 41,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/cli.js",
+            "line": 70,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/graph-tools.js",
+            "line": 18,
+            "match": "process.env"
+          }
+        ],
+        "credential_paths": [
+          {
+            "file": "package/dist/auth.js",
+            "line": 165,
+            "match": "Keychain"
+          }
+        ],
+        "shell": [
+          {
+            "file": "package/test-calendar-fix.js",
+            "line": 6,
+            "match": "from 'child_process'"
+          },
+          {
+            "file": "package/bin/modules/generate-mcp-tools.mjs",
+            "line": 3,
+            "match": "from 'child_process'"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 37,
+        "other_files": 1,
+        "bytes": 897001,
+        "longest_line": 1181,
+        "avg_line_length": 44,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 203010,
+        "truncated": false
+      }
+    },
+    "npm:@stripe/mcp@0.3.3": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/dist/cli.js",
+            "line": 32,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/test/index.test.js",
+            "line": 90,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 4,
+        "other_files": 1,
+        "bytes": 13467,
+        "longest_line": 196,
+        "avg_line_length": 40,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 5227,
+        "truncated": false
+      }
+    },
+    "npm:@supabase/mcp-server-supabase@0.8.1": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/dist/chunk-LYI5DEVZ.cjs",
+            "line": 1,
+            "match": "fetch("
+          },
+          {
+            "file": "package/dist/chunk-OCWOYE3R.js",
+            "line": 1,
+            "match": "fetch("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/transports/stdio.cjs",
+            "line": 2,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/transports/stdio.js",
+            "line": 2,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 26,
+        "other_files": 1,
+        "bytes": 286842,
+        "longest_line": 16069,
+        "avg_line_length": 61,
+        "minified": true,
+        "minified_files": [
+          "package/dist/chunk-EVDY7FB4.cjs",
+          "package/dist/chunk-LYI5DEVZ.cjs",
+          "package/dist/chunk-QX2UXNCU.cjs",
+          "package/dist/index.cjs",
+          "package/dist/platform/index.cjs",
+          "package/dist/transports/stdio.cjs",
+          "package/dist/chunk-IO3RHCXN.js",
+          "package/dist/chunk-OCWOYE3R.js",
+          "package/dist/chunk-VCRYYVOD.js",
+          "package/dist/index.js"
+        ],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "10 of 26 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
+        "tarball_bytes": 120836,
+        "truncated": false
+      }
+    },
+    "npm:@taazkareem/clickup-mcp-server@0.14.4": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/build/middleware/auth.js",
+            "line": 1,
+            "match": "axios"
+          },
+          {
+            "file": "package/build/services/clickup/base.js",
+            "line": 1,
+            "match": "axios"
+          },
+          {
+            "file": "package/build/license.js",
+            "line": 1,
+            "match": "axios"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/build/config.js",
+            "line": 1,
+            "match": "process.env"
+          },
+          {
+            "file": "package/build/license.js",
+            "line": 1,
+            "match": "process.env"
+          },
+          {
+            "file": "package/build/logger.js",
+            "line": 1,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 94,
+        "other_files": 1,
+        "bytes": 1607896,
+        "longest_line": 83426,
+        "avg_line_length": 16925,
+        "minified": true,
+        "minified_files": [
+          "package/build/tools/attachment.js",
+          "package/build/services/clickup/audit-logs.js",
+          "package/build/tools/audit-logs.js",
+          "package/build/middleware/auth.js",
+          "package/build/services/clickup/base.js",
+          "package/build/tools/task/bulk-operations.js",
+          "package/build/services/clickup/bulk.js",
+          "package/build/utils/cache.js",
+          "package/build/tools/categories.js",
+          "package/build/services/clickup/chat.js"
+        ],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "92 of 94 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
+        "tarball_bytes": 476019,
+        "truncated": false
+      }
+    },
+    "npm:@tankpkg/mcp-server@0.15.7": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "shell": [
+          {
+            "file": "package/dist/index.js",
+            "line": 8097,
+            "match": "execSync("
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/index.js",
+            "line": 4763,
+            "match": "fetch("
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/index.js",
+            "line": 4695,
+            "match": "fs.readFileSync"
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/dist/index.js",
+            "line": 4825,
+            "match": "fs.mkdirSync"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/index.js",
+            "line": 13,
+            "match": "process.env"
+          }
+        ],
+        "dynamic_code": [
+          {
+            "file": "package/dist/index.js",
+            "line": 504,
+            "match": "new Function("
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 2,
+        "other_files": 1,
+        "bytes": 286467,
+        "longest_line": 432,
+        "avg_line_length": 34,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 183895,
+        "truncated": false
+      }
+    },
+    "npm:@theia/ai-mcp-server@1.71.1": {
+      "checked_at": "2026-09-17",
+      "found": {},
+      "coverage": {
+        "code_files": 45,
+        "other_files": 1,
+        "bytes": 108177,
+        "longest_line": 162,
+        "avg_line_length": 43,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 24358,
+        "truncated": false
+      }
+    },
+    "npm:@tocharianou/mcp-server-kibana@0.8.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "fs_read": [
+          {
+            "file": "package/dist/src/base-tools.js",
+            "line": 43,
+            "match": "fs.readFileSync"
+          },
+          {
+            "file": "package/dist/index.js",
+            "line": 58,
+            "match": "fs.readFileSync"
+          },
+          {
+            "file": "package/dist/src/resources.js",
+            "line": 30,
+            "match": "fs.readFileSync"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/src/base-tools.js",
+            "line": 22,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/index.js",
+            "line": 252,
+            "match": "process.env"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/index.js",
+            "line": 57,
+            "match": "require(\"https\")"
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: npm run build"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 30,
+        "other_files": 1,
+        "bytes": 152969,
+        "longest_line": 893,
+        "avg_line_length": 43,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 723972,
+        "truncated": false
+      }
+    },
+    "npm:@translated/lara-mcp@1.0.2": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/dist/__tests__/tools/annotations.test.js",
+            "line": 3,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/env.js",
+            "line": 14,
+            "match": "process.env"
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/dist/mcp/tools/import_glossary_csv.js",
+            "line": 35,
+            "match": "fs.writeFileSync"
+          },
+          {
+            "file": "package/dist/mcp/tools/import_tmx.js",
+            "line": 25,
+            "match": "fs.writeFileSync"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/rest/routes/server-info.js",
+            "line": 4,
+            "match": "fs.readFileSync"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/rest/server.js",
+            "line": 8,
+            "match": "from \"node:http\""
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 61,
+        "other_files": 1,
+        "bytes": 127487,
+        "longest_line": 297,
+        "avg_line_length": 41,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 26484,
+        "truncated": false
+      }
+    },
+    "npm:@transloadit/mcp-server@0.3.21": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/dist/cli.js",
+            "line": 3,
+            "match": "from 'node:http'"
+          },
+          {
+            "file": "package/dist/http-helpers.d.ts",
+            "line": 1,
+            "match": "from 'node:http'"
+          },
+          {
+            "file": "package/dist/http-request-handler.d.ts",
+            "line": 1,
+            "match": "from 'node:http'"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/cli.js",
+            "line": 74,
+            "match": "readFile("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/cli.js",
+            "line": 93,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 20,
+        "other_files": 1,
+        "bytes": 68530,
+        "longest_line": 232,
+        "avg_line_length": 40,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 30916,
+        "truncated": false
+      }
+    },
+    "npm:@ui5/mcp-server@0.2.11": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/lib/tools/get_api_reference/lib/ApiReferenceProvider.js",
+            "line": 271,
+            "match": "got"
+          },
+          {
+            "file": "package/lib/utils/cdnHelper.js",
+            "line": 56,
+            "match": "fetch("
+          },
+          {
+            "file": "package/lib/tools/create_ui5_app/ODataMetadata.js",
+            "line": 56,
+            "match": "fetch("
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/lib/tools/get_api_reference/lib/ApiReferenceProvider.js",
+            "line": 58,
+            "match": "readFile("
+          },
+          {
+            "file": "package/lib/tools/get_api_reference/lib/apiReferenceResources.js",
+            "line": 98,
+            "match": "readFile("
+          },
+          {
+            "file": "package/lib/tools/create_integration_card/create_integration_card.js",
+            "line": 72,
+            "match": "readFile("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/lib/utils/cdnHelper.js",
+            "line": 6,
+            "match": "process.env"
+          },
+          {
+            "file": "package/lib/utils/dataStorageHelper.js",
+            "line": 22,
+            "match": "process.env"
+          },
+          {
+            "file": "package/lib/utils/getAllowedDomains.js",
+            "line": 5,
+            "match": "process.env"
+          }
+        ],
+        "dynamic_require": [
+          {
+            "file": "package/resources/template-js/webapp/test-lt1_124/integration/opaTests.qunit.js",
+            "line": 8,
+            "match": "require([\"integration/HelloJourney\"], function ()"
+          },
+          {
+            "file": "package/resources/template-js/webapp/test-lt1_124/unit/unitTests.qunit.js",
+            "line": 9,
+            "match": "require([\"unit/controller/Main.qunit\"], function ()"
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: test -f ./.husky/skip.js && node ./.husky/skip.js || test -d"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 148,
+        "other_files": 4,
+        "bytes": 251417,
+        "longest_line": 344,
+        "avg_line_length": 39,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 339998,
+        "truncated": false
+      }
+    },
+    "npm:@upstash/context7-mcp@2.2.4": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/dist/lib/api.js",
+            "line": 5,
+            "match": "from \"tls\""
+          },
+          {
+            "file": "package/dist/index.js",
+            "line": 359,
+            "match": "fetch("
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/lib/api.js",
+            "line": 53,
+            "match": "readFileSync("
+          },
+          {
+            "file": "package/dist/lib/constants.js",
+            "line": 5,
+            "match": "readFileSync("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/lib/api.js",
+            "line": 37,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/lib/constants.js",
+            "line": 10,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/lib/encryption.js",
+            "line": 4,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 7,
+        "other_files": 1,
+        "bytes": 33504,
+        "longest_line": 525,
+        "avg_line_length": 44,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 23573,
+        "truncated": false
+      }
+    },
+    "npm:@upstash/mcp-server@0.2.3": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/dist/index.js",
+            "line": 7,
+            "match": "from \"http\""
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/dist/index.js",
+            "line": 37,
+            "match": "appendFileSync("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/index.js",
+            "line": 1742,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 2,
+        "other_files": 1,
+        "bytes": 71787,
+        "longest_line": 443,
+        "avg_line_length": 39,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 50419,
+        "truncated": false
+      }
+    },
+    "npm:@vapi-ai/mcp-server@0.0.9": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/dist/index.js",
+            "line": 9,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/__tests__/mcp-server-e2e.test.js",
+            "line": 20,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/__tests__/mcp-server-mock.test.js",
+            "line": 7,
+            "match": "process.env"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/__tests__/mcp-server-e2e.test.js",
+            "line": 139,
+            "match": "got"
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: npm run build"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 28,
+        "other_files": 1,
+        "bytes": 98105,
+        "longest_line": 240,
+        "avg_line_length": 37,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 18838,
+        "truncated": false
+      }
+    },
+    "npm:@vibeframe/mcp-server@0.104.3": {
+      "checked_at": "2026-09-17",
+      "found": {},
+      "coverage": {
+        "code_files": 0,
+        "other_files": 1,
+        "bytes": 0,
+        "longest_line": 0,
+        "avg_line_length": 0,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 4935505,
+        "truncated": true
+      }
+    },
+    "npm:@voltagent/mcp-server@2.0.2": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/dist/index.d.mts",
+            "line": 5,
+            "match": "from 'node:http'"
+          },
+          {
+            "file": "package/dist/index.d.ts",
+            "line": 5,
+            "match": "from 'node:http'"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 4,
+        "other_files": 1,
+        "bytes": 172725,
+        "longest_line": 1107,
+        "avg_line_length": 34,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 84781,
+        "truncated": false
+      }
+    },
+    "npm:@winor30/mcp-server-datadog@1.7.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/build/index.js",
+            "line": 1109,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 2,
+        "other_files": 1,
+        "bytes": 33722,
+        "longest_line": 175,
+        "avg_line_length": 29,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 15248,
+        "truncated": false
+      }
+    },
+    "npm:@zereight/mcp-gitlab@2.1.10": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/build/auth-retry.js",
+            "line": 8,
+            "match": "node-fetch"
+          },
+          {
+            "file": "package/build/test/callback-proxy-tests.js",
+            "line": 28,
+            "match": "fetch("
+          },
+          {
+            "file": "package/build/config.js",
+            "line": 92,
+            "match": "got"
+          }
+        ],
+        "shell": [
+          {
+            "file": "package/build/test/stateless/config-ttl.test.js",
+            "line": 21,
+            "match": "from \"node:child_process\""
+          },
+          {
+            "file": "package/build/test/utils/server-launcher.js",
+            "line": 5,
+            "match": "from \"child_process\""
+          },
+          {
+            "file": "package/build/test/streamable-http-static-token-auth.test.js",
+            "line": 2,
+            "match": "from \"node:child_process\""
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/build/test/stateless/config-ttl.test.js",
+            "line": 17,
+            "match": "process.env"
+          },
+          {
+            "file": "package/build/config.js",
+            "line": 17,
+            "match": "process.env"
+          },
+          {
+            "file": "package/build/customSchemas.js",
+            "line": 2,
+            "match": "process.env"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/build/gitlab-client-pool.js",
+            "line": 91,
+            "match": "fs.readFileSync"
+          },
+          {
+            "file": "package/build/index.js",
+            "line": 92,
+            "match": "fs.readFileSync"
+          },
+          {
+            "file": "package/build/oauth.js",
+            "line": 208,
+            "match": "fs.readFileSync"
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/build/index.js",
+            "line": 4889,
+            "match": "fs.mkdirSync"
+          },
+          {
+            "file": "package/build/test/oauth-tests.js",
+            "line": 68,
+            "match": "fs.unlinkSync"
+          },
+          {
+            "file": "package/build/oauth.js",
+            "line": 191,
+            "match": "fs.writeFileSync"
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: npm run build"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 69,
+        "other_files": 1,
+        "bytes": 1230200,
+        "longest_line": 4383,
+        "avg_line_length": 44,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 231222,
+        "truncated": false
+      }
+    },
+    "npm:argocd-mcp@0.7.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/dist/index.js",
+            "line": 152,
+            "match": "fetch("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/index.js",
+            "line": 593,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 2,
+        "other_files": 1,
+        "bytes": 37612,
+        "longest_line": 313,
+        "avg_line_length": 36,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 26661,
+        "truncated": false
+      }
+    },
+    "npm:brave-search-mcp@2.1.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/dist/index.js",
+            "line": 8,
+            "match": "fetch("
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/index.js",
+            "line": 8,
+            "match": "readFile("
+          }
+        ],
+        "dynamic_code": [
+          {
+            "file": "package/dist/index.js",
+            "line": 5,
+            "match": "new Function("
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 1,
+        "other_files": 1,
+        "bytes": 556030,
+        "longest_line": 456986,
+        "avg_line_length": 69504,
+        "minified": true,
+        "minified_files": [
+          "package/dist/index.js"
+        ],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "1 of 1 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
+        "tarball_bytes": 895772,
+        "truncated": false
+      }
+    },
+    "npm:chrome-devtools-mcp@0.26.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "shell": [
+          {
+            "file": "package/build/src/browser.js",
+            "line": 6,
+            "match": "from 'node:child_process'"
+          },
+          {
+            "file": "package/build/src/utils/check-for-updates.js",
+            "line": 6,
+            "match": "from 'node:child_process'"
+          },
+          {
+            "file": "package/build/src/daemon/client.js",
+            "line": 6,
+            "match": "from 'node:child_process'"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/build/src/browser.js",
+            "line": 61,
+            "match": "readFile("
+          },
+          {
+            "file": "package/build/src/utils/check-for-updates.js",
+            "line": 32,
+            "match": "fs.readFile"
+          },
+          {
+            "file": "package/build/src/HeapSnapshotManager.js",
+            "line": 90,
+            "match": "createReadStream("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/build/src/browser.js",
+            "line": 113,
+            "match": "process.env"
+          },
+          {
+            "file": "package/build/src/utils/check-for-updates.js",
+            "line": 23,
+            "match": "process.env"
+          },
+          {
+            "file": "package/build/src/bin/chrome-devtools-mcp-cli-options.js",
+            "line": 264,
+            "match": "process.env"
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/build/src/utils/check-for-updates.js",
+            "line": 48,
+            "match": "fs.mkdir"
+          },
+          {
+            "file": "package/build/src/bin/check-latest-version.js",
+            "line": 18,
+            "match": "fs.mkdir"
+          },
+          {
+            "file": "package/build/src/daemon/client.js",
+            "line": 58,
+            "match": "fs.unlinkSync"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/build/src/bin/check-latest-version.js",
+            "line": 12,
+            "match": "fetch("
+          },
+          {
+            "file": "package/build/src/bin/chrome-devtools-cli-options.js",
+            "line": 148,
+            "match": "fetch("
+          },
+          {
+            "file": "package/build/src/telemetry/watchdog/ClearcutSender.js",
+            "line": 155,
+            "match": "fetch("
+          }
+        ],
+        "dynamic_code": [
+          {
+            "file": "package/build/src/third_party/devtools-formatter-worker.js",
+            "line": 8057,
+            "match": "eval("
+          },
+          {
+            "file": "package/build/src/third_party/devtools-heap-snapshot-worker.js",
+            "line": 820,
+            "match": "eval("
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: node --experimental-strip-types scripts/prepare.ts"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 73,
+        "other_files": 1,
+        "bytes": 1344812,
+        "longest_line": 4546,
+        "avg_line_length": 38,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 3122137,
+        "truncated": true
+      }
+    },
+    "npm:clinicaltrialsgov-mcp-server@2.4.7": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/dist/services/clinical-trials/clinical-trials-service.js",
+            "line": 244,
+            "match": "fetch("
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: bunx husky"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 42,
+        "other_files": 1,
+        "bytes": 160244,
+        "longest_line": 724,
+        "avg_line_length": 46,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 70903,
+        "truncated": false
+      }
+    },
+    "npm:codex-mcp-server@1.4.10": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "shell": [
+          {
+            "file": "package/dist/utils/command.js",
+            "line": 1,
+            "match": "from 'child_process'"
+          },
+          {
+            "file": "package/dist/__tests__/mcp-stdio.test.js",
+            "line": 1,
+            "match": "from 'child_process'"
+          },
+          {
+            "file": "package/dist/__tests__/resume-functionality.test.js",
+            "line": 143,
+            "match": "exec ("
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/utils/command.js",
+            "line": 73,
+            "match": "got"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/utils/command.js",
+            "line": 29,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/__tests__/context-building.test.js",
+            "line": 14,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/__tests__/default-model.test.js",
+            "line": 14,
+            "match": "process.env"
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/dist/__tests__/mcp-stdio.test.js",
+            "line": 25,
+            "match": "writeFileSync("
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 36,
+        "other_files": 1,
+        "bytes": 105383,
+        "longest_line": 203,
+        "avg_line_length": 41,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 38069,
+        "truncated": false
+      }
+    },
+    "npm:dataforseo-mcp-server@2.9.2": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "shell": [
+          {
+            "file": "package/build/main/main/cli.js",
+            "line": 2,
+            "match": "from 'child_process'"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/build/main/main/cli.js",
+            "line": 15,
+            "match": "process.env"
+          },
+          {
+            "file": "package/build/main/core/config/field-configuration.js",
+            "line": 76,
+            "match": "process.env"
+          },
+          {
+            "file": "package/build/main/core/config/global.tool.js",
+            "line": 9,
+            "match": "process.env"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/build/main/core/client/dataforseo.client.js",
+            "line": 26,
+            "match": "fetch("
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/build/main/core/config/field-configuration.js",
+            "line": 24,
+            "match": "fs.readFileSync"
+          },
+          {
+            "file": "package/build/main/core/utils/version.js",
+            "line": 18,
+            "match": "fs.readFileSync"
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: npm run build"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 117,
+        "other_files": 1,
+        "bytes": 337009,
+        "longest_line": 549,
+        "avg_line_length": 45,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 89948,
+        "truncated": false
+      }
+    },
+    "npm:deepl-mcp-server@1.1.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/workshops/deepl-simple-js/deepl-simple.js",
+            "line": 6,
+            "match": "axios"
+          },
+          {
+            "file": "package/workshops/jokes-js/jokes.js",
+            "line": 9,
+            "match": "axios"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/workshops/deepl-simple-js/deepl-simple.js",
+            "line": 21,
+            "match": "process.env"
+          },
+          {
+            "file": "package/src/index.mjs",
+            "line": 12,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 3,
+        "other_files": 4,
+        "bytes": 23389,
+        "longest_line": 574,
+        "avg_line_length": 32,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 39835,
+        "truncated": false
+      }
+    },
+    "npm:exa-mcp-server@3.2.1": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/smithery/shttp/index.cjs",
+            "line": 12,
+            "match": "require(\"http\")"
+          },
+          {
+            "file": "package/smithery/stdio/index.cjs",
+            "line": 9,
+            "match": "require(\"http\")"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/smithery/shttp/index.cjs",
+            "line": 62,
+            "match": "createReadStream("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/smithery/shttp/index.cjs",
+            "line": 13,
+            "match": "process.env"
+          },
+          {
+            "file": "package/smithery/stdio/index.cjs",
+            "line": 10,
+            "match": "process.env"
+          }
+        ],
+        "dynamic_code": [
+          {
+            "file": "package/smithery/shttp/index.cjs",
+            "line": 9,
+            "match": "new Function("
+          },
+          {
+            "file": "package/smithery/stdio/index.cjs",
+            "line": 6,
+            "match": "new Function("
+          }
+        ],
+        "dynamic_require": [
+          {
+            "file": "package/smithery/shttp/index.cjs",
+            "line": 62,
+            "match": "require(t)"
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: npm run build:stdio"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 2,
+        "other_files": 1,
+        "bytes": 3441265,
+        "longest_line": 594413,
+        "avg_line_length": 4435,
+        "minified": true,
+        "minified_files": [
+          "package/smithery/shttp/index.cjs",
+          "package/smithery/stdio/index.cjs"
+        ],
+        "base64_bytes": 0,
+        "escape_heavy_files": 1,
+        "caveat": "2 of 2 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
+        "tarball_bytes": 930037,
+        "truncated": false
+      }
+    },
+    "npm:firecrawl-mcp@3.15.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/dist/index.js",
+            "line": 1407,
+            "match": "fetch("
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/index.js",
+            "line": 1384,
+            "match": "readFile("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/index.js",
+            "line": 59,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 1,
+        "other_files": 1,
+        "bytes": 54797,
+        "longest_line": 341,
+        "avg_line_length": 38,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 24092,
+        "truncated": false
+      }
+    },
+    "npm:fsb-mcp-server@0.9.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/build/bridge.js",
+            "line": 549,
+            "match": "new WebSocket("
+          },
+          {
+            "file": "package/build/http.js",
+            "line": 2,
+            "match": "from 'node:http'"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/build/config-writer.js",
+            "line": 153,
+            "match": "readFile("
+          },
+          {
+            "file": "package/build/diagnostics.js",
+            "line": 129,
+            "match": "readFile("
+          }
+        ],
+        "shell": [
+          {
+            "file": "package/build/install.js",
+            "line": 4,
+            "match": "from 'node:child_process'"
+          },
+          {
+            "file": "package/build/install.d.ts",
+            "line": 20,
+            "match": "execSync ("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/build/platforms.js",
+            "line": 10,
+            "match": "process.env"
+          }
+        ],
+        "dynamic_require": [
+          {
+            "file": "package/build/queue.js",
+            "line": 9,
+            "match": "require(path.resolve(__dirname, '../ai/tool-definitions.cjs')"
+          },
+          {
+            "file": "package/build/tools/schema-bridge.js",
+            "line": 23,
+            "match": "require(path.resolve(__dirname, '../../ai/tool-definitions.cjs')"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 51,
+        "other_files": 1,
+        "bytes": 349205,
+        "longest_line": 2126,
+        "avg_line_length": 48,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 116985,
+        "truncated": false
+      }
+    },
+    "npm:godot-mcp-server@0.5.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "fs_read": [
+          {
+            "file": "package/scripts/build-visualizer.js",
+            "line": 23,
+            "match": "readFileSync("
+          },
+          {
+            "file": "package/dist/index.js",
+            "line": 47,
+            "match": "readFileSync("
+          },
+          {
+            "file": "package/dist/visualizer-server.js",
+            "line": 41,
+            "match": "fs.readFileSync"
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/scripts/build-visualizer.js",
+            "line": 48,
+            "match": "writeFileSync("
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/godot-bridge.js",
+            "line": 167,
+            "match": "got"
+          },
+          {
+            "file": "package/dist/index.js",
+            "line": 41,
+            "match": "got"
+          },
+          {
+            "file": "package/dist/primary-http.js",
+            "line": 11,
+            "match": "from 'node:http'"
+          }
+        ],
+        "shell": [
+          {
+            "file": "package/dist/index.js",
+            "line": 25,
+            "match": "from 'child_process'"
+          },
+          {
+            "file": "package/dist/visualizer-server.js",
+            "line": 10,
+            "match": "from 'node:child_process'"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/index.js",
+            "line": 56,
+            "match": "process.env"
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: npm run build"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 29,
+        "other_files": 1,
+        "bytes": 137790,
+        "longest_line": 858,
+        "avg_line_length": 44,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 82091,
+        "truncated": false
+      }
+    },
+    "npm:hostinger-api-mcp@0.1.43": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "shell": [
+          {
+            "file": "package/build.js",
+            "line": 3,
+            "match": "from 'child_process'"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/build.js",
+            "line": 45,
+            "match": "fs.readFileSync"
+          },
+          {
+            "file": "package/src/core/runtime.js",
+            "line": 318,
+            "match": "fs.createReadStream"
+          },
+          {
+            "file": "package/src/core/runtime.ts",
+            "line": 348,
+            "match": "fs.createReadStream"
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/build.js",
+            "line": 14,
+            "match": "fs.mkdirSync"
+          },
+          {
+            "file": "package/src/core/runtime.js",
+            "line": 1185,
+            "match": "fs.unlinkSync"
+          },
+          {
+            "file": "package/src/core/runtime.ts",
+            "line": 1215,
+            "match": "fs.unlinkSync"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/src/core/runtime.js",
+            "line": 8,
+            "match": "axios"
+          },
+          {
+            "file": "package/src/core/runtime.ts",
+            "line": 15,
+            "match": "axios"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/src/core/runtime.js",
+            "line": 41,
+            "match": "process.env"
+          },
+          {
+            "file": "package/src/core/runtime.ts",
+            "line": 66,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 32,
+        "other_files": 1,
+        "bytes": 656448,
+        "longest_line": 701,
+        "avg_line_length": 30,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 101624,
+        "truncated": false
+      }
+    },
+    "npm:ios-simulator-mcp@1.6.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "shell": [
+          {
+            "file": "package/build/index.js",
+            "line": 10,
+            "match": "require(\"child_process\")"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/build/index.js",
+            "line": 537,
+            "match": "readFileSync("
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/build/index.js",
+            "line": 540,
+            "match": "unlinkSync("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/build/index.js",
+            "line": 44,
+            "match": "process.env"
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: npm run build"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 1,
+        "other_files": 1,
+        "bytes": 37313,
+        "longest_line": 249,
+        "avg_line_length": 41,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 12581,
+        "truncated": false
+      }
+    },
+    "npm:kubernetes-mcp-server@0.0.62": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "shell": [
+          {
+            "file": "package/bin/index.js",
+            "line": 3,
+            "match": "require('child_process')"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 1,
+        "other_files": 1,
+        "bytes": 1597,
+        "longest_line": 108,
+        "avg_line_length": 34,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 17750,
+        "truncated": false
+      }
+    },
+    "npm:linear-mcp-server@0.1.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/build/index.js",
+            "line": 643,
+            "match": "process.env"
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: npm run build"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 1,
+        "other_files": 1,
+        "bytes": 40582,
+        "longest_line": 316,
+        "avg_line_length": 44,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 9978,
+        "truncated": false
+      }
+    },
+    "npm:linkup-mcp-server@3.2.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/dist/client.js",
+            "line": 15,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/index.js",
+            "line": 4,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/stdio.js",
+            "line": 20,
+            "match": "process.env"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/tools/fetch.js",
+            "line": 24,
+            "match": "fetch("
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: node .husky/install.mjs"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 7,
+        "other_files": 1,
+        "bytes": 10957,
+        "longest_line": 430,
+        "avg_line_length": 39,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 10004,
+        "truncated": false
+      }
+    },
+    "npm:lsp-mcp-server@1.1.17": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "fs_read": [
+          {
+            "file": "package/dist/tools/code-actions.js",
+            "line": 92,
+            "match": "readFile("
+          },
+          {
+            "file": "package/dist/config.js",
+            "line": 50,
+            "match": "fs.readFile"
+          },
+          {
+            "file": "package/dist/tools/diagnostics.js",
+            "line": 110,
+            "match": "readFile("
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/dist/tools/code-actions.js",
+            "line": 122,
+            "match": "fs.writeFile"
+          },
+          {
+            "file": "package/dist/tools/formatting.js",
+            "line": 95,
+            "match": "fs.writeFile"
+          },
+          {
+            "file": "package/dist/tools/rename.js",
+            "line": 85,
+            "match": "fs.writeFile"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/config.js",
+            "line": 34,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/utils/logger.js",
+            "line": 36,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/services/lsp-client.js",
+            "line": 74,
+            "match": "process.env"
+          }
+        ],
+        "shell": [
+          {
+            "file": "package/dist/services/lsp-client.js",
+            "line": 22,
+            "match": "from 'node:child_process'"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 74,
+        "other_files": 1,
+        "bytes": 396833,
+        "longest_line": 809,
+        "avg_line_length": 40,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 117980,
+        "truncated": false
+      }
+    },
+    "npm:mcp-searxng@1.0.3": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/dist/error-handler.js",
+            "line": 121,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/http-security.js",
+            "line": 11,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/index.js",
+            "line": 191,
+            "match": "process.env"
+          }
+        ],
+        "credential_paths": [
+          {
+            "file": "package/dist/error-handler.js",
+            "line": 37,
+            "match": "keychain"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/proxy.js",
+            "line": 1,
+            "match": "undici"
+          },
+          {
+            "file": "package/dist/search.js",
+            "line": 67,
+            "match": "fetch("
+          },
+          {
+            "file": "package/dist/tls-config.js",
+            "line": 38,
+            "match": "undici"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/tls-config.js",
+            "line": 27,
+            "match": "readFileSync("
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 24,
+        "other_files": 1,
+        "bytes": 69732,
+        "longest_line": 240,
+        "avg_line_length": 39,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 21836,
+        "truncated": false
+      }
+    },
+    "npm:mcp-server-kubernetes@3.5.1": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/dist/utils/auth.js",
+            "line": 27,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/tools/exec_in_pod.js",
+            "line": 91,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/tools/helm-operations.js",
+            "line": 149,
+            "match": "process.env"
+          }
+        ],
+        "shell": [
+          {
+            "file": "package/dist/tools/exec_in_pod.js",
+            "line": 11,
+            "match": "from \"child_process\""
+          },
+          {
+            "file": "package/dist/tools/helm-operations.js",
+            "line": 7,
+            "match": "from \"child_process\""
+          },
+          {
+            "file": "package/dist/tools/kubectl-apply.js",
+            "line": 1,
+            "match": "from \"child_process\""
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/dist/tools/helm-operations.js",
+            "line": 206,
+            "match": "writeFileSync("
+          },
+          {
+            "file": "package/dist/tools/kubectl-apply.js",
+            "line": 54,
+            "match": "fs.writeFileSync"
+          },
+          {
+            "file": "package/dist/tools/kubectl-create.js",
+            "line": 161,
+            "match": "fs.writeFileSync"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/utils/streamable-http.d.ts",
+            "line": 2,
+            "match": "from \"http\""
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 80,
+        "other_files": 1,
+        "bytes": 311031,
+        "longest_line": 286,
+        "avg_line_length": 34,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 54378,
+        "truncated": false
+      }
+    },
+    "npm:mongodb-mcp-server@1.10.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "shell": [
+          {
+            "file": "package/dist/cjs/setup/aiTool.js",
+            "line": 12,
+            "match": "require(\"child_process\")"
+          },
+          {
+            "file": "package/dist/esm/setup/aiTool.js",
+            "line": 6,
+            "match": "from \"child_process\""
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/cjs/setup/aiTool.js",
+            "line": 123,
+            "match": "readFileSync("
+          },
+          {
+            "file": "package/dist/esm/setup/aiTool.js",
+            "line": 117,
+            "match": "fs.readFileSync"
+          },
+          {
+            "file": "package/dist/cjs/common/exportsManager.js",
+            "line": 80,
+            "match": "readFile("
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/dist/cjs/setup/aiTool.js",
+            "line": 58,
+            "match": "writeFileSync("
+          },
+          {
+            "file": "package/dist/esm/setup/aiTool.js",
+            "line": 45,
+            "match": "fs.mkdirSync"
+          },
+          {
+            "file": "package/dist/esm/common/logging/diskLogger.js",
+            "line": 13,
+            "match": "fs.mkdir"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/cjs/setup/aiTool.js",
+            "line": 30,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/esm/setup/aiTool.js",
+            "line": 24,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/cjs/common/config/configUtils.js",
+            "line": 19,
+            "match": "process.env"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/cjs/common/atlas/apiClient.js",
+            "line": 112,
+            "match": "fetch("
+          },
+          {
+            "file": "package/dist/esm/common/atlas/apiClient.js",
+            "line": 105,
+            "match": "fetch("
+          },
+          {
+            "file": "package/dist/cjs/ui/lib/tools/list-databases.js",
+            "line": 10,
+            "match": "fetch("
+          }
+        ],
+        "credential_paths": [
+          {
+            "file": "package/dist/cjs/transports/base.js",
+            "line": 45,
+            "match": "keychain"
+          },
+          {
+            "file": "package/dist/esm/transports/base.js",
+            "line": 9,
+            "match": "Keychain"
+          },
+          {
+            "file": "package/dist/cjs/tools/atlas/connect/connectCluster.js",
+            "line": 98,
+            "match": "keychain"
+          }
+        ],
+        "dynamic_code": [
+          {
+            "file": "package/dist/cjs/ui/lib/tools/list-databases.js",
+            "line": 10,
+            "match": "new Function("
+          },
+          {
+            "file": "package/dist/esm/ui/lib/tools/list-databases.js",
+            "line": 7,
+            "match": "new Function("
+          },
+          {
+            "file": "package/dist/cjs/ui/lib/tools/list-databases.d.ts",
+            "line": 7,
+            "match": "new Function("
+          }
+        ],
+        "dynamic_require": [
+          {
+            "file": "package/dist/cjs/ui/lib/tools/list-databases.js",
+            "line": 10,
+            "match": "require(\\\"util\\\")"
+          },
+          {
+            "file": "package/dist/esm/ui/lib/tools/list-databases.js",
+            "line": 7,
+            "match": "require(\\\"util\\\")"
+          },
+          {
+            "file": "package/dist/cjs/ui/lib/tools/list-databases.d.ts",
+            "line": 7,
+            "match": "require(\\\"util\\\")"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 572,
+        "other_files": 3,
+        "bytes": 5939331,
+        "longest_line": 1465485,
+        "avg_line_length": 163,
+        "minified": true,
+        "minified_files": [
+          "package/dist/cjs/ui/lib/tools/list-databases.js",
+          "package/dist/esm/ui/lib/tools/list-databases.js",
+          "package/dist/cjs/ui/lib/tools/list-databases.d.ts"
+        ],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "3 of 572 code file(s) are written for a machine; a pattern scan over them can show presence, never absence",
+        "tarball_bytes": 1832823,
+        "truncated": true
+      }
+    },
+    "npm:obsidian-mcp-server@3.1.9": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/dist/config/server-config.js",
+            "line": 59,
+            "match": "got"
+          },
+          {
+            "file": "package/dist/services/obsidian/obsidian-service.d.ts",
+            "line": 8,
+            "match": "undici"
+          },
+          {
+            "file": "package/dist/services/obsidian/obsidian-service.js",
+            "line": 71,
+            "match": "fetch("
+          }
+        ],
+        "shell": [
+          {
+            "file": "package/dist/services/obsidian/obsidian-service.js",
+            "line": 396,
+            "match": "exec("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/services/obsidian/obsidian-service.js",
+            "line": 44,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 58,
+        "other_files": 1,
+        "bytes": 339017,
+        "longest_line": 663,
+        "avg_line_length": 49,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 132660,
+        "truncated": false
+      }
+    },
+    "npm:openapi-mcp-generator@3.3.0": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/dist/generator/env-file.js",
+            "line": 84,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/utils/security.js",
+            "line": 22,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/generator/server-code.js",
+            "line": 113,
+            "match": "process.env"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/index.js",
+            "line": 77,
+            "match": "fs.readdir"
+          },
+          {
+            "file": "package/dist/generator/streamable-http.js",
+            "line": 215,
+            "match": "fs.readFileSync"
+          },
+          {
+            "file": "package/dist/generator/web-server.js",
+            "line": 252,
+            "match": "fs.readFileSync"
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/dist/index.js",
+            "line": 116,
+            "match": "fs.mkdir"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/generator/package-json.js",
+            "line": 30,
+            "match": "axios"
+          },
+          {
+            "file": "package/dist/utils/security.js",
+            "line": 141,
+            "match": "axios"
+          },
+          {
+            "file": "package/dist/generator/server-code.js",
+            "line": 86,
+            "match": "axios"
+          }
+        ],
+        "dynamic_code": [
+          {
+            "file": "package/dist/generator/server-code.js",
+            "line": 213,
+            "match": "eval("
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 37,
+        "other_files": 1,
+        "bytes": 139019,
+        "longest_line": 339,
+        "avg_line_length": 35,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 46982,
+        "truncated": false
+      }
+    },
+    "npm:prometheus-mcp@1.1.3": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/dist/index.mjs",
+            "line": 54,
+            "match": "fetch("
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/index.mjs",
+            "line": 15,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 1,
+        "other_files": 1,
+        "bytes": 18306,
+        "longest_line": 118,
+        "avg_line_length": 32,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 9141,
+        "truncated": false
+      }
+    },
+    "npm:slack-mcp-server@1.2.3": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "shell": [
+          {
+            "file": "package/bin/index.js",
+            "line": 5,
+            "match": "require('child_process')"
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/bin/index.js",
+            "line": 60,
+            "match": "fs.chmodSync"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/bin/index.js",
+            "line": 18,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 1,
+        "other_files": 1,
+        "bytes": 2450,
+        "longest_line": 107,
+        "avg_line_length": 37,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 8661,
+        "truncated": false
+      }
+    },
+    "npm:tavily-mcp@0.2.19": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "network": [
+          {
+            "file": "package/build/index.js",
+            "line": 5,
+            "match": "axios"
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/build/index.js",
+            "line": 12,
+            "match": "process.env"
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: npm run build"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 1,
+        "other_files": 1,
+        "bytes": 38653,
+        "longest_line": 372,
+        "avg_line_length": 49,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 11781,
+        "truncated": false
+      }
+    },
+    "npm:todoist-mcp@1.3.4": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/dist/utils/helpers.js",
+            "line": 9,
+            "match": "process.env"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/utils/TodoistClient.js",
+            "line": 51,
+            "match": "fetch("
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 36,
+        "other_files": 1,
+        "bytes": 52334,
+        "longest_line": 378,
+        "avg_line_length": 36,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 15520,
+        "truncated": false
+      }
+    },
+    "npm:touchdesigner-mcp-server@1.4.10": {
+      "checked_at": "2026-09-17",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/dist/cli.js",
+            "line": 99,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/server/connectionManager.js",
+            "line": 29,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/gen/endpoints/TouchDesignerAPI.js",
+            "line": 34,
+            "match": "process.env"
+          }
+        ],
+        "network": [
+          {
+            "file": "package/dist/api/customInstance.js",
+            "line": 1,
+            "match": "axios"
+          },
+          {
+            "file": "package/dist/tdClient/touchDesignerClient.js",
+            "line": 1,
+            "match": "axios"
+          },
+          {
+            "file": "package/dist/api/customInstance.d.ts",
+            "line": 1,
+            "match": "axios"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/dist/features/tools/presenter/markdownRenderer.js",
+            "line": 17,
+            "match": "readFileSync("
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 88,
+        "other_files": 1,
+        "bytes": 256996,
+        "longest_line": 692,
+        "avg_line_length": 36,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 65420,
+        "truncated": false
+      }
+    }
+  }
+}

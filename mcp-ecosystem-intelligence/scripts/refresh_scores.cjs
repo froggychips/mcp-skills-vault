@@ -23,6 +23,7 @@ const { execFileSync } = require('child_process');
 const fs   = require('fs');
 const path = require('path');
 const { writeDb } = require('./lib/db_io.cjs');
+const { githubSlug } = require('./lib/repo_url.cjs');
 
 const DB_PATH  = path.resolve(__dirname, '../assets/tools_database.json');
 const CALC     = path.resolve(__dirname, 'calculate_health.cjs');
@@ -76,8 +77,11 @@ function calcScore(stars, days, inRegistry, hasInstall, critIssues, license) {
 // Extract owner/repo from a github.com URL, stripping /tree/... paths.
 function githubOwnerRepo(url) {
   if (!url || !url.includes('github.com')) return null;
-  const m = url.match(/github\.com\/([^/]+\/[^/]+?)(?:\/|$)/);
-  return m ? m[1] : null;
+  // Anchored via lib/repo_url.cjs: an unanchored match read
+  // `https://evil.example/github.com/acme/server` as `acme/server`, and this
+  // slug decides which repository gets asked about.
+  const slug = githubSlug(url);
+  return slug;
 }
 
 function daysSince(isoDate) {

@@ -14,10 +14,12 @@
  * becomes a derived value:
  *
  *   trust_evidence: {
+ *     availability:   { status: 'present',   checked_at: '2026-09-17' },
  *     artifact:       { status: 'verified',  checked_at: '2026-09-17', method: 'deep-hash' },
  *     signature:      { status: 'verified',  checked_at: '2026-09-17', keyid: 'SHA256:…' },
- *     provenance:     { status: 'claimed',   checked_at: '2026-09-17', repository: '…' },
+ *     provenance:     { status: 'bound',     checked_at: '2026-09-17', identity: '…' },
  *     source_binding: { status: 'verified',  checked_at: '2026-09-17' },
+ *     registry:       { status: 'listed',    checked_at: '2026-09-17', server_id: 'io.github.o/r' },
  *     license:        { status: 'osi',       checked_at: '2026-09-17', value: 'MIT' },
  *     advisories:     { status: 'clean',     checked_at: '2026-09-17' },
  *     dependencies:   { status: 'hooks',     checked_at: '2026-09-17', count: 608 },
@@ -37,10 +39,13 @@
  */
 
 const DIMENSIONS = [
+  'availability',    // the package is still published at all
   'artifact',        // the bytes match the pin
   'signature',       // the registry vouched for that pin
   'provenance',      // a build claims to have produced it
-  'source_binding',  // the registry's repo agrees with ours
+  'source_binding',  // the package registry's repo agrees with ours
+  'registry',        // the official MCP registry's ownership-verified listing
+  'repository_posture', // how the upstream repo is run (OpenSSF Scorecard)
   'license',         // what the licence actually says
   'advisories',      // nothing known against this version
   'dependencies',    // what the tree contains
@@ -51,10 +56,16 @@ const DIMENSIONS = [
 // the perishable one: "clean" means "clean as of that date", and disclosures
 // do not wait. A hash match, by contrast, is about bytes that do not change.
 const DEFAULT_MAX_AGE_DAYS = {
+  // As perishable as an advisory: a package can be unpublished today, and the
+  // name then becomes claimable by someone else.
+  availability:   7,
   artifact:       90,
   signature:      90,
   provenance:     90,
   source_binding: 60,
+  registry:       30,
+  // Scorecard reruns weekly at most, and branch protection does not change often.
+  repository_posture: 60,
   license:        30,
   advisories:     7,
   dependencies:   14,
@@ -66,7 +77,7 @@ const today = (now = Date.now()) => new Date(now).toISOString().slice(0, 10);
 // What counts as an answer in the affirmative, per dimension vocabulary. Used
 // where "did this actually check out?" is being asked, so that a new status
 // added later defaults to "not established" rather than to "fine".
-const POSITIVE_STATUSES = new Set(['verified', 'clean', 'claimed', 'pass', 'hooks', 'advisories-present', 'osi']);
+const POSITIVE_STATUSES = new Set(['verified', 'clean', 'claimed', 'bound', 'present', 'listed', 'pass', 'hooks', 'advisories-present', 'osi']);
 
 /**
  * Turn one run's *typed check results* into dated evidence.
@@ -95,6 +106,12 @@ function buildEvidence(checks, { now = Date.now(), artifactId = null } = {}) {
 
   const c = checks || {};
 
+  if (c.availability) {
+    const extra = {};
+    if (c.availability.detail)  extra.detail = c.availability.detail;
+    if (c.availability.replacement) extra.replacement = c.availability.replacement;
+    put('availability', c.availability.state, extra);
+  }
   if (c.artifact) {
     put('artifact', c.artifact.state, c.artifact.method ? { method: c.artifact.method } : {});
   }
@@ -102,9 +119,25 @@ function buildEvidence(checks, { now = Date.now(), artifactId = null } = {}) {
     put('signature', c.signature.state, c.signature.keyid ? { keyid: c.signature.keyid } : {});
   }
   if (c.provenance) {
-    put('provenance', c.provenance.state, c.provenance.repository ? { repository: c.provenance.repository } : {});
+    const extra = {};
+    if (c.provenance.repository) extra.repository = c.provenance.repository;
+    // The signing identity is what makes a 'bound' result checkable later.
+    if (c.provenance.identity) extra.identity = c.provenance.identity;
+    put('provenance', c.provenance.state, extra);
   }
   if (c.source_binding) put('source_binding', c.source_binding.state);
+  if (c.repository_posture) {
+    const extra = {};
+    if (c.repository_posture.checks)      extra.checks = c.repository_posture.checks;
+    if (c.repository_posture.report_date) extra.report_date = c.repository_posture.report_date;
+    put('repository_posture', c.repository_posture.state, extra);
+  }
+  if (c.registry) {
+    const extra = {};
+    if (c.registry.server_id) extra.server_id = c.registry.server_id;
+    if (c.registry.detail)    extra.detail = c.registry.detail;
+    put('registry', c.registry.state, extra);
+  }
   if (c.advisories)     put('advisories', c.advisories.state);
   if (c.dependencies) {
     put('dependencies', c.dependencies.state, Number.isFinite(c.dependencies.count) ? { count: c.dependencies.count } : {});
@@ -215,7 +248,11 @@ function requiredFor(ecosystem) {
 
 function deriveTrust(evidence, { maxAgeDays = DEFAULT_MAX_AGE_DAYS, now = Date.now(), require: required = ['artifact'] } = {}) {
   const dims = (evidence && evidence.dimensions) || {};
-  const bad = ['mismatch', 'vulnerable', 'fail'];   // actively wrong, not merely unknown
+  // Actively wrong, not merely unknown. A package that is no longer published
+  // belongs here rather than in 'candidate': candidate means "not vetted yet",
+  // and an unpublished name is worse than unvetted — it may now belong to
+  // somebody else.
+  const bad = ['mismatch', 'vulnerable', 'fail', 'gone', 'version-gone', 'yanked'];
   for (const value of Object.values(dims)) {
     if (bad.includes(value.status)) return 'unverified';
   }

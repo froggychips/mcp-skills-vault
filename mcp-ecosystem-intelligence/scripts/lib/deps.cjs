@@ -24,7 +24,7 @@
  *
  * API:
  *   parseLockTree(lockJson)               -> [{ name, version, integrity, hasInstallScript, depth }]
- *   resolveNpmTree(pkg, version, opts)    -> { ok, packages, error? }
+ *   resolveNpmTree(pkg, version, opts)    -> { ok, packages, lockfile?, error? }
  *   pypiDirectDependencies(pypiMeta)      -> [{ name, spec }]
  *   summarizeTree(packages)               -> { count, withInstallScripts, maxDepth }
  */
@@ -104,6 +104,11 @@ function resolveNpmTree(pkg, version, {
   registry = null,
   tmpRoot = os.tmpdir(),
   run = execFile,
+  // Keep the lockfile npm wrote, not just the flattened summary. A summary is
+  // enough to *report* a tree and not enough to *reinstall* it: `npm ci` needs
+  // npm's own file, and regenerating one by re-resolving gives a different
+  // tree the moment any dependency publishes. That is not a lockfile.
+  keepLockfile = false,
 } = {}) {
   return new Promise((resolve) => {
     let dir;
@@ -123,7 +128,12 @@ function resolveNpmTree(pkg, version, {
       '--package-lock-only',   // resolve and write the lockfile; install nothing
       '--ignore-scripts',      // belt and braces: no lifecycle script ever runs
       '--no-audit', '--no-fund', '--silent',
-      '--prefix', dir,
+      // No `--prefix`: it is the same directory as cwd, and passing both made
+      // npm treat the prefix as a separate root and write *absolute* temp-dir
+      // paths as the lockfile's package keys
+      // ("../../private/var/folders/…/node_modules/pkg"). parseLockTree coped,
+      // because it splits on "node_modules/", so nothing noticed until the
+      // lockfile had to be handed back to npm — where `npm ci` rejected it.
     ];
     if (registry) args.push('--registry', registry);
 
@@ -140,7 +150,12 @@ function resolveNpmTree(pkg, version, {
       try { lock = JSON.parse(fs.readFileSync(path.join(dir, 'package-lock.json'), 'utf8')); }
       catch (e) { cleanup(); resolve({ ok: false, error: `no usable lockfile: ${e.message}` }); return; }
       cleanup();
-      resolve({ ok: true, packages: parseLockTree(lock), lockfileVersion: lock.lockfileVersion || null });
+      resolve({
+        ok: true,
+        packages: parseLockTree(lock),
+        lockfileVersion: lock.lockfileVersion || null,
+        ...(keepLockfile ? { lockfile: lock } : {}),
+      });
     });
   });
 }

@@ -35,6 +35,8 @@
  *   node scripts/verify_integrity.cjs --deep       download artifacts and hash them locally
  *   node scripts/verify_integrity.cjs --require-signatures  unsigned npm release = failure
  *   node scripts/verify_integrity.cjs --require-provenance  no provenance attestation = failure
+ *   node scripts/verify_integrity.cjs --require-provenance-binding
+ *                                                     attestation not bound to the artifact digest = failure
  *   node scripts/verify_integrity.cjs --json       structured report on stdout
  *   node scripts/verify_integrity.cjs --sarif      SARIF 2.1.0 (GitHub code scanning)
  *
@@ -55,7 +57,7 @@ const { getJson, postJson, mapLimit } = require('./lib/http.cjs');
 const { hashUrl, sriEqual, parseSri, ociManifestDigest } = require('./lib/artifact.cjs');
 const { parseImageRef, fetchManifest, ALLOWED_REGISTRIES } = require('./lib/oci.cjs');
 const {
-  verifyRegistrySignature, provenanceClaim, keysUrl,
+  verifyRegistrySignature, provenanceClaim, checkProvenance, keysUrl,
 } = require('./lib/npm_signatures.cjs');
 const { readInstalledServers } = require('./lib/installed.cjs');
 const {
@@ -146,7 +148,20 @@ const DEEP_MAX_BYTES   = Math.max(1, Number(process.env.MCP_VAULT_DEEP_MAX_BYTES
 // enough that flagging it by default would bury the real findings. These turn
 // "absent" into a failure for anyone who wants that bar.
 const REQUIRE_SIGNATURES = process.argv.includes('--require-signatures') || policySays((p) => p.signatures === 'require');
-const REQUIRE_PROVENANCE = process.argv.includes('--require-provenance') || policySays((p) => p.provenance === 'require');
+// The stricter bar: an attestation whose in-toto subject digest *is* the
+// artifact we verified, signed by the source repository's own workflow. A
+// readable attestation that merely names the right repo does not clear it.
+const REQUIRE_PROVENANCE_BINDING = process.argv.includes('--require-provenance-binding')
+  || policySays((p) => p.provenance === 'bound');
+// Asking for a *bound* attestation is asking for an attestation. Without this
+// implication, `--require-provenance-binding` on its own enforced the binding
+// only for attestations that were readable in the first place: a package with
+// no attestation at all, or one we could not parse, sailed through the stricter
+// flag while a package that published a readable one was held to it. Exactly
+// backwards.
+const REQUIRE_PROVENANCE = process.argv.includes('--require-provenance')
+  || REQUIRE_PROVENANCE_BINDING
+  || policySays((p) => p.provenance === 'require' || p.provenance === 'bound');
 // --installed: verify what the local hosts are configured to launch, instead of
 // what the DB says. The DB is still consulted — for a pin to compare against —
 // but the subjects are the configured servers.
@@ -836,7 +851,27 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
   if (attestationsUrl) {
     const att = await httpsGetJson(attestationsUrl, 10000, {}, CACHE_TTL_MS);
     const claim = att ? provenanceClaim(att) : null;
-    if (!claim) {
+    // What the attestation establishes about *these* bytes: the in-toto
+    // subject's sha512 against the integrity value the registry signed, and
+    // the signing certificate's SAN against the repository the DB records.
+    // Reading only `claim.repository` meant an attestation for a different
+    // artifact of the same repo — or for a different package entirely — read
+    // as provenance for this one.
+    const prov = checkProvenance({
+      claim,
+      sourceUrl:     tool.source_url || null,
+      name:          pkg,
+      version:       npmVersion,
+      integrity:     npmIntegrity,
+      // The same keys the registry signature above was checked against. They
+      // are what makes the attestation's subject digest mean anything: a
+      // certificate inside a bundle is not validated against a trust root, so
+      // the digest half of a binding has to rest on npm's own key.
+      keys,
+      normalizeRepo: normalizeGitUrl,
+    });
+
+    if (prov.state === 'unreadable') {
       // "There is an attestation but we could not read it" is not evidence of
       // provenance. Under --require-provenance it fails like an absent one.
       checks.provenance = { state: 'unreadable' };
@@ -846,15 +881,24 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
       } else {
         lines.push(['NOTE', 'provenance attestation present but unreadable']);
       }
+    } else if (prov.state === 'mismatch') {
+      lines.push(['WARN', `provenance does not describe this artifact\n        ${prov.findings.join('\n        ')}`]);
+      checks.provenance = { state: 'mismatch', repository: prov.repository };
+      if (STRICT || REQUIRE_PROVENANCE || REQUIRE_PROVENANCE_BINDING) failures++;
+    } else if (prov.state === 'bound') {
+      lines.push(['PROVBOUND', `provenance bound to this artifact: npm's registry key signed a statement `
+        + `carrying this sha512, and a certificate claims ${prov.identity} built it `
+        + `(certificate chain and Rekor proof not validated)`]);
+      checks.provenance = { state: 'bound', repository: prov.repository, identity: prov.identity };
     } else {
-      const claimedRepo = normalizeGitUrl(claim.repository);
-      if (storedRepo && claimedRepo && claimedRepo.toLowerCase() !== storedRepo.toLowerCase()) {
-        lines.push(['WARN', `provenance names a different repository\n        source_url: ${tool.source_url}\n        provenance: ${claim.repository}`]);
-        checks.provenance = { state: 'mismatch', repository: claim.repository };
-        if (STRICT) failures++;
-      } else {
-        lines.push(['PROV', `provenance claims ${claim.repository}${claim.workflowPath ? ` (${claim.workflowPath})` : ''} — claim read, not cryptographically verified`]);
-        checks.provenance = { state: 'claimed', repository: claim.repository };
+      // Readable, nothing contradicts it, but nothing tied it to these bytes
+      // or to this repository either.
+      lines.push(['PROV', `provenance claims ${prov.repository || '(no repository)'}${prov.workflow ? ` (${prov.workflow})` : ''}`
+        + ` — claim read, not bound${prov.findings.length ? `: ${prov.findings.join('; ')}` : ''}`]);
+      checks.provenance = { state: 'claimed', repository: prov.repository };
+      if (REQUIRE_PROVENANCE_BINDING) {
+        lines.push(['FAIL', 'policy requires provenance bound to the artifact digest, and this one is not']);
+        failures++;
       }
     }
   } else if (REQUIRE_PROVENANCE) {
@@ -1295,6 +1339,7 @@ async function main() {
       switches: {
         fail_unverified: FAIL_UNVERIFIED, deep: DEEP, deps: DEPS,
         require_signatures: REQUIRE_SIGNATURES, require_provenance: REQUIRE_PROVENANCE,
+        require_provenance_binding: REQUIRE_PROVENANCE_BINDING,
         fail_dep_advisories: FAIL_DEP_ADVISORIES, strict: STRICT,
       },
     }, null, 2) + '\n');
@@ -1435,8 +1480,21 @@ async function main() {
   let ghsa          = { ok: true, data: {}, failures: 0 };
   let snyk          = { ok: true, data: {}, skipped: false, failures: 0 };
   if (!UPDATE && !NO_AUDIT && !OFFLINE) {
+    // npm's bulk endpoint filters advisories by the versions you ask about, so
+    // ask about the pinned one. The previous value here was `['']` — an array
+    // containing an empty string — under a comment saying npm tolerates it. It
+    // does not: the endpoint answers HTTP 400, which meant this feed had never
+    // returned a single advisory. One of four advisory sources, dead in every
+    // run since it was written, and invisible because a dead feed is reported
+    // as "UNAVAILABLE" in a summary line nobody reads twice.
+    //
+    // An entry with no version is left out of the query rather than sent with a
+    // placeholder: there is no version to filter by, and OSV/GHSA still cover
+    // it. Leaving it out is not a feed outage, so it is not reported as one.
     const npmMap = {};
-    for (const { pkg } of npmTools) npmMap[pkg] = [''];   // npm tolerates empty version array
+    for (const { pkg, tool } of npmTools) {
+      if (tool.version) npmMap[pkg] = [tool.version];
+    }
     const npmQueries  = npmTools.map(({ pkg, tool })  => ({ ecosystem: 'npm',  name: pkg, version: tool.version || '0.0.0' }));
     const pypiQueries = pypiTools.map(({ pkg, tool }) => ({ ecosystem: 'PyPI', name: pkg, version: tool.version || '0.0.0' }));
     const allQueries  = [...npmQueries, ...pypiQueries];

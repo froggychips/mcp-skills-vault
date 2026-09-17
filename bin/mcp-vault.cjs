@@ -37,12 +37,20 @@ const COMMANDS = {
   discover:        "discover.cjs",
   eval:            "mcp_eval.cjs",
   "docker-drift":  "check_docker_drift.cjs",
+  availability:    "check_availability.cjs",
+  identity:        "check_identity.cjs",
+  posture:         "check_posture.cjs",
+  explain:         "explain.cjs",
+  upgrade:         "suggest_upgrade.cjs",
+  capabilities:    "check_capabilities.cjs",
   "license-drift": "check_license_drift.cjs",
   health:          "calculate_health.cjs",
   refresh:         "refresh_scores.cjs",
   wrap:            "generate_wrapper.cjs",
   "site-registry": "generate_registry_page.cjs",
   budget:          "token_budget.cjs",
+  lock:            "lock.cjs",
+  sbom:            "sbom.cjs",
 };
 
 const HELP = `mcp-vault — make MCP supply-chain boring.
@@ -61,6 +69,12 @@ COMMANDS
                     (--host claude-code|claude-desktop|cursor|vscode|codex)
   discover          Harvest fresh MCP candidates from npm / gh / README
   eval              Behavioural smoke (handshake + tools/list + schema lint)
+  availability      Is every entry still published, and still the same thing?
+  identity          Who published it, per the ownership-verified official registry
+  posture           How each upstream repo is run (OpenSSF Scorecard via deps.dev)
+  explain <name>    Why this entry is allowed or denied, with the evidence and the rule
+  upgrade           Shortest version that clears the advisories against a pin
+  capabilities      What a package can do, and what it gained since the last scan
   docker-drift      Detect upstream Docker @sha256 drift
   license-drift     Detect MIT → BSL / SSPL relicensing
   health <args>     Score a candidate by stars / recency / license / registry
@@ -68,6 +82,9 @@ COMMANDS
   wrap              Generate MCP wrapper boilerplate for a CLI / API tool
   site-registry     Generate docs/site/registry.html from tools_database.json
   budget            What your configured servers cost in context tokens
+  sbom              CycloneDX bill of materials (--installed / --deps)
+  lock              Freeze the verified dependency tree + tool surface (mcp.lock.json)
+                    (--check: diff a fresh resolve against it; --vendor: install it)
 
 COMMON OPTIONS
   --json            Machine-readable output
@@ -82,6 +99,8 @@ COMMON OPTIONS
   --require-signatures  Unsigned npm release = failure (verify)
   --require-provenance  No provenance attestation = failure (verify)
   --allow-unpinned  Allow install to write a launch command with no version pin
+  --allow-over-budget   Install even when the config would exceed the policy's
+                        context ceiling (maxContextTokens / maxContextPercent)
   --cwd <path>      Target project directory (scan / audit)
   --host <id>       Which host config to write (install; --list-hosts to see them)
   --scope <s>       project or user (install; --global means --scope user)

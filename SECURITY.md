@@ -12,6 +12,54 @@
 
 Older commits are not patched — update to `HEAD` of `master`.
 
+## What `bound` means for provenance
+
+`verify` reports provenance as `bound` when **all** of the following hold:
+
+1. npm's own registry signing key — the same key `dist.signatures` is checked
+   against — signed a DSSE statement whose subject digest is the artifact this
+   run verified. That signature is checked, not assumed.
+2. A signing certificate in the bundle claims the repository the DB records, via
+   the SAN identity Fulcio puts there (`https://github.com/<owner>/<repo>/<workflow>@<ref>`).
+3. The builder id is a GitHub Actions runner, matched anchored rather than as a
+   substring.
+
+What `bound` does **not** mean, and the output never says otherwise:
+
+- **The certificate chain is not validated** against Fulcio's root, and the
+  Rekor inclusion proof is not checked. Anyone can mint a certificate with any
+  SAN in it, so (2) is a *claim about* a repository rather than proof of one.
+  That is exactly why (1) must rest on npm's key: the digest half of the binding
+  has to hold even when the identity half is forgeable.
+- A statement verified **only** against the bundle's own certificate reaches
+  `claimed`, not `bound`, and says why. In practice npm publishes both
+  attestations, so this costs nothing for real packages while refusing a forged
+  document that carries only the forgeable half.
+- Nothing here establishes that the code in the artifact is benign.
+
+Validating the Fulcio chain (with a pinned root) is the obvious next step and is
+not done yet.
+
+## Static analysis (CodeQL)
+
+CodeQL runs as **advanced setup** on the self-hosted runner
+([.github/workflows/codeql.yml](.github/workflows/codeql.yml)), analysing
+`javascript-typescript` and `actions` with the `security-extended` suite on
+pushes to master, on pull requests that touch code or workflows, and weekly.
+
+The default setup was **disabled**, not abandoned. It is hard-wired to
+GitHub-hosted runners, and this account's hosted minutes are blocked by a
+billing lock (see [runner-health.yml](.github/workflows/runner-health.yml)), so
+every "CodeQL Setup" run failed before executing a step — a red check that said
+nothing about the code. In a repository about supply-chain scanning, a scanner
+that cannot run is worse than one that is honestly absent.
+
+The `actions` language is the reason this is worth a runner slot: the CI
+problems fixed in this repo recently — a `pull_request_target` trust boundary, a
+job running with a token scoped far wider than it needed, unpinned third-party
+actions — are precisely what those queries look for, and all of them were found
+by a human reading the YAML.
+
 ## Reporting a Vulnerability
 
 Please report privately — do **not** open a public GitHub issue for security matters.

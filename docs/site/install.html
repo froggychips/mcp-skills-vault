@@ -47,6 +47,29 @@
       <p>Every enabled server injects its whole tool list into the system prompt, on every request.</p>
       <pre><code>npx -y @froggychips/mcp-vault budget</code></pre>
     </section>
+    <section class="step">
+      <h3>7. Ask why, before you argue with it</h3>
+      <p>Every dimension with the date it was established, the policy in force, each rule with its
+         outcome, and the rule that decided it. <code>--record</code> appends the decision as one
+         JSON line, which is the audit trail a policy engine gets asked for months later.</p>
+      <pre><code>npx -y @froggychips/mcp-vault explain &lt;name&gt;</code></pre>
+    </section>
+    <section class="step">
+      <h3>8. When something has an advisory</h3>
+      <p>The shortest version that clears <em>every</em> advisory against the pin &mdash; not the
+         newest release &mdash; with the candidate checked too, because &ldquo;fixed in 2.1.30&rdquo;
+         means fixed for that one advisory.</p>
+      <pre><code>npx -y @froggychips/mcp-vault upgrade</code></pre>
+    </section>
+    <section class="step">
+      <h3>9. Freeze what actually runs</h3>
+      <p><code>npx -y pkg@1.2.3</code> re-resolves that package&rsquo;s dependency tree at every
+         start: a pinned root does not pin its tree. <code>lock</code> records npm&rsquo;s own
+         lockfile per server, <code>--check</code> diffs a fresh resolve against it, and
+         <code>--vendor</code> installs the locked tree so nothing resolves at launch.</p>
+      <pre><code>npx -y @froggychips/mcp-vault lock
+npx -y @froggychips/mcp-vault lock --check</code></pre>
+    </section>
   </main>
 </body>
 </html>

@@ -28,15 +28,20 @@ const path          = require('path');
 const { spawnSync } = require('child_process');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { listHosts, resolveTarget, writeServerEntry } = require('./lib/hosts.cjs');
-const { trustScore, fitScore, recommend } = require('./lib/scores.cjs');
+const { trustScore, fitScore, behaviour, recommend } = require('./lib/scores.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
+const { loadPolicy } = require('./lib/policy.cjs');
+const { readInstalledServers } = require('./lib/installed.cjs');
+const { estimateServer, matchDbEntry, wouldExceed, DEFAULT_CONTEXT } = require('./lib/budget.cjs');
 // Reuse the gate's parsers so "what gets pinned" and "what gets checked" can
 // never drift apart — they were two independent regexes before.
+const { isExactVersion } = require('./lib/install_cmd.cjs');
 const {
   npmPkgName, pypiPkgName, dockerImageRef, dockerDigestPinned,
 } = require('./verify_integrity.cjs');
 
 const DB_PATH    = path.resolve(__dirname, '../assets/tools_database.json');
+const EVAL_PATH  = path.resolve(__dirname, '../assets/eval_results.json');
 const VERIFY_CJS = path.resolve(__dirname, 'verify_integrity.cjs');
 
 // ── CLI args ────────────────────────────────────────────────────────────────
@@ -55,6 +60,9 @@ const STRICT     = argv.includes('--strict');
 // Off by default: writing an unpinned command into .mcp.json means the thing
 // that runs is not the thing the gate checked.
 const ALLOW_UNPINNED = argv.includes('--allow-unpinned');
+// A context ceiling in policy is enforced at install: the cost is a property of
+// the whole set of enabled servers, and install is the moment the set changes.
+const ALLOW_OVER_BUDGET = argv.includes('--allow-over-budget');
 // Which host's config to write. The same vault entry is just as useful in
 // Cursor, VS Code, Claude Desktop or Codex; only the path (and in two cases the
 // shape) differs.
@@ -478,6 +486,37 @@ function getInstalled(cwd) {
 
 // ── Install: verify + write ─────────────────────────────────────────────────
 
+// The policy in force for the directory being written into — not for wherever
+// this process happens to have been started.
+const POLICY = loadPolicy(CWD).policy;
+
+/**
+ * What this install would do to the config's standing context cost.
+ *
+ * Returns null when the policy has no opinion about context: a policy that is
+ * silent is not a policy that says "unlimited", and inventing a default ceiling
+ * here would be a bar nobody agreed to.
+ */
+function checkBudget(tool, cwd) {
+  if (POLICY.maxContextTokens === null && POLICY.maxContextPercent === null) return null;
+  let db;
+  try { db = JSON.parse(fs.readFileSync(DB_PATH, 'utf8')).tools || []; } catch { db = []; }
+  let evals = [];
+  try { evals = (JSON.parse(fs.readFileSync(EVAL_PATH, 'utf8')).results) || []; } catch { /* no snapshot */ }
+  const evalBy = new Map(evals.map((r) => [r.name, r]));
+
+  const rows = readInstalledServers({ cwd }).map((srv) => {
+    const dbEntry = matchDbEntry(srv, db);
+    return estimateServer({
+      name:      srv.name,
+      dbEntry,
+      evalEntry: evalBy.get(srv.name) || (dbEntry && evalBy.get(dbEntry.name)),
+    });
+  });
+  const adding = estimateServer({ name: tool.name, dbEntry: tool, evalEntry: evalBy.get(tool.name) });
+  return wouldExceed({ rows, adding, policy: POLICY, context: DEFAULT_CONTEXT });
+}
+
 function installTool(tool, cwd, global_) {
   process.stderr.write(`\nRunning integrity scan for ${tool.name}…\n`);
 
@@ -511,6 +550,42 @@ function installTool(tool, cwd, global_) {
   }
   if (/^(WARN|HOOK)\b|\[(WARN|HOOK)\]/m.test(out)) {
     process.stderr.write(`\n${YL}WARN: review the issue above before proceeding.${RS}\n`);
+  }
+
+  // Context budget. Every enabled server injects its whole tool list into every
+  // request, so the cost of a config is a property of the set — and the moment
+  // the set changes is the only moment anyone is in a position to decide about
+  // it. `mcp-vault budget` could already compute this; it was a report you had
+  // to think to run, which meant it ran after the surprise rather than before.
+  const budget = checkBudget(tool, cwd);
+  if (budget) {
+    const pct = ((budget.after / budget.context) * 100).toFixed(1);
+    // "this config" means every server the host will load, which includes the
+    // user-scope ones — the model sees one merged tool list, not one per scope,
+    // and a project-only total would understate what it actually costs.
+    const line = `${tool.name} adds ≈${(budget.adding.tokens ?? 0).toLocaleString('en-US')} tokens`
+      + `${budget.adding.tools ? ` (${budget.adding.tools} tools, ${budget.adding.source})` : ''}`
+      + ` — ${budget.server_count} server${budget.server_count === 1 ? '' : 's'} across project and user scope`
+      + ` would inject ≈${budget.after.toLocaleString('en-US')} tokens into every request (${pct}% of ${budget.context.toLocaleString('en-US')})`;
+    if (budget.over) {
+      const over = `over the policy ceiling of ${budget.limit.toLocaleString('en-US')} (${budget.limit_source})`;
+      if (budget.unknown_servers) {
+        // Saying "over by N" while N servers went uncounted would be a number
+        // with a hole in it. Say where the hole is.
+        process.stderr.write(`${YL}NOTE: ${budget.unknown_servers} configured server(s) could not be measured and are not in this total: ${budget.unknown_names.join(', ')}${RS}\n`);
+      }
+      if (POLICY.contextBudget === 'fail' && !ALLOW_OVER_BUDGET) {
+        process.stderr.write(`\n${RD}ABORT: ${line}, ${over}.${RS}\n`);
+        if (tool.toolsets) process.stderr.write(`This server can be narrowed: ${tool.toolsets}\n`);
+        process.stderr.write(`Run \`mcp-vault budget --cwd ${cwd}\` to see what the rest of the config costs, `
+          + `or pass --allow-over-budget to install anyway.\n`);
+        process.exit(1);
+      }
+      process.stderr.write(`\n${YL}WARN: ${line}, ${over}.${RS}\n`);
+      if (tool.toolsets) process.stderr.write(`${YL}This server can be narrowed: ${tool.toolsets}${RS}\n`);
+    } else if (budget.adding.tokens) {
+      process.stderr.write(`\n${DM}${line}; ${Math.max(0, budget.headroom).toLocaleString('en-US')} tokens of headroom left.${RS}\n`);
+    }
   }
 
   // Build the server config entry
@@ -566,19 +641,6 @@ function installTool(tool, cwd, global_) {
 // `pkg@latest`, `pkg@^1.2` and a stale `pkg@1.0.0` all launch something other
 // than the artifact whose hash was compared, so they get rewritten to the DB's
 // version rather than trusted.
-// "Exact" has to mean exact. `1`, `1.2` and `1.x` all satisfied the old
-// pattern, so `pinInstallCmd` happily produced `pkg@1.x` and called it pinned —
-// a range dressed as a pin.
-//   npm:  semver, three components, optional pre-release/build
-//   PyPI: PEP 440 release segment, optional pre/post/dev/local
-const EXACT_NPM_VERSION  = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
-const EXACT_PYPI_VERSION = /^\d+(?:\.\d+)*(?:(?:a|b|rc)\d+)?(?:\.post\d+)?(?:\.dev\d+)?(?:\+[0-9A-Za-z.]+)?$/;
-
-function isExactVersion(runner, version) {
-  if (typeof version !== 'string' || !version) return false;
-  return runner === 'npx' ? EXACT_NPM_VERSION.test(version) : EXACT_PYPI_VERSION.test(version);
-}
-
 function pinInstallCmd(cmd, version) {
   const raw    = String(cmd).trim();
   const parts  = raw.split(/\s+/);
@@ -657,10 +719,42 @@ function buildServerEntry(tool) {
   return { command: parts[0], args: parts.slice(1) };
 }
 
+// ── Behavioural results ────────────────────────────────────────────────────
+
+// Behavioural results, read once. The eval has always recorded whether an
+// entry can complete a handshake; until now nothing consulted it at the point
+// a recommendation was printed, which is the one place it changes a decision.
+let _evalIndex = null;
+function evalIndex() {
+  if (_evalIndex) return _evalIndex;
+  _evalIndex = new Map();
+  try {
+    const doc = JSON.parse(fs.readFileSync(EVAL_PATH, 'utf8'));
+    for (const r of doc.results || []) if (r && r.name) _evalIndex.set(r.name, r);
+  } catch {
+    /* no snapshot in this install: behaviour reads as 'unknown', which is the
+       honest answer rather than a failure */
+  }
+  return _evalIndex;
+}
+
+function behaviourFor(name) {
+  return behaviour(evalIndex().get(name) || null);
+}
+
 // ── Report formatting ───────────────────────────────────────────────────────
 
 const HEAVY = 30;
 const HR    = '─'.repeat(60);
+
+// How a behavioural state reads in one glance, next to the entry it describes.
+const BEHAVIOUR_TAG = {
+  starts:              () => '',
+  unknown:             () => '',
+  'needs-credentials': () => `${YL}needs credentials${RS}`,
+  'needs-network':     () => `${YL}needs network${RS}`,
+  'never-started':     () => `${RD}never started${RS}`,
+};
 
 function printTool(t) {
   const heavy   = t.est_tools_count >= HEAVY;
@@ -669,10 +763,17 @@ function printTool(t) {
     : `${DM}${t.est_tools_count} tools${RS}`;
   const tier  = t.classification.padEnd(13);
   const name  = t.name.padEnd(26);
-  process.stdout.write(`  ${B}${tier}${RS} ${name} ${toolTag}  ${DM}score ${t.health_score}${RS}\n`);
+  const behav = behaviourFor(t.name);
+  const tag   = (BEHAVIOUR_TAG[behav.state] || (() => ''))();
+  process.stdout.write(`  ${B}${tier}${RS} ${name} ${toolTag}  ${DM}score ${t.health_score}${RS}${tag ? `  ${tag}` : ''}\n`);
   process.stdout.write(`  ${' '.repeat(13)}  ${DM}${t.install_cmd}${RS}\n`);
   if (heavy && t.toolsets) {
     process.stdout.write(`  ${' '.repeat(13)}  ${YL}→ ${t.toolsets}${RS}\n`);
+  }
+  // The reason, not just the label: "crashed" and "wants an API key" are
+  // different amounts of work for whoever reads this.
+  if (behav.state === 'never-started') {
+    process.stdout.write(`  ${' '.repeat(13)}  ${DM}${behav.reason}${RS}\n`);
   }
 }
 
@@ -819,6 +920,7 @@ if (require.main === module) {
 module.exports = {
   detectStack,
   slim,
+  behaviourFor,
   matchDB,
   unmappedSignals,
   fallbackBySignal,
@@ -847,6 +949,7 @@ function slim(t, stack = null) {
     trust.reasons.unshift(`stored evidence describes ${t.trust_evidence.artifact_id}, not ${currentId} — ignored`);
   }
   const fit   = stack ? fitScore(t, stack, { signalToTools: SIGNAL_TO_TOOLS, universal: UNIVERSAL_TOOLS }) : null;
+  const behav = behaviourFor(t.name);
   return {
     name:            t.name,
     category:        t.category,
@@ -861,7 +964,11 @@ function slim(t, stack = null) {
       health: Number.isFinite(t.health_score) ? t.health_score : null,
       trust:  { score: trust.score, gate: trust.gate, reasons: trust.reasons.slice(0, 4) },
       fit:    fit ? { score: fit.score, reasons: fit.reasons.slice(0, 4) } : null,
-      recommendation: recommend({ trust, health: t.health_score, fit }),
+      // Behaviour is reported next to the scores rather than folded into one
+      // of them: "it does not start" is not a trust finding and not a fit
+      // penalty, it is a different kind of fact.
+      behaviour: { state: behav.state, tools: behav.tools, reason: behav.reason },
+      recommendation: recommend({ trust, health: t.health_score, fit, behaviour: behav }),
     },
   };
 }

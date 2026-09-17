@@ -58,6 +58,7 @@ const { exitAfterFlush } = require('./lib/exit.cjs');
 const fs           = require('fs');
 const https        = require('https');
 const path         = require('path');
+const { githubSlug } = require('./lib/repo_url.cjs');
 
 const { classifyLicense } = require('./calculate_health.cjs');
 
@@ -139,8 +140,11 @@ function pypiPkgName(cmd) {
 
 function githubOwnerRepo(url) {
   if (!url || !url.includes('github.com')) return null;
-  const m = url.match(/github\.com\/([^/]+\/[^/]+?)(?:\/|$)/);
-  return m ? m[1] : null;
+  // Anchored via lib/repo_url.cjs: an unanchored match read
+  // `https://evil.example/github.com/acme/server` as `acme/server`, and this
+  // slug decides which repository gets asked about.
+  const slug = githubSlug(url);
+  return slug;
 }
 
 // ── PyPI license extraction ────────────────────────────────────────────────
