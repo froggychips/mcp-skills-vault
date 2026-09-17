@@ -25,6 +25,39 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/microsoft/playwright-mcp",
+            "identity": "https://github.com/microsoft/playwright-mcp/.github/workflows/publish.yml@refs/tags/v0.0.75",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -47,7 +80,17 @@
       "pkg_integrity": null,
       "trust": "candidate",
       "license": "MIT",
-      "notes": "Installed via uvx --from git+... \u2014 pkg_integrity cannot be verified through PyPI; git commit SHA is not pinned. Downgraded to candidate until a PyPI release or pinned commit is available.\n\n[HOLD 2026-05-22] Still installed via uvx --from git+... (no PyPI release / no pinned commit SHA). pkg_integrity unverifiable \u2014 pre-existing hold continues."
+      "notes": "Installed via uvx --from git+... \u2014 pkg_integrity cannot be verified through PyPI; git commit SHA is not pinned. Downgraded to candidate until a PyPI release or pinned commit is available.\n\n[HOLD 2026-05-22] Still installed via uvx --from git+... (no PyPI release / no pinned commit SHA). pkg_integrity unverifiable \u2014 pre-existing hold continues.",
+      "trust_evidence": {
+        "artifact_id": "git:git+https://github.com/redis/mcp-redis",
+        "dimensions": {
+          "artifact": {
+            "status": "unverified",
+            "checked_at": "2026-09-17",
+            "method": "unroutable"
+          }
+        }
+      }
     },
     {
       "name": "mcp-server-neon",
@@ -75,6 +118,35 @@
             "status": "deprecated",
             "checked_at": "2026-09-17",
             "detail": "This package is deprecated. Use the remote MCP server at mcp.neon.tech instead. See https://neon.tech/docs/ai/neon-mcp-server for more details."
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "unverified",
+            "checked_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -104,6 +176,41 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/mongodb-js/mongodb-mcp-server",
+            "identity": "https://github.com/mongodb-js/mongodb-mcp-server/.github/workflows/publish.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "listed",
+            "checked_at": "2026-09-17",
+            "server_id": "io.github.mongodb-js/mongodb-mcp-server",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -131,6 +238,28 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "listed",
+            "checked_at": "2026-09-17",
+            "server_id": "io.github.ClickHouse/mcp-clickhouse",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -163,6 +292,26 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -191,6 +340,36 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -222,6 +401,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -251,6 +460,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -271,7 +510,7 @@
       "last_checked": "2026-07-31",
       "version": "0.21.1",
       "pkg_integrity": "sha256-dff6c81541506cb0cc80d7ac9900ffdcb246fec7808e41e8df73c09dd4a28074",
-      "trust": "verified",
+      "trust": "unverified",
       "notes": "PyPI declares no project_urls and no license metadata \u2014 both sourced manually from GitHub.",
       "license": "MIT",
       "trust_evidence": {
@@ -281,6 +520,24 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "unverified",
+            "checked_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "vulnerable",
+            "checked_at": "2026-09-17"
           }
         }
       }
@@ -309,6 +566,36 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -341,6 +628,25 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "unverified",
+            "checked_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -371,6 +677,43 @@
             "status": "yanked",
             "checked_at": "2026-09-17",
             "detail": "awslabs.core-mcp-server==1.0.27 is yanked: load individual MCPs"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "repository_posture": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "checks": {
+              "maintained": "found",
+              "code_review": "found",
+              "dangerous_workflows": "absent",
+              "token_permissions": "found",
+              "actions_pinned": "found",
+              "release_signing": "unknown",
+              "branch_protection": "found",
+              "security_policy": "found",
+              "sast": "found"
+            },
+            "report_date": "2026-08-24",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -401,6 +744,35 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "unverified",
+            "checked_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -421,7 +793,7 @@
       "last_checked": "2026-07-31",
       "version": "3.5.1",
       "pkg_integrity": "sha512-4+KxkNRJ8RGjK9083Zy/FtmG6Oy0j9nDmVgePG41rLw5Fa6aB+elzJUxjcb7ctCvGo9gDPEFCEVTJztJDyU1sw==",
-      "trust": "verified",
+      "trust": "unverified",
       "license": "MIT",
       "trust_evidence": {
         "artifact_id": "npm:mcp-server-kubernetes@3.5.1",
@@ -430,6 +802,38 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/Flux159/mcp-server-kubernetes",
+            "identity": "https://github.com/Flux159/mcp-server-kubernetes/.github/workflows/cd.yml@refs/tags/v3.5.1",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "vulnerable",
+            "checked_at": "2026-09-17"
           }
         }
       }
@@ -458,6 +862,36 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -490,6 +924,33 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "unverified",
+            "checked_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -517,6 +978,36 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -549,6 +1040,39 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/stripe/ai",
+            "identity": "https://github.com/stripe/ai/.github/workflows/npm_release_shared.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -569,7 +1093,7 @@
       "last_checked": "2026-07-31",
       "version": "0.1.0",
       "pkg_integrity": "sha512-HNk4aB9VZzT/BYBYSe0NlbwTukJAp0PyreoQCqff+avNkaHllJq0hGuBO5W2Sk8zbBwwtj5E93b35/6gcvbp4A==",
-      "trust": "verified",
+      "trust": "unverified",
       "notes": "npm repository.url points to modelcontextprotocol/linear-server (404 \u2014 repo deleted). Real source is jerhadf/linear-mcp-server (original author, 374 days stale). Verifier will WARN on repo mismatch \u2014 this is expected. Best available Linear MCP option but effectively unmaintained.",
       "license": "MIT",
       "trust_evidence": {
@@ -577,6 +1101,35 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "mismatch",
+            "checked_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -609,6 +1162,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -637,6 +1220,39 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/mikechao/brave-search-mcp",
+            "identity": "https://github.com/mikechao/brave-search-mcp/.github/workflows/publish.yml@refs/tags/v2.1.0",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -669,6 +1285,26 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -699,6 +1335,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -726,6 +1392,38 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "listed",
+            "checked_at": "2026-09-17",
+            "server_id": "io.github.tavily-ai/tavily-mcp",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -758,6 +1456,25 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "unverified",
+            "checked_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -780,7 +1497,22 @@
       "pkg_integrity": "sha256-2ac27ef03461ef2b877031b838a7d1fd7f12b12d4ace7796d8cad91446d55959",
       "trust": "verified",
       "notes": "Docker image pinned by digest. Refresh with: docker manifest inspect ghcr.io/github/github-mcp-server.",
-      "license": "MIT"
+      "license": "MIT",
+      "trust_evidence": {
+        "artifact_id": "oci:ghcr.io/github/github-mcp-server@sha256:2ac27ef03461ef2b877031b838a7d1fd7f12b12d4ace7796d8cad91446d55959",
+        "dimensions": {
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "mcp-server-git",
@@ -808,6 +1540,25 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "unverified",
+            "checked_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -828,7 +1579,7 @@
       "last_checked": "2026-07-31",
       "version": "2.1.10",
       "pkg_integrity": "sha512-HHDxwge67zbyMREYOPTg821qBBe6ITlo1bs2sZg3UrBzmKORJSpS2yEgcdHDJc6tmjpDHLrz/p+EeeGUXkoxMg==",
-      "trust": "verified",
+      "trust": "unverified",
       "notes": "Comprehensive GitLab platform API (MRs, issues, pipelines, wiki, releases, tags, milestones); supports self-hosted instances and PAT/OAuth. Top community choice; gitlab-org/* has no equivalent open-source MCP.",
       "license": "MIT",
       "trust_evidence": {
@@ -838,6 +1589,38 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/zereight/gitlab-mcp",
+            "identity": "https://github.com/zereight/gitlab-mcp/.github/workflows/npm-publish.yml@refs/tags/v2.1.10",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "vulnerable",
+            "checked_at": "2026-09-17"
           }
         }
       }
@@ -858,7 +1641,7 @@
       "last_checked": "2026-07-31",
       "version": "0.10.1",
       "pkg_integrity": "sha512-pj5bN9KV5A+QN+K9eAOcP5t/z7WwTtw1qhtMgi4D7Rp98eeOFGBV8XWzE9NmjP9Myhbyj/O98fyp6g2fO898Ww==",
-      "trust": "verified",
+      "trust": "unverified",
       "notes": "GitHub repo is apify/apify-mcp-server (npm field); actors-mcp-server is the npm package name.",
       "license": "MIT",
       "trust_evidence": {
@@ -868,6 +1651,38 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/apify/apify-mcp-server",
+            "identity": "https://github.com/apify/apify-mcp-server/.github/workflows/manual_publish_to_npm.yaml@refs/heads/master",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "vulnerable",
+            "checked_at": "2026-09-17"
           }
         }
       }
@@ -898,6 +1713,38 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "listed",
+            "checked_at": "2026-09-17",
+            "server_id": "io.github.firecrawl/firecrawl-mcp-server",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -909,7 +1756,7 @@
       "source_url": "https://github.com/mapbox/mcp-server",
       "version": "0.11.0",
       "pkg_integrity": "sha512-5ZFOfordbtKrV2GERYm2lPrmWXIeHyG+Qdmg9meOAFX70vRrgnPaewypelUJnLWwFJeomyXOZGAZsUZm46PZ4Q==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 80,
       "classification": "Recommended",
@@ -927,6 +1774,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -938,7 +1815,7 @@
       "source_url": "https://github.com/dynatrace-oss/dynatrace-mcp",
       "version": "1.8.5",
       "pkg_integrity": "sha512-HXaNyjyf7MY5PYE+KkK0SH0dpeiDgQNXM8IEIBiKJNeXwMfkZQCzfd81smmeZs872PmW/IgGn7QWVyarHltn0g==",
-      "trust": "verified",
+      "trust": "unverified",
       "license": "MIT",
       "health_score": 80,
       "classification": "Recommended",
@@ -956,6 +1833,38 @@
             "status": "deprecated",
             "checked_at": "2026-09-17",
             "detail": "Package no longer supported. Contact Support at https://www.npmjs.com/support for more info."
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/dynatrace-oss/dynatrace-mcp",
+            "identity": "https://github.com/dynatrace-oss/dynatrace-mcp/.github/workflows/release.yml@refs/tags/v1.8.5",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "vulnerable",
+            "checked_at": "2026-09-17"
           }
         }
       }
@@ -983,6 +1892,36 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -1014,6 +1953,39 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/phantom/phantom-connect-sdk",
+            "identity": "https://github.com/phantom/phantom-connect-sdk/.github/workflows/release.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -1025,7 +1997,7 @@
       "source_url": "https://github.com/microsoft/azure-devops-mcp",
       "version": "2.7.0",
       "pkg_integrity": "sha512-nQG/D4EM9faYOecvdLuGVG84Au0t9rAxzLCwOlMUqWJpTk8ywKBDZ23mgpUFgjyaiMUI+vEoU8opB2yHhSpJYw==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 80,
       "classification": "Recommended",
@@ -1041,6 +2013,36 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -1072,6 +2074,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -1099,6 +2131,39 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/eslint/rewrite",
+            "identity": "https://github.com/eslint/rewrite/.github/workflows/release-please.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -1130,6 +2195,39 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/argoproj-labs/mcp-for-argocd",
+            "identity": "https://github.com/argoproj-labs/mcp-for-argocd/.github/workflows/release.yml@refs/tags/v0.7.0",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -1159,6 +2257,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -1170,7 +2298,7 @@
       "source_url": "https://github.com/postmanlabs/postman-mcp-server",
       "version": "2.8.9",
       "pkg_integrity": "sha512-B75NPyCgyQkI/P/xwJHniurVyOnpGQhLrKkzkLdurlcAmFecJc6I7bk8JzYjsdCCA8wvl8DxtJ3b86yAtwuhug==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 80,
       "classification": "Recommended",
@@ -1186,6 +2314,39 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/postmanlabs/postman-mcp-server",
+            "identity": "https://github.com/postmanlabs/postman-mcp-server/.github/workflows/pkg-release.yml@refs/tags/v2.8.9",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -1217,6 +2378,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -1244,6 +2435,36 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -1275,6 +2496,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -1302,6 +2553,39 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/victorgarciaesgi/regle",
+            "identity": "https://github.com/victorgarciaesgi/regle/.github/workflows/publish.yml@refs/tags/v1.25.2",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -1333,6 +2617,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -1344,7 +2658,7 @@
       "source_url": "https://github.com/bitwarden/mcp-server",
       "version": "2026.2.0",
       "pkg_integrity": "sha512-6FjjVQIOMbyLwrSL1LdXDEjnJev6f2ubhWB5Asn2VOMDBGy+FlJAKTHqbfFygI1a+5HSqH2vb14EEiWbWx1gdQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "GPL-3.0",
       "health_score": 80,
       "classification": "Recommended",
@@ -1360,6 +2674,39 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/bitwarden/mcp-server",
+            "identity": "https://github.com/bitwarden/mcp-server/.github/workflows/publish.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -1391,6 +2738,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -1418,6 +2795,35 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "unverified",
+            "checked_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -1449,6 +2855,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -1460,7 +2896,7 @@
       "source_url": "https://github.com/ihor-sokoliuk/mcp-searxng",
       "version": "1.0.3",
       "pkg_integrity": "sha512-lX7YeZyuzax28s5IR0AgEWqDhm+O6ah9+CKFlQzSs/WeDQ+yTWiQGvy4C4Jia6VEpm7n0Vllo7tnrhu0LBpUmg==",
-      "trust": "verified",
+      "trust": "unverified",
       "license": "MIT",
       "health_score": 80,
       "classification": "Recommended",
@@ -1478,6 +2914,40 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/ihor-sokoliuk/mcp-searxng",
+            "identity": "https://github.com/ihor-sokoliuk/mcp-searxng/.github/workflows/npm-publish.yml@refs/tags/v1.0.3",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "listed",
+            "checked_at": "2026-09-17",
+            "server_id": "io.github.ihor-sokoliuk/mcp-searxng",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "vulnerable",
+            "checked_at": "2026-09-17"
           }
         }
       }
@@ -1505,6 +2975,36 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -1536,6 +3036,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -1565,6 +3095,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -1576,7 +3136,7 @@
       "source_url": "https://github.com/cyanheads/git-mcp-server",
       "version": "2.15.1",
       "pkg_integrity": "sha512-IuBjTfFhyNCceNwfTWcda2SPiQaGqyo3fw2OVwXzRzPT+vKAybFH4ntZTbZt5VRlpdTIpVevUkmGC0ZY09roLQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 80,
       "classification": "Recommended",
@@ -1592,6 +3152,36 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -1623,6 +3213,39 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/SocketDev/socket-mcp",
+            "identity": "https://github.com/SocketDev/socket-mcp/.github/workflows/provenance.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -1652,6 +3275,38 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "listed",
+            "checked_at": "2026-09-17",
+            "server_id": "io.github.cyanheads/obsidian-mcp-server",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -1663,7 +3318,7 @@
       "source_url": "https://github.com/mondaycom/monday-ai",
       "version": "3.1.2",
       "pkg_integrity": "sha512-wIV7MAjswiuOU54L08dOflmah+InETFS2/zf6QEfn8Vf4zsMyfZTNfT1QtKXBBRiWg5j4WWEfw6XKQ2/u554jw==",
-      "trust": "verified",
+      "trust": "unverified",
       "license": "MIT",
       "health_score": 80,
       "classification": "Recommended",
@@ -1681,6 +3336,35 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "mismatch",
+            "checked_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -1692,7 +3376,7 @@
       "source_url": "https://github.com/jgraph/drawio-mcp",
       "version": "1.2.7",
       "pkg_integrity": "sha512-S2VWhXqJdgvuLzTdRJAg6RtZmnmf4nsVAuiQJmer0hbkEtBzurixbdgblV/483MWaVarzT6sk5oTlc/FVD+/Fw==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 80,
       "classification": "Recommended",
@@ -1708,6 +3392,36 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -1739,6 +3453,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -1766,6 +3510,39 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/dataforseo/mcp-server-typescript",
+            "identity": "https://github.com/dataforseo/mcp-server-typescript/.github/workflows/npm.yaml@refs/tags/v2.9.2",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -1797,6 +3574,39 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/joshuayoes/ios-simulator-mcp",
+            "identity": "https://github.com/joshuayoes/ios-simulator-mcp/.github/workflows/publish.yml@refs/tags/1.6.0",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -1824,6 +3634,39 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/instantdb/instant",
+            "identity": "https://github.com/instantdb/instant/.github/workflows/js.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -1855,6 +3698,39 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/cap-js/mcp-server",
+            "identity": "https://github.com/cap-js/mcp-server/.github/workflows/release.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -1884,6 +3760,41 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/hostinger/api-mcp-server",
+            "identity": "https://github.com/hostinger/api-mcp-server/.github/workflows/build-release.yaml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "listed",
+            "checked_at": "2026-09-17",
+            "server_id": "io.github.hostinger/hostinger-api-mcp",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -1895,7 +3806,7 @@
       "source_url": "https://github.com/ProfessionalWiki/MediaWiki-MCP-Server",
       "version": "0.9.1",
       "pkg_integrity": "sha512-bmnSuASaLxcHAiInNXo2Uy/b54gpnMYQ64vJX49sZ2wldgPKSyoWDsOqRnWco+i57GJUg7pG3iU/N+Nz6OeS7g==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 80,
       "classification": "Recommended",
@@ -1913,6 +3824,39 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/ProfessionalWiki/MediaWiki-MCP-Server",
+            "identity": "https://github.com/ProfessionalWiki/MediaWiki-MCP-Server/.github/workflows/release.yml@refs/tags/v0.9.1",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -1924,7 +3868,7 @@
       "source_url": "https://github.com/UI5/mcp-server",
       "version": "0.2.11",
       "pkg_integrity": "sha512-wT353pXcJkePmXJkc6nOslfd9z5HgVYuStX0rXUcCCULKnfshSnhL1LwQyYrSkpuRvpRag6AvtxbRe0N8YPvTQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 79.82,
       "classification": "Recommended",
@@ -1940,6 +3884,39 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/UI5/mcp-server",
+            "identity": "https://github.com/UI5/mcp-server/.github/workflows/release-please.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -1971,6 +3948,39 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/alchemyplatform/alchemy-mcp-server",
+            "identity": "https://github.com/alchemyplatform/alchemy-mcp-server/.github/workflows/publish.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -2000,6 +4010,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -2011,7 +4051,7 @@
       "source_url": "https://github.com/heroku/heroku-mcp-server",
       "version": "1.2.2",
       "pkg_integrity": "sha512-LJ2f/5RHXrFiVl9eBh0sbuSf15/EL0TGQm8l2pgsMCsuPoYWifGTuMvPSIYyWh5puDu42Ff0khEK21/pr84RlA==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 79.08,
       "classification": "Recommended",
@@ -2029,6 +4069,39 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/heroku/heroku-mcp-server",
+            "identity": "https://github.com/heroku/heroku-mcp-server/.github/workflows/release.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -2040,7 +4113,7 @@
       "source_url": "https://github.com/transloadit/node-sdk",
       "version": "0.3.21",
       "pkg_integrity": "sha512-GovQJSUyTdrQOGCk5ywW1fv6jdS4uDIDoHtQsdpUwqWQ8rdzRlW2RXg99E4B7XuNPzOWwKz2vkK/lCZVlg98TA==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 78.69,
       "classification": "Recommended",
@@ -2058,6 +4131,55 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/transloadit/node-sdk",
+            "identity": "https://github.com/transloadit/node-sdk/.github/workflows/release.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "repository_posture": {
+            "status": "weak",
+            "checked_at": "2026-09-17",
+            "checks": {
+              "code_review": "absent",
+              "maintained": "found",
+              "dangerous_workflows": "absent",
+              "token_permissions": "absent",
+              "security_policy": "absent",
+              "actions_pinned": "absent",
+              "release_signing": "unknown",
+              "branch_protection": "absent",
+              "sast": "absent"
+            },
+            "report_date": "2026-08-24"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -2069,7 +4191,7 @@
       "source_url": "https://github.com/cyanheads/clinicaltrialsgov-mcp-server",
       "version": "2.4.7",
       "pkg_integrity": "sha512-p3/McGAF3CDCpKqT1L4LwSML5mrFIaY8tipOoMrYtf/XzIoWTnjtcbArTm7V5M++edhH1vBwQjEhAuwX7EGE5w==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 79.24,
       "classification": "Recommended",
@@ -2085,6 +4207,38 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "listed",
+            "checked_at": "2026-09-17",
+            "server_id": "io.github.cyanheads/clinicaltrialsgov-mcp-server",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -2116,6 +4270,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -2145,6 +4329,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -2156,7 +4370,7 @@
       "source_url": "https://github.com/last9/last9-mcp-server",
       "version": "0.7.1",
       "pkg_integrity": "sha512-DprwVOZ+20X8inIImU0puZHTvJk51I8/gLt7WpsIczdqLgcrZvr7cQa7mZB4Azm/cHuBOIiiWZR1Z3LNAkNRiQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 77.78,
       "classification": "Recommended",
@@ -2174,6 +4388,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -2185,7 +4429,7 @@
       "source_url": "https://github.com/contentful/contentful-mcp-server",
       "version": "1.7.15",
       "pkg_integrity": "sha512-lNC8ybethkCVKoIS1nQZ52uFV1X7phkWf5Air7mOagDZTqoyXyFSHm5VUPqUaM6M0tLdfqHmW5EAYQZoAsyIBQ==",
-      "trust": "verified",
+      "trust": "unverified",
       "license": "MIT",
       "health_score": 77.71,
       "classification": "Recommended",
@@ -2203,6 +4447,35 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "vulnerable",
+            "checked_at": "2026-09-17"
           }
         }
       }
@@ -2232,6 +4505,39 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/esaio/esa-mcp-server",
+            "identity": "https://github.com/esaio/esa-mcp-server/.github/workflows/publish.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -2259,6 +4565,39 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/upstash/mcp-server",
+            "identity": "https://github.com/upstash/mcp-server/.github/workflows/release.yaml@refs/tags/v0.2.3",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -2291,6 +4630,39 @@
             "checked_at": "2026-09-17",
             "detail": "Renamed to @donmai/mcp-server. See https://donmai.dev/docs/migration.",
             "replacement": "@donmai/mcp-server"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/RenseiAI/agentfactory",
+            "identity": "https://github.com/RenseiAI/agentfactory/.github/workflows/release.yml@refs/tags/v0.9.0",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -2302,7 +4674,7 @@
       "source_url": "https://github.com/yoda-digital/mcp-gitlab-server",
       "version": null,
       "pkg_integrity": null,
-      "trust": "verified",
+      "trust": "unverified",
       "license": "MIT",
       "health_score": 77.92,
       "classification": "Recommended",
@@ -2320,6 +4692,38 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/yoda-digital/mcp-gitlab-server",
+            "identity": "https://github.com/yoda-digital/mcp-gitlab-server/.github/workflows/publish.yml@refs/tags/v0.9.1",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "vulnerable",
+            "checked_at": "2026-09-17"
           }
         }
       }
@@ -2347,6 +4751,36 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -2378,6 +4812,39 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/kintone/mcp-server",
+            "identity": "https://github.com/kintone/mcp-server/.github/workflows/release.yaml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -2407,6 +4874,15 @@
             "status": "gone",
             "checked_at": "2026-09-17",
             "detail": "@diskd-ai/email-mcp returns 404 from the npm registry \u2014 unpublished, renamed or taken down; the name is claimable"
+          },
+          "artifact": {
+            "status": "unverified",
+            "checked_at": "2026-09-17",
+            "method": "registry-404"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
           }
         }
       }
@@ -2436,6 +4912,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -2447,7 +4953,7 @@
       "source_url": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
       "version": "0.26.0",
       "pkg_integrity": "sha512-tSU6E8mmlki9mmfPy3aHlXKkGCcKXVXjAWF4Y/KZIslW7fQy0PalrsUoe8J4FQpEhxbh9vv2TkO08fFLDenMmA==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 75,
       "classification": "Recommended",
@@ -2463,6 +4969,41 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
+            "identity": "https://github.com/ChromeDevTools/chrome-devtools-mcp/.github/workflows/publish-to-npm-on-tag.yml@refs/tags/chrome-devtools-mcp-v0.26.0",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "listed",
+            "checked_at": "2026-09-17",
+            "server_id": "io.github.ChromeDevTools/chrome-devtools-mcp",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "advisories-present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -2494,6 +5035,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -2521,6 +5092,39 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/supabase-community/supabase-mcp",
+            "identity": "https://github.com/supabase-community/supabase-mcp/.github/workflows/release.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -2552,6 +5156,41 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/containers/kubernetes-mcp-server",
+            "identity": "https://github.com/containers/kubernetes-mcp-server/.github/workflows/release.yaml@refs/tags/v0.0.62",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "listed",
+            "checked_at": "2026-09-17",
+            "server_id": "io.github.containers/kubernetes-mcp-server",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -2563,7 +5202,7 @@
       "source_url": "https://github.com/microsoft/mcp",
       "version": "3.0.0-beta.10",
       "pkg_integrity": "sha512-xW47hDIJazF2w+SKg+qyzMuFetmYSmo5sCP8Qnwve6gURtVh1EvtnPIuM/xgMBs0yQ9MN8d4lrszdLfPziGmpA==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 75,
       "classification": "Recommended",
@@ -2579,6 +5218,36 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -2610,6 +5279,52 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "repository_posture": {
+            "status": "weak",
+            "checked_at": "2026-09-17",
+            "checks": {
+              "code_review": "absent",
+              "maintained": "found",
+              "security_policy": "found",
+              "dangerous_workflows": "absent",
+              "token_permissions": "absent",
+              "branch_protection": "absent",
+              "release_signing": "unknown",
+              "sast": "absent",
+              "actions_pinned": "absent"
+            },
+            "report_date": "2026-08-24"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -2637,6 +5352,36 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -2668,6 +5413,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -2679,7 +5454,7 @@
       "source_url": "https://github.com/qase-tms/qase-mcp-server",
       "version": "1.1.7",
       "pkg_integrity": "sha512-dP6yOF0aWWo92kGtMloxoROeeHG3D9d768TwQPwl1Qj6XblSrYUiV+dkYmtedOM+D08ZyK1yROugCOKvh3tGOQ==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 75.05,
       "classification": "Recommended",
@@ -2697,6 +5472,39 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/qase-tms/qase-mcp-server",
+            "identity": "https://github.com/qase-tms/qase-mcp-server/.github/workflows/npm.yml@refs/tags/v1.1.7",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -2708,7 +5516,7 @@
       "source_url": "https://github.com/LinkupPlatform/linkup-mcp-server",
       "version": "3.2.0",
       "pkg_integrity": "sha512-MAw7md5agV2lCTRv9cdy8zbZ/DBZTDzgxoExf+HfyyVHyvAd6bAp/UiR1m88sRJVJshOgVa1c9C+Dxk1PrVZPw==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 54.77,
       "classification": "Experimental",
@@ -2724,6 +5532,36 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -2755,6 +5593,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -2782,6 +5650,39 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/growthbook/growthbook-mcp",
+            "identity": "https://github.com/growthbook/growthbook-mcp/.github/workflows/publish-mcp.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -2813,6 +5714,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -2840,6 +5771,39 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/currents-dev/currents-mcp",
+            "identity": "https://github.com/currents-dev/currents-mcp/.github/workflows/publish.yaml@refs/heads/release/2.2.18",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -2871,6 +5835,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -2898,6 +5892,39 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/tuannvm/codex-mcp-server",
+            "identity": "https://github.com/tuannvm/codex-mcp-server/.github/workflows/release.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -2929,6 +5956,36 @@
             "status": "deprecated",
             "checked_at": "2026-09-17",
             "detail": "Deprecated: use CircleCI's hosted MCP server or CircleCI CLI MCP instead. See https://circleci.com/docs/guides/toolkit/circleci-mcp-overview/"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -2956,6 +6013,39 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/MemberJunction/MJ",
+            "identity": "https://github.com/MemberJunction/MJ/.github/workflows/publish.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -2987,6 +6077,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -3014,6 +6134,36 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -3045,6 +6195,36 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -3072,6 +6252,55 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/eclipse-theia/theia",
+            "identity": "https://github.com/eclipse-theia/theia/.github/workflows/publish-ci.yml@refs/heads/release/1.71.x",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "repository_posture": {
+            "status": "weak",
+            "checked_at": "2026-09-17",
+            "checks": {
+              "maintained": "found",
+              "security_policy": "found",
+              "code_review": "found",
+              "dangerous_workflows": "found",
+              "token_permissions": "absent",
+              "branch_protection": "unknown",
+              "release_signing": "absent",
+              "actions_pinned": "found",
+              "sast": "absent"
+            },
+            "report_date": "2026-08-24"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -3103,6 +6332,39 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/Daghis/teamcity-mcp",
+            "identity": "https://github.com/Daghis/teamcity-mcp/.github/workflows/publish.yml@refs/tags/teamcity-mcp-v2.12.1",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -3130,6 +6392,39 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/idanfishman/prometheus-mcp",
+            "identity": "https://github.com/idanfishman/prometheus-mcp/.github/workflows/release.yaml@refs/tags/v1.1.3",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -3161,6 +6456,35 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "absent",
+            "checked_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "unverified",
+            "checked_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -3190,6 +6514,39 @@
             "status": "present",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/winor30/mcp-server-datadog",
+            "identity": "https://github.com/winor30/mcp-server-datadog/.github/workflows/publish.yml@refs/tags/v1.7.0",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
           }
         }
       }
@@ -3212,7 +6569,22 @@
       "stars": 1491,
       "last_commit_days": 0,
       "open_issues": 52,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "oci:hashicorp/terraform-mcp-server@sha256:67b4d3d39aa2c32c5ee280b21d67fb6513dab463af6c93c2ae0cdd4af09d4603",
+        "dimensions": {
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "kafka-mcp-server",
@@ -3232,7 +6604,22 @@
       "stars": 53,
       "last_commit_days": 143,
       "open_issues": 20,
-      "last_checked": "2026-07-31"
+      "last_checked": "2026-07-31",
+      "trust_evidence": {
+        "artifact_id": "oci:ghcr.io/tuannvm/kafka-mcp-server@sha256:3ac9f77f81933b2be290fefc3d6e069f74751a4ac5c17ce1d0ab120f196ca9ac",
+        "dimensions": {
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          }
+        }
+      }
     },
     {
       "name": "@anyproto/anytype-mcp",
@@ -3250,7 +6637,7 @@
       "last_checked": "2026-07-31",
       "version": "1.2.8",
       "pkg_integrity": "sha512-Qf6Jyg+qYHOhHntgf4r/2vNRajrXJqJ/shhM/UNSEQSF2Hdq016Unyrm6H4eDTmXwomlxsNPWbDfy2Y+vw9x2A==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "notes": "Official Anytype MCP server (registry id io.github.anyproto/anytype-mcp). Tools generated from Anytype's OpenAPI spec: search, spaces, members, objects, lists, properties, tags, types, templates. est_tools_count not yet measured (needs the Anytype desktop app + API key to smoke-test). Promoted from discovery candidates 2026-06-20.",
       "trust_evidence": {
@@ -3258,6 +6645,39 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/anyproto/anytype-mcp",
+            "identity": "https://github.com/anyproto/anytype-mcp/.github/workflows/release.yml@refs/tags/v1.2.8",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "unlisted",
+            "checked_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }
@@ -3280,7 +6700,7 @@
       "last_checked": "2026-07-31",
       "version": "1.4.10",
       "pkg_integrity": "sha512-q4iH/IUqw7h5qGErOifh6LtFsnUSS9gi54jNjzlohOodiK8/eB7NMWLnbRewK7eCfopo1RuYklMRW7gV7+zT1w==",
-      "trust": "candidate",
+      "trust": "verified",
       "license": "MIT",
       "notes": "Controls TouchDesigner projects via MCP, 13 tools (node create/delete, parameter read/update, Python exec, class/help introspection); registry id io.github.8beeeaaat/touchdesigner-mcp-server. category=utility: no creative/media-tooling category exists; mirrors godot-mcp-server precedent. Promoted from discovery candidates 2026-06-20.",
       "trust_evidence": {
@@ -3288,6 +6708,41 @@
         "dimensions": {
           "availability": {
             "status": "present",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "artifact": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "method": "deep-hash",
+            "verified_at": "2026-09-17"
+          },
+          "signature": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+            "verified_at": "2026-09-17"
+          },
+          "provenance": {
+            "status": "bound",
+            "checked_at": "2026-09-17",
+            "repository": "https://github.com/8beeeaaat/touchdesigner-mcp",
+            "identity": "https://github.com/8beeeaaat/touchdesigner-mcp/.github/workflows/release.yml@refs/heads/main",
+            "verified_at": "2026-09-17"
+          },
+          "source_binding": {
+            "status": "verified",
+            "checked_at": "2026-09-17",
+            "verified_at": "2026-09-17"
+          },
+          "registry": {
+            "status": "listed",
+            "checked_at": "2026-09-17",
+            "server_id": "io.github.8beeeaaat/touchdesigner-mcp-server",
+            "verified_at": "2026-09-17"
+          },
+          "advisories": {
+            "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
           }

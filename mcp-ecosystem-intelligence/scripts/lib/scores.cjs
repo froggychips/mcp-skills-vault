@@ -30,7 +30,7 @@
  * a poor trade.
  *
  * API:
- *   trustScore(evidence, opts)        -> { score, gate, reasons }
+ *   trustScore(evidence, opts)        -> { score, gate, blocking, reasons }
  *   fitScore(tool, stack, opts)       -> { score, reasons }
  *   behaviour(evalResult)             -> { state, tools, reason, requires }
  *   recommend({ trust, health, fit, behaviour }) -> { verdict, reasons }
@@ -45,6 +45,15 @@ const TRUST_WEIGHTS = {
   // Being published at all is worth nothing on its own — it is the floor, not
   // an achievement — but its negative states are findings that block.
   availability:   { present: 0, deprecated: -5, gone: -100, 'version-gone': -100, yanked: -100 },
+  // Being listed in the ownership-verified official registry is a small
+  // positive; a contradiction between it and this entry is a finding worth
+  // points but not a veto (forks and org renames produce it legitimately).
+  registry:       { listed: 5, unlisted: 0, contradicted: -10, withdrawn: -10 },
+  // How the upstream repository is run. Worth points, never a veto: an
+  // unprotected branch upstream is a reason to look closer, not evidence that
+  // this artifact is wrong. 'weak' costs less than a metadata contradiction
+  // because Scorecard's checks are about process, not about these bytes.
+  repository_posture: { clean: 5, weak: -5 },
   artifact:       { verified: 40, unverified: 0, mismatch: -100 },
   signature:      { verified: 20, absent: 0 },
   // 'bound' means the attestation's subject digest is the artifact we verified
@@ -57,8 +66,29 @@ const TRUST_WEIGHTS = {
   smoke:          { pass: 0, fail: -5, skipped: 0 },   // behavioural, not a trust claim
 };
 
-// A negative weight is a finding, not a deduction: it blocks.
-const BLOCKING = new Set(['mismatch', 'vulnerable', 'gone', 'version-gone', 'yanked']);
+// A negative weight is a finding, not a deduction: it blocks — but only for the
+// dimensions where the status actually means "do not run this".
+//
+// This used to be one set of status *words*, which coupled dimensions that have
+// nothing to do with each other: adding a `registry: contradicted` state, or
+// giving provenance a `mismatch`, would have silently started blocking installs
+// on a disagreement between two metadata sources. Per dimension, the question
+// "does this status block?" has a different answer, and it is written down here
+// rather than inferred from a shared vocabulary.
+const BLOCKING = {
+  artifact:     new Set(['mismatch']),        // the bytes are not what we verified
+  advisories:   new Set(['vulnerable']),      // a known CVE applies to this version
+  availability: new Set(['gone', 'version-gone', 'yanked']),   // there is nothing to install
+  // Deliberately absent: source_binding, provenance and registry. Each can
+  // disagree for innocent reasons — a fork, a monorepo move, an org rename —
+  // and each is reported as a finding by the gate. A metadata disagreement is
+  // something to read, not a refusal to install.
+};
+
+function blocks(dimension, status) {
+  const set = BLOCKING[dimension];
+  return Boolean(set && set.has(status));
+}
 
 /**
  * Trust from recorded evidence.
@@ -72,12 +102,16 @@ function trustScore(evidence, { now = Date.now(), maxAgeDays = DEFAULT_MAX_AGE_D
   const dims = (evidence && evidence.dimensions) || {};
   const reasons = [];
   if (!Object.keys(dims).length) {
-    return { score: 0, gate: 'thin', reasons: ['no evidence recorded for this entry'] };
+    return { score: 0, gate: 'thin', blocking: [], reasons: ['no evidence recorded for this entry'] };
   }
 
   const stale = new Set(staleDimensions(evidence, maxAgeDays, now).map((s) => s.dimension));
   let score = 0;
-  let blocked = false;
+  // The dimensions that actually block, kept apart from the running commentary.
+  // They used to be pushed into the same `reasons` array as the positive
+  // findings, so a caller reading `reasons[0]` to explain a denial printed
+  // "artifact: verified" as the reason an entry with a known CVE was blocked.
+  const blocking = [];
 
   for (const [name, value] of Object.entries(dims)) {
     const table = TRUST_WEIGHTS[name];
@@ -85,9 +119,8 @@ function trustScore(evidence, { now = Date.now(), maxAgeDays = DEFAULT_MAX_AGE_D
     const weight = table[value.status];
     if (weight === undefined) continue;
 
-    if (BLOCKING.has(value.status)) {
-      blocked = true;
-      reasons.push(`${name}: ${value.status} (as of ${value.checked_at})`);
+    if (blocks(name, value.status)) {
+      blocking.push({ dimension: name, status: value.status, checked_at: value.checked_at });
       continue;
     }
     if (stale.has(name)) {
@@ -112,13 +145,18 @@ function trustScore(evidence, { now = Date.now(), maxAgeDays = DEFAULT_MAX_AGE_D
   const artifactCurrent = artifact
     && artifact.status === 'verified'
     && !stale.has('artifact');
-  const gate = blocked ? 'block' : (artifactCurrent && score >= 55 ? 'ok' : 'thin');
-  if (!blocked && !artifactCurrent) {
+  const gate = blocking.length ? 'block' : (artifactCurrent && score >= 55 ? 'ok' : 'thin');
+  if (!blocking.length && !artifactCurrent) {
     reasons.unshift(artifact
       ? `artifact: ${artifact.status}${stale.has('artifact') ? ` (and ${artifact.checked_at} is past its shelf life)` : ''} — nothing else substitutes for that`
       : 'artifact was never verified — nothing else substitutes for that');
   }
-  return { score, gate, reasons };
+  // A blocked verdict leads with what blocked it. Anything else reads as a
+  // non-sequitur next to the word DENIED.
+  if (blocking.length) {
+    reasons.unshift(...blocking.map((b) => `${b.dimension}: ${b.status} (as of ${b.checked_at})`));
+  }
+  return { score, gate, blocking, reasons };
 }
 
 /**
@@ -304,4 +342,4 @@ function recommend({ trust, health, fit, behaviour: behav } = {}) {
   return { verdict, reasons };
 }
 
-module.exports = { trustScore, fitScore, behaviour, recommend, TRUST_WEIGHTS, BEHAVIOUR_CEILING, VERDICTS };
+module.exports = { trustScore, fitScore, behaviour, recommend, blocks, TRUST_WEIGHTS, BLOCKING, BEHAVIOUR_CEILING, VERDICTS };

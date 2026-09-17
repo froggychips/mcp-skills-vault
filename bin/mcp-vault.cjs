@@ -38,6 +38,9 @@ const COMMANDS = {
   eval:            "mcp_eval.cjs",
   "docker-drift":  "check_docker_drift.cjs",
   availability:    "check_availability.cjs",
+  identity:        "check_identity.cjs",
+  posture:         "check_posture.cjs",
+  explain:         "explain.cjs",
   "license-drift": "check_license_drift.cjs",
   health:          "calculate_health.cjs",
   refresh:         "refresh_scores.cjs",
@@ -65,6 +68,9 @@ COMMANDS
   discover          Harvest fresh MCP candidates from npm / gh / README
   eval              Behavioural smoke (handshake + tools/list + schema lint)
   availability      Is every entry still published, and still the same thing?
+  identity          Who published it, per the ownership-verified official registry
+  posture           How each upstream repo is run (OpenSSF Scorecard via deps.dev)
+  explain <name>    Why this entry is allowed or denied, with the evidence and the rule
   docker-drift      Detect upstream Docker @sha256 drift
   license-drift     Detect MIT → BSL / SSPL relicensing
   health <args>     Score a candidate by stars / recency / license / registry

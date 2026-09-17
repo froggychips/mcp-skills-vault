@@ -1467,8 +1467,21 @@ async function main() {
   let ghsa          = { ok: true, data: {}, failures: 0 };
   let snyk          = { ok: true, data: {}, skipped: false, failures: 0 };
   if (!UPDATE && !NO_AUDIT && !OFFLINE) {
+    // npm's bulk endpoint filters advisories by the versions you ask about, so
+    // ask about the pinned one. The previous value here was `['']` — an array
+    // containing an empty string — under a comment saying npm tolerates it. It
+    // does not: the endpoint answers HTTP 400, which meant this feed had never
+    // returned a single advisory. One of four advisory sources, dead in every
+    // run since it was written, and invisible because a dead feed is reported
+    // as "UNAVAILABLE" in a summary line nobody reads twice.
+    //
+    // An entry with no version is left out of the query rather than sent with a
+    // placeholder: there is no version to filter by, and OSV/GHSA still cover
+    // it. Leaving it out is not a feed outage, so it is not reported as one.
     const npmMap = {};
-    for (const { pkg } of npmTools) npmMap[pkg] = [''];   // npm tolerates empty version array
+    for (const { pkg, tool } of npmTools) {
+      if (tool.version) npmMap[pkg] = [tool.version];
+    }
     const npmQueries  = npmTools.map(({ pkg, tool })  => ({ ecosystem: 'npm',  name: pkg, version: tool.version || '0.0.0' }));
     const pypiQueries = pypiTools.map(({ pkg, tool }) => ({ ecosystem: 'PyPI', name: pkg, version: tool.version || '0.0.0' }));
     const allQueries  = [...npmQueries, ...pypiQueries];

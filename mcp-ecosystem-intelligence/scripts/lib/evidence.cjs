@@ -19,6 +19,7 @@
  *     signature:      { status: 'verified',  checked_at: '2026-09-17', keyid: 'SHA256:…' },
  *     provenance:     { status: 'bound',     checked_at: '2026-09-17', identity: '…' },
  *     source_binding: { status: 'verified',  checked_at: '2026-09-17' },
+ *     registry:       { status: 'listed',    checked_at: '2026-09-17', server_id: 'io.github.o/r' },
  *     license:        { status: 'osi',       checked_at: '2026-09-17', value: 'MIT' },
  *     advisories:     { status: 'clean',     checked_at: '2026-09-17' },
  *     dependencies:   { status: 'hooks',     checked_at: '2026-09-17', count: 608 },
@@ -42,7 +43,9 @@ const DIMENSIONS = [
   'artifact',        // the bytes match the pin
   'signature',       // the registry vouched for that pin
   'provenance',      // a build claims to have produced it
-  'source_binding',  // the registry's repo agrees with ours
+  'source_binding',  // the package registry's repo agrees with ours
+  'registry',        // the official MCP registry's ownership-verified listing
+  'repository_posture', // how the upstream repo is run (OpenSSF Scorecard)
   'license',         // what the licence actually says
   'advisories',      // nothing known against this version
   'dependencies',    // what the tree contains
@@ -60,6 +63,9 @@ const DEFAULT_MAX_AGE_DAYS = {
   signature:      90,
   provenance:     90,
   source_binding: 60,
+  registry:       30,
+  // Scorecard reruns weekly at most, and branch protection does not change often.
+  repository_posture: 60,
   license:        30,
   advisories:     7,
   dependencies:   14,
@@ -71,7 +77,7 @@ const today = (now = Date.now()) => new Date(now).toISOString().slice(0, 10);
 // What counts as an answer in the affirmative, per dimension vocabulary. Used
 // where "did this actually check out?" is being asked, so that a new status
 // added later defaults to "not established" rather than to "fine".
-const POSITIVE_STATUSES = new Set(['verified', 'clean', 'claimed', 'bound', 'present', 'pass', 'hooks', 'advisories-present', 'osi']);
+const POSITIVE_STATUSES = new Set(['verified', 'clean', 'claimed', 'bound', 'present', 'listed', 'pass', 'hooks', 'advisories-present', 'osi']);
 
 /**
  * Turn one run's *typed check results* into dated evidence.
@@ -120,6 +126,18 @@ function buildEvidence(checks, { now = Date.now(), artifactId = null } = {}) {
     put('provenance', c.provenance.state, extra);
   }
   if (c.source_binding) put('source_binding', c.source_binding.state);
+  if (c.repository_posture) {
+    const extra = {};
+    if (c.repository_posture.checks)      extra.checks = c.repository_posture.checks;
+    if (c.repository_posture.report_date) extra.report_date = c.repository_posture.report_date;
+    put('repository_posture', c.repository_posture.state, extra);
+  }
+  if (c.registry) {
+    const extra = {};
+    if (c.registry.server_id) extra.server_id = c.registry.server_id;
+    if (c.registry.detail)    extra.detail = c.registry.detail;
+    put('registry', c.registry.state, extra);
+  }
   if (c.advisories)     put('advisories', c.advisories.state);
   if (c.dependencies) {
     put('dependencies', c.dependencies.state, Number.isFinite(c.dependencies.count) ? { count: c.dependencies.count } : {});
