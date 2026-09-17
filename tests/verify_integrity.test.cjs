@@ -379,3 +379,12 @@ test('CLI --json: exit code still reflects the verdict', () => {
   assert.equal(runVerify(['--offline', '--json']).status, 0);
   assert.equal(runVerify(['--offline', '--json', '--fail-unverified']).status, 1);
 });
+
+test('npmManifestUrl: scoped names keep their slash encoded', () => {
+  assert.equal(v.npmManifestUrl('mcp-server-foo', '1.2.3', 'https://r'), 'https://r/mcp-server-foo/1.2.3');
+  assert.equal(v.npmManifestUrl('@scope/pkg', '1.2.3', 'https://r'), 'https://r/@scope%2fpkg/1.2.3');
+  assert.equal(v.npmManifestUrl('@yoda.digital/gitlab-mcp-server', null, 'https://r'), 'https://r/@yoda.digital%2fgitlab-mcp-server/latest');
+  // A version with a plus or a pre-release tag must survive intact enough to
+  // address the document.
+  assert.equal(v.npmManifestUrl('pkg', '1.0.0-rc.1', 'https://r'), 'https://r/pkg/1.0.0-rc.1');
+});

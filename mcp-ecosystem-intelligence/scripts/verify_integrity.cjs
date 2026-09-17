@@ -42,7 +42,7 @@
 
 'use strict';
 
-const { execFileSync } = require('child_process');
+const { getJson, postJson, mapLimit } = require('./lib/http.cjs');
 const https       = require('https');
 const fs          = require('fs');
 const path        = require('path');
@@ -102,46 +102,29 @@ function normalizeGitUrl(url) {
     .replace(/\/issues\/?$/, '');                       // strip /issues from Bug Tracker URLs
 }
 
-// POST helper for JSON APIs.
-function httpsPostJson(opts, payload, timeoutMs = 10000) {
-  return new Promise((resolve) => {
-    const body = JSON.stringify(payload);
-    const req = https.request(
-      { ...opts, headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body), ...(opts.headers || {}) } },
-      (res) => {
-        if (res.statusCode < 200 || res.statusCode >= 300) { res.resume(); resolve(null); return; }
-        let data = '';
-        res.on('data', (c) => { data += c; });
-        res.on('end', () => { try { resolve(JSON.parse(data)); } catch { resolve(null); } });
-      }
-    );
-    req.on('error', () => resolve(null));
-    req.setTimeout(timeoutMs, () => { req.destroy(); resolve(null); });
-    req.write(body);
-    req.end();
-  });
+// Registry and feed transport. Both wrappers keep the old contract — a null
+// means "this did not answer" — but underneath they retry transient failures
+// (timeouts, 429, 403 rate limits, 5xx) and, for GETs, revalidate a disk cache
+// with the stored ETag. Before this, one 403 partway through the GHSA loop
+// turned a package's result into "feed unreachable" with no second attempt.
+const CACHE_TTL_MS = Number(process.env.MCP_VAULT_CACHE_TTL_MS || 15 * 60 * 1000);
+// How many registry/feed requests are in flight at once. The feeds are the slow
+// part of a run: 114 entries once meant 114 sequential round trips per feed.
+const CONCURRENCY = Math.max(1, Number(process.env.MCP_VAULT_CONCURRENCY || 8));
+// npm's public registry, overridable for a mirror or a private registry.
+const NPM_REGISTRY = (process.env.MCP_VAULT_NPM_REGISTRY || 'https://registry.npmjs.org').replace(/\/+$/, '');
+
+function httpsPostJson(url, payload, timeoutMs = 10000) {
+  return postJson(url, payload, { timeoutMs }).then((r) => (r.ok ? r.data : null));
 }
 
-function httpsGetJson(url, timeoutMs = 10000, headers = {}) {
-  return new Promise((resolve) => {
-    const u = new URL(url);
-    const req = https.get(
-      { hostname: u.hostname, path: u.pathname + u.search, headers },
-      (res) => {
-        if (res.statusCode !== 200) { res.resume(); resolve(null); return; }
-        let data = '';
-        res.on('data', (c) => { data += c; });
-        res.on('end', () => { try { resolve(JSON.parse(data)); } catch { resolve(null); } });
-      },
-    );
-    req.on('error', () => resolve(null));
-    req.setTimeout(timeoutMs, () => { req.destroy(); resolve(null); });
-  });
+function httpsGetJson(url, timeoutMs = 10000, headers = {}, cacheTtlMs = CACHE_TTL_MS) {
+  return getJson(url, { headers, timeoutMs, cacheTtlMs }).then((r) => (r.ok ? r.data : null));
 }
 
 function fetchNpmAdvisories(pkgMap) {
   return httpsPostJson(
-    { hostname: 'registry.npmjs.org', path: '/-/npm/v1/security/advisories/bulk', method: 'POST' },
+    `${NPM_REGISTRY}/-/npm/v1/security/advisories/bulk`,
     pkgMap,
   ).then((r) => ({ ok: r !== null, data: r || {} }));
 }
@@ -160,7 +143,7 @@ function fetchOsvAdvisories(queries) {
     })),
   };
   return httpsPostJson(
-    { hostname: 'api.osv.dev', path: '/v1/querybatch', method: 'POST' },
+    'https://api.osv.dev/v1/querybatch',
     payload,
     15000,
   ).then((r) => ({ ok: r !== null, data: (r && r.results) || [] }));
@@ -194,16 +177,24 @@ async function fetchGhsaAdvisories(queries) {
   };
   const out = {};
   let failures = 0;
-  for (const q of queries) {
+
+  // One request per (ecosystem, package), up to CONCURRENCY at a time. The
+  // client retries a 403 with backoff, which is what an anonymous run hits
+  // after 60 packages.
+  const fetched = await mapLimit(queries, CONCURRENCY, async (q) => {
     // GHSA ecosystem codes: "npm", "pip" (PyPI), "rubygems", "maven", "go", …
     const ecoCode = q.ecosystem === 'PyPI' ? 'pip' : q.ecosystem;
-    const key = `${ecoCode}:${q.name}`;
-    // affects=pkg@version → server-side filter to only advisories that the
-    // pinned version is actually inside the vulnerable range of. If version
-    // is unknown, fall back to the pkg-wide query (caller's problem to triage).
+    // affects=pkg@version → server-side filter to only advisories the pinned
+    // version is actually inside the vulnerable range of. Without it the
+    // endpoint returns every advisory in the package's history regardless of
+    // whether the pinned version is patched (the false-positive batch in the
+    // first GHSA rollout).
     const affects = q.version ? `${q.name}@${q.version}` : q.name;
     const url = `https://api.github.com/advisories?ecosystem=${encodeURIComponent(ecoCode)}&affects=${encodeURIComponent(affects)}&per_page=20`;
-    const advs = await httpsGetJson(url, 10000, headers);
+    return { key: `${ecoCode}:${q.name}`, advs: await httpsGetJson(url, 10000, headers) };
+  });
+
+  for (const { key, advs } of fetched) {
     if (advs === null)        { out[key] = null; failures++; continue; }  // unreachable: network / 403 rate-limit / 5xx
     if (!Array.isArray(advs)) { out[key] = [];               continue; }  // 200 but unexpected shape → no advisories
     out[key] = advs.map((a) => ({
@@ -225,17 +216,20 @@ async function fetchSnykAdvisories(queries) {
   if (!queries.length) return { ok: true, data: {}, skipped: false, failures: 0 };
   const token = process.env.SNYK_TOKEN;
   if (!token) return { ok: true, data: {}, skipped: 'SNYK_TOKEN not set', failures: 0 };
-  const out = {};
-  let failures = 0;
   const headers = {
     'Authorization': `token ${token}`,
     'User-Agent':    'mcp-skills-vault/verify_integrity.cjs',
   };
-  for (const q of queries) {
+  const out = {};
+  let failures = 0;
+
+  const fetched = await mapLimit(queries, CONCURRENCY, async (q) => {
     const eco = q.ecosystem === 'PyPI' ? 'pip' : q.ecosystem;
-    const key = `${eco}:${q.name}`;
     const url = `https://api.snyk.io/v1/test/${encodeURIComponent(eco)}/${encodeURIComponent(q.name)}/${encodeURIComponent(q.version || '0.0.0')}`;
-    const data = await httpsGetJson(url, 10000, headers);
+    return { key: `${eco}:${q.name}`, data: await httpsGetJson(url, 10000, headers) };
+  });
+
+  for (const { key, data } of fetched) {
     if (data === null) { out[key] = null; failures++; continue; }  // unreachable
     const vulns = (data?.issues?.vulnerabilities || []);
     out[key] = vulns.map((v) => ({
@@ -247,6 +241,30 @@ async function fetchSnykAdvisories(queries) {
     }));
   }
   return { ok: failures === 0, data: out, skipped: false, failures };
+}
+
+/**
+ * The version manifest for one npm package, straight from the registry.
+ *
+ * This replaces `npm view <pkg>@<version> --json`, which cost a child process
+ * per entry — 102 sequential `npm view` calls, the slowest part of a full run —
+ * and pulled DB-controlled strings onto a command line. The per-version
+ * document is small (unlike the full packument) and carries everything the gate
+ * reads: dist.integrity, dist.tarball, repository, scripts, license.
+ */
+// A scoped name keeps its slash encoded: /@scope%2fpkg/1.2.3
+function npmManifestUrl(pkg, version, registry = NPM_REGISTRY) {
+  const name = pkg.startsWith('@')
+    ? `@${encodeURIComponent(pkg.slice(1)).replace(/%2F/i, '%2f')}`
+    : encodeURIComponent(pkg);
+  return `${registry}/${name}/${encodeURIComponent(version || 'latest')}`;
+}
+
+// Returns the http client's result object, not just the body: a 404 means the
+// package or version is gone from the registry, which is a different thing
+// from "the registry did not answer" and deserves saying out loud.
+function fetchNpmManifest(pkg, version) {
+  return getJson(npmManifestUrl(pkg, version), { cacheTtlMs: CACHE_TTL_MS });
 }
 
 function fetchPypiMeta(pkg, version) {
@@ -463,24 +481,25 @@ function verdictFor(failures, lines) {
 
 // ── per-tool processors ────────────────────────────────────────────────────
 
-async function processNpm(tool, pkg, advisoriesForTool, degraded, results) {
+async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, results) {
   if (OFFLINE) {
     processOfflinePackage(tool, pkg, 'npm', results);
     return;
   }
-  const versionSpec = tool.version ? `${pkg}@${tool.version}` : `${pkg}@latest`;
-  let meta;
-  try {
-    // execFileSync, not execSync: `versionSpec` carries DB-supplied strings
-    // (`tool.version`) into the call, and a shell would treat `$(…)`/backticks
-    // in them as code. argv form has no shell to interpret.
-    meta = JSON.parse(execFileSync('npm', ['view', versionSpec, '--json'], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }));
-  } catch (e) {
-    // Registry unreachable ≠ "pin is fine". Fail closed under --strict.
+  // `fetched` is the http result; `meta` is its body.
+  const meta = fetched && fetched.ok ? fetched.data : null;
+  if (!meta || !meta.version) {
+    // A 404 is not a transport problem: the package or the pinned version is
+    // no longer in the registry. Unpublished, renamed, or taken down — and the
+    // name may now be claimable by someone else, so say which case this is.
+    const gone = fetched && fetched.status === 404;
+    const why = gone
+      ? `no longer in the npm registry (404) — unpublished, renamed, or taken down`
+      : `npm registry lookup failed: ${(fetched && fetched.error) || 'no response'}`;
     results.push({
       tool,
       status: 'UNVERIFIED',
-      msg: `${tool.name}: npm view failed: ${e.message.split('\n')[0]}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`,
+      msg: `${tool.name}: ${pkg}@${tool.version || 'latest'} ${why}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`,
       failures: FAIL_UNVERIFIED ? 1 : 0,
     });
     return;
@@ -558,12 +577,11 @@ async function processNpm(tool, pkg, advisoriesForTool, degraded, results) {
   });
 }
 
-async function processPypi(tool, pkg, advisoriesForTool, degraded, results) {
+async function processPypi(tool, pkg, meta, advisoriesForTool, degraded, results) {
   if (OFFLINE) {
     processOfflinePackage(tool, pkg, 'PyPI', results);
     return;
   }
-  const meta = await fetchPypiMeta(pkg, tool.version);
   if (!meta) {
     results.push({
       tool,
@@ -783,6 +801,21 @@ async function main() {
     progress('No-audit mode: checking live registry metadata; advisory feeds skipped.\n');
   }
 
+  // Registry metadata for every entry, fetched concurrently. The processing
+  // below stays sequential so the report keeps DB order.
+  let npmMetas  = [];
+  let pypiMetas = [];
+  if (!OFFLINE) {
+    if (npmTools.length || pypiTools.length) {
+      progress(`Fetching registry metadata for ${npmTools.length} npm + ${pypiTools.length} PyPI entries (${CONCURRENCY} at a time)... `);
+    }
+    [npmMetas, pypiMetas] = await Promise.all([
+      mapLimit(npmTools,  CONCURRENCY, ({ tool, pkg }) => fetchNpmManifest(pkg, tool.version)),
+      mapLimit(pypiTools, CONCURRENCY, ({ tool, pkg }) => fetchPypiMeta(pkg, tool.version)),
+    ]);
+    if (npmTools.length || pypiTools.length) progress('done.\n');
+  }
+
   // Process npm.
   for (let i = 0; i < npmTools.length; i++) {
     const { tool, pkg } = npmTools[i];
@@ -795,9 +828,9 @@ async function main() {
       snykList: snyk.data[`npm:${pkg}`] || [],
     });
     const degraded = (UPDATE || NO_AUDIT) ? [] : degradedFeedsFor('npm', `npm:${pkg}`, health);
-    await processNpm(tool, pkg, advs, degraded, results);
+    await processNpm(tool, pkg, npmMetas[i], advs, degraded, results);
   }
-  // Process PyPI (sequentially — PyPI per-package metadata fetch).
+  // Process PyPI.
   for (let i = 0; i < pypiTools.length; i++) {
     const { tool, pkg } = pypiTools[i];
     const advs = unifyAdvisories({
@@ -807,7 +840,7 @@ async function main() {
       snykList: snyk.data[`pip:${pkg}`] || [],
     });
     const degraded = (UPDATE || NO_AUDIT) ? [] : degradedFeedsFor('PyPI', `pip:${pkg}`, health);
-    await processPypi(tool, pkg, advs, degraded, results);
+    await processPypi(tool, pkg, pypiMetas[i], advs, degraded, results);
   }
   // Process docker.
   for (const { tool } of dockerTools) processDocker(tool, results);
@@ -888,6 +921,7 @@ module.exports = {
   cvss3BaseScore,
   scoreToSeverity,
   dockerDigestPinned,
+  npmManifestUrl,
   verdictFor,
   osvSeverity,
   unifyAdvisories,
