@@ -154,6 +154,11 @@ Flags:
 | `--require-signatures` | An npm release with no verifiable registry signature is a failure |
 | `--require-provenance` | An npm release with no provenance attestation is a failure |
 
+This project publishes itself with npm provenance (`npm publish --provenance`,
+signed against a GitHub OIDC token — which works on a self-hosted runner, since
+the token comes from GitHub rather than the runner). If provenance cannot be
+produced, the publish stops rather than shipping without it.
+
 Every npm entry's registry signature is checked on every run: npm signs
 `<name>@<version>:<integrity>` with a published ECDSA key, so a response with a
 swapped `dist.integrity` cannot pass. 100 of the DB's 102 npm entries verify

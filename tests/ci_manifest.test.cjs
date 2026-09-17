@@ -213,3 +213,29 @@ test('the sandbox never passes a DB-supplied docker command through', () => {
   assert.equal(wrapped.args.includes('--privileged'), false);
   assert.equal(wrapped.args.at(-1), `ghcr.io/x/y@sha256:${digest}`);
 });
+
+test('our own release ships with provenance, and does not fall back silently', () => {
+  // A project that asks users to check provenance on other people's packages
+  // should publish it on its own — and an unprovenanced release from that
+  // project is worse than a late one, so the fallback is opt-in.
+  const release = sources.get('.github/workflows/release.yml');
+  assert.ok(release, 'release workflow missing');
+  assert.match(release, /npm publish --access public --provenance/, 'publish without --provenance');
+  assert.match(release, /id-token: write/, 'provenance needs an OIDC token');
+  // The unprovenanced path exists but must be gated on an explicit input.
+  const fallback = release.match(/npm publish --access public\s*$/m);
+  if (fallback) {
+    assert.match(release, /ALLOW_UNPROVENANCED|allow_unprovenanced/, 'a silent unprovenanced fallback');
+  }
+});
+
+test('the publish job runs the suite before it ships anything', () => {
+  // Comments mention `npm publish` while explaining past failures, so look at
+  // the steps rather than at the whole file.
+  const release = sources.get('.github/workflows/release.yml');
+  const code = release.split('\n').filter((l) => !/^\s*#/.test(l));
+  const testsIdx   = code.findIndex((l) => /node --test/.test(l));
+  const publishIdx = code.findIndex((l) => /npm publish/.test(l));
+  assert.ok(testsIdx !== -1, 'the publish job never runs the suite');
+  assert.ok(testsIdx < publishIdx, 'tests must run before anything is published');
+});
