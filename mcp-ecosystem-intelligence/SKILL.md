@@ -398,7 +398,7 @@ Eval results are written to `assets/eval_results.json` — never back into `tool
 
 ### Step 2 — choose the install method
 
-**Prefer Docker where an official image exists, pinned by digest.** Use `@sha256:<digest>` rather than `:latest` — the verifier flags any unpinned image with `WARN` (or `FAIL` under `--strict`). Refresh digests with:
+**Prefer Docker where an official image exists, pinned by digest.** Use `@sha256:<digest>` rather than `:latest` — the verifier flags any unpinned image with `WARN` (or `FAIL` under `--strict`). When upstream rebuilds a tracked tag, `check_docker_drift.cjs --write` moves the pins so the change arrives as a reviewable diff (the weekly CI job opens a PR); a rebuilt tag is routine, but only a human can tell it from a hijack. Refresh digests with:
 
 ```bash
 docker manifest inspect <image> | jq -r '.manifests[0].digest // .config.digest'

@@ -241,6 +241,8 @@ Checks Node version, optional `gh` / Docker / `uvx`, project `.mcp.json`, projec
 ```bash
 mcp-vault docker-drift           # human-readable
 mcp-vault docker-drift --json    # machine-readable
+mcp-vault docker-drift           # report drift
+mcp-vault docker-drift --write   # move the pins, for review as a diff
 mcp-vault docker-drift --strict  # exit 1 on any drift
 ```
 

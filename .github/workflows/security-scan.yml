@@ -164,33 +164,70 @@ jobs:
     needs: smoke
     runs-on: self-hosted
     timeout-minutes: 20
+    permissions:
+      contents: write        # the refreshed pins land on a branch
+      pull-requests: write
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: '20'
-      - name: check_docker_drift
+      # --write turns the drift into a diff. A red job says "something moved";
+      # a pull request says what moved, from which digest to which, with a link
+      # to the upstream releases page — which is what a human needs to tell a
+      # routine rebuild from a hijack. Errors still fail the job: an unreachable
+      # registry means nothing was compared.
+      - name: check_docker_drift --write
         id: drift
         run: |
           set -o pipefail
-          node mcp-ecosystem-intelligence/scripts/check_docker_drift.cjs --json | tee drift.json
+          node mcp-ecosystem-intelligence/scripts/check_docker_drift.cjs --write --json | tee drift.json
           drifts=$(node -e "console.log(JSON.parse(require('fs').readFileSync('drift.json','utf8')).drifts)")
-          echo "drifts=$drifts" >> "$GITHUB_OUTPUT"
+          updated=$(node -e "console.log(JSON.parse(require('fs').readFileSync('drift.json','utf8')).updated.length)")
+          echo "drifts=$drifts"   >> "$GITHUB_OUTPUT"
+          echo "updated=$updated" >> "$GITHUB_OUTPUT"
           {
             echo "## Docker drift check"
             echo
-            echo "Drifts: **$drifts**"
+            echo "Drifts: **$drifts** · pins updated: **$updated**"
             echo
             echo '```json'
             cat drift.json
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Fail if drift detected
-        if: steps.drift.outputs.drifts != '0'
-        run: |
-          echo "Upstream digest differs from pinned digest for at least one image."
-          echo "Review the change in the registry, then run verify_integrity.cjs --update locally."
-          exit 1
+      # Prove the new pins before asking anyone to look at them: --deep hashes
+      # the manifest the registry serves and compares it with what we just wrote.
+      - name: Re-verify the refreshed pins
+        if: steps.drift.outputs.updated != '0'
+        run: node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --deep --no-audit
+      - name: Open a PR with the refreshed digests
+        if: steps.drift.outputs.updated != '0'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          commit-message: 'chore(docker): refresh drifted image digests'
+          title: 'chore(docker): refresh drifted image digests'
+          body: |
+            Upstream rebuilt one or more tracked tags, so the pinned digests no
+            longer match what the registry serves. This PR moves the pins.
+
+            The digest lives in two places per docker entry — inside
+            `install_cmd` and in `pkg_integrity` — and both moved together.
+            `verify_integrity --deep` re-ran against the new pins and passed,
+            so the manifest the registry serves hashes to the digest recorded
+            here.
+
+            ## Reviewer checklist
+            - [ ] Open the upstream releases page for each image (linked in the job summary) and confirm a release explains the rebuild
+            - [ ] A rebuild with no matching release is the interesting case — a hijack looks exactly like a routine rebuild from here
+            - [ ] Confirm the image is still published by the same org
+            - [ ] Confirm `tracked_tag` is still the tag you mean to follow
+
+            > A rebuilt tag is routine. This PR exists so "routine" is a
+            > judgement someone made, not an assumption the tooling made.
+          branch: chore/docker-digest-refresh
+          delete-branch: true
+          add-paths: |
+            mcp-ecosystem-intelligence/assets/tools_database.json
 
   license-drift:
     name: Weekly license-drift check

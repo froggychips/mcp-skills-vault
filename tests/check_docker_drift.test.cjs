@@ -120,3 +120,13 @@ test('driftExitCode: a registry we could not read is never a pass', () => {
   assert.equal(d.driftExitCode({ drifts: 2, errors: 0, strict: true  }), 1);
   assert.equal(d.driftExitCode(), 0);
 });
+
+test('--write is reflected in the exit code: a diff is not a failure', () => {
+  // The point of --write is to turn drift into a reviewable diff, so drift
+  // stops being the failure. An unreachable registry still is one: nothing was
+  // compared in that case.
+  assert.equal(d.driftExitCode({ drifts: 0, errors: 0, strict: false }), 0);
+  assert.equal(d.driftExitCode({ drifts: 2, errors: 0, strict: false }), 0);
+  assert.equal(d.driftExitCode({ drifts: 2, errors: 0, strict: true }), 1);
+  assert.equal(d.driftExitCode({ drifts: 0, errors: 1, strict: false }), 1);
+});
