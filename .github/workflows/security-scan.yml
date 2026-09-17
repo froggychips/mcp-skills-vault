@@ -42,6 +42,7 @@ jobs:
   unit-tests:
     name: Unit tests (node:test)
     runs-on: self-hosted
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -55,6 +56,7 @@ jobs:
   smoke:
     name: Verify seeded DB (offline)
     runs-on: self-hosted
+    timeout-minutes: 15
     needs: unit-tests
     steps:
       - uses: actions/checkout@v7
@@ -71,6 +73,7 @@ jobs:
     if: (github.event_name == 'schedule' && github.event.schedule == '17 6 * * 1') || github.event_name == 'workflow_dispatch'
     needs: smoke
     runs-on: self-hosted
+    timeout-minutes: 45
     permissions:
       contents: write
       pull-requests: write
@@ -144,6 +147,7 @@ jobs:
     if: (github.event_name == 'schedule' && github.event.schedule == '17 6 * * 1') || github.event_name == 'workflow_dispatch'
     needs: smoke
     runs-on: self-hosted
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -185,6 +189,7 @@ jobs:
     if: (github.event_name == 'schedule' && github.event.schedule == '17 6 * * 1') || github.event_name == 'workflow_dispatch'
     needs: smoke
     runs-on: self-hosted
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -216,6 +221,7 @@ jobs:
     if: (github.event_name == 'schedule' && github.event.schedule == '23 6 * * 4') || github.event_name == 'workflow_dispatch'
     needs: smoke
     runs-on: self-hosted
+    timeout-minutes: 30
     permissions:
       contents: write
       pull-requests: write
@@ -293,6 +299,7 @@ jobs:
     if: github.event_name != 'pull_request' && ((github.event_name == 'schedule' && github.event.schedule == '17 6 * * 1') || github.event_name == 'workflow_dispatch')
     needs: unit-tests
     runs-on: self-hosted
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -342,6 +349,10 @@ jobs:
         with:
           name: eval-results
           path: eval_results_run.json
+          # The default 90-day retention filled this account's artifact quota,
+          # and "Artifact storage quota has been hit" is what failed the run —
+          # not the eval itself. A week is longer than anyone reads these.
+          retention-days: 7
 
   mcp-eval-pr:
     name: MCP eval (sandboxed, changed entries)
@@ -357,6 +368,7 @@ jobs:
     if: github.event_name == 'pull_request'
     needs: unit-tests
     runs-on: self-hosted
+    timeout-minutes: 30
     continue-on-error: true
     steps:
       - uses: actions/checkout@v7

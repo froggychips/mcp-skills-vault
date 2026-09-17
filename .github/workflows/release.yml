@@ -48,6 +48,7 @@ jobs:
     name: release-please (auto)
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.tag == '')
     runs-on: self-hosted
+    timeout-minutes: 15
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
@@ -71,6 +72,7 @@ jobs:
     name: Manual tag (workflow_dispatch)
     if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
     runs-on: self-hosted
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
         with:
@@ -114,6 +116,7 @@ jobs:
     # self-hosted: this org has no github-hosted runners available. Publishing
     # our own package needs no isolation, so the trusted runner is fine.
     runs-on: self-hosted
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
@@ -124,7 +127,35 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
       - name: Tests must pass before publish
         run: node --test tests/*.test.cjs
+      # `npm publish` answers E404 — not 401 — when the token is missing,
+      # expired or lacks publish rights on the scope. That is how v0.13.0 ended
+      # up with a git tag and a GitHub release but no package on npm: the run
+      # failed at the last step, after the release was already public. Check the
+      # credential first, and say which of the two it is.
+      - name: Preflight — npm credential and target version
+        id: preflight
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -uo pipefail
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "::error::NPM_TOKEN secret is empty. Add an npm *automation* token (Settings → Secrets and variables → Actions)." >&2
+            exit 1
+          fi
+          if ! who=$(npm whoami 2>&1); then
+            echo "::error::NPM_TOKEN cannot authenticate against registry.npmjs.org (npm said: ${who}). Automation tokens don't expire; granular tokens do — reissue and update the secret." >&2
+            exit 1
+          fi
+          echo "Authenticated to npm as ${who}"
+          version=$(node -p "require('./package.json').version")
+          name=$(node -p "require('./package.json').name")
+          echo "Publishing ${name}@${version}"
+          if npm view "${name}@${version}" version >/dev/null 2>&1; then
+            echo "::notice::${name}@${version} is already on npm — skipping publish."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: npm publish
+        if: steps.preflight.outputs.skip != 'true'
         # No --provenance: that needs github-hosted OIDC, which isn't available
         # here. NPM_TOKEN must be an npm *automation* token (bypasses 2FA OTP).
         run: npm publish --access public
