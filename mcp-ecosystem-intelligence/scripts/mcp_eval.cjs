@@ -353,6 +353,15 @@ async function smokeEntry(tool, opts) {
   const launch = (opts.sandbox && !tool._evalSpawn) ? stdio.sandboxWrap(parsed) : parsed;
   result.sandboxed = !!launch.sandboxed;
 
+  // sandboxWrap refuses a launch it cannot make safe — a docker entry with no
+  // digest to rebuild from. Refusing and then running it anyway would be the
+  // worst of both.
+  if (launch.refused) {
+    result.status = 'skip';
+    result.error_code = launch.sandbox_note || 'sandbox refused this launch command';
+    return result;
+  }
+
   // Track stderr for failure diagnostics (last 4 lines, capped at 4KB).
   const stderrChunks = [];
   const stderrLimit  = 4096;

@@ -152,17 +152,65 @@ class Correlator {
 // isolation (prefetch-then-run with `--network none`) is a separate, heavier
 // mode and is deliberately not the default.
 //
-// `docker run` entries are already containerized by their own flags, so they
-// pass through unchanged (sandboxed:false).
+// A `docker run` entry is NOT passed through. "Already containerized" is not
+// the same as "sandboxed": the flags come from the DB, and a database entry is
+// something a pull request can edit. `docker run -v /:/host …`, `--privileged`,
+// `--network host`, `--pid host` are all one diff away, and running the string
+// as given would hand a stranger's PR the host. So the launch is rebuilt from
+// the one field that is evidence — the pinned `image@sha256:…` — under the same
+// jail flags everything else gets. An image without a digest is refused
+// outright: there is nothing to rebuild from.
+const DIGEST_RE = /^[^\s]+@sha256:[a-f0-9]{64}$/;
+
 function sandboxWrap(parsed, opts = {}) {
   if (!parsed || typeof parsed.command !== 'string') return parsed;
+
   if (parsed.command === 'docker') {
-    return { ...parsed, sandboxed: false, sandbox_note: 'docker entry is already containerized' };
+    // The image reference is the first non-flag token after `run`.
+    const tokens = (parsed.args || []).slice();
+    if (tokens[0] !== 'run') {
+      return { ...parsed, sandboxed: false, refused: true, sandbox_note: `not a "docker run" launch: cannot sandbox` };
+    }
+    const imageRef = tokens.slice(1).find((t) => !t.startsWith('-') && DIGEST_RE.test(t));
+    if (!imageRef) {
+      return {
+        ...parsed,
+        sandboxed: false,
+        refused: true,
+        sandbox_note: 'no digest-pinned image in the launch command — refusing to run DB-supplied docker flags',
+      };
+    }
+    // Everything else from the entry is dropped on purpose. Any argument the
+    // server genuinely needs belongs after the image, and a smoke test only
+    // has to reach `tools/list`.
+    return {
+      command: 'docker',
+      args: dockerJail(opts).concat([imageRef]),
+      sandboxed: true,
+      image: imageRef,
+      sandbox_note: 'rebuilt from the pinned digest; flags from the DB entry were discarded',
+    };
   }
   const image = opts.image || (parsed.command === 'uvx'
     ? 'ghcr.io/astral-sh/uv:python3.12-bookworm-slim'  // ships uv/uvx
     : 'node:22-alpine');                               // ships node/npx
-  const jail = [
+  const jail = dockerJail(opts).concat([
+    '--tmpfs', '/home/node/.npm',
+    '-e', 'HOME=/home/node',
+    '-e', 'npm_config_ignore_scripts=true', // install hooks already vetted by verify_integrity
+    '-u', 'node',
+    image,
+    parsed.command, ...parsed.args,
+  ]);
+  return { command: 'docker', args: jail, sandboxed: true, image };
+}
+
+// The flags both sandbox paths share. Kept in one function so the jail for a
+// docker entry and the jail for an npx/uvx entry cannot drift apart — the last
+// time two copies of a launch parser lived side by side in this repo, they
+// disagreed about which token was the package.
+function dockerJail(opts = {}) {
+  return [
     'run', '--rm', '-i',
     '--cap-drop', 'ALL',
     '--security-opt', 'no-new-privileges',
@@ -170,14 +218,7 @@ function sandboxWrap(parsed, opts = {}) {
     '--pids-limit', String(opts.pidsLimit || 256),
     '--read-only',
     '--tmpfs', '/tmp:exec',
-    '--tmpfs', '/home/node/.npm',
-    '-e', 'HOME=/home/node',
-    '-e', 'npm_config_ignore_scripts=true', // install hooks already vetted by verify_integrity
-    '-u', 'node',
-    image,
-    parsed.command, ...parsed.args,
   ];
-  return { command: 'docker', args: jail, sandboxed: true, image };
 }
 
 // ── 3. Failure classification ────────────────────────────────────────────────
@@ -217,6 +258,7 @@ module.exports = {
   Correlator,
   // eval policy
   sandboxWrap,
+  dockerJail,
   classifyFailure,
   FAILURE_CLASS,
 };

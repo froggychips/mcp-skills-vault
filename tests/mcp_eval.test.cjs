@@ -483,3 +483,68 @@ test('CLI --no-spawn never reaches the live smoke', () => {
   assert.equal(fs.readFileSync(resPath, 'utf8'), JSON.stringify({ results: [] }));
   fs.rmSync(tmp, { recursive: true, force: true });
 });
+
+// ── sandboxWrap: a DB entry is not a trusted argv ──────────────────────────
+
+test('sandboxWrap: a docker entry is rebuilt from its digest, not trusted', () => {
+  const digest = 'a'.repeat(64);
+  const parsed = e.parseInstallCmd(`docker run -i --rm --cap-drop ALL ghcr.io/x/y@sha256:${digest}`);
+  const w = e.sandboxWrap(parsed);
+  assert.equal(w.sandboxed, true);
+  assert.equal(w.image, `ghcr.io/x/y@sha256:${digest}`);
+  // The jail flags are ours, and the image is the last argument.
+  assert.equal(w.args.at(-1), `ghcr.io/x/y@sha256:${digest}`);
+  for (const flag of ['--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--read-only', '--rm']) {
+    assert.ok(w.args.includes(flag), flag);
+  }
+});
+
+test('sandboxWrap: hostile flags in a DB entry are discarded', () => {
+  // The DB is a file a pull request can edit. `-v /:/host` is one diff away,
+  // and "already containerized" is not the same as sandboxed.
+  const digest = 'b'.repeat(64);
+  const parsed = e.parseInstallCmd(
+    `docker run -i --rm -v /:/host --privileged --network host --pid host ghcr.io/evil/x@sha256:${digest}`
+  );
+  const w = e.sandboxWrap(parsed);
+  assert.equal(w.sandboxed, true);
+  const argv = w.args.join(' ');
+  assert.doesNotMatch(argv, /-v /);
+  assert.doesNotMatch(argv, /\/:\/host/);
+  assert.doesNotMatch(argv, /--privileged/);
+  assert.doesNotMatch(argv, /--network host/);
+  assert.doesNotMatch(argv, /--pid host/);
+  assert.match(w.sandbox_note, /discarded/);
+});
+
+test('sandboxWrap: refuses a docker entry with nothing to rebuild from', () => {
+  const parsed = e.parseInstallCmd('docker run -i --rm --network host ghcr.io/x/y:latest');
+  const w = e.sandboxWrap(parsed);
+  assert.equal(w.sandboxed, false);
+  assert.equal(w.refused, true);
+  assert.match(w.sandbox_note, /no digest-pinned image/);
+});
+
+test('sandboxWrap: npx and uvx still get a jail with their own runtime image', () => {
+  const npx = e.sandboxWrap(e.parseInstallCmd('npx -y pkg@1.0.0'));
+  assert.equal(npx.sandboxed, true);
+  assert.equal(npx.image, 'node:22-alpine');
+  assert.ok(npx.args.includes('npm_config_ignore_scripts=true'));
+  const uvx = e.sandboxWrap(e.parseInstallCmd('uvx pkg==1.0.0'));
+  assert.match(uvx.image, /astral-sh\/uv/);
+  // Both paths share one jail definition, so they cannot drift apart.
+  for (const flag of ['--cap-drop', '--read-only', '--pids-limit']) {
+    assert.ok(npx.args.includes(flag) && uvx.args.includes(flag), flag);
+  }
+});
+
+test('a refused sandbox means the entry is skipped, not run', async () => {
+  const digestless = {
+    name: 'no-digest',
+    install_cmd: 'docker run -i --rm --privileged ghcr.io/x/y:latest',
+  };
+  const r = await e.smokeEntry(digestless, { sandbox: true, timeoutMs: 1000 });
+  assert.equal(r.status, 'skip');
+  assert.match(r.error_code, /no digest-pinned image/);
+  assert.equal(r.sandboxed, false);
+});

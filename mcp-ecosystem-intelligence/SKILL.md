@@ -382,15 +382,15 @@ feed it.
 node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --name <pkg> --sandbox --timeout 60000
 
 # No docker? Run on the host instead (explicit opt-out of the sandbox)
-node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --name <pkg> --unsafe --timeout 60000
+node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --name <pkg> --sandbox --timeout 60000
 
-# Smoke the whole DB (slow; runs in weekly CI, --unsafe on the trusted runner)
-node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --unsafe --json
+# Smoke the whole DB (slow; runs in weekly CI under --sandbox)
+node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --sandbox --json
 ```
 
 For each entry the script spawns the server, runs `initialize` → `tools/list`, and lints each tool's `inputSchema` (minimal lint: top-level `type: object` + `properties` + `required` consistency + nested object/array types; rejects `$ref`). Pass means the handshake worked. A failed smoke is classified (`failure_class`): `NEEDS_ENV` / `NEEDS_NET` (server needs creds/network to boot — not broken, just not cheaply smoke-able), `TIMEOUT`, `NO_TOOLS`, or `CRASH`. Tool-count drift (`tool_count_drift: true`) means the DB's `est_tools_count` is stale and the recommendation needs a refresh.
 
-**Spawn policy (default-deny):** a live smoke runs third-party code, so you must pass `--sandbox` (jailed ephemeral container — `--cap-drop ALL`, read-only rootfs, non-root, mem/pid caps, install hooks off; needs docker) or `--unsafe` (run on host). Network stays on even under `--sandbox` because npx/uvx fetch at launch — the jail constrains everything else. On PRs, CI runs `--sandbox` on a disposable github-hosted VM; the weekly whole-DB smoke runs `--unsafe` on the trusted self-hosted runner.
+**Spawn policy (default-deny):** a live smoke runs third-party code, so you must pass `--sandbox` (jailed ephemeral container — `--cap-drop ALL`, read-only rootfs, non-root, mem/pid caps, install hooks off; needs docker) or `--unsafe` (run on host). Network stays on even under `--sandbox` because npx/uvx fetch at launch — the jail constrains everything else. A `docker run` entry under `--sandbox` is rebuilt from its pinned digest with our jail flags — the entry's own flags are discarded, because a DB entry is PR-editable — and an undigested image is refused. Both CI eval jobs use `--sandbox`; `--unsafe` is not used in CI at all.
 
 This step needs network (npx/uvx fetch the package). For air-gapped flows, skip it — `verify_integrity.cjs` covers the supply-chain side; eval is purely an additional confidence layer. The `--no-spawn` flag lints existing `eval_results.json` without touching the network.
 

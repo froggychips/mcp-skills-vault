@@ -256,8 +256,9 @@ For each DB entry with a recognized install method (`npx -y`, `uvx`, `docker run
 
 ```bash
 mcp-vault eval --name memory --sandbox   # one entry, jailed in a container
+mcp-vault eval --name memory --sandbox   # one entry, jailed container (preferred)
 mcp-vault eval --name memory --unsafe    # one entry, on the host (no docker)
-mcp-vault eval --unsafe --json --strict  # whole DB, CI form (trusted runner)
+mcp-vault eval --sandbox --json --strict # whole DB, CI form
 mcp-vault eval --no-spawn                # offline self-test
 ```
 
@@ -265,7 +266,9 @@ Spawn policy is **default-deny**: a live smoke runs third-party code, so it refu
 
 Output: `assets/eval_results.json` — `{name, status, boot_ms, list_latency_ms, tool_count, tool_count_db, tool_count_drift, schema_errors[], error_code, failure_class, sandboxed, checked_at}` per entry, sorted by name for deterministic diffs. Results never flow back into `tools_database.json` — DB stays the source of truth, eval is a separate evidence stream.
 
-Network policy: real smoke needs to fetch packages (`npx` cache miss, `uvx` wheel download, `docker pull`), so it is NOT offline (network stays on even under `--sandbox` — the jail constrains everything else). The weekly `mcp-eval-smoke` CI job runs the whole DB `--unsafe` on the trusted self-hosted runner; the `mcp-eval-pr` job smokes only the entries changed in a PR with `--sandbox` on a disposable github-hosted runner. The `--no-spawn` flag re-lints existing results without spawning anything; that path IS offline.
+A `docker run` entry is **not** passed through as written. "Already containerized" is not the same as sandboxed: the flags come from the DB, and the DB is a file a pull request can edit — `-v /:/host`, `--privileged`, `--network host` are one diff away. Under `--sandbox` the launch is rebuilt from the pinned `image@sha256:…` under our own jail flags, and everything else in the entry is discarded. An image with no digest is refused rather than run.
+
+Network policy: real smoke needs to fetch packages (`npx` cache miss, `uvx` wheel download, `docker pull`), so it is NOT offline (network stays on even under `--sandbox` — the jail constrains everything else). Both CI eval jobs use `--sandbox`; `--unsafe` is never used in CI, because a verified hash says which artifact ran, not that it was benign. The `--no-spawn` flag re-lints existing results without spawning anything; that path IS offline.
 
 What it does NOT validate: behavioural correctness (we don't call any tool), business logic, or security of the server's tool implementations. This is a *smoke* check, not a fitness test.
 
