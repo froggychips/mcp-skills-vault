@@ -13,15 +13,25 @@ Steps marked **[scripted]** have a dedicated script you call via Bash. Steps mar
 
 ```
 1. Detect stack         → [scripted] node scripts/orchestrate.cjs --cwd $CWD
+                                     signals carry source + confidence
 2. Cache lookup         → [scripted] included in orchestrate.cjs output
-3. Discovery (if miss)  → [Claude]   WebFetch registry + Bash gh search
-4. Validate (5 checks)  → [scripted] node scripts/verify_integrity.cjs
-5. Score                → [scripted] node scripts/calculate_health.cjs <args>
+3. Discovery (if miss)  → [scripted] node scripts/discover.cjs  (inbox only)
+4. Validate             → [scripted] node scripts/verify_integrity.cjs
+                                     --deep hashes the artifact, --deps the tree,
+                                     signatures + provenance checked by default
+5. Score                → [scripted] health (calculate_health.cjs) + trust + fit
+                                     (lib/scores.cjs), trust gates the rest
 6. Reject heuristics    → [Claude]   apply 5-Minute / Bloat / Duplication rules
-7. Recommend            → [scripted] included in orchestrate.cjs output (with tool count)
+7. Recommend            → [scripted] orchestrate.cjs --json carries the three axes
 8. Install (on consent) → [scripted] node scripts/orchestrate.cjs --install <name>
+                                     writes the verified version, any host
 9. Update DB            → [Claude]   append/update assets/tools_database.json
+                                     evidence via verify --record-evidence
 ```
+
+What stays [Claude] is deliberate: taste (step 6) and promoting an entry to
+`trust: verified` (step 9). Neither should become automatic — an LLM can help a
+human read a diff, but it must not be the trust root.
 
 Default output mode is **terse**. The user can ask for "verbose" / "explain" to flip into the long form.
 
@@ -149,9 +159,14 @@ npm search mcp-server-<keyword> --json | jq '.[0:5] | .[] | {name, description, 
 
 If all tiers return nothing, proceed to §8 (wrapper generation).
 
-## 4. Validation (all five required)
+## 4. Validation
 
-A candidate is **rejected** if any check fails:
+A candidate is **rejected** if any check fails. The five below are the entry
+requirements; the gate additionally verifies the npm registry signature, reads
+any provenance attestation, and — with `--deep` / `--deps` — hashes the artifact
+itself and checks the resolved dependency tree. Anything it *could not* check is
+`UNVERIFIED`, which is a failure under `--fail-unverified`; "the feed was down"
+is not "the pin is good".
 
 1. **Install command** is documented (`npx -y …`, `uvx …`, `pip install …`, `docker run …`).
 2. **MCP wiring** is detectable: `server.json` present **or** `@modelcontextprotocol/sdk` / `mcp` (Python) imported in source.
@@ -343,6 +358,22 @@ node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs
 | `--no-audit` | skip advisory APIs; still fetch registry metadata |
 | `--offline` | true offline mode; no network calls, validate stored DB pins only |
 | `--update` | refresh `version` + `pkg_integrity` fields from registries |
+| `--fail-unverified` | `UNVERIFIED` (registry unreachable / unparsable cmd / no sdist) becomes a hard failure; implied by `--strict` |
+| `--entry <name>` | check one DB entry instead of the whole DB |
+| `--installed` | verify the servers local host configs launch, not the DB |
+
+`token_budget.cjs` (`mcp-vault budget`) adds up what the configured servers cost
+in context; `mcp_eval.cjs --installed` measures real `tools/list` payloads to
+feed it.
+
+| `--no-policy` / `--show-policy` | ignore `.mcp-vault.policy.json` / print the policy in force |
+| `--deep` | download the artifact and hash it locally (npm tarball sha512, PyPI sdist sha256, OCI manifest sha256) |
+| `--deps` | resolve the dependency tree and check it (transitive install hooks + OSV over every package in the tree) |
+| `--fail-dep-advisories` | a high/critical advisory in the tree fails the run |
+| `--require-signatures` | an npm release with no verifiable registry signature fails |
+| `--require-provenance` | an npm release with no provenance attestation fails |
+| `--json` | structured report (`mcp-vault/verify-report@1`) on stdout |
+| `--sarif` | SARIF 2.1.0 for code scanning; findings anchored to DB lines |
 
 **Interpreting output:**
 
@@ -366,15 +397,15 @@ node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs
 node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --name <pkg> --sandbox --timeout 60000
 
 # No docker? Run on the host instead (explicit opt-out of the sandbox)
-node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --name <pkg> --unsafe --timeout 60000
+node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --name <pkg> --sandbox --timeout 60000
 
-# Smoke the whole DB (slow; runs in weekly CI, --unsafe on the trusted runner)
-node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --unsafe --json
+# Smoke the whole DB (slow; runs in weekly CI under --sandbox)
+node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --sandbox --json
 ```
 
 For each entry the script spawns the server, runs `initialize` → `tools/list`, and lints each tool's `inputSchema` (minimal lint: top-level `type: object` + `properties` + `required` consistency + nested object/array types; rejects `$ref`). Pass means the handshake worked. A failed smoke is classified (`failure_class`): `NEEDS_ENV` / `NEEDS_NET` (server needs creds/network to boot — not broken, just not cheaply smoke-able), `TIMEOUT`, `NO_TOOLS`, or `CRASH`. Tool-count drift (`tool_count_drift: true`) means the DB's `est_tools_count` is stale and the recommendation needs a refresh.
 
-**Spawn policy (default-deny):** a live smoke runs third-party code, so you must pass `--sandbox` (jailed ephemeral container — `--cap-drop ALL`, read-only rootfs, non-root, mem/pid caps, install hooks off; needs docker) or `--unsafe` (run on host). Network stays on even under `--sandbox` because npx/uvx fetch at launch — the jail constrains everything else. On PRs, CI runs `--sandbox` on a disposable github-hosted VM; the weekly whole-DB smoke runs `--unsafe` on the trusted self-hosted runner.
+**Spawn policy (default-deny):** a live smoke runs third-party code, so you must pass `--sandbox` (jailed ephemeral container — `--cap-drop ALL`, read-only rootfs, non-root, mem/pid caps, install hooks off; needs docker) or `--unsafe` (run on host). Network stays on even under `--sandbox` because npx/uvx fetch at launch — the jail constrains everything else. A `docker run` entry under `--sandbox` is rebuilt from its pinned digest with our jail flags — the entry's own flags are discarded, because a DB entry is PR-editable — and an undigested image is refused. Both CI eval jobs use `--sandbox`; `--unsafe` is not used in CI at all.
 
 This step needs network (npx/uvx fetch the package). For air-gapped flows, skip it — `verify_integrity.cjs` covers the supply-chain side; eval is purely an additional confidence layer. The `--no-spawn` flag lints existing `eval_results.json` without touching the network.
 
@@ -382,7 +413,7 @@ Eval results are written to `assets/eval_results.json` — never back into `tool
 
 ### Step 2 — choose the install method
 
-**Prefer Docker where an official image exists, pinned by digest.** Use `@sha256:<digest>` rather than `:latest` — the verifier flags any unpinned image with `WARN` (or `FAIL` under `--strict`). Refresh digests with:
+**Prefer Docker where an official image exists, pinned by digest.** Use `@sha256:<digest>` rather than `:latest` — the verifier flags any unpinned image with `WARN` (or `FAIL` under `--strict`). When upstream rebuilds a tracked tag, `check_docker_drift.cjs --write` moves the pins so the change arrives as a reviewable diff (the weekly CI job opens a PR); a rebuilt tag is routine, but only a human can tell it from a hijack. Refresh digests with:
 
 ```bash
 docker manifest inspect <image> | jq -r '.manifests[0].digest // .config.digest'
@@ -400,9 +431,15 @@ docker run -i --rm \
 
 For npm/PyPI servers without an upstream image, the verifier still catches integrity drift via `pkg_integrity`. Whether to additionally wrap them in a generic container is an extra (manual) hardening step — `--read-only` breaks many servers that cache locally, so apply it case-by-case.
 
-### Step 3 — write to `.mcp.json` (project-scoped) or `~/.claude.json` (global)
+### Step 3 — write the host config
 
 **Default: project-scoped `.mcp.json`** in the repository root. This keeps the server active only in that project and avoids injecting unused tools into unrelated conversations.
+
+`orchestrate.cjs --install` writes it for you, and writes the version the gate
+verified rather than the entry's command verbatim — `npx -y pkg` resolves
+`latest` at every start, which is not the artifact that was checked. Other hosts:
+`--host cursor|vscode|claude-desktop|codex` (`--list-hosts` to see them, and
+Codex gets a TOML block to paste rather than a rewritten config).
 
 **Use `~/.claude.json` only for servers needed in every project** — typically `mcp-server-filesystem` and `mcp-server-memory`.
 

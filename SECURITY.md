@@ -52,15 +52,42 @@ Residual risk: a compromised npm/PyPI release that publishes under the same vers
 
 ### `verify_integrity.cjs` — the integrity gate
 
-A logic error here makes the entire pinning story worthless. Specifically dangerous failure modes:
-- Comparing hash with `==` against a non-string (coerces away difference)
-- Returning early on a parse error instead of failing
-- Falling back to a "warning" when the registry is unreachable
+A logic error here makes the entire pinning story worthless. The dangerous
+failure mode has a shape: **a check that did not happen must never be
+indistinguishable from a check that passed.** Every real instance found so far
+was a variant of it — a registry timeout recorded as `SKIP` and not counted, a
+wheel-only release where the comparison was skipped and the entry still read
+`OK`, an advisory severity that could not be parsed and therefore was not
+"hard", a feed outage coalescing into "no advisories".
+
+What the gate does today:
+- **Artifact** — the stored pin against the registry's metadata, and with
+  `--deep` against the bytes themselves (npm tarball sha512, PyPI sdist sha256,
+  OCI manifest sha256, hashed locally)
+- **Signature** — npm signs `<name>@<version>:<integrity>` with a published
+  ECDSA key; verified on every run, so a response with a swapped
+  `dist.integrity` cannot pass
+- **Provenance** — the attestation is read and its claimed repository compared
+  with `source_url`. Reported as a *claim*: verifying the sigstore bundle
+  (Fulcio chain, Rekor inclusion) is not something this tool does
+- **Advisories** — four feeds merged, severity taken from the worst any of them
+  reported, CVSS vectors scored rather than pattern-matched
+- **Dependencies** — with `--deps`, the resolved tree's install scripts and its
+  packages against OSV
+- **Source binding, install hooks, licence, digest pinning** — as before
+
+Anything the gate could not establish is `UNVERIFIED`: reported, counted, and a
+hard failure under `--fail-unverified` (which `--strict` implies, and which
+`install` passes). Evidence written back to the DB records *what was checked*,
+per dimension, with the date — so "verified" cannot quietly mean "verified
+eight months ago, by a run that skipped this part".
 
 Mitigations:
-- Unit tests in `tests/verify_integrity.test.cjs` cover the parser, advisory dedup, and gate logic
-- Smoke job runs on every PR (`--offline` mode), fast and network-free — would catch a regression that breaks the local gate
-- `--strict` mode treats WARNs as failures and is what CI uses
+- 535 tests, including the fail-closed paths and the CI manifests themselves
+- Smoke job on every PR (`--offline`), network-free, plus a SARIF upload so a
+  finding lands on the DB line that caused it
+- `--strict` treats WARNs as failures; `--fail-unverified` treats "could not
+  check" as one
 
 ### Weekly hash refresh PR
 
@@ -75,6 +102,46 @@ Mitigations:
 ### Docker drift
 
 `scripts/check_docker_drift.cjs` compares pinned `@sha256:` against the registry digest for `tracked_tag`. The `docker-drift` weekly job fails on any drift. A maintainer reviews the upstream change BEFORE refreshing the pin — a routine rebuild and a registry hijack look identical from here, and the human gate is the differentiator.
+
+## CI isolation model
+
+This project's own CI is part of its attack surface, and for a while it was the
+weakest part of it: a supply-chain scanner whose pull-request builds ran
+attacker-authored code on a persistent machine.
+
+GitHub-hosted runners do not start on this account (billing lock, documented in
+`.github/workflows/runner-health.yml`), so every job runs on one self-hosted
+macOS machine. Isolation therefore happens *inside* that machine:
+
+| Input | Where it runs |
+|---|---|
+| PR-authored code (tests, scripts) | container: `--network none`, repo mounted read-only, `--cap-drop ALL`, `no-new-privileges`, no docker socket |
+| PR-authored data (`tools_database.json`) | evaluated by **base-commit** code; every docker launch is rebuilt from its pinned digest, so flags in an entry cannot reach the host |
+| Third-party MCP servers | always `mcp_eval --sandbox`; `--unsafe` is not used in CI |
+| Our own code (push, cron) | directly on the runner |
+
+Outputs are written under `RUNNER_TEMP`, never to a path inside the checkout: a
+redirect performed by the host shell follows whatever that path is, and a PR can
+commit a name as a symlink. Mounting the workspace read-only does not prevent
+that.
+
+`tests/ci_manifest.test.cjs` asserts these properties against the manifests —
+per step, not per job — so a later one-line edit cannot quietly remove them.
+
+### Known limitation
+
+For a `pull_request` event, GitHub uses the workflow file **from the pull
+request**. The isolation is therefore described by the thing being isolated, and
+a test that greps the manifests is a regression check, not a security boundary.
+
+The mitigation is a repository setting rather than code: workflow runs from fork
+pull requests require maintainer approval (Settings → Actions → *Require
+approval for all external contributors*). Approve a run only after reading the
+diff, including changes to `.github/`.
+
+If GitHub-hosted runners become available on this account, the PR jobs should
+move to a disposable VM, and the container jail becomes defence in depth rather
+than the boundary.
 
 ## What this project is NOT
 

@@ -8,6 +8,7 @@ const path = require("path");
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const DB_PATH = path.join(ROOT, "mcp-ecosystem-intelligence", "assets", "tools_database.json");
+const EVAL_PATH = path.join(ROOT, "mcp-ecosystem-intelligence", "assets", "eval_results.json");
 const OUT_DIR = path.join(ROOT, "docs", "site");
 
 function esc(s) {
@@ -18,7 +19,7 @@ function esc(s) {
     .replace(/"/g, "&quot;");
 }
 
-function slimEntry(t) {
+function slimEntry(t, evidence = null, smoke = null) {
   return {
     name: t.name,
     category: t.category,
@@ -29,6 +30,15 @@ function slimEntry(t) {
     est_tools_count: t.est_tools_count,
     install_cmd: t.install_cmd,
     source_url: t.source_url,
+    // What was checked, and when. A registry that publishes a verdict without
+    // its date is asking to be read as current forever.
+    evidence: evidence
+      ? Object.fromEntries(Object.entries(evidence.dimensions || {})
+          .map(([k, v]) => [k, { status: v.status, checked_at: v.checked_at }]))
+      : null,
+    smoke: smoke
+      ? { status: smoke.status, tools: smoke.tool_count ?? null, checked_at: (smoke.checked_at || "").slice(0, 10) }
+      : null,
   };
 }
 
@@ -128,7 +138,17 @@ function renderHtml(entries) {
 
 function main() {
   const db = JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
-  const entries = db.tools.map(slimEntry).sort((a, b) =>
+  // Behavioural results are a separate stream, and may be absent (nothing has
+  // run yet) — an empty file must not become an empty claim.
+  let smokeByName = new Map();
+  try {
+    const evals = JSON.parse(fs.readFileSync(EVAL_PATH, "utf8"));
+    smokeByName = new Map((evals.results || []).map((r) => [r.name, r]));
+  } catch { /* no results shipped */ }
+
+  const entries = db.tools
+    .map((t) => slimEntry(t, t.trust_evidence || null, smokeByName.get(t.name) || null))
+    .sort((a, b) =>
     (a.category || "").localeCompare(b.category || "") ||
     (b.health_score || 0) - (a.health_score || 0) ||
     (a.name || "").localeCompare(b.name || "")

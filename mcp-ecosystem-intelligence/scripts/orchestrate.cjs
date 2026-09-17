@@ -9,6 +9,10 @@
  * Usage:
  *   node scripts/orchestrate.cjs [--cwd <path>] [--query <text>]
  *   node scripts/orchestrate.cjs --install <name> [--global] [--cwd <path>]
+ *                                 [--strict] [--allow-unpinned]
+ *                                 [--host claude-code|claude-desktop|cursor|vscode|codex]
+ *                                 [--scope project|user]
+ *   node scripts/orchestrate.cjs --list-hosts
  *   node scripts/orchestrate.cjs --json   (machine-readable, for Claude)
  *
  * Exit codes:
@@ -21,7 +25,16 @@
 
 const fs            = require('fs');
 const path          = require('path');
-const { execSync, spawnSync } = require('child_process');
+const { spawnSync } = require('child_process');
+const { exitAfterFlush } = require('./lib/exit.cjs');
+const { listHosts, resolveTarget, writeServerEntry } = require('./lib/hosts.cjs');
+const { trustScore, fitScore, recommend } = require('./lib/scores.cjs');
+const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
+// Reuse the gate's parsers so "what gets pinned" and "what gets checked" can
+// never drift apart — they were two independent regexes before.
+const {
+  npmPkgName, pypiPkgName, dockerImageRef, dockerDigestPinned,
+} = require('./verify_integrity.cjs');
 
 const DB_PATH    = path.resolve(__dirname, '../assets/tools_database.json');
 const VERIFY_CJS = path.resolve(__dirname, 'verify_integrity.cjs');
@@ -37,6 +50,16 @@ const GLOBAL     = argv.includes('--global');
 // Skip the network-bound advisory feeds during install — useful for CI /
 // air-gapped runs / integration tests. Hash check still runs.
 const OFFLINE    = argv.includes('--offline');
+const STRICT     = argv.includes('--strict');
+// Escape hatch for installing an entry whose DB record has no pinned version.
+// Off by default: writing an unpinned command into .mcp.json means the thing
+// that runs is not the thing the gate checked.
+const ALLOW_UNPINNED = argv.includes('--allow-unpinned');
+// Which host's config to write. The same vault entry is just as useful in
+// Cursor, VS Code, Claude Desktop or Codex; only the path (and in two cases the
+// shape) differs.
+const HOST   = argVal('--host') || 'claude-code';
+const SCOPE  = argv.includes('--global') ? 'user' : (argVal('--scope') || 'project');
 
 function argVal(flag) {
   const i = argv.indexOf(flag);
@@ -56,113 +79,151 @@ const RS = T ? '\x1b[0m'  : '';
 // ── Stack detection ─────────────────────────────────────────────────────────
 
 function detectStack(cwd) {
+  // Signals are recorded with where they came from and how much they imply.
+  // The sets below are derived from them, which is the way round that lets a
+  // recommendation be explained: "aws, because .env has an AWS_ prefix" is a
+  // different statement from "aws, because boto3 is a dependency", and only one
+  // of them means the project actually talks to AWS.
+  //
+  //   detected — the project declares it (a manifest dependency, a config file)
+  //   inferred — something suggests it (an env var name, a directory)
+  const signals = [];
+  let src = 'unknown';
+  let kind = 'detected';
+  let conf = 0.9;
+  const from = (source, confidence, k = 'detected') => { src = source; conf = confidence; kind = k; };
+  const note = (dimension, value) => {
+    const existing = signals.find((x) => x.dimension === dimension && x.value === value);
+    // Two sources agreeing is stronger evidence than either alone, but never
+    // certainty: keep the best, and record that it was seen more than once.
+    if (existing) {
+      existing.sources = [...new Set([...existing.sources, src])];
+      if (conf > existing.confidence) { existing.confidence = conf; existing.kind = kind; }
+      return;
+    }
+    signals.push({ dimension, value, kind, sources: [src], confidence: conf });
+  };
+
   const langs  = new Set();
   const dbs    = new Set();
   const infra  = new Set();
   const cats   = new Set();
   const keys   = [];
+  const addLang  = (v) => { langs.add(v);  note('lang', v); };
+  const addDb    = (v) => { dbs.add(v);    note('db', v); };
+  const addInfra = (v) => { infra.add(v);  note('infra', v); };
+  const addCat   = (v) => { cats.add(v);   note('category', v); };
 
   // package.json
+  from('package.json dependency', 0.95);
   try {
     const pkg  = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf8'));
     const deps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
-    langs.add('Node');
-    if (deps.some(d => ['next','react','remix','nuxt','vue','svelte'].includes(d))) langs.add('Next.js/React');
-    if (deps.some(d => ['express','fastify','koa','hono'].includes(d)))             langs.add('Node HTTP');
-    if (deps.some(d => d === 'pg' || d === 'postgres' || d.includes('prisma') || d.includes('sequelize') || d === 'knex')) { dbs.add('postgres'); cats.add('database'); }
-    if (deps.some(d => d === 'mongoose' || d.includes('mongodb') || d === '@typegoose/typegoose')) { dbs.add('mongodb');  cats.add('database'); }
-    if (deps.some(d => d === 'redis' || d === 'ioredis' || d === '@upstash/redis'))  { dbs.add('redis');    cats.add('database'); }
-    if (deps.some(d => d.includes('clickhouse')))                                    { dbs.add('clickhouse'); cats.add('database'); }
-    if (deps.some(d => d.includes('stripe')))                                        { infra.add('stripe');     cats.add('payments'); }
-    if (deps.some(d => d.includes('@sentry')))                                       { infra.add('sentry');     cats.add('observability'); }
-    if (deps.some(d => d.includes('cloudflare') || d === 'wrangler'))                { infra.add('cloudflare'); cats.add('infra'); }
-    if (deps.some(d => d.startsWith('@aws-sdk') || d === 'aws-sdk'))                 { infra.add('aws');        cats.add('infra'); }
-    if (deps.some(d => d.includes('@kubernetes') || d === 'kubernetes-client'))      { infra.add('kubernetes'); cats.add('infra'); }
+    addLang('Node');
+    if (deps.some(d => ['next','react','remix','nuxt','vue','svelte'].includes(d))) addLang('Next.js/React');
+    if (deps.some(d => ['express','fastify','koa','hono'].includes(d)))             addLang('Node HTTP');
+    if (deps.some(d => d === 'pg' || d === 'postgres' || d.includes('prisma') || d.includes('sequelize') || d === 'knex')) { addDb('postgres'); addCat('database'); }
+    if (deps.some(d => d === 'mongoose' || d.includes('mongodb') || d === '@typegoose/typegoose')) { addDb('mongodb');  addCat('database'); }
+    if (deps.some(d => d === 'redis' || d === 'ioredis' || d === '@upstash/redis'))  { addDb('redis');    addCat('database'); }
+    if (deps.some(d => d.includes('clickhouse')))                                    { addDb('clickhouse'); addCat('database'); }
+    if (deps.some(d => d.includes('stripe')))                                        { addInfra('stripe');     addCat('payments'); }
+    if (deps.some(d => d.includes('@sentry')))                                       { addInfra('sentry');     addCat('observability'); }
+    if (deps.some(d => d.includes('cloudflare') || d === 'wrangler'))                { addInfra('cloudflare'); addCat('infra'); }
+    if (deps.some(d => d.startsWith('@aws-sdk') || d === 'aws-sdk'))                 { addInfra('aws');        addCat('infra'); }
+    if (deps.some(d => d.includes('@kubernetes') || d === 'kubernetes-client'))      { addInfra('kubernetes'); addCat('infra'); }
   } catch { /* no package.json */ }
 
   // pyproject.toml / requirements.txt
+  from('python requirements', 0.95);
   for (const f of ['pyproject.toml', 'requirements.txt']) {
     try {
       const txt = fs.readFileSync(path.join(cwd, f), 'utf8').toLowerCase();
-      langs.add('Python');
-      if (/psycopg2|sqlalchemy|asyncpg|databases/.test(txt)) { dbs.add('postgres');   cats.add('database'); }
-      if (/pymongo|motor/.test(txt))                          { dbs.add('mongodb');    cats.add('database'); }
-      if (/\bredis\b/.test(txt))                              { dbs.add('redis');      cats.add('database'); }
-      if (/clickhouse/.test(txt))                             { dbs.add('clickhouse'); cats.add('database'); }
-      if (/boto3|aiobotocore/.test(txt))                      { infra.add('aws');        cats.add('infra'); }
-      if (/\bstripe\b/.test(txt))                             { infra.add('stripe');     cats.add('payments'); }
-      if (/\bsentry\b/.test(txt))                             { infra.add('sentry');     cats.add('observability'); }
+      addLang('Python');
+      if (/psycopg2|sqlalchemy|asyncpg|databases/.test(txt)) { addDb('postgres');   addCat('database'); }
+      if (/pymongo|motor/.test(txt))                          { addDb('mongodb');    addCat('database'); }
+      if (/\bredis\b/.test(txt))                              { addDb('redis');      addCat('database'); }
+      if (/clickhouse/.test(txt))                             { addDb('clickhouse'); addCat('database'); }
+      if (/boto3|aiobotocore/.test(txt))                      { addInfra('aws');        addCat('infra'); }
+      if (/\bstripe\b/.test(txt))                             { addInfra('stripe');     addCat('payments'); }
+      if (/\bsentry\b/.test(txt))                             { addInfra('sentry');     addCat('observability'); }
     } catch {}
   }
 
   // go.mod / Cargo.toml
-  if (fs.existsSync(path.join(cwd, 'go.mod')))    langs.add('Go');
-  if (fs.existsSync(path.join(cwd, 'Cargo.toml'))) langs.add('Rust');
+  from('language manifest', 0.95);
+  if (fs.existsSync(path.join(cwd, 'go.mod')))    addLang('Go');
+  if (fs.existsSync(path.join(cwd, 'Cargo.toml'))) addLang('Rust');
 
   // Swift — Package.swift (SwiftPM) or Project.swift (Tuist)
-  if (fs.existsSync(path.join(cwd, 'Package.swift')))  langs.add('swift');
-  if (fs.existsSync(path.join(cwd, 'Project.swift')))  langs.add('swift');
+  from('language manifest', 0.95);
+  if (fs.existsSync(path.join(cwd, 'Package.swift')))  addLang('swift');
+  if (fs.existsSync(path.join(cwd, 'Project.swift')))  addLang('swift');
 
   // JVM — pom.xml / build.gradle / build.gradle.kts. Dep parsing skipped:
   // pom.xml is XML, build.gradle is Groovy/Kotlin DSL — out of scope here.
-  if (fs.existsSync(path.join(cwd, 'pom.xml')))             langs.add('jvm');
-  if (fs.existsSync(path.join(cwd, 'build.gradle')))        langs.add('jvm');
-  if (fs.existsSync(path.join(cwd, 'build.gradle.kts')))    langs.add('jvm');
+  if (fs.existsSync(path.join(cwd, 'pom.xml')))             addLang('jvm');
+  if (fs.existsSync(path.join(cwd, 'build.gradle')))        addLang('jvm');
+  if (fs.existsSync(path.join(cwd, 'build.gradle.kts')))    addLang('jvm');
 
   // Ruby — Gemfile (preferred) with line-by-line gem scan; Gemfile.lock fallback.
+  from('Gemfile', 0.9);
   for (const f of ['Gemfile', 'Gemfile.lock']) {
     try {
       const txt = fs.readFileSync(path.join(cwd, f), 'utf8');
-      langs.add('ruby');
+      addLang('ruby');
       // Simple string-contains lookup — no real parser. Matches both
       // `gem "pg"` and Gemfile.lock dependency lines.
-      if (/\bpg\b/.test(txt))         { dbs.add('postgres');   cats.add('database'); }
-      if (/\bmysql2\b/.test(txt))     { dbs.add('mysql');      cats.add('database'); }
-      if (/\bredis\b/.test(txt))      { dbs.add('redis');      cats.add('database'); }
-      if (/\bmongo\b/.test(txt))      { dbs.add('mongodb');    cats.add('database'); }
-      if (/\bdalli\b/.test(txt))      { infra.add('memcached'); cats.add('database'); }
-      if (/\baws-sdk\b/.test(txt))    { infra.add('aws');      cats.add('infra'); }
+      if (/\bpg\b/.test(txt))         { addDb('postgres');   addCat('database'); }
+      if (/\bmysql2\b/.test(txt))     { addDb('mysql');      addCat('database'); }
+      if (/\bredis\b/.test(txt))      { addDb('redis');      addCat('database'); }
+      if (/\bmongo\b/.test(txt))      { addDb('mongodb');    addCat('database'); }
+      if (/\bdalli\b/.test(txt))      { addInfra('memcached'); addCat('database'); }
+      if (/\baws-sdk\b/.test(txt))    { addInfra('aws');      addCat('infra'); }
       break; // Gemfile wins over Gemfile.lock — don't double-scan.
     } catch {}
   }
 
   // PHP — composer.json with JSON `require` map scan.
+  from('composer.json require', 0.95);
   try {
     const composer = JSON.parse(fs.readFileSync(path.join(cwd, 'composer.json'), 'utf8'));
-    langs.add('php');
+    addLang('php');
     const req = { ...(composer.require || {}), ...(composer['require-dev'] || {}) };
     const reqKeys = Object.keys(req);
-    if (reqKeys.some(k => k === 'mongodb/mongodb' || k.startsWith('mongodb/')))    { dbs.add('mongodb');  cats.add('database'); }
-    if (reqKeys.some(k => k === 'predis/predis' || k.startsWith('predis/')))       { dbs.add('redis');    cats.add('database'); }
-    if (reqKeys.some(k => k.startsWith('aws/aws-sdk-php')))                         { infra.add('aws');    cats.add('infra'); }
+    if (reqKeys.some(k => k === 'mongodb/mongodb' || k.startsWith('mongodb/')))    { addDb('mongodb');  addCat('database'); }
+    if (reqKeys.some(k => k === 'predis/predis' || k.startsWith('predis/')))       { addDb('redis');    addCat('database'); }
+    if (reqKeys.some(k => k.startsWith('aws/aws-sdk-php')))                         { addInfra('aws');    addCat('infra'); }
     if (reqKeys.some(k => k === 'firebase/php-jwt'))                                { /* auth dep, no MCP signal */ }
-    if (reqKeys.some(k => k.startsWith('stripe/')))                                 { infra.add('stripe'); cats.add('payments'); }
-    if (reqKeys.some(k => k.startsWith('sentry/')))                                 { infra.add('sentry'); cats.add('observability'); }
+    if (reqKeys.some(k => k.startsWith('stripe/')))                                 { addInfra('stripe'); addCat('payments'); }
+    if (reqKeys.some(k => k.startsWith('sentry/')))                                 { addInfra('sentry'); addCat('observability'); }
   } catch { /* no composer.json or invalid JSON */ }
 
   // .NET — *.csproj / *.sln. Skip parsing; flag the language only.
+  from('project file', 0.95);
   try {
     const entries = fs.readdirSync(cwd);
-    if (entries.some(f => f.endsWith('.csproj') || f.endsWith('.sln'))) langs.add('dotnet');
+    if (entries.some(f => f.endsWith('.csproj') || f.endsWith('.sln'))) addLang('dotnet');
   } catch {}
 
   // Elixir — mix.exs. Skip dep parsing (Elixir DSL).
-  if (fs.existsSync(path.join(cwd, 'mix.exs'))) langs.add('elixir');
+  from('mix.exs', 0.95);
+  if (fs.existsSync(path.join(cwd, 'mix.exs'))) addLang('elixir');
 
   // docker-compose.yml
+  from('docker-compose service', 0.85);
   try {
     const txt = fs.readFileSync(path.join(cwd, 'docker-compose.yml'), 'utf8').toLowerCase();
-    if (/image:\s*(postgres|pg[^s])/.test(txt))     { dbs.add('postgres');   cats.add('database'); }
-    if (/image:\s*(mysql|mariadb)/.test(txt))        { dbs.add('mysql');      cats.add('database'); }
-    if (/image:\s*mongo/.test(txt))                  { dbs.add('mongodb');    cats.add('database'); }
-    if (/image:\s*redis/.test(txt))                  { dbs.add('redis');      cats.add('database'); }
-    if (/clickhouse/.test(txt))                      { dbs.add('clickhouse'); cats.add('database'); }
-    if (/image:\s*(confluentinc\/|bitnami\/kafka|apache\/kafka)/.test(txt)) { infra.add('kafka');      cats.add('streaming'); }
-    if (/image:\s*(prom\/prometheus|prometheus)/.test(txt))                 { infra.add('prometheus'); cats.add('observability'); }
-    if (/image:\s*grafana/.test(txt))                                       { infra.add('grafana');    cats.add('observability'); }
-    if (/image:\s*grafana\/loki/.test(txt))                                 { infra.add('loki');       cats.add('observability'); }
-    if (/image:\s*nginx/.test(txt))                                         { infra.add('nginx');      cats.add('infra'); }
-    if (/image:\s*hashicorp\/vault/.test(txt))                              { infra.add('vault');      cats.add('infra'); }
+    if (/image:\s*(postgres|pg[^s])/.test(txt))     { addDb('postgres');   addCat('database'); }
+    if (/image:\s*(mysql|mariadb)/.test(txt))        { addDb('mysql');      addCat('database'); }
+    if (/image:\s*mongo/.test(txt))                  { addDb('mongodb');    addCat('database'); }
+    if (/image:\s*redis/.test(txt))                  { addDb('redis');      addCat('database'); }
+    if (/clickhouse/.test(txt))                      { addDb('clickhouse'); addCat('database'); }
+    if (/image:\s*(confluentinc\/|bitnami\/kafka|apache\/kafka)/.test(txt)) { addInfra('kafka');      addCat('streaming'); }
+    if (/image:\s*(prom\/prometheus|prometheus)/.test(txt))                 { addInfra('prometheus'); addCat('observability'); }
+    if (/image:\s*grafana/.test(txt))                                       { addInfra('grafana');    addCat('observability'); }
+    if (/image:\s*grafana\/loki/.test(txt))                                 { addInfra('loki');       addCat('observability'); }
+    if (/image:\s*nginx/.test(txt))                                         { addInfra('nginx');      addCat('infra'); }
+    if (/image:\s*hashicorp\/vault/.test(txt))                              { addInfra('vault');      addCat('infra'); }
   } catch {}
 
   // Infra files at well-known paths (one-shot existence check, no content scan)
@@ -183,19 +244,24 @@ function detectStack(cwd) {
     [['k8s', 'kubernetes', 'manifests'],  'kubernetes','infra'],
     [['Dockerfile'],                      'docker',   'infra'],
   ];
+  from('project file or directory', 0.85);
   for (const [paths, signal, cat] of fileSignals) {
     if (paths.some(p => fs.existsSync(path.join(cwd, p)))) {
-      infra.add(signal); cats.add(cat);
+      addInfra(signal); addCat(cat);
     }
   }
 
   // Surface .tf files anywhere in the repo root as a terraform signal
   // (covers projects that don't put them in a dedicated dir).
   try {
-    if (fs.readdirSync(cwd).some(f => f.endsWith('.tf'))) { infra.add('terraform'); cats.add('infra'); }
+    from('.tf file in the repo root', 0.85);
+    if (fs.readdirSync(cwd).some(f => f.endsWith('.tf'))) { addInfra('terraform'); addCat('infra'); }
   } catch {}
 
-  // .env / .env.example / .env.local — key names only, never values
+  // .env / .env.example / .env.local — key names only, never values.
+  // Weakest signal of the lot, and marked `inferred`: a configured credential
+  // says someone has an account, not that this project calls that service.
+  from('.env key name', 0.6, 'inferred');
   for (const f of ['.env.example', '.env.local', '.env']) {
     try {
       for (const line of fs.readFileSync(path.join(cwd, f), 'utf8').split('\n')) {
@@ -203,55 +269,61 @@ function detectStack(cwd) {
         if (!m) continue;
         const k = m[1];
         keys.push(k);
-        if (/^GITHUB_/.test(k))                              { infra.add('github');     cats.add('vcs'); }
-        if (/^GITLAB_/.test(k))                              { infra.add('gitlab');     cats.add('vcs'); }
-        if (/^LINEAR_/.test(k))                              { infra.add('linear');     cats.add('pm'); }
-        if (/^NOTION_/.test(k))                              { infra.add('notion');     cats.add('docs'); }
-        if (/^SENTRY_/.test(k))                              { infra.add('sentry');     cats.add('observability'); }
-        if (/^STRIPE_/.test(k))                              { infra.add('stripe');     cats.add('payments'); }
-        if (/^SUPABASE_/.test(k))                            { dbs.add('supabase');     cats.add('database'); }
-        if (/^NEON_/.test(k) || k === 'NEON_DATABASE_URL')  { dbs.add('neon');         cats.add('database'); }
-        if (/^(CLOUDFLARE_|CF_API_TOKEN)/.test(k))          { infra.add('cloudflare'); cats.add('infra'); }
-        if (/^AWS_/.test(k))                                 { infra.add('aws');        cats.add('infra'); }
-        if (/^MONGO/.test(k))                                { dbs.add('mongodb');      cats.add('database'); }
-        if (/^CLICKHOUSE_/.test(k))                          { dbs.add('clickhouse');   cats.add('database'); }
-        if (/^(KUBE_|KUBERNETES_)/.test(k))                  { infra.add('kubernetes'); cats.add('infra'); }
-        if (/^(MYSQL_|MARIADB_)/.test(k))                    { dbs.add('mysql');        cats.add('database'); }
-        if (/^(PG_|POSTGRES_|POSTGRESQL_)/.test(k))          { dbs.add('postgres');     cats.add('database'); }
-        if (/^(TEAMCITY_|TC_(URL|TOKEN|API))/.test(k))       { infra.add('teamcity');   cats.add('ci-cd'); }
-        if (/^(CIRCLECI_|CIRCLE_)/.test(k))                  { infra.add('circleci');   cats.add('ci-cd'); }
-        if (/^JENKINS_/.test(k))                             { infra.add('jenkins');    cats.add('ci-cd'); }
-        if (/^(ARGOCD_|ARGO_)/.test(k))                      { infra.add('argocd');     cats.add('infra'); }
-        if (/^HELM_/.test(k))                                { infra.add('helm');       cats.add('infra'); }
-        if (/^(TERRAFORM_|TF_(VAR|CLI))/.test(k))            { infra.add('terraform');  cats.add('infra'); }
-        if (/^VAULT_(ADDR|TOKEN|NAMESPACE)/.test(k))         { infra.add('vault');      cats.add('infra'); }
-        if (/^PROMETHEUS_/.test(k))                          { infra.add('prometheus'); cats.add('observability'); }
-        if (/^GRAFANA_/.test(k))                             { infra.add('grafana');    cats.add('observability'); }
-        if (/^LOKI_/.test(k))                                { infra.add('loki');       cats.add('observability'); }
-        if (/^DATADOG_/.test(k))                             { infra.add('datadog');    cats.add('observability'); }
-        if (/^DYNATRACE_/.test(k))                           { infra.add('dynatrace');  cats.add('observability'); }
-        if (/^NEWRELIC_/.test(k))                            { infra.add('newrelic');   cats.add('observability'); }
-        if (/^KAFKA_/.test(k))                               { infra.add('kafka');      cats.add('streaming'); }
-        if (/^(SALESFORCE_|SFDC_)/.test(k))                  { infra.add('salesforce'); cats.add('crm'); }
-        if (/^MAPBOX_/.test(k))                              { infra.add('mapbox');     cats.add('maps'); }
-        if (/^BROWSERSTACK_/.test(k))                        { infra.add('browserstack');cats.add('browser'); }
-        if (/^POSTMAN_/.test(k))                             { infra.add('postman');    cats.add('testing'); }
-        if (/^(AZURE_DEVOPS_|ADO_)/.test(k))                 { infra.add('azure-devops');cats.add('vcs'); }
-        if (/^(JIRA_|CONFLUENCE_|ATLASSIAN_)/.test(k))       { infra.add('atlassian');  cats.add('pm'); }
+        if (/^GITHUB_/.test(k))                              { addInfra('github');     addCat('vcs'); }
+        if (/^GITLAB_/.test(k))                              { addInfra('gitlab');     addCat('vcs'); }
+        if (/^LINEAR_/.test(k))                              { addInfra('linear');     addCat('pm'); }
+        if (/^NOTION_/.test(k))                              { addInfra('notion');     addCat('docs'); }
+        if (/^SENTRY_/.test(k))                              { addInfra('sentry');     addCat('observability'); }
+        if (/^STRIPE_/.test(k))                              { addInfra('stripe');     addCat('payments'); }
+        if (/^SUPABASE_/.test(k))                            { addDb('supabase');     addCat('database'); }
+        if (/^NEON_/.test(k) || k === 'NEON_DATABASE_URL')  { addDb('neon');         addCat('database'); }
+        if (/^(CLOUDFLARE_|CF_API_TOKEN)/.test(k))          { addInfra('cloudflare'); addCat('infra'); }
+        if (/^AWS_/.test(k))                                 { addInfra('aws');        addCat('infra'); }
+        if (/^MONGO/.test(k))                                { addDb('mongodb');      addCat('database'); }
+        if (/^CLICKHOUSE_/.test(k))                          { addDb('clickhouse');   addCat('database'); }
+        if (/^(KUBE_|KUBERNETES_)/.test(k))                  { addInfra('kubernetes'); addCat('infra'); }
+        if (/^(MYSQL_|MARIADB_)/.test(k))                    { addDb('mysql');        addCat('database'); }
+        if (/^(PG_|POSTGRES_|POSTGRESQL_)/.test(k))          { addDb('postgres');     addCat('database'); }
+        if (/^(TEAMCITY_|TC_(URL|TOKEN|API))/.test(k))       { addInfra('teamcity');   addCat('ci-cd'); }
+        if (/^(CIRCLECI_|CIRCLE_)/.test(k))                  { addInfra('circleci');   addCat('ci-cd'); }
+        if (/^JENKINS_/.test(k))                             { addInfra('jenkins');    addCat('ci-cd'); }
+        if (/^(ARGOCD_|ARGO_)/.test(k))                      { addInfra('argocd');     addCat('infra'); }
+        if (/^HELM_/.test(k))                                { addInfra('helm');       addCat('infra'); }
+        if (/^(TERRAFORM_|TF_(VAR|CLI))/.test(k))            { addInfra('terraform');  addCat('infra'); }
+        if (/^VAULT_(ADDR|TOKEN|NAMESPACE)/.test(k))         { addInfra('vault');      addCat('infra'); }
+        if (/^PROMETHEUS_/.test(k))                          { addInfra('prometheus'); addCat('observability'); }
+        if (/^GRAFANA_/.test(k))                             { addInfra('grafana');    addCat('observability'); }
+        if (/^LOKI_/.test(k))                                { addInfra('loki');       addCat('observability'); }
+        if (/^DATADOG_/.test(k))                             { addInfra('datadog');    addCat('observability'); }
+        if (/^DYNATRACE_/.test(k))                           { addInfra('dynatrace');  addCat('observability'); }
+        if (/^NEWRELIC_/.test(k))                            { addInfra('newrelic');   addCat('observability'); }
+        if (/^KAFKA_/.test(k))                               { addInfra('kafka');      addCat('streaming'); }
+        if (/^(SALESFORCE_|SFDC_)/.test(k))                  { addInfra('salesforce'); addCat('crm'); }
+        if (/^MAPBOX_/.test(k))                              { addInfra('mapbox');     addCat('maps'); }
+        if (/^BROWSERSTACK_/.test(k))                        { addInfra('browserstack');addCat('browser'); }
+        if (/^POSTMAN_/.test(k))                             { addInfra('postman');    addCat('testing'); }
+        if (/^(AZURE_DEVOPS_|ADO_)/.test(k))                 { addInfra('azure-devops');addCat('vcs'); }
+        if (/^(JIRA_|CONFLUENCE_|ATLASSIAN_)/.test(k))       { addInfra('atlassian');  addCat('pm'); }
         // Jira/Confluence are both served by mcp-atlassian. Keep the
         // 'atlassian' signal above for back-compat and add 'jira' →
         // 'docs' so docs-oriented callers find the same server.
-        if (/^JIRA_/.test(k) || k === 'ATLASSIAN_TOKEN')     { infra.add('jira');       cats.add('docs'); }
-        if (/^ATLASSIAN_/.test(k))                           { infra.add('jira');       cats.add('docs'); }
-        if (/^SEQ_/.test(k))                                 { infra.add('seq');        cats.add('observability'); }
-        if (/^SLACK_/.test(k))                               { infra.add('slack');      cats.add('communication'); }
-        if (/^DISCORD_/.test(k))                             { infra.add('discord');    cats.add('communication'); }
-        if (/^(MAILGUN_|SENDGRID_|POSTMARK_)/.test(k))       { infra.add('email');      cats.add('communication'); }
+        if (/^JIRA_/.test(k) || k === 'ATLASSIAN_TOKEN')     { addInfra('jira');       addCat('docs'); }
+        if (/^ATLASSIAN_/.test(k))                           { addInfra('jira');       addCat('docs'); }
+        if (/^SEQ_/.test(k))                                 { addInfra('seq');        addCat('observability'); }
+        if (/^SLACK_/.test(k))                               { addInfra('slack');      addCat('communication'); }
+        if (/^DISCORD_/.test(k))                             { addInfra('discord');    addCat('communication'); }
+        if (/^(MAILGUN_|SENDGRID_|POSTMARK_)/.test(k))       { addInfra('email');      addCat('communication'); }
       }
     } catch {}
   }
 
-  return { langs, dbs, infra, cats, keys: [...new Set(keys)] };
+  return {
+    langs, dbs, infra, cats,
+    keys: [...new Set(keys)],
+    // Ordered strongest-first, so a report can lead with what the project
+    // actually declares rather than with what an env var hinted at.
+    signals: signals.sort((a, b) => b.confidence - a.confidence || a.value.localeCompare(b.value)),
+  };
 }
 
 // ── DB matching ─────────────────────────────────────────────────────────────
@@ -409,103 +481,180 @@ function getInstalled(cwd) {
 function installTool(tool, cwd, global_) {
   process.stderr.write(`\nRunning integrity scan for ${tool.name}…\n`);
 
-  const verifyArgs = OFFLINE ? [VERIFY_CJS, '--no-audit'] : [VERIFY_CJS];
-  const res = spawnSync('node', verifyArgs, { encoding: 'utf8' });
-  const out  = res.stdout + res.stderr;
+  // Scan this one entry and trust the exit code, instead of scraping the
+  // report for lines that mention the tool. The old text match had two holes:
+  // a `SKIP` line (registry unreachable, unparsable name) matched neither the
+  // FAIL nor the WARN pattern and read as "nothing wrong", and an entry with
+  // no `version` made `l.includes(tool.version || '')` true for *every* line,
+  // so an unrelated entry's FAIL aborted this install.
+  // --fail-unverified: for an install, "couldn't check" is a refusal.
+  // --cwd matters: the policy file that applies is the one belonging to the
+  // project we are about to write into, not the directory this process happens
+  // to have been started from.
+  const verifyArgs = [VERIFY_CJS, '--entry', tool.name, '--fail-unverified', '--cwd', cwd];
+  if (OFFLINE) verifyArgs.push('--offline');
+  if (STRICT)  verifyArgs.push('--strict');
 
-  // Find this tool's line in the output
-  const toolLines = out.split('\n').filter(l => l.includes(tool.name) || l.includes(tool.version || ''));
-  const isFail    = toolLines.some(l => /^(FAIL|CVE)\b/.test(l));
-  const isWarn    = toolLines.some(l => /^(WARN|HOOK)\b/.test(l));
-
-  if (toolLines.length) {
-    for (const l of toolLines) process.stderr.write(`  ${l}\n`);
-  } else {
-    process.stderr.write(`  (no integrity entry for ${tool.name} — MISS)\n`);
+  const res = spawnSync(process.execPath, verifyArgs, { encoding: 'utf8' });
+  const out = `${res.stdout || ''}${res.stderr || ''}`;
+  for (const l of out.split('\n')) {
+    if (l.trim()) process.stderr.write(`  ${l}\n`);
   }
 
-  if (isFail) {
-    process.stderr.write(`\n${RD}ABORT: integrity check failed for ${tool.name}. Do not install.${RS}\n`);
+  if (res.error) {
+    process.stderr.write(`\n${RD}ABORT: could not run the integrity gate: ${res.error.message}${RS}\n`);
     process.exit(1);
   }
-
-  if (isWarn) {
+  if (res.status !== 0) {
+    process.stderr.write(`\n${RD}ABORT: integrity gate did not clear ${tool.name} (verify exit ${res.status}). Do not install.${RS}\n`);
+    process.exit(1);
+  }
+  if (/^(WARN|HOOK)\b|\[(WARN|HOOK)\]/m.test(out)) {
     process.stderr.write(`\n${YL}WARN: review the issue above before proceeding.${RS}\n`);
   }
 
   // Build the server config entry
   const serverEntry = buildServerEntry(tool);
 
-  if (global_) {
-    writeGlobal(tool.name, serverEntry);
-  } else {
-    writeProjectMcp(cwd, tool.name, serverEntry);
-  }
-}
-
-function buildServerEntry(tool) {
-  // Parse install_cmd into command + args
-  const cmd = tool.install_cmd.trim();
-
-  if (cmd.startsWith('docker ')) {
-    // docker run -i --rm … <image>
-    const parts = cmd.split(/\s+/);
-    return { command: 'docker', args: parts.slice(1) };
-  }
-
-  if (cmd.startsWith('npx ')) {
-    // npx -y <pkg>[@ver] [extra args]
-    const parts = cmd.split(/\s+/);
-    return { command: 'npx', args: parts.slice(1) };
-  }
-
-  if (cmd.startsWith('uvx ')) {
-    const parts = cmd.split(/\s+/);
-    return { command: 'uvx', args: parts.slice(1) };
-  }
-
-  // fallback
-  const parts = cmd.split(/\s+/);
-  return { command: parts[0], args: parts.slice(1) };
-}
-
-function writeProjectMcp(cwd, serverName, entry) {
-  const mcpPath = path.join(cwd, '.mcp.json');
-  let cfg = {};
-  try { cfg = JSON.parse(fs.readFileSync(mcpPath, 'utf8')); } catch {}
-  cfg.mcpServers = cfg.mcpServers || {};
-
-  if (cfg.mcpServers[serverName]) {
-    process.stderr.write(`\n${YL}NOTE: ${serverName} already in .mcp.json — overwriting.${RS}\n`);
-  }
-
-  cfg.mcpServers[serverName] = entry;
-
-  const diff = JSON.stringify({ mcpServers: { [serverName]: entry } }, null, 2);
-  process.stderr.write(`\nWill add to ${mcpPath}:\n${DM}${diff}${RS}\n\n`);
-
-  fs.writeFileSync(mcpPath, JSON.stringify(cfg, null, 2) + '\n');
-  process.stdout.write(`Added ${serverName} to .mcp.json\nRestart Claude Code to pick up the new server.\n`);
-}
-
-function writeGlobal(serverName, entry) {
-  const cfgPath = path.join(process.env.HOME || '', '.claude.json');
-  let cfg = {};
-  try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch {
-    process.stderr.write(`${RD}~/.claude.json not found — cannot write global config.${RS}\n`);
+  const target = resolveTarget(HOST, SCOPE, { cwd });
+  if (!target) {
+    const hosts = listHosts().map((h) => `${h.id} (${h.scopes.join('/')})`).join(', ');
+    process.stderr.write(`${RD}No such host/scope: ${HOST}/${SCOPE}.${RS}\nAvailable: ${hosts}\n`);
     process.exit(2);
   }
 
-  // backup
-  const bak = cfgPath + `.bak.${Date.now()}`;
-  fs.copyFileSync(cfgPath, bak);
-  process.stderr.write(`Backup: ${bak}\n`);
+  const diff = JSON.stringify({ [target.key]: { [tool.name]: serverEntry } }, null, 2);
+  process.stderr.write(`\nWill add to ${target.path} (${target.label}, ${SCOPE} scope):\n${DM}${diff}${RS}\n\n`);
 
-  cfg.mcpServers = cfg.mcpServers || {};
-  cfg.mcpServers[serverName] = entry;
+  let result;
+  try {
+    result = writeServerEntry(target, tool.name, serverEntry);
+  } catch (e) {
+    process.stderr.write(`${RD}${e.message}${RS}\n`);
+    process.exit(2);
+  }
 
-  fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2) + '\n');
-  process.stdout.write(`Added ${serverName} to ~/.claude.json\nRestart Claude Code to pick up the new server.\n`);
+  if (result.action === 'manual') {
+    // Codex keeps TOML. Rewriting it without a TOML parser would destroy
+    // comments and formatting, so hand over the three correct lines instead.
+    process.stdout.write(
+      `${target.label} keeps its config in TOML (${target.path}).\n` +
+      `Add this block yourself — mcp-vault does not rewrite TOML:\n\n${result.snippet}\n`
+    );
+    return;
+  }
+
+  if (result.replaced) process.stderr.write(`${YL}NOTE: ${tool.name} was already configured here — replaced.${RS}\n`);
+  if (result.backup)   process.stderr.write(`Backup: ${result.backup}\n`);
+  process.stdout.write(`Added ${tool.name} to ${result.path}\nRestart ${target.label} to pick up the new server.\n`);
+}
+
+// Pin the package token of an install command to the version the DB records —
+// and that verify_integrity actually hashed.
+//
+// Most DB entries store the command unpinned (`npx -y @scope/mcp-server`) with
+// the checked version in a separate `version` field. Copying that command into
+// .mcp.json verbatim means npx resolves `latest` every time the server starts:
+// the artifact that runs is not the artifact whose sha512 the gate compared, so
+// a compromised release published after our last refresh installs itself
+// silently. Synthesise the pin instead.
+//
+// Returns { parts, pinned, reason } — `parts` is the argv-style token list.
+//
+// "Pinned" means: the launch command names the exact version the gate verified.
+// A command that already carries *some* specifier is not automatically fine —
+// `pkg@latest`, `pkg@^1.2` and a stale `pkg@1.0.0` all launch something other
+// than the artifact whose hash was compared, so they get rewritten to the DB's
+// version rather than trusted.
+// "Exact" has to mean exact. `1`, `1.2` and `1.x` all satisfied the old
+// pattern, so `pinInstallCmd` happily produced `pkg@1.x` and called it pinned —
+// a range dressed as a pin.
+//   npm:  semver, three components, optional pre-release/build
+//   PyPI: PEP 440 release segment, optional pre/post/dev/local
+const EXACT_NPM_VERSION  = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+const EXACT_PYPI_VERSION = /^\d+(?:\.\d+)*(?:(?:a|b|rc)\d+)?(?:\.post\d+)?(?:\.dev\d+)?(?:\+[0-9A-Za-z.]+)?$/;
+
+function isExactVersion(runner, version) {
+  if (typeof version !== 'string' || !version) return false;
+  return runner === 'npx' ? EXACT_NPM_VERSION.test(version) : EXACT_PYPI_VERSION.test(version);
+}
+
+function pinInstallCmd(cmd, version) {
+  const raw    = String(cmd).trim();
+  const parts  = raw.split(/\s+/);
+  const runner = parts[0];
+
+  if (runner === 'docker') {
+    // The image is the first non-flag token; a digest sitting in some other
+    // argument (`-e REF=img@sha256:…`) is not a pin on the image that runs.
+    const ref = dockerImageRef(raw);
+    if (!ref) return { parts, pinned: false, reason: 'cannot parse the docker image reference' };
+    const ok = dockerDigestPinned(ref);
+    return { parts, pinned: ok, reason: ok ? null : `docker image ${ref} is not pinned by @sha256 digest` };
+  }
+
+  if (runner !== 'npx' && runner !== 'uvx') {
+    return { parts, pinned: false, reason: `unknown runner "${runner}" — cannot pin` };
+  }
+
+  // Resolve the package with the gate's own parser: a command shaped in a way
+  // the gate declines to check (flags before the package, --package, uvx
+  // --from/--with) must not be pinnable here either.
+  const pkg = runner === 'npx' ? npmPkgName(raw) : pypiPkgName(raw);
+  if (!pkg) {
+    return {
+      parts, pinned: false,
+      reason: runner === 'npx'
+        ? 'not a plain `npx -y <pkg>` command — the gate cannot check it either'
+        : 'not a plain `uvx <pkg>` command (--from / --with / flags) — the gate cannot check it either',
+    };
+  }
+
+  const sep = runner === 'npx' ? '@' : '==';
+  const idx = parts.findIndex((p) => p === pkg || p.startsWith(pkg + sep));
+  if (idx === -1) return { parts, pinned: false, reason: 'cannot locate the package token in install_cmd' };
+
+  const current = parts[idx] === pkg ? null : parts[idx].slice(pkg.length + sep.length);
+
+  if (!version) {
+    return {
+      parts, pinned: false,
+      reason: current
+        ? `install_cmd asks for "${current}", but the DB entry has no verified \`version\` — run verify_integrity.cjs --update`
+        : 'no `version` in the DB entry — run verify_integrity.cjs --update',
+    };
+  }
+  if (!isExactVersion(runner, version)) {
+    return {
+      parts, pinned: false,
+      reason: `DB version "${version}" is not an exact ${runner === 'npx' ? 'semver' : 'PEP 440'} version — a range is not a pin`,
+    };
+  }
+  if (current === version) return { parts, pinned: true, reason: null };
+
+  // Unpinned, or pinned to something the gate did not verify: rewrite it.
+  const pinnedParts = [...parts];
+  pinnedParts[idx] = `${pkg}${sep}${version}`;
+  return { parts: pinnedParts, pinned: true, reason: null };
+}
+
+function buildServerEntry(tool) {
+  const { parts, pinned, reason } = pinInstallCmd(tool.install_cmd, tool.version);
+
+  if (!pinned) {
+    if (!ALLOW_UNPINNED) {
+      process.stderr.write(
+        `\n${RD}ABORT: refusing to write an unpinned launch command for ${tool.name}.${RS}\n` +
+        `  ${reason}\n` +
+        `  The gate verifies a specific version; an unpinned command runs whatever\n` +
+        `  the registry serves at startup. Pass --allow-unpinned to override.\n`
+      );
+      process.exit(1);
+    }
+    process.stderr.write(`\n${YL}WARN: writing an unpinned launch command (${reason}).${RS}\n`);
+  }
+
+  return { command: parts[0], args: parts.slice(1) };
 }
 
 // ── Report formatting ───────────────────────────────────────────────────────
@@ -611,6 +760,15 @@ function printReport(stack, matched, installed, db, unmapped) {
 // ── Main ────────────────────────────────────────────────────────────────────
 
 if (require.main === module) {
+  if (argv.includes('--list-hosts')) {
+    for (const h of listHosts()) {
+      process.stdout.write(`${h.id.padEnd(16)} ${h.label.padEnd(16)} scopes: ${h.scopes.join(', ').padEnd(14)} ${h.format === 'toml' ? '(snippet only — TOML config)' : ''}\n`);
+    }
+    // `return` as well as the exit: exitAfterFlush() queues the exit behind a
+    // stdout drain, so execution would otherwise carry on into the scan.
+    return exitAfterFlush(0);
+  }
+
   const db        = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
   const stack     = detectStack(CWD);
   const matched   = matchDB(db, stack, QUERY);
@@ -638,14 +796,20 @@ if (require.main === module) {
         infra:      [...stack.infra],
         categories: [...stack.cats],
         keys:       stack.keys.slice(0, 20),
+        // Each signal with where it came from and how much it implies, so a
+        // recommendation can be explained rather than asserted.
+        signals:    stack.signals,
         unmapped_signals: unmapped,
       },
-      recommended: matched.filter(t => t.est_tools_count < HEAVY).map(slim),
-      heavy:       matched.filter(t => t.est_tools_count >= HEAVY).map(slim),
+      recommended: matched.filter(t => t.est_tools_count < HEAVY).map(t => slim(t, stack)),
+      heavy:       matched.filter(t => t.est_tools_count >= HEAVY).map(t => slim(t, stack)),
       installed,
       db_entry_count: db.tools.length,
     }, null, 2) + '\n');
-    process.exit(0);
+    // `return` matters: exitAfterFlush() is asynchronous, so execution would
+    // otherwise fall through to printReport() and append a human-readable
+    // report after the JSON document.
+    return exitAfterFlush(0);
   }
 
   // -- default: human-readable report --
@@ -654,14 +818,35 @@ if (require.main === module) {
 
 module.exports = {
   detectStack,
+  slim,
   matchDB,
   unmappedSignals,
   fallbackBySignal,
+  pinInstallCmd,
+  isExactVersion,
   SIGNAL_TO_TOOLS,
   UNIVERSAL_TOOLS,
 };
 
-function slim(t) {
+function slim(t, stack = null) {
+  // health / trust / fit, kept apart on purpose: health says the project is
+  // maintained, trust says we know which bytes we would run, fit says this
+  // project has a use for it. A recommendation is a policy over the three —
+  // trust gates, the others rank — so popularity cannot outvote a bad pin.
+  // Evidence only counts for the artifact it was collected on. Bumping
+  // `version` while leaving `trust_evidence` in place otherwise carries the old
+  // release's verdict onto a version nothing has checked.
+  const typed = toTypedEntry(t);
+  const currentId = typed ? artifactId(typed.artifact) : null;
+  const evidence = t.trust_evidence
+    && (!t.trust_evidence.artifact_id || !currentId || t.trust_evidence.artifact_id === currentId)
+    ? t.trust_evidence
+    : null;
+  const trust = trustScore(evidence);
+  if (t.trust_evidence && !evidence) {
+    trust.reasons.unshift(`stored evidence describes ${t.trust_evidence.artifact_id}, not ${currentId} — ignored`);
+  }
+  const fit   = stack ? fitScore(t, stack, { signalToTools: SIGNAL_TO_TOOLS, universal: UNIVERSAL_TOOLS }) : null;
   return {
     name:            t.name,
     category:        t.category,
@@ -672,5 +857,11 @@ function slim(t) {
     trust:           t.trust,
     install_cmd:     t.install_cmd,
     last_checked:    t.last_checked,
+    scores: {
+      health: Number.isFinite(t.health_score) ? t.health_score : null,
+      trust:  { score: trust.score, gate: trust.gate, reasons: trust.reasons.slice(0, 4) },
+      fit:    fit ? { score: fit.score, reasons: fit.reasons.slice(0, 4) } : null,
+      recommendation: recommend({ trust, health: t.health_score, fit }),
+    },
   };
 }

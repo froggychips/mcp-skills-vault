@@ -37,10 +37,17 @@ on:
         required: false
         type: boolean
         default: false
+      allow_unprovenanced:
+        description: 'Publish even if npm provenance cannot be produced. Off by default: a tool that argues for provenance should ship with it.'
+        required: false
+        type: boolean
+        default: false
 
+# Default to read. The jobs that need to write a tag, a release or a PR declare
+# it for themselves — an undeclared block inherits the repository default,
+# which on this repo was `write` for every job in every workflow.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   # Automatic flow: scans commits, opens/updates the release PR.
@@ -48,11 +55,15 @@ jobs:
     name: release-please (auto)
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.tag == '')
     runs-on: self-hosted
+    timeout-minutes: 15
+    permissions:
+      contents: write         # commits the release PR
+      pull-requests: write
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
-      - uses: googleapis/release-please-action@v5
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7   # v5.0.0
         id: release
         with:
           # Manifest mode: the release-type and the version-file wiring live in
@@ -71,8 +82,11 @@ jobs:
     name: Manual tag (workflow_dispatch)
     if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
     runs-on: self-hosted
+    timeout-minutes: 15
+    permissions:
+      contents: write         # creates the tag and the GitHub release
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
         with:
           fetch-depth: 0   # need full history for `gh release create --generate-notes`
       - name: Create tag
@@ -111,22 +125,80 @@ jobs:
       always() &&
       (needs.release-please.outputs.release_created == 'true' ||
        (github.event_name == 'workflow_dispatch' && inputs.publish_npm))
-    # self-hosted: this org has no github-hosted runners available. Publishing
-    # our own package needs no isolation, so the trusted runner is fine.
+    # self-hosted: GitHub-hosted runners do not start on this account. Publishing
+    # our own code needs no isolation from itself, so the trusted runner is fine.
     runs-on: self-hosted
+    timeout-minutes: 20
     permissions:
       contents: read
+      # npm provenance is signed against a GitHub OIDC token. The token comes
+      # from GitHub, not from the runner, so this works on a self-hosted runner
+      # too — the earlier comment claiming provenance needed a hosted runner was
+      # wrong about where the token comes from.
+      id-token: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v7.0.0
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
       - name: Tests must pass before publish
         run: node --test tests/*.test.cjs
-      - name: npm publish
-        # No --provenance: that needs github-hosted OIDC, which isn't available
-        # here. NPM_TOKEN must be an npm *automation* token (bypasses 2FA OTP).
-        run: npm publish --access public
+      # `npm publish` answers E404 — not 401 — when the token is missing,
+      # expired or lacks publish rights on the scope. That is how v0.13.0 ended
+      # up with a git tag and a GitHub release but no package on npm: the run
+      # failed at the last step, after the release was already public. Check the
+      # credential first, and say which of the two it is.
+      - name: Preflight — npm credential and target version
+        id: preflight
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -uo pipefail
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "::error::NPM_TOKEN secret is empty. Add an npm *automation* token (Settings → Secrets and variables → Actions)." >&2
+            exit 1
+          fi
+          if ! who=$(npm whoami 2>&1); then
+            echo "::error::NPM_TOKEN cannot authenticate against registry.npmjs.org (npm said: ${who}). Automation tokens don't expire; granular tokens do — reissue and update the secret." >&2
+            exit 1
+          fi
+          echo "Authenticated to npm as ${who}"
+          version=$(node -p "require('./package.json').version")
+          name=$(node -p "require('./package.json').name")
+          echo "Publishing ${name}@${version}"
+          if npm view "${name}@${version}" version >/dev/null 2>&1; then
+            echo "::notice::${name}@${version} is already on npm — skipping publish."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      # Published with provenance: a signed statement tying this tarball to this
+      # repository, this commit and this workflow run. A project that asks its
+      # users to check provenance on 114 other packages should ship it on its
+      # own. NPM_TOKEN must be an npm *automation* token (bypasses 2FA OTP).
+      #
+      # If provenance cannot be produced, the publish stops rather than quietly
+      # shipping without it — an unprovenanced release from a tool that argues
+      # for provenance is worse than a late one. `allow_unprovenanced` is the
+      # deliberate override.
+      - name: npm publish (with provenance)
+        if: steps.preflight.outputs.skip != 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          ALLOW_UNPROVENANCED: ${{ inputs.allow_unprovenanced }}
+        run: |
+          set -uo pipefail
+          if npm publish --access public --provenance 2>&1 | tee /tmp/npm-publish.log; then
+            echo "published with provenance"
+            exit 0
+          fi
+          if grep -qiE 'provenance|id-token|oidc' /tmp/npm-publish.log; then
+            if [ "${ALLOW_UNPROVENANCED:-false}" = "true" ]; then
+              echo "::warning::provenance unavailable; publishing without it because allow_unprovenanced was set"
+              npm publish --access public
+              exit $?
+            fi
+            echo "::error::provenance could not be produced (see log above). Nothing was published. Re-run with allow_unprovenanced=true to publish without it." >&2
+            exit 1
+          fi
+          echo "::error::npm publish failed for a reason unrelated to provenance." >&2
+          exit 1

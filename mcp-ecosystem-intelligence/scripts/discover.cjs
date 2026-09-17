@@ -51,6 +51,7 @@ const fs    = require('fs');
 const https = require('https');
 const path  = require('path');
 const { execFileSync } = require('child_process');
+const { exitAfterFlush } = require('./lib/exit.cjs');
 
 const DB_PATH      = path.resolve(__dirname, '../assets/tools_database.json');
 const CALC_HEALTH  = path.resolve(__dirname, 'calculate_health.cjs');
@@ -609,7 +610,9 @@ async function main() {
     process.stdout.write(json);
   }
 
-  process.exit(top.length ? 0 : 1);
+  // 40KB+ of JSON on stdout: exiting straight away truncates it at the pipe
+  // buffer. See lib/exit.cjs.
+  exitAfterFlush(top.length ? 0 : 1);
 }
 
 if (require.main === module) {

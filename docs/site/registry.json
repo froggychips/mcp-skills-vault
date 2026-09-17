@@ -1,50 +1,45 @@
 {
-  "generated_at": "2026-05-24T12:49:53.893Z",
-  "count": 112,
+  "generated_at": "2026-09-17T08:59:41.413Z",
+  "count": 114,
   "entries": [
     {
       "name": "@last9/mcp-server",
       "category": "ai",
-      "classification": "Core",
+      "classification": "Recommended",
       "trust": "candidate",
       "license": "Apache-2.0",
-      "health_score": 107.5,
+      "health_score": 77.78,
       "est_tools_count": null,
       "install_cmd": "npx -y @last9/mcp-server",
-      "source_url": "https://github.com/last9/last9-mcp-server"
+      "source_url": "https://github.com/last9/last9-mcp-server",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "lsp-mcp-server",
       "category": "ai",
-      "classification": "Core",
+      "classification": "Experimental",
       "trust": "verified",
       "license": "MIT",
-      "health_score": 101.8,
+      "health_score": 53.22,
       "est_tools_count": null,
       "install_cmd": "npx -y lsp-mcp-server",
-      "source_url": "https://github.com/ProfessioneIT/lsp-mcp-server"
+      "source_url": "https://github.com/ProfessioneIT/lsp-mcp-server",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "codex-mcp-server",
       "category": "ai",
-      "classification": "Core",
+      "classification": "Experimental",
       "trust": "verified",
       "license": "Unknown",
-      "health_score": 100,
+      "health_score": 50,
       "est_tools_count": null,
       "install_cmd": "npx -y codex-mcp-server",
-      "source_url": "https://github.com/tuannvm/codex-mcp-server"
-    },
-    {
-      "name": "@browserstack/mcp-server",
-      "category": "browser",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "AGPL-3.0",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @browserstack/mcp-server",
-      "source_url": "https://github.com/browserstack/mcp-server"
+      "source_url": "https://github.com/tuannvm/codex-mcp-server",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "playwright-mcp",
@@ -55,106 +50,139 @@
       "health_score": 110,
       "est_tools_count": 64,
       "install_cmd": "npx -y @playwright/mcp@0.0.75",
-      "source_url": "https://github.com/microsoft/playwright-mcp"
+      "source_url": "https://github.com/microsoft/playwright-mcp",
+      "evidence": null,
+      "smoke": null
     },
     {
-      "name": "@agent-infra/mcp-server-browser",
+      "name": "@browserstack/mcp-server",
       "category": "browser",
-      "classification": "Core",
+      "classification": "Recommended",
       "trust": "verified",
-      "license": "Apache-2.0",
-      "health_score": 105,
+      "license": "AGPL-3.0",
+      "health_score": 80,
       "est_tools_count": null,
-      "install_cmd": "npx -y @agent-infra/mcp-server-browser",
-      "source_url": "https://github.com/bytedance/UI-TARS-desktop"
+      "install_cmd": "npx -y @browserstack/mcp-server",
+      "source_url": "https://github.com/browserstack/mcp-server",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "chrome-devtools-mcp",
       "category": "browser",
-      "classification": "Core",
+      "classification": "Recommended",
       "trust": "candidate",
       "license": "Apache-2.0",
-      "health_score": 105,
+      "health_score": 75,
       "est_tools_count": null,
       "install_cmd": "npx -y chrome-devtools-mcp",
-      "source_url": "https://github.com/ChromeDevTools/chrome-devtools-mcp"
+      "source_url": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "fsb-mcp-server",
       "category": "browser",
-      "classification": "Core",
+      "classification": "Recommended",
       "trust": "verified",
       "license": "NOASSERTION",
-      "health_score": 97.8,
+      "health_score": 70,
       "est_tools_count": null,
       "install_cmd": "npx -y fsb-mcp-server",
-      "source_url": "https://github.com/lakshmanturlapati/FSB"
+      "source_url": "https://github.com/lakshmanturlapati/FSB",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@agent-infra/mcp-server-browser",
+      "category": "browser",
+      "classification": "Experimental",
+      "trust": "verified",
+      "license": "Apache-2.0",
+      "health_score": 55,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @agent-infra/mcp-server-browser",
+      "source_url": "https://github.com/bytedance/UI-TARS-desktop",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "@circleci/mcp-server-circleci",
       "category": "ci-cd",
-      "classification": "Core",
+      "classification": "Recommended",
       "trust": "verified",
       "license": "NOASSERTION",
-      "health_score": 99.2,
+      "health_score": 69.4,
       "est_tools_count": null,
       "install_cmd": "npx -y @circleci/mcp-server-circleci",
-      "source_url": "https://github.com/CircleCI-Public/mcp-server-circleci"
+      "source_url": "https://github.com/CircleCI-Public/mcp-server-circleci",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "teamcity-mcp",
       "category": "ci-cd",
-      "classification": "Recommended",
+      "classification": "Experimental",
       "trust": "verified",
       "license": "MIT",
-      "health_score": 65,
+      "health_score": 54.47,
       "est_tools_count": null,
       "install_cmd": "npx -y @daghis/teamcity-mcp",
-      "source_url": "https://github.com/Daghis/teamcity-mcp"
+      "source_url": "https://github.com/Daghis/teamcity-mcp",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "@contentful/mcp-server",
       "category": "cms",
-      "classification": "Core",
+      "classification": "Recommended",
       "trust": "verified",
       "license": "MIT",
-      "health_score": 107.4,
+      "health_score": 77.71,
       "est_tools_count": null,
       "install_cmd": "npx -y @contentful/mcp-server",
-      "source_url": "https://github.com/contentful/contentful-mcp-server"
-    },
-    {
-      "name": "@diskd-ai/email-mcp",
-      "category": "communication",
-      "classification": "Core",
-      "trust": "candidate",
-      "license": "LGPL-3.0",
-      "health_score": 106.4,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @diskd-ai/email-mcp",
-      "source_url": "https://github.com/codefuturist/email-mcp"
+      "source_url": "https://github.com/contentful/contentful-mcp-server",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "slack-mcp-server",
       "category": "communication",
-      "classification": "Core",
+      "classification": "Recommended",
       "trust": "verified",
       "license": "MIT",
-      "health_score": 105,
+      "health_score": 75,
       "est_tools_count": null,
       "install_cmd": "npx -y slack-mcp-server",
-      "source_url": "https://github.com/korotovsky/slack-mcp-server"
+      "source_url": "https://github.com/korotovsky/slack-mcp-server",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@diskd-ai/email-mcp",
+      "category": "communication",
+      "classification": "Experimental",
+      "trust": "candidate",
+      "license": "LGPL-3.0",
+      "health_score": 59.4,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @diskd-ai/email-mcp",
+      "source_url": "https://github.com/codefuturist/email-mcp",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "@salesforce/mcp",
       "category": "crm",
-      "classification": "Core",
+      "classification": "Recommended",
       "trust": "verified",
       "license": "Apache-2.0",
-      "health_score": 110,
+      "health_score": 80,
       "est_tools_count": null,
       "install_cmd": "npx -y @salesforce/mcp",
-      "source_url": "https://github.com/salesforcecli/mcp"
+      "source_url": "https://github.com/salesforcecli/mcp",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "mcp-redis",
@@ -165,18 +193,9 @@
       "health_score": 110,
       "est_tools_count": 10,
       "install_cmd": "uvx --from git+https://github.com/redis/mcp-redis mcp-redis",
-      "source_url": "https://github.com/redis/mcp-redis"
-    },
-    {
-      "name": "mcp-server-mysql",
-      "category": "database",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MIT",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @benborla29/mcp-server-mysql",
-      "source_url": "https://github.com/benborla/mcp-server-mysql"
+      "source_url": "https://github.com/redis/mcp-redis",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "mcp-server-neon",
@@ -187,7 +206,9 @@
       "health_score": 110,
       "est_tools_count": 29,
       "install_cmd": "npx -y @neondatabase/mcp-server-neon@0.6.5",
-      "source_url": "https://github.com/neondatabase/mcp-server-neon"
+      "source_url": "https://github.com/neondatabase/mcp-server-neon",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "mongodb-mcp-server",
@@ -198,18 +219,35 @@
       "health_score": 110,
       "est_tools_count": 42,
       "install_cmd": "npx -y mongodb-mcp-server@1.10.0",
-      "source_url": "https://github.com/mongodb-js/mongodb-mcp-server"
+      "source_url": "https://github.com/mongodb-js/mongodb-mcp-server",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "mcp-server-mysql",
+      "category": "database",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "MIT",
+      "health_score": 80,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @benborla29/mcp-server-mysql",
+      "source_url": "https://github.com/benborla/mcp-server-mysql",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "@supabase/mcp-server-supabase",
       "category": "database",
-      "classification": "Core",
+      "classification": "Recommended",
       "trust": "verified",
       "license": "Apache-2.0",
-      "health_score": 105,
+      "health_score": 75,
       "est_tools_count": null,
       "install_cmd": "npx -y @supabase/mcp-server-supabase",
-      "source_url": "https://github.com/supabase-community/supabase-mcp"
+      "source_url": "https://github.com/supabase-community/supabase-mcp",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "mcp-clickhouse",
@@ -217,21 +255,25 @@
       "classification": "Recommended",
       "trust": "verified",
       "license": "Apache-2.0",
-      "health_score": 80,
+      "health_score": 75,
       "est_tools_count": 4,
       "install_cmd": "uvx mcp-clickhouse==0.3.0",
-      "source_url": "https://github.com/ClickHouse/mcp-clickhouse"
+      "source_url": "https://github.com/ClickHouse/mcp-clickhouse",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "supabase-mcp",
       "category": "database",
-      "classification": "Recommended",
+      "classification": "Experimental",
       "trust": "verified",
       "license": "Apache-2.0",
-      "health_score": 80,
+      "health_score": 60,
       "est_tools_count": 8,
       "install_cmd": "uvx supabase-mcp-server==0.4",
-      "source_url": "https://github.com/alexander-zuev/supabase-mcp-server"
+      "source_url": "https://github.com/alexander-zuev/supabase-mcp-server",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "mcp-server-everything",
@@ -242,18 +284,22 @@
       "health_score": 105,
       "est_tools_count": 18,
       "install_cmd": "npx -y @modelcontextprotocol/server-everything@2026.1.26",
-      "source_url": "https://github.com/modelcontextprotocol/servers/tree/main/src/everything"
+      "source_url": "https://github.com/modelcontextprotocol/servers/tree/main/src/everything",
+      "evidence": null,
+      "smoke": null
     },
     {
-      "name": "@professional-wiki/mediawiki-mcp-server",
+      "name": "@anyproto/anytype-mcp",
       "category": "docs",
       "classification": "Core",
       "trust": "candidate",
       "license": "MIT",
-      "health_score": 109.5,
+      "health_score": 110,
       "est_tools_count": null,
-      "install_cmd": "npx -y @professional-wiki/mediawiki-mcp-server",
-      "source_url": "https://github.com/ProfessionalWiki/MediaWiki-MCP-Server"
+      "install_cmd": "npx -y @anyproto/anytype-mcp@1.2.8",
+      "source_url": "https://github.com/anyproto/anytype-mcp",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "context7",
@@ -261,10 +307,12 @@
       "classification": "Core",
       "trust": "verified",
       "license": "MIT",
-      "health_score": 105,
+      "health_score": 110,
       "est_tools_count": 4,
       "install_cmd": "npx -y @upstash/context7-mcp@2.2.4",
-      "source_url": "https://github.com/upstash/context7"
+      "source_url": "https://github.com/upstash/context7",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "notion-mcp-server",
@@ -272,21 +320,38 @@
       "classification": "Core",
       "trust": "verified",
       "license": "MIT",
-      "health_score": 85,
+      "health_score": 105,
       "est_tools_count": 22,
       "install_cmd": "npx -y @notionhq/notion-mcp-server@2.2.1",
-      "source_url": "https://github.com/makenotion/notion-mcp-server"
+      "source_url": "https://github.com/makenotion/notion-mcp-server",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@professional-wiki/mediawiki-mcp-server",
+      "category": "docs",
+      "classification": "Recommended",
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 80,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @professional-wiki/mediawiki-mcp-server",
+      "source_url": "https://github.com/ProfessionalWiki/MediaWiki-MCP-Server",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "mcp-atlassian",
       "category": "docs",
-      "classification": "Experimental",
+      "classification": "Recommended",
       "trust": "verified",
       "license": "MIT",
-      "health_score": 55,
+      "health_score": 75,
       "est_tools_count": 72,
       "install_cmd": "uvx mcp-atlassian==0.21.1",
-      "source_url": "https://github.com/sooperset/mcp-atlassian"
+      "source_url": "https://github.com/sooperset/mcp-atlassian",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "mcp-server-filesystem",
@@ -297,18 +362,9 @@
       "health_score": 105,
       "est_tools_count": 10,
       "install_cmd": "npx -y @modelcontextprotocol/server-filesystem@2026.1.14 <path>",
-      "source_url": "https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem"
-    },
-    {
-      "name": "dataforseo-mcp-server",
-      "category": "http",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "Apache-2.0",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y dataforseo-mcp-server",
-      "source_url": "https://github.com/dataforseo/mcp-server-typescript"
+      "source_url": "https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "mcp-server-fetch",
@@ -319,62 +375,35 @@
       "health_score": 105,
       "est_tools_count": 1,
       "install_cmd": "uvx mcp-server-fetch==2025.4.7",
-      "source_url": "https://github.com/modelcontextprotocol/servers/tree/main/src/fetch"
+      "source_url": "https://github.com/modelcontextprotocol/servers/tree/main/src/fetch",
+      "evidence": null,
+      "smoke": null
     },
     {
-      "name": "@azure-devops/mcp",
-      "category": "infra",
-      "classification": "Core",
-      "trust": "candidate",
-      "license": "MIT",
-      "health_score": 110,
+      "name": "dataforseo-mcp-server",
+      "category": "http",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "Apache-2.0",
+      "health_score": 80,
       "est_tools_count": null,
-      "install_cmd": "npx -y @azure-devops/mcp",
-      "source_url": "https://github.com/microsoft/azure-devops-mcp"
+      "install_cmd": "npx -y dataforseo-mcp-server",
+      "source_url": "https://github.com/dataforseo/mcp-server-typescript",
+      "evidence": null,
+      "smoke": null
     },
     {
-      "name": "@google-cloud/observability-mcp",
+      "name": "mcp-server-cloudflare",
       "category": "infra",
       "classification": "Core",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @google-cloud/observability-mcp",
-      "source_url": "https://github.com/googleapis/gcloud-mcp"
-    },
-    {
-      "name": "terraform-mcp-server",
-      "category": "infra",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MPL-2.0",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "docker run -i --rm --cap-drop ALL --security-opt no-new-privileges hashicorp/terraform-mcp-server@sha256:67b4d3d39aa2c32c5ee280b21d67fb6513dab463af6c93c2ae0cdd4af09d4603",
-      "source_url": "https://github.com/hashicorp/terraform-mcp-server"
-    },
-    {
-      "name": "@azure/mcp",
-      "category": "infra",
-      "classification": "Core",
-      "trust": "candidate",
-      "license": "MIT",
-      "health_score": 105,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @azure/mcp",
-      "source_url": "https://github.com/microsoft/mcp"
-    },
-    {
-      "name": "kubernetes-mcp-server",
-      "category": "infra",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "Apache-2.0",
-      "health_score": 105,
-      "est_tools_count": null,
-      "install_cmd": "npx -y kubernetes-mcp-server",
-      "source_url": "https://github.com/containers/kubernetes-mcp-server"
+      "est_tools_count": 5,
+      "install_cmd": "npx -y @cloudflare/mcp-server-cloudflare@0.2.0",
+      "source_url": "https://github.com/cloudflare/mcp-server-cloudflare",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "mcp-server-aws",
@@ -385,18 +414,22 @@
       "health_score": 105,
       "est_tools_count": 20,
       "install_cmd": "uvx awslabs.core-mcp-server==1.0.27",
-      "source_url": "https://github.com/awslabs/mcp"
+      "source_url": "https://github.com/awslabs/mcp",
+      "evidence": null,
+      "smoke": null
     },
     {
-      "name": "mcp-server-cloudflare",
+      "name": "@azure-devops/mcp",
       "category": "infra",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "Apache-2.0",
-      "health_score": 105,
-      "est_tools_count": 5,
-      "install_cmd": "npx -y @cloudflare/mcp-server-cloudflare@0.2.0",
-      "source_url": "https://github.com/cloudflare/mcp-server-cloudflare"
+      "classification": "Recommended",
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 80,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @azure-devops/mcp",
+      "source_url": "https://github.com/microsoft/azure-devops-mcp",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "mcp-server-kubernetes",
@@ -407,18 +440,74 @@
       "health_score": 80,
       "est_tools_count": 24,
       "install_cmd": "npx -y mcp-server-kubernetes@3.5.1",
-      "source_url": "https://github.com/Flux159/mcp-server-kubernetes"
+      "source_url": "https://github.com/Flux159/mcp-server-kubernetes",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@azure/mcp",
+      "category": "infra",
+      "classification": "Recommended",
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 75,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @azure/mcp",
+      "source_url": "https://github.com/microsoft/mcp",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@google-cloud/observability-mcp",
+      "category": "infra",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "Apache-2.0",
+      "health_score": 75,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @google-cloud/observability-mcp",
+      "source_url": "https://github.com/googleapis/gcloud-mcp",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "kubernetes-mcp-server",
+      "category": "infra",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "Apache-2.0",
+      "health_score": 75,
+      "est_tools_count": null,
+      "install_cmd": "npx -y kubernetes-mcp-server",
+      "source_url": "https://github.com/containers/kubernetes-mcp-server",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "terraform-mcp-server",
+      "category": "infra",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "MPL-2.0",
+      "health_score": 75,
+      "est_tools_count": null,
+      "install_cmd": "docker run -i --rm --cap-drop ALL --security-opt no-new-privileges hashicorp/terraform-mcp-server@sha256:67b4d3d39aa2c32c5ee280b21d67fb6513dab463af6c93c2ae0cdd4af09d4603",
+      "source_url": "https://github.com/hashicorp/terraform-mcp-server",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "@mapbox/mcp-server",
       "category": "maps",
-      "classification": "Core",
+      "classification": "Recommended",
       "trust": "candidate",
       "license": "MIT",
-      "health_score": 110,
+      "health_score": 80,
       "est_tools_count": null,
       "install_cmd": "npx -y @mapbox/mcp-server",
-      "source_url": "https://github.com/mapbox/mcp-server"
+      "source_url": "https://github.com/mapbox/mcp-server",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "mcp-server-memory",
@@ -429,7 +518,9 @@
       "health_score": 105,
       "est_tools_count": 9,
       "install_cmd": "npx -y @modelcontextprotocol/server-memory@2026.1.26",
-      "source_url": "https://github.com/modelcontextprotocol/servers/tree/main/src/memory"
+      "source_url": "https://github.com/modelcontextprotocol/servers/tree/main/src/memory",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "mcp-installer",
@@ -440,40 +531,22 @@
       "health_score": 40,
       "est_tools_count": 3,
       "install_cmd": "npx -y @anaisbetts/mcp-installer@0.5.0",
-      "source_url": "https://github.com/anaisbetts/mcp-installer"
+      "source_url": "https://github.com/anaisbetts/mcp-installer",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "ios-simulator-mcp",
       "category": "mobile",
-      "classification": "Core",
+      "classification": "Experimental",
       "trust": "verified",
       "license": "MIT",
-      "health_score": 110,
+      "health_score": 50,
       "est_tools_count": null,
       "install_cmd": "npx -y ios-simulator-mcp",
-      "source_url": "https://github.com/joshuayoes/ios-simulator-mcp"
-    },
-    {
-      "name": "@dynatrace-oss/dynatrace-mcp-server",
-      "category": "observability",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MIT",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @dynatrace-oss/dynatrace-mcp-server",
-      "source_url": "https://github.com/dynatrace-oss/dynatrace-mcp"
-    },
-    {
-      "name": "datadog-mcp",
-      "category": "observability",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "Apache-2.0",
-      "health_score": 105,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @winor30/mcp-server-datadog",
-      "source_url": "https://github.com/winor30/mcp-server-datadog"
+      "source_url": "https://github.com/joshuayoes/ios-simulator-mcp",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "sentry-mcp",
@@ -484,7 +557,35 @@
       "health_score": 95,
       "est_tools_count": 18,
       "install_cmd": "npx -y @sentry/mcp-server@0.33.0",
-      "source_url": "https://github.com/getsentry/sentry-mcp"
+      "source_url": "https://github.com/getsentry/sentry-mcp",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@dynatrace-oss/dynatrace-mcp-server",
+      "category": "observability",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "MIT",
+      "health_score": 80,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @dynatrace-oss/dynatrace-mcp-server",
+      "source_url": "https://github.com/dynatrace-oss/dynatrace-mcp",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "datadog-mcp",
+      "category": "observability",
+      "classification": "Experimental",
+      "trust": "verified",
+      "license": "Apache-2.0",
+      "health_score": 60,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @winor30/mcp-server-datadog",
+      "source_url": "https://github.com/winor30/mcp-server-datadog",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "prometheus-mcp",
@@ -492,21 +593,12 @@
       "classification": "Experimental",
       "trust": "verified",
       "license": "MIT",
-      "health_score": 60,
+      "health_score": 44.47,
       "est_tools_count": null,
       "install_cmd": "npx -y prometheus-mcp",
-      "source_url": "https://github.com/idanfishman/prometheus-mcp"
-    },
-    {
-      "name": "@phantom/mcp-server",
-      "category": "payments",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MIT",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @phantom/mcp-server",
-      "source_url": "https://github.com/phantom/phantom-connect-sdk"
+      "source_url": "https://github.com/idanfishman/prometheus-mcp",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "stripe-agent-toolkit",
@@ -514,65 +606,90 @@
       "classification": "Core",
       "trust": "verified",
       "license": "MIT",
-      "health_score": 110,
+      "health_score": 105,
       "est_tools_count": 25,
       "install_cmd": "npx -y @stripe/mcp@0.3.3",
-      "source_url": "https://github.com/stripe/ai"
+      "source_url": "https://github.com/stripe/ai",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@phantom/mcp-server",
+      "category": "payments",
+      "classification": "Experimental",
+      "trust": "verified",
+      "license": "MIT",
+      "health_score": 50,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @phantom/mcp-server",
+      "source_url": "https://github.com/phantom/phantom-connect-sdk",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "@delorenj/mcp-server-trello",
       "category": "pm",
-      "classification": "Core",
+      "classification": "Recommended",
       "trust": "verified",
       "license": "MIT",
-      "health_score": 110,
+      "health_score": 80,
       "est_tools_count": null,
       "install_cmd": "npx -y @delorenj/mcp-server-trello",
-      "source_url": "https://github.com/delorenj/mcp-server-trello"
+      "source_url": "https://github.com/delorenj/mcp-server-trello",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "@mondaydotcomorg/monday-api-mcp",
       "category": "pm",
-      "classification": "Core",
+      "classification": "Recommended",
       "trust": "verified",
       "license": "MIT",
-      "health_score": 110,
+      "health_score": 80,
       "est_tools_count": null,
       "install_cmd": "npx -y @mondaydotcomorg/monday-api-mcp",
-      "source_url": "https://github.com/mondaycom/monday-ai"
-    },
-    {
-      "name": "@roychri/mcp-server-asana",
-      "category": "pm",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MIT",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @roychri/mcp-server-asana",
-      "source_url": "https://github.com/roychri/mcp-server-asana"
-    },
-    {
-      "name": "todoist-mcp",
-      "category": "pm",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MIT",
-      "health_score": 108.1,
-      "est_tools_count": null,
-      "install_cmd": "npx -y todoist-mcp",
-      "source_url": "https://github.com/stanislavlysenko0912/todoist-mcp-server"
+      "source_url": "https://github.com/mondaycom/monday-ai",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "@taazkareem/clickup-mcp-server",
       "category": "pm",
-      "classification": "Core",
+      "classification": "Recommended",
       "trust": "verified",
       "license": "NOASSERTION",
-      "health_score": 96,
+      "health_score": 66.99,
       "est_tools_count": null,
       "install_cmd": "npx -y @taazkareem/clickup-mcp-server",
-      "source_url": "https://github.com/taazkareem/clickup-mcp-server"
+      "source_url": "https://github.com/taazkareem/clickup-mcp-server",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@roychri/mcp-server-asana",
+      "category": "pm",
+      "classification": "Experimental",
+      "trust": "verified",
+      "license": "MIT",
+      "health_score": 60,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @roychri/mcp-server-asana",
+      "source_url": "https://github.com/roychri/mcp-server-asana",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "todoist-mcp",
+      "category": "pm",
+      "classification": "Experimental",
+      "trust": "verified",
+      "license": "MIT",
+      "health_score": 58.13,
+      "est_tools_count": null,
+      "install_cmd": "npx -y todoist-mcp",
+      "source_url": "https://github.com/stanislavlysenko0912/todoist-mcp-server",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "linear-mcp-server",
@@ -583,7 +700,9 @@
       "health_score": 40,
       "est_tools_count": 5,
       "install_cmd": "npx -y linear-mcp-server@0.1.0",
-      "source_url": "https://github.com/jerhadf/linear-mcp-server"
+      "source_url": "https://github.com/jerhadf/linear-mcp-server",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "mcp-server-sequentialthinking",
@@ -594,51 +713,22 @@
       "health_score": 105,
       "est_tools_count": 1,
       "install_cmd": "npx -y @modelcontextprotocol/server-sequential-thinking@2025.12.18",
-      "source_url": "https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking"
+      "source_url": "https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "@brave/brave-search-mcp-server",
       "category": "search",
-      "classification": "Core",
+      "classification": "Recommended",
       "trust": "verified",
       "license": "MIT",
-      "health_score": 110,
+      "health_score": 80,
       "est_tools_count": null,
       "install_cmd": "npx -y @brave/brave-search-mcp-server",
-      "source_url": "https://github.com/brave/brave-search-mcp-server"
-    },
-    {
-      "name": "obsidian-mcp-server",
-      "category": "search",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "Apache-2.0",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y obsidian-mcp-server",
-      "source_url": "https://github.com/cyanheads/obsidian-mcp-server"
-    },
-    {
-      "name": "clinicaltrialsgov-mcp-server",
-      "category": "search",
-      "classification": "Core",
-      "trust": "candidate",
-      "license": "Apache-2.0",
-      "health_score": 108.6,
-      "est_tools_count": null,
-      "install_cmd": "npx -y clinicaltrialsgov-mcp-server",
-      "source_url": "https://github.com/cyanheads/clinicaltrialsgov-mcp-server"
-    },
-    {
-      "name": "linkup-mcp-server",
-      "category": "search",
-      "classification": "Core",
-      "trust": "candidate",
-      "license": "MIT",
-      "health_score": 104.6,
-      "est_tools_count": null,
-      "install_cmd": "npx -y linkup-mcp-server",
-      "source_url": "https://github.com/LinkupPlatform/linkup-mcp-server"
+      "source_url": "https://github.com/brave/brave-search-mcp-server",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "duckduckgo-mcp-server",
@@ -649,7 +739,9 @@
       "health_score": 80,
       "est_tools_count": 2,
       "install_cmd": "uvx duckduckgo-mcp-server==0.4.0",
-      "source_url": "https://github.com/nickclyde/duckduckgo-mcp-server"
+      "source_url": "https://github.com/nickclyde/duckduckgo-mcp-server",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "exa-mcp-server",
@@ -660,7 +752,22 @@
       "health_score": 80,
       "est_tools_count": 5,
       "install_cmd": "npx -y exa-mcp-server@3.2.1",
-      "source_url": "https://github.com/exa-labs/exa-mcp-server"
+      "source_url": "https://github.com/exa-labs/exa-mcp-server",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "clinicaltrialsgov-mcp-server",
+      "category": "search",
+      "classification": "Recommended",
+      "trust": "candidate",
+      "license": "Apache-2.0",
+      "health_score": 79.24,
+      "est_tools_count": null,
+      "install_cmd": "npx -y clinicaltrialsgov-mcp-server",
+      "source_url": "https://github.com/cyanheads/clinicaltrialsgov-mcp-server",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "tavily-mcp",
@@ -668,10 +775,12 @@
       "classification": "Recommended",
       "trust": "verified",
       "license": "MIT",
-      "health_score": 80,
+      "health_score": 75,
       "est_tools_count": 2,
       "install_cmd": "npx -y tavily-mcp@0.2.19",
-      "source_url": "https://github.com/tavily-ai/tavily-mcp"
+      "source_url": "https://github.com/tavily-ai/tavily-mcp",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "brave-search-mcp",
@@ -682,392 +791,100 @@
       "health_score": 60,
       "est_tools_count": 3,
       "install_cmd": "npx -y brave-search-mcp@2.1.0",
-      "source_url": "https://github.com/mikechao/brave-search-mcp"
+      "source_url": "https://github.com/mikechao/brave-search-mcp",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "obsidian-mcp-server",
+      "category": "search",
+      "classification": "Experimental",
+      "trust": "verified",
+      "license": "Apache-2.0",
+      "health_score": 60,
+      "est_tools_count": null,
+      "install_cmd": "npx -y obsidian-mcp-server",
+      "source_url": "https://github.com/cyanheads/obsidian-mcp-server",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "linkup-mcp-server",
+      "category": "search",
+      "classification": "Experimental",
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 54.77,
+      "est_tools_count": null,
+      "install_cmd": "npx -y linkup-mcp-server",
+      "source_url": "https://github.com/LinkupPlatform/linkup-mcp-server",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "kafka-mcp-server",
       "category": "streaming",
-      "classification": "Recommended",
+      "classification": "Experimental",
       "trust": "verified",
       "license": "MIT",
-      "health_score": 65,
+      "health_score": 47.32,
       "est_tools_count": null,
       "install_cmd": "docker run -i --rm --cap-drop ALL --security-opt no-new-privileges ghcr.io/tuannvm/kafka-mcp-server@sha256:3ac9f77f81933b2be290fefc3d6e069f74751a4ac5c17ce1d0ab120f196ca9ac",
-      "source_url": "https://github.com/tuannvm/kafka-mcp-server"
+      "source_url": "https://github.com/tuannvm/kafka-mcp-server",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "@eslint/mcp",
       "category": "testing",
-      "classification": "Core",
+      "classification": "Recommended",
       "trust": "verified",
       "license": "Apache-2.0",
-      "health_score": 110,
+      "health_score": 80,
       "est_tools_count": null,
       "install_cmd": "npx -y @eslint/mcp",
-      "source_url": "https://github.com/eslint/rewrite"
+      "source_url": "https://github.com/eslint/rewrite",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "@postman/postman-mcp-server",
       "category": "testing",
-      "classification": "Core",
+      "classification": "Recommended",
       "trust": "candidate",
       "license": "Apache-2.0",
-      "health_score": 110,
+      "health_score": 80,
       "est_tools_count": null,
       "install_cmd": "npx -y @postman/postman-mcp-server",
-      "source_url": "https://github.com/postmanlabs/postman-mcp-server"
+      "source_url": "https://github.com/postmanlabs/postman-mcp-server",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "@qase/mcp-server",
       "category": "testing",
-      "classification": "Core",
+      "classification": "Recommended",
       "trust": "candidate",
       "license": "MIT",
-      "health_score": 104.8,
+      "health_score": 75.05,
       "est_tools_count": null,
       "install_cmd": "npx -y @qase/mcp-server",
-      "source_url": "https://github.com/qase-tms/qase-mcp-server"
+      "source_url": "https://github.com/qase-tms/qase-mcp-server",
+      "evidence": null,
+      "smoke": null
     },
     {
-      "name": "@bitwarden/mcp-server",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "candidate",
-      "license": "GPL-3.0",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @bitwarden/mcp-server",
-      "source_url": "https://github.com/bitwarden/mcp-server"
-    },
-    {
-      "name": "@drawio/mcp",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "candidate",
-      "license": "Apache-2.0",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @drawio/mcp",
-      "source_url": "https://github.com/jgraph/drawio-mcp"
-    },
-    {
-      "name": "@instantdb/mcp",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "Apache-2.0",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @instantdb/mcp",
-      "source_url": "https://github.com/instantdb/instant"
-    },
-    {
-      "name": "@knip/mcp",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "ISC",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @knip/mcp",
-      "source_url": "https://github.com/webpro-nl/knip"
-    },
-    {
-      "name": "@pandacss/mcp",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MIT",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @pandacss/mcp",
-      "source_url": "https://github.com/chakra-ui/panda"
-    },
-    {
-      "name": "@regle/mcp-server",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MIT",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @regle/mcp-server",
-      "source_url": "https://github.com/victorgarciaesgi/regle"
-    },
-    {
-      "name": "@socketsecurity/mcp",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MIT",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @socketsecurity/mcp",
-      "source_url": "https://github.com/SocketDev/socket-mcp"
-    },
-    {
-      "name": "@softeria/ms-365-mcp-server",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MIT",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @softeria/ms-365-mcp-server",
-      "source_url": "https://github.com/softeria/ms-365-mcp-server"
-    },
-    {
-      "name": "@vibeframe/mcp-server",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MIT",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @vibeframe/mcp-server",
-      "source_url": "https://github.com/vericontext/vibeframe"
-    },
-    {
-      "name": "@voltagent/mcp-server",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MIT",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @voltagent/mcp-server",
-      "source_url": "https://github.com/VoltAgent/voltagent"
-    },
-    {
-      "name": "argocd-mcp",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "Apache-2.0",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y argocd-mcp",
-      "source_url": "https://github.com/argoproj-labs/mcp-for-argocd"
-    },
-    {
-      "name": "deepl-mcp-server",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MIT",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y deepl-mcp-server",
-      "source_url": "https://github.com/DeepLcom/deepl-mcp-server"
-    },
-    {
-      "name": "godot-mcp-server",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MIT",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y godot-mcp-server",
-      "source_url": "https://github.com/tomyud1/godot-mcp"
-    },
-    {
-      "name": "mcp-searxng",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MIT",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y mcp-searxng",
-      "source_url": "https://github.com/ihor-sokoliuk/mcp-searxng"
-    },
-    {
-      "name": "openapi-mcp-generator",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MIT",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y openapi-mcp-generator",
-      "source_url": "https://github.com/harsha-iiiv/openapi-mcp-generator"
-    },
-    {
-      "name": "@cap-js/mcp-server",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "Apache-2.0",
-      "health_score": 109.9,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @cap-js/mcp-server",
-      "source_url": "https://github.com/cap-js/mcp-server"
-    },
-    {
-      "name": "hostinger-api-mcp",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MIT",
-      "health_score": 109.6,
-      "est_tools_count": null,
-      "install_cmd": "npx -y hostinger-api-mcp",
-      "source_url": "https://github.com/hostinger/api-mcp-server"
-    },
-    {
-      "name": "@alchemy/mcp-server",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MIT",
-      "health_score": 109.3,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @alchemy/mcp-server",
-      "source_url": "https://github.com/alchemyplatform/alchemy-mcp-server"
-    },
-    {
-      "name": "@translated/lara-mcp",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MIT",
-      "health_score": 109.3,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @translated/lara-mcp",
-      "source_url": "https://github.com/translated/lara-mcp"
-    },
-    {
-      "name": "@ui5/mcp-server",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "candidate",
-      "license": "Apache-2.0",
-      "health_score": 109.3,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @ui5/mcp-server",
-      "source_url": "https://github.com/UI5/mcp-server"
-    },
-    {
-      "name": "@heroku/mcp-server",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "candidate",
-      "license": "Apache-2.0",
-      "health_score": 108.9,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @heroku/mcp-server",
-      "source_url": "https://github.com/heroku/heroku-mcp-server"
-    },
-    {
-      "name": "@transloadit/mcp-server",
+      "name": "touchdesigner-mcp-server",
       "category": "utility",
       "classification": "Core",
       "trust": "candidate",
       "license": "MIT",
-      "health_score": 108.6,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @transloadit/mcp-server",
-      "source_url": "https://github.com/transloadit/node-sdk"
-    },
-    {
-      "name": "@tocharianou/mcp-server-kibana",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "Apache-2.0",
-      "health_score": 108.1,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @tocharianou/mcp-server-kibana",
-      "source_url": "https://github.com/TocharianOU/mcp-server-kibana"
-    },
-    {
-      "name": "@esaio/esa-mcp-server",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MIT",
-      "health_score": 107.3,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @esaio/esa-mcp-server",
-      "source_url": "https://github.com/esaio/esa-mcp-server"
-    },
-    {
-      "name": "@upstash/mcp-server",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MIT",
-      "health_score": 107.3,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @upstash/mcp-server",
-      "source_url": "https://github.com/upstash/mcp-server"
-    },
-    {
-      "name": "@renseiai/agentfactory-mcp-server",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MIT",
-      "health_score": 107.2,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @renseiai/agentfactory-mcp-server",
-      "source_url": "https://github.com/RenseiAI/agentfactory"
-    },
-    {
-      "name": "@vapi-ai/mcp-server",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MIT",
-      "health_score": 107,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @vapi-ai/mcp-server",
-      "source_url": "https://github.com/VapiAI/mcp-server"
-    },
-    {
-      "name": "@kintone/mcp-server",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "Apache-2.0",
-      "health_score": 106.4,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @kintone/mcp-server",
-      "source_url": "https://github.com/kintone/mcp-server"
-    },
-    {
-      "name": "@contextlint/mcp-server",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "Apache-2.0",
-      "health_score": 105.2,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @contextlint/mcp-server",
-      "source_url": "https://github.com/nozomi-koborinai/contextlint"
-    },
-    {
-      "name": "@penpot/mcp",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MPL-2.0",
-      "health_score": 105,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @penpot/mcp",
-      "source_url": "https://github.com/penpot/penpot"
-    },
-    {
-      "name": "@sap-ux/fiori-mcp-server",
-      "category": "utility",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "Apache-2.0",
-      "health_score": 105,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @sap-ux/fiori-mcp-server",
-      "source_url": "https://github.com/SAP/open-ux-tools"
+      "health_score": 110,
+      "est_tools_count": 13,
+      "install_cmd": "npx -y touchdesigner-mcp-server@1.4.10",
+      "source_url": "https://github.com/8beeeaaat/touchdesigner-mcp",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "mcp-server-time",
@@ -1078,95 +895,490 @@
       "health_score": 105,
       "est_tools_count": 2,
       "install_cmd": "uvx mcp-server-time==2026.1.26",
-      "source_url": "https://github.com/modelcontextprotocol/servers/tree/main/src/time"
+      "source_url": "https://github.com/modelcontextprotocol/servers/tree/main/src/time",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@bitwarden/mcp-server",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "candidate",
+      "license": "GPL-3.0",
+      "health_score": 80,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @bitwarden/mcp-server",
+      "source_url": "https://github.com/bitwarden/mcp-server",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@cap-js/mcp-server",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "Apache-2.0",
+      "health_score": 80,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @cap-js/mcp-server",
+      "source_url": "https://github.com/cap-js/mcp-server",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@drawio/mcp",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "candidate",
+      "license": "Apache-2.0",
+      "health_score": 80,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @drawio/mcp",
+      "source_url": "https://github.com/jgraph/drawio-mcp",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@instantdb/mcp",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "Apache-2.0",
+      "health_score": 80,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @instantdb/mcp",
+      "source_url": "https://github.com/instantdb/instant",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@knip/mcp",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "ISC",
+      "health_score": 80,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @knip/mcp",
+      "source_url": "https://github.com/webpro-nl/knip",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@pandacss/mcp",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "MIT",
+      "health_score": 80,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @pandacss/mcp",
+      "source_url": "https://github.com/chakra-ui/panda",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@regle/mcp-server",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "MIT",
+      "health_score": 80,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @regle/mcp-server",
+      "source_url": "https://github.com/victorgarciaesgi/regle",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@socketsecurity/mcp",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "MIT",
+      "health_score": 80,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @socketsecurity/mcp",
+      "source_url": "https://github.com/SocketDev/socket-mcp",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@softeria/ms-365-mcp-server",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "MIT",
+      "health_score": 80,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @softeria/ms-365-mcp-server",
+      "source_url": "https://github.com/softeria/ms-365-mcp-server",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@vibeframe/mcp-server",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "MIT",
+      "health_score": 80,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @vibeframe/mcp-server",
+      "source_url": "https://github.com/vericontext/vibeframe",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "deepl-mcp-server",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "MIT",
+      "health_score": 80,
+      "est_tools_count": null,
+      "install_cmd": "npx -y deepl-mcp-server",
+      "source_url": "https://github.com/DeepLcom/deepl-mcp-server",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "hostinger-api-mcp",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "MIT",
+      "health_score": 80,
+      "est_tools_count": null,
+      "install_cmd": "npx -y hostinger-api-mcp",
+      "source_url": "https://github.com/hostinger/api-mcp-server",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "mcp-searxng",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "MIT",
+      "health_score": 80,
+      "est_tools_count": null,
+      "install_cmd": "npx -y mcp-searxng",
+      "source_url": "https://github.com/ihor-sokoliuk/mcp-searxng",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@ui5/mcp-server",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "candidate",
+      "license": "Apache-2.0",
+      "health_score": 79.82,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @ui5/mcp-server",
+      "source_url": "https://github.com/UI5/mcp-server",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@heroku/mcp-server",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "candidate",
+      "license": "Apache-2.0",
+      "health_score": 79.08,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @heroku/mcp-server",
+      "source_url": "https://github.com/heroku/heroku-mcp-server",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@tocharianou/mcp-server-kibana",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "Apache-2.0",
+      "health_score": 78.86,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @tocharianou/mcp-server-kibana",
+      "source_url": "https://github.com/TocharianOU/mcp-server-kibana",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@transloadit/mcp-server",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "candidate",
+      "license": "MIT",
+      "health_score": 78.69,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @transloadit/mcp-server",
+      "source_url": "https://github.com/transloadit/node-sdk",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@esaio/esa-mcp-server",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "MIT",
+      "health_score": 77.92,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @esaio/esa-mcp-server",
+      "source_url": "https://github.com/esaio/esa-mcp-server",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@renseiai/agentfactory-mcp-server",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "MIT",
+      "health_score": 77.85,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @renseiai/agentfactory-mcp-server",
+      "source_url": "https://github.com/RenseiAI/agentfactory",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@upstash/mcp-server",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "MIT",
+      "health_score": 77.56,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @upstash/mcp-server",
+      "source_url": "https://github.com/upstash/mcp-server",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@kintone/mcp-server",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "Apache-2.0",
+      "health_score": 77.24,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @kintone/mcp-server",
+      "source_url": "https://github.com/kintone/mcp-server",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@contextlint/mcp-server",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "Apache-2.0",
+      "health_score": 76.23,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @contextlint/mcp-server",
+      "source_url": "https://github.com/nozomi-koborinai/contextlint",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "@tankpkg/mcp-server",
       "category": "utility",
-      "classification": "Core",
+      "classification": "Recommended",
       "trust": "verified",
       "license": "MIT",
-      "health_score": 104.6,
+      "health_score": 75.68,
       "est_tools_count": null,
       "install_cmd": "npx -y @tankpkg/mcp-server",
-      "source_url": "https://github.com/tankpkg/tank"
+      "source_url": "https://github.com/tankpkg/tank",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@penpot/mcp",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "MPL-2.0",
+      "health_score": 75,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @penpot/mcp",
+      "source_url": "https://github.com/penpot/penpot",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@sap-ux/fiori-mcp-server",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "Apache-2.0",
+      "health_score": 75,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @sap-ux/fiori-mcp-server",
+      "source_url": "https://github.com/SAP/open-ux-tools",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@voltagent/mcp-server",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "MIT",
+      "health_score": 75,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @voltagent/mcp-server",
+      "source_url": "https://github.com/VoltAgent/voltagent",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "argocd-mcp",
+      "category": "utility",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "Apache-2.0",
+      "health_score": 75,
+      "est_tools_count": null,
+      "install_cmd": "npx -y argocd-mcp",
+      "source_url": "https://github.com/argoproj-labs/mcp-for-argocd",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "@growthbook/mcp",
       "category": "utility",
-      "classification": "Core",
+      "classification": "Recommended",
       "trust": "verified",
       "license": "MIT",
-      "health_score": 103.6,
+      "health_score": 73.98,
       "est_tools_count": null,
       "install_cmd": "npx -y @growthbook/mcp",
-      "source_url": "https://github.com/growthbook/growthbook-mcp"
+      "source_url": "https://github.com/growthbook/growthbook-mcp",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "@currents/mcp",
       "category": "utility",
-      "classification": "Core",
+      "classification": "Recommended",
       "trust": "verified",
       "license": "Apache-2.0",
-      "health_score": 102.3,
+      "health_score": 73.01,
       "est_tools_count": null,
       "install_cmd": "npx -y @currents/mcp",
-      "source_url": "https://github.com/currents-dev/currents-mcp"
+      "source_url": "https://github.com/currents-dev/currents-mcp",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "@memberjunction/ai-mcp-server",
       "category": "utility",
-      "classification": "Core",
+      "classification": "Recommended",
       "trust": "verified",
       "license": "ISC",
-      "health_score": 98.4,
+      "health_score": 69.62,
       "est_tools_count": null,
       "install_cmd": "npx -y @memberjunction/ai-mcp-server",
-      "source_url": "https://github.com/MemberJunction/MJ"
+      "source_url": "https://github.com/MemberJunction/MJ",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "@skillsmith/mcp-server",
       "category": "utility",
-      "classification": "Core",
+      "classification": "Recommended",
       "trust": "verified",
       "license": "NOASSERTION",
-      "health_score": 97.5,
+      "health_score": 68.75,
       "est_tools_count": null,
       "install_cmd": "npx -y @skillsmith/mcp-server",
-      "source_url": "https://github.com/smith-horn/skillsmith"
+      "source_url": "https://github.com/smith-horn/skillsmith",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "@theia/ai-mcp-server",
       "category": "utility",
-      "classification": "Core",
+      "classification": "Recommended",
       "trust": "verified",
       "license": "EPL-2.0",
-      "health_score": 95,
+      "health_score": 65,
       "est_tools_count": null,
       "install_cmd": "npx -y @theia/ai-mcp-server",
-      "source_url": "https://github.com/eclipse-theia/theia"
+      "source_url": "https://github.com/eclipse-theia/theia",
+      "evidence": null,
+      "smoke": null
     },
     {
-      "name": "@cyanheads/git-mcp-server",
-      "category": "vcs",
-      "classification": "Core",
-      "trust": "candidate",
-      "license": "Apache-2.0",
-      "health_score": 110,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @cyanheads/git-mcp-server",
-      "source_url": "https://github.com/cyanheads/git-mcp-server"
-    },
-    {
-      "name": "@yoda.digital/gitlab-mcp-server",
-      "category": "vcs",
-      "classification": "Core",
+      "name": "openapi-mcp-generator",
+      "category": "utility",
+      "classification": "Experimental",
       "trust": "verified",
       "license": "MIT",
-      "health_score": 107.1,
+      "health_score": 60,
       "est_tools_count": null,
-      "install_cmd": "npx -y @yoda.digital/gitlab-mcp-server",
-      "source_url": "https://github.com/yoda-digital/mcp-gitlab-server"
+      "install_cmd": "npx -y openapi-mcp-generator",
+      "source_url": "https://github.com/harsha-iiiv/openapi-mcp-generator",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@translated/lara-mcp",
+      "category": "utility",
+      "classification": "Experimental",
+      "trust": "verified",
+      "license": "MIT",
+      "health_score": 59.78,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @translated/lara-mcp",
+      "source_url": "https://github.com/translated/lara-mcp",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@alchemy/mcp-server",
+      "category": "utility",
+      "classification": "Experimental",
+      "trust": "verified",
+      "license": "MIT",
+      "health_score": 59.49,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @alchemy/mcp-server",
+      "source_url": "https://github.com/alchemyplatform/alchemy-mcp-server",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@vapi-ai/mcp-server",
+      "category": "utility",
+      "classification": "Experimental",
+      "trust": "verified",
+      "license": "MIT",
+      "health_score": 57.56,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @vapi-ai/mcp-server",
+      "source_url": "https://github.com/VapiAI/mcp-server",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "godot-mcp-server",
+      "category": "utility",
+      "classification": "Experimental",
+      "trust": "verified",
+      "license": "MIT",
+      "health_score": 50,
+      "est_tools_count": null,
+      "install_cmd": "npx -y godot-mcp-server",
+      "source_url": "https://github.com/tomyud1/godot-mcp",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "github-mcp-server",
@@ -1177,7 +1389,9 @@
       "health_score": 105,
       "est_tools_count": 100,
       "install_cmd": "docker run -i --rm --cap-drop ALL --security-opt no-new-privileges -e GITHUB_PERSONAL_ACCESS_TOKEN ghcr.io/github/github-mcp-server@sha256:2ac27ef03461ef2b877031b838a7d1fd7f12b12d4ace7796d8cad91446d55959",
-      "source_url": "https://github.com/github/github-mcp-server"
+      "source_url": "https://github.com/github/github-mcp-server",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "mcp-server-git",
@@ -1188,18 +1402,22 @@
       "health_score": 105,
       "est_tools_count": 9,
       "install_cmd": "uvx mcp-server-git==2026.1.14",
-      "source_url": "https://github.com/modelcontextprotocol/servers/tree/main/src/git"
+      "source_url": "https://github.com/modelcontextprotocol/servers/tree/main/src/git",
+      "evidence": null,
+      "smoke": null
     },
     {
-      "name": "@nexus2520/bitbucket-mcp-server",
+      "name": "@cyanheads/git-mcp-server",
       "category": "vcs",
-      "classification": "Core",
-      "trust": "verified",
-      "license": "MIT",
-      "health_score": 103.2,
+      "classification": "Recommended",
+      "trust": "candidate",
+      "license": "Apache-2.0",
+      "health_score": 80,
       "est_tools_count": null,
-      "install_cmd": "npx -y @nexus2520/bitbucket-mcp-server",
-      "source_url": "https://github.com/pdogra1299/bitbucket-mcp-server"
+      "install_cmd": "npx -y @cyanheads/git-mcp-server",
+      "source_url": "https://github.com/cyanheads/git-mcp-server",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "gitlab-mcp",
@@ -1210,7 +1428,35 @@
       "health_score": 80,
       "est_tools_count": 153,
       "install_cmd": "npx -y @zereight/mcp-gitlab@2.1.10",
-      "source_url": "https://github.com/zereight/gitlab-mcp"
+      "source_url": "https://github.com/zereight/gitlab-mcp",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@yoda.digital/gitlab-mcp-server",
+      "category": "vcs",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "MIT",
+      "health_score": 77.92,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @yoda.digital/gitlab-mcp-server",
+      "source_url": "https://github.com/yoda-digital/mcp-gitlab-server",
+      "evidence": null,
+      "smoke": null
+    },
+    {
+      "name": "@nexus2520/bitbucket-mcp-server",
+      "category": "vcs",
+      "classification": "Recommended",
+      "trust": "verified",
+      "license": "MIT",
+      "health_score": 73.98,
+      "est_tools_count": null,
+      "install_cmd": "npx -y @nexus2520/bitbucket-mcp-server",
+      "source_url": "https://github.com/pdogra1299/bitbucket-mcp-server",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "actors-mcp-server",
@@ -1221,7 +1467,9 @@
       "health_score": 75,
       "est_tools_count": 21,
       "install_cmd": "npx -y @apify/actors-mcp-server@0.10.1",
-      "source_url": "https://github.com/apify/apify-mcp-server"
+      "source_url": "https://github.com/apify/apify-mcp-server",
+      "evidence": null,
+      "smoke": null
     },
     {
       "name": "firecrawl-mcp-server",
@@ -1232,7 +1480,9 @@
       "health_score": 75,
       "est_tools_count": 6,
       "install_cmd": "npx -y firecrawl-mcp@3.15.0",
-      "source_url": "https://github.com/firecrawl/firecrawl-mcp-server"
+      "source_url": "https://github.com/firecrawl/firecrawl-mcp-server",
+      "evidence": null,
+      "smoke": null
     }
   ]
 }

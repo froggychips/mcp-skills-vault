@@ -150,8 +150,11 @@ test('pypiClassifierToSpdx: known mappings + passthrough tail', () => {
   assert.equal(drift.pypiClassifierToSpdx('License :: OSI Approved :: MIT License'),                'MIT');
   assert.equal(drift.pypiClassifierToSpdx('License :: OSI Approved :: Apache Software License'),   'Apache-2.0');
   assert.equal(drift.pypiClassifierToSpdx('License :: OSI Approved :: BSD License'),               'BSD-3-Clause');
-  // Other/Proprietary → null (we treat as unknown so it can't masquerade as a real license)
-  assert.equal(drift.pypiClassifierToSpdx('License :: Other/Proprietary License'),                 null);
+  // Other/Proprietary is not an SPDX id, but it is a definite statement: not
+  // open source. 'Proprietary' classifies as restrictive, so an MIT → proprietary
+  // move becomes drift-osi-to-restrictive and fails --strict. As null it used to
+  // be drift-to-unknown, which --strict lets through.
+  assert.equal(drift.pypiClassifierToSpdx('License :: Other/Proprietary License'),                 'Proprietary');
   // Unknown tail — passed through. (Free-form strings still allow equality comparison.)
   assert.equal(drift.pypiClassifierToSpdx('License :: OSI Approved :: Some Future License'),       'Some Future License');
   assert.equal(drift.pypiClassifierToSpdx('not a license string'),                                  null);
@@ -232,4 +235,28 @@ test('runDriftCheck: a thrown fetcher exception becomes an error, not a crash', 
   assert.equal(report.errors.length, 1);
   assert.equal(report.errors[0].error, 'boom');
   assert.equal(report.drifts.length, 0);
+});
+
+test('MIT → Other/Proprietary is a hard --strict failure', () => {
+  const spdx = drift.pypiClassifierToSpdx('License :: Other/Proprietary License');
+  const kind = drift.diffLicense('MIT', spdx);
+  assert.equal(kind, 'drift-osi-to-restrictive');
+  assert.equal(drift.isHardFail(kind), true);
+});
+
+test('licenseExitCode: --strict fails on fetch errors, not just on drift', () => {
+  const clean   = { drifts: [], errors: [] };
+  const errored = { drifts: [], errors: [{ name: 'x', error: 'npm view failed' }] };
+  const drifted = { drifts: [{ classification: 'drift-osi-to-restrictive' }], errors: [] };
+  const soft    = { drifts: [{ classification: 'drift-to-unknown' }], errors: [] };
+
+  assert.equal(drift.licenseExitCode(clean,   true),  0);
+  assert.equal(drift.licenseExitCode(drifted, true),  1);
+  // The hole: every feed unreachable used to exit 0, so the weekly gate went
+  // green having checked nothing.
+  assert.equal(drift.licenseExitCode(errored, true),  1);
+  assert.equal(drift.licenseExitCode(soft,    true),  0);
+  // Without --strict nothing fails — the report is the output.
+  assert.equal(drift.licenseExitCode(errored, false), 0);
+  assert.equal(drift.licenseExitCode(drifted, false), 0);
 });

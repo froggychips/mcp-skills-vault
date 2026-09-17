@@ -19,7 +19,7 @@
 
 'use strict';
 
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const fs   = require('fs');
 const path = require('path');
 const { writeDb } = require('./lib/db_io.cjs');
@@ -50,7 +50,8 @@ function normalizeLicense(githubSpdx, fallback) {
 
 function ghApi(endpoint) {
   try {
-    return JSON.parse(execSync(`gh api "${endpoint}"`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }));
+    // argv form: `endpoint` is built from DB-supplied source_url values.
+    return JSON.parse(execFileSync('gh', ['api', endpoint], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }));
   } catch {
     return null;
   }
@@ -58,8 +59,12 @@ function ghApi(endpoint) {
 
 function calcScore(stars, days, inRegistry, hasInstall, critIssues, license) {
   try {
-    const out = execSync(
-      `node "${CALC}" ${stars} ${days} ${inRegistry} ${hasInstall} ${critIssues} ${license || ''}`,
+    // argv form: `license` arrives from the GitHub API / the DB and went into a
+    // shell command line unquoted — "MIT OR Apache-2.0" alone split into three
+    // arguments, and anything with a `$(…)` in it would have been executed.
+    const out = execFileSync(
+      process.execPath,
+      [CALC, stars, days, inRegistry, hasInstall, critIssues, license || ''].map(String),
       { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
     );
     return JSON.parse(out);
@@ -94,7 +99,7 @@ function main({ write, today } = {}) {
   // `rate_limit` is readable by user and installation tokens alike and costs
   // nothing against the limit it reports.
   try {
-    execSync('gh api rate_limit', { stdio: 'pipe' });
+    execFileSync('gh', ['api', 'rate_limit'], { stdio: 'pipe' });
   } catch {
     console.error('gh CLI not found, or its token cannot reach the GitHub API.');
     console.error('Locally: gh auth login. In CI: pass GITHUB_TOKEN to the job.');

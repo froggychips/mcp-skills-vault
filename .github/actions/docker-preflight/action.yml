@@ -1,0 +1,44 @@
+name: Docker preflight
+description: >
+  Find a reachable container runtime and export DOCKER_HOST for the rest of the
+  job. A launchd-spawned self-hosted runner does not inherit the user's docker
+  context, so the CLI falls back to /var/run/docker.sock and reports the engine
+  as missing while it is running one path away.
+
+  GITHUB_ENV only reaches later steps of the *same* job, so every job that needs
+  docker runs this — which is why it is an action rather than a step copied into
+  one job and forgotten in the others.
+
+inputs:
+  required:
+    description: >
+      Fail the job when no runtime answers. Jobs that isolate untrusted code set
+      this: with no container there is no isolation, and the only honest outcome
+      is to check nothing.
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        REQUIRED: ${{ inputs.required }}
+      run: |
+        set -uo pipefail
+        if docker info >/dev/null 2>&1; then
+          echo "docker is reachable with the ambient configuration"
+          exit 0
+        fi
+        for sock in "$HOME/.rd/docker.sock" "$HOME/.docker/run/docker.sock" "/var/run/docker.sock"; do
+          if [ -S "$sock" ] && DOCKER_HOST="unix://$sock" docker info >/dev/null 2>&1; then
+            echo "DOCKER_HOST=unix://$sock" >> "$GITHUB_ENV"
+            echo "docker reachable at $sock"
+            exit 0
+          fi
+        done
+        if [ "$REQUIRED" = "true" ]; then
+          echo "::error::No container runtime is reachable, so untrusted code cannot be isolated. This job checks nothing rather than running it on the host." >&2
+          exit 1
+        fi
+        echo "::warning::No container runtime is reachable; steps that need one will fail."

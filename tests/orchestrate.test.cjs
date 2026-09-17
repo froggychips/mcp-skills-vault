@@ -319,3 +319,206 @@ test('detectStack: SEQ_API_KEY env-key adds seq signal + observability category'
   assert.ok(stack.infra.has('seq'), `infra=${[...stack.infra]}`);
   assert.ok(stack.cats.has('observability'));
 });
+
+// ── pinInstallCmd ───────────────────────────────────────────────────────────
+// The gate hashes `pkg@version` from the DB; .mcp.json must launch that exact
+// artifact. Most DB entries store the command unpinned, so `npx -y pkg` in a
+// config resolved `latest` at every server start — a different tarball than the
+// one whose sha512 was compared.
+
+test('pinInstallCmd: npm entry gets the DB version pinned in', () => {
+  const r = o.pinInstallCmd('npx -y @mapbox/mcp-server', '0.11.0');
+  assert.equal(r.pinned, true);
+  assert.deepEqual(r.parts, ['npx', '-y', '@mapbox/mcp-server@0.11.0']);
+});
+
+test('pinInstallCmd: a matching pin is left alone', () => {
+  const r = o.pinInstallCmd('npx -y @scope/pkg@1.2.3', '1.2.3');
+  assert.equal(r.pinned, true);
+  assert.deepEqual(r.parts, ['npx', '-y', '@scope/pkg@1.2.3']);
+});
+
+test('pinInstallCmd: a pin the gate did not verify is rewritten, not trusted', () => {
+  // `@latest`, a range, or a stale pin all launch something other than the
+  // artifact whose hash was compared. Carrying *a* specifier is not enough.
+  for (const spec of ['@latest', '@^1.2', '@~1', '@1.0.0', '']) {
+    const r = o.pinInstallCmd(`npx -y pkg${spec}`, '1.2.3');
+    assert.equal(r.pinned, true, spec);
+    assert.deepEqual(r.parts, ['npx', '-y', 'pkg@1.2.3'], spec);
+  }
+  assert.deepEqual(o.pinInstallCmd('uvx pkg==2.0.0', '1.2.3').parts, ['uvx', 'pkg==1.2.3']);
+});
+
+test('pinInstallCmd: a range is not a pin, whatever it looks like', () => {
+  // `1`, `1.2` and `1.x` all used to pass as "exact", so the pinner produced
+  // `pkg@1.x` and called the entry pinned.
+  for (const version of ['^1.2.0', '~1.2', '1.x', '1', '1.2', 'latest', '*']) {
+    const r = o.pinInstallCmd('npx -y pkg', version);
+    assert.equal(r.pinned, false, version);
+    assert.match(r.reason, /not an exact semver version/, version);
+  }
+  for (const version of ['1.2.3', '1.0.0-rc.1', '1.0.0+build.5']) {
+    assert.equal(o.pinInstallCmd('npx -y pkg', version).pinned, true, version);
+  }
+});
+
+test('pinInstallCmd: PyPI versions follow PEP 440, not semver', () => {
+  // The DB legitimately carries dates-as-versions for PyPI entries.
+  for (const version of ['2026.1.14', '1.0', '1.0.0', '1.0+local', '2.0rc1', '1.0.post1']) {
+    assert.equal(o.pinInstallCmd('uvx pkg', version).pinned, true, version);
+  }
+  for (const version of ['1.*', '>=1.0', 'latest']) {
+    assert.equal(o.pinInstallCmd('uvx pkg', version).pinned, false, version);
+  }
+});
+
+test('isExactVersion: the two ecosystems have different rules', () => {
+  assert.equal(o.isExactVersion('npx', '1.2'), false);      // npm wants three components
+  assert.equal(o.isExactVersion('uvx', '1.2'), true);       // PyPI does not
+  assert.equal(o.isExactVersion('npx', null), false);
+  assert.equal(o.isExactVersion('uvx', ''), false);
+});
+
+test('pinInstallCmd: refuses commands the gate itself cannot parse', () => {
+  // Flags before the package name: the old parser pinned "--cache" and the
+  // gate checked a package that does not exist.
+  for (const cmd of ['npx -y --cache /tmp/c pkg', 'npx -y --package pkg server']) {
+    const r = o.pinInstallCmd(cmd, '1.2.3');
+    assert.equal(r.pinned, false, cmd);
+    assert.match(r.reason, /not a plain `npx -y <pkg>` command/);
+  }
+  for (const cmd of ['uvx --with extra server', 'uvx --from git+https://x/y z']) {
+    const r = o.pinInstallCmd(cmd, '1.2.3');
+    assert.equal(r.pinned, false, cmd);
+    assert.match(r.reason, /not a plain `uvx <pkg>` command/);
+  }
+});
+
+test('pinInstallCmd: a digest in some other argument is not a pin on the image', () => {
+  const digest = 'a'.repeat(64);
+  const r = o.pinInstallCmd(`docker run -e REF=img@sha256:${digest} img:latest`, null);
+  assert.equal(r.pinned, false);
+  assert.match(r.reason, /img:latest is not pinned/);
+  // …while a value-taking flag before the image is handled.
+  const ok = o.pinInstallCmd(`docker run --pull always ghcr.io/x/y@sha256:${digest}`, null);
+  assert.equal(ok.pinned, true);
+});
+
+test('pinInstallCmd: pins the package token, not trailing args', () => {
+  const r = o.pinInstallCmd('npx -y mcp-server-foo --toolsets repos,issues', '1.0.0');
+  assert.deepEqual(r.parts, ['npx', '-y', 'mcp-server-foo@1.0.0', '--toolsets', 'repos,issues']);
+});
+
+test('pinInstallCmd: uvx uses == for the PyPI pin', () => {
+  assert.deepEqual(
+    o.pinInstallCmd('uvx mcp-server-git', '2026.1.14').parts,
+    ['uvx', 'mcp-server-git==2026.1.14'],
+  );
+  assert.equal(o.pinInstallCmd('uvx mcp-server-git==2026.1.14', '9.9').pinned, true);
+});
+
+test('pinInstallCmd: docker is pinned by its digest, or not at all', () => {
+  const digest = 'a'.repeat(64);
+  assert.equal(o.pinInstallCmd(`docker run -i --rm ghcr.io/x/y@sha256:${digest}`, null).pinned, true);
+  const loose = o.pinInstallCmd('docker run -i --rm ghcr.io/x/y:latest', '1.0');
+  assert.equal(loose.pinned, false);
+  assert.match(loose.reason, /not pinned by @sha256/);
+});
+
+test('pinInstallCmd: unpinnable cases report why', () => {
+  assert.match(o.pinInstallCmd('npx -y @scope/pkg', null).reason, /no `version` in the DB entry/);
+  assert.match(o.pinInstallCmd('npx -y pkg@1.0.0', null).reason, /asks for "1.0.0".*no verified/s);
+  assert.match(o.pinInstallCmd('pipx run something', '1.0').reason, /unknown runner/);
+});
+
+test('pinInstallCmd: every npm/uvx entry in the shipped DB can be pinned', () => {
+  const db = require('../mcp-ecosystem-intelligence/assets/tools_database.json');
+  const unpinnable = db.tools
+    .filter(t => /^(npx|uvx)\s/.test(t.install_cmd || ''))
+    .map(t => ({ name: t.name, ...o.pinInstallCmd(t.install_cmd, t.version) }))
+    .filter(r => !r.pinned)
+    .map(r => `${r.name}: ${r.reason}`);
+  // Entries that can't be pinned are exactly the ones verify_integrity reports
+  // as UNVERIFIED (no version, or a --from source install). Keep the list small
+  // and visible rather than asserting zero.
+  assert.ok(unpinnable.length <= 2, `unpinnable entries grew:\n${unpinnable.join('\n')}`);
+});
+
+// ── signal provenance ──────────────────────────────────────────────────────
+
+test('detectStack: every signal says where it came from and how much it implies', () => {
+  const fs = require('node:fs'), os = require('node:os'), pathMod = require('node:path');
+  const dir = fs.mkdtempSync(pathMod.join(os.tmpdir(), 'mcp-signals-'));
+  // A declared dependency and a bare credential name are not the same claim.
+  fs.writeFileSync(pathMod.join(dir, 'package.json'), JSON.stringify({ dependencies: { pg: '^8' } }));
+  fs.writeFileSync(pathMod.join(dir, '.env.example'), 'AWS_ACCESS_KEY_ID=\nDATABASE_URL=\n');
+
+  const stack = o.detectStack(dir);
+  const byValue = Object.fromEntries(stack.signals.map(s => [s.value, s]));
+
+  assert.equal(byValue.postgres.kind, 'detected');
+  assert.equal(byValue.postgres.confidence, 0.95);
+  assert.deepEqual(byValue.postgres.sources, ['package.json dependency']);
+
+  // The env-derived one is weaker and marked as an inference.
+  const inferred = stack.signals.filter(s => s.kind === 'inferred');
+  assert.ok(inferred.length > 0, 'an .env key should produce an inferred signal');
+  assert.ok(inferred.every(s => s.confidence < byValue.postgres.confidence));
+
+  // The old shape still works for existing callers.
+  assert.ok(stack.dbs.has('postgres'));
+  assert.ok(stack.langs.has('Node'));
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('detectStack: two sources agreeing are recorded as both', () => {
+  const fs = require('node:fs'), os = require('node:os'), pathMod = require('node:path');
+  const dir = fs.mkdtempSync(pathMod.join(os.tmpdir(), 'mcp-signals-two-'));
+  fs.writeFileSync(pathMod.join(dir, 'package.json'), JSON.stringify({ dependencies: { redis: '^4' } }));
+  fs.writeFileSync(pathMod.join(dir, 'docker-compose.yml'), 'services:\n  cache:\n    image: redis:7\n');
+  const stack = o.detectStack(dir);
+  const redis = stack.signals.find(s => s.value === 'redis');
+  assert.equal(redis.sources.length, 2);
+  assert.equal(redis.confidence, 0.95);   // the stronger source wins
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('scan: evidence from a different version does not score the current one', () => {
+  // Bumping `version` while leaving trust_evidence in place otherwise carries
+  // the old release's verdict onto a version nothing has checked.
+  const stale = {
+    name: 'pkg', category: 'database', install_cmd: 'npx -y pkg@2.0.0', version: '2.0.0',
+    pkg_integrity: 'sha512-new', health_score: 80, est_tools_count: 5,
+    trust_evidence: {
+      artifact_id: 'npm:pkg@1.0.0',
+      dimensions: {
+        artifact:   { status: 'verified', checked_at: new Date().toISOString().slice(0, 10) },
+        advisories: { status: 'clean',    checked_at: new Date().toISOString().slice(0, 10) },
+        signature:  { status: 'verified', checked_at: new Date().toISOString().slice(0, 10) },
+      },
+    },
+  };
+  const out = o.slim(stale, { cats: new Set(['database']), dbs: new Set(), infra: new Set(), signals: [] });
+  assert.equal(out.scores.trust.gate, 'thin');
+  assert.match(out.scores.trust.reasons.join(' '), /describes npm:pkg@1\.0\.0, not npm:pkg@2\.0\.0/);
+  assert.notEqual(out.scores.recommendation.verdict, 'recommended');
+});
+
+test('scan: evidence for the current version is used', () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const current = {
+    name: 'pkg', category: 'database', install_cmd: 'npx -y pkg@2.0.0', version: '2.0.0',
+    pkg_integrity: 'sha512-new', health_score: 80, est_tools_count: 5,
+    trust_evidence: {
+      artifact_id: 'npm:pkg@2.0.0',
+      dimensions: {
+        artifact:       { status: 'verified', checked_at: today },
+        advisories:     { status: 'clean',    checked_at: today },
+        signature:      { status: 'verified', checked_at: today },
+        source_binding: { status: 'verified', checked_at: today },
+      },
+    },
+  };
+  const out = o.slim(current, { cats: new Set(['database']), dbs: new Set(), infra: new Set(), signals: [] });
+  assert.equal(out.scores.trust.gate, 'ok');
+});

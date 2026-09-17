@@ -12,19 +12,31 @@ Concretely: the CI `smoke` job is offline. Air-gapped environments install with 
 
 Zero runtime dependencies for the scripts. Node built-ins only (`fs`, `https`, `child_process`, `path`, `crypto`). The supply-chain attack surface for *this* repo is exactly Node's, no more.
 
-The DB is a single JSON file. The orchestrator is one `.cjs` file. The integrity scanner is one `.cjs` file. No build step, no transpilation, no bundler. `npx -y @froggychips/mcp-vault scan` works on day one — and so does `git clone` + `node scripts/orchestrate.cjs` for users who prefer to inspect first.
+The DB is a single JSON file. There are 16 command scripts and 16 small
+libraries beside them, all CommonJS, all Node built-ins — the count has grown
+with what the gate checks, the dependency-free part has not. No build step, no
+transpilation, no bundler. `npx -y @froggychips/mcp-vault scan` works on day one — and so does `git clone` + `node scripts/orchestrate.cjs` for users who prefer to inspect first.
 
 ## 3. Inspectable
 
 Every output is machine-readable (`--json`) and human-readable (default). Every entry in the DB carries its full audit trail in `notes`: `[VERIFIED YYYY-MM-DD]` and `[TRIAGE YYYY-MM-DD]` prefixes are greppable. Every promotion / demotion is a git commit with the reasoning in the message.
 
-You can audit this project by reading the JSON, the four scripts, and the CHANGELOG. No telemetry, no remote-fetched code, no plugins. What's in the repo is what runs.
+You can audit this project by reading the JSON, the scripts, and the CHANGELOG. No telemetry, no remote-fetched code, no plugins. What's in the repo is what runs.
 
 ## 4. Deterministic
 
 The same DB at the same commit produces the same recommendations. `orchestrate.cjs --json` against a fixed `cwd` is reproducible. `verify_integrity.cjs --offline` against a fixed DB returns the same exit code every run.
 
-No randomness, no time-dependent behavior, no LLM in the critical path. The Claude skill is a *consumer* of this project's output — Claude reads what `orchestrate.cjs` prints, doesn't replace it.
+No randomness, no LLM in the critical path. The Claude skill is a *consumer* of
+this project's output — Claude reads what `orchestrate.cjs` prints, doesn't
+replace it.
+
+One qualification, added because the code now depends on it: evidence is dated,
+and dates age. `verify --offline` against a fixed DB still returns the same exit
+code every run, but a stored verification has a shelf life — a hash match holds
+for 90 days, "no advisories" for 7 — and past it the entry reports `UNVERIFIED`.
+That is time-dependence on purpose: the alternative is a verdict that keeps
+claiming to be current long after anyone checked.
 
 ## 5. Boring
 

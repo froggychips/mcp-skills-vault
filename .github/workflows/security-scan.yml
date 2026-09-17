@@ -15,12 +15,24 @@ name: security-scan
 #   mcp-eval-smoke      — weekly + manual, spawns each DB entry's MCP server,
 #                         runs handshake + tools/list + schema lint, uploads
 #                         eval_results.json as an artifact (no auto-commit).
-#                         Needs network (npx/uvx package fetch); --unsafe on the
-#                         trusted self-hosted runner, cron-only.
+#                         Needs network (npx/uvx package fetch); --sandbox, so
+#                         third-party code never runs on the host. Cron-only.
 #   mcp-eval-pr         — on PRs touching the DB: behavioural smoke of just the
 #                         changed entries, each in a jailed container
-#                         (mcp_eval --sandbox). github-hosted (untrusted code →
-#                         disposable VM). Fails only on CRASH / NO_TOOLS.
+#                         (mcp_eval --sandbox), with the *code* taken from the
+#                         PR's base commit. Fails only on CRASH / NO_TOOLS.
+#
+# Isolation model. GitHub-hosted runners don't start on this account (billing
+# lock, see runner-health.yml), so everything lands on one self-hosted macOS
+# machine and isolation has to happen inside it:
+#   - PR-authored code (tests, scripts) runs in a container: no network, repo
+#     mounted read-only, no capabilities, no docker socket.
+#   - PR-authored *data* (tools_database.json) is evaluated by base-commit code,
+#     and every docker launch is rebuilt from its pinned digest, so a hostile
+#     install_cmd cannot smuggle flags onto the host.
+#   - Third-party MCP servers always run under --sandbox, never --unsafe.
+# tests/ci_manifest.test.cjs asserts these properties so they can't quietly
+# regress in a later one-line edit.
 
 on:
   pull_request:
@@ -41,28 +53,117 @@ permissions:
 jobs:
   unit-tests:
     name: Unit tests (node:test)
+    # GitHub-hosted runners do not start on this account (billing lock — see
+    # runner-health.yml), so every job lands on the self-hosted machine and the
+    # isolation has to happen inside it. A pull_request build runs code the PR
+    # author wrote: `node --test tests/*.test.cjs` executes whatever landed in
+    # tests/. For those builds the suite runs in a container with no network, a
+    # read-only copy of the repo, no capabilities and no access to the runner's
+    # home directory or docker socket. Trusted contexts (push, cron) run
+    # directly, because the code is ours.
     runs-on: self-hosted
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v7.0.0
         with:
           node-version: '20'
+      # The PR path needs a container to isolate PR-authored code. If no
+      # runtime answers, the honest outcome is "not checked" — running the
+      # suite on the host instead would quietly drop the isolation exactly when
+      # nobody is looking.
+      - name: Docker preflight
+        if: github.event_name == 'pull_request'
+        uses: ./.github/actions/docker-preflight
+        with:
+          required: 'true'
       - name: node --test
+        env:
+          # Pinned by digest, like everything else this project consumes.
+          JAIL_IMAGE: node:22-alpine
         # Bash expands the glob into a file list before node sees it;
         # node --test in Node 20 doesn't glob-expand quoted patterns itself.
-        run: node --test tests/*.test.cjs
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "pull_request build — running the suite in a jailed container"
+            docker run --rm --network none \
+              --cap-drop ALL --security-opt no-new-privileges \
+              --memory 2g --pids-limit 512 \
+              -v "$PWD":/w:ro -w /w "$JAIL_IMAGE" \
+              node --test tests/*.test.cjs
+          else
+            node --test tests/*.test.cjs
+          fi
 
   smoke:
     name: Verify seeded DB (offline)
     runs-on: self-hosted
+    timeout-minutes: 15
     needs: unit-tests
+    permissions:
+      contents: read
+      security-events: write   # upload-sarif
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v7.0.0
         with:
           node-version: '20'
+      - name: Docker preflight
+        if: github.event_name == 'pull_request'
+        uses: ./.github/actions/docker-preflight
+        with:
+          required: 'true'
       - name: verify_integrity --offline
-        run: node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --offline
+        env:
+          JAIL_IMAGE: node:22-alpine
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            docker run --rm --network none \
+              --cap-drop ALL --security-opt no-new-privileges \
+              -v "$PWD":/w:ro -w /w "$JAIL_IMAGE" \
+              node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --offline
+          else
+            node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --offline
+          fi
+      # Same run, machine-readable: each finding lands on the tools_database.json
+      # line that caused it, so a PR that adds an entry with no pin gets the
+      # annotation on that entry instead of a red check with prose in the log.
+      - name: verify_integrity --sarif
+        id: sarif
+        if: always()
+        env:
+          JAIL_IMAGE: node:22-alpine
+        # The redirect target is a fresh file under RUNNER_TEMP, never a path
+        # inside the checkout. Redirecting to `./verify.sarif` ran on the host
+        # and followed that path wherever it led — and a PR can commit
+        # `verify.sarif` as a symlink to any file the runner user can write,
+        # which `-v …:ro` does nothing about.
+        run: |
+          set -uo pipefail
+          out="$RUNNER_TEMP/mcp-vault-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.sarif"
+          rm -f "$out"
+          # Publish the path first. With `set -e` and the output written last, a
+          # verifier exiting non-zero — a policy gate doing its job — skipped
+          # the line, and the always() upload below got an empty path: the run
+          # that most needed its findings published was the one that lost them.
+          echo "path=$out" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            docker run --rm --network none \
+              --cap-drop ALL --security-opt no-new-privileges \
+              -v "$PWD":/w:ro -w /w "$JAIL_IMAGE" \
+              node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --offline --sarif > "$out"
+          else
+            node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --offline --sarif > "$out"
+          fi
+      - name: Upload to code scanning
+        if: always()
+        continue-on-error: true   # code scanning may be off; never block the gate on it
+        uses: github/codeql-action/upload-sarif@faaca9a8f6edddba5725ffe5adefdab6669a2eca   # v3
+        with:
+          sarif_file: ${{ steps.sarif.outputs.path }}
+          category: mcp-vault-verify
 
   refresh-hashes:
     name: Weekly hash refresh PR
@@ -71,6 +172,7 @@ jobs:
     if: (github.event_name == 'schedule' && github.event.schedule == '17 6 * * 1') || github.event_name == 'workflow_dispatch'
     needs: smoke
     runs-on: self-hosted
+    timeout-minutes: 45
     permissions:
       contents: write
       pull-requests: write
@@ -86,14 +188,17 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v7.0.0
         with:
           node-version: '20'
       - name: verify_integrity --update
         run: node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --update
-      - name: Re-verify with refreshed hashes
-        run: node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs
+      - name: Re-verify with refreshed hashes, recording dated evidence
+        # --record-evidence writes per-dimension results with the date they were
+        # established, so `trust` becomes derived rather than asserted. This job
+        # is the right place for it: it is the one that talks to every feed.
+        run: node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --deep --record-evidence
       - name: refresh_scores --write
         run: node mcp-ecosystem-intelligence/scripts/refresh_scores.cjs --write
       # The `mcp-eval-pr` gate below can never see the PR this job opens:
@@ -110,7 +215,7 @@ jobs:
           base: HEAD
           title: MCP eval (entries changed by this refresh)
       - name: Open PR if anything changed
-        uses: peter-evans/create-pull-request@v8
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1   # v8.1.1
         with:
           commit-message: 'chore: weekly refresh of hashes + GitHub metrics'
           title: 'chore: weekly refresh of hashes + GitHub metrics'
@@ -144,33 +249,73 @@ jobs:
     if: (github.event_name == 'schedule' && github.event.schedule == '17 6 * * 1') || github.event_name == 'workflow_dispatch'
     needs: smoke
     runs-on: self-hosted
+    timeout-minutes: 20
+    permissions:
+      contents: write        # the refreshed pins land on a branch
+      pull-requests: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v7.0.0
         with:
           node-version: '20'
-      - name: check_docker_drift
+      # --write turns the drift into a diff. A red job says "something moved";
+      # a pull request says what moved, from which digest to which, with a link
+      # to the upstream releases page — which is what a human needs to tell a
+      # routine rebuild from a hijack. Errors still fail the job: an unreachable
+      # registry means nothing was compared.
+      - name: check_docker_drift --write
         id: drift
+        # Trusted context only (cron / manual dispatch), so writing inside the
+        # checkout is fine here — unlike the PR path above.
         run: |
           set -o pipefail
-          node mcp-ecosystem-intelligence/scripts/check_docker_drift.cjs --json | tee drift.json
+          node mcp-ecosystem-intelligence/scripts/check_docker_drift.cjs --write --json | tee drift.json
           drifts=$(node -e "console.log(JSON.parse(require('fs').readFileSync('drift.json','utf8')).drifts)")
-          echo "drifts=$drifts" >> "$GITHUB_OUTPUT"
+          updated=$(node -e "console.log(JSON.parse(require('fs').readFileSync('drift.json','utf8')).updated.length)")
+          echo "drifts=$drifts"   >> "$GITHUB_OUTPUT"
+          echo "updated=$updated" >> "$GITHUB_OUTPUT"
           {
             echo "## Docker drift check"
             echo
-            echo "Drifts: **$drifts**"
+            echo "Drifts: **$drifts** · pins updated: **$updated**"
             echo
             echo '```json'
             cat drift.json
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Fail if drift detected
-        if: steps.drift.outputs.drifts != '0'
-        run: |
-          echo "Upstream digest differs from pinned digest for at least one image."
-          echo "Review the change in the registry, then run verify_integrity.cjs --update locally."
-          exit 1
+      # Prove the new pins before asking anyone to look at them: --deep hashes
+      # the manifest the registry serves and compares it with what we just wrote.
+      - name: Re-verify the refreshed pins
+        if: steps.drift.outputs.updated != '0'
+        run: node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --deep --no-audit
+      - name: Open a PR with the refreshed digests
+        if: steps.drift.outputs.updated != '0'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1   # v8.1.1
+        with:
+          commit-message: 'chore(docker): refresh drifted image digests'
+          title: 'chore(docker): refresh drifted image digests'
+          body: |
+            Upstream rebuilt one or more tracked tags, so the pinned digests no
+            longer match what the registry serves. This PR moves the pins.
+
+            The digest lives in two places per docker entry — inside
+            `install_cmd` and in `pkg_integrity` — and both moved together.
+            `verify_integrity --deep` re-ran against the new pins and passed,
+            so the manifest the registry serves hashes to the digest recorded
+            here.
+
+            ## Reviewer checklist
+            - [ ] Open the upstream releases page for each image (linked in the job summary) and confirm a release explains the rebuild
+            - [ ] A rebuild with no matching release is the interesting case — a hijack looks exactly like a routine rebuild from here
+            - [ ] Confirm the image is still published by the same org
+            - [ ] Confirm `tracked_tag` is still the tag you mean to follow
+
+            > A rebuilt tag is routine. This PR exists so "routine" is a
+            > judgement someone made, not an assumption the tooling made.
+          branch: chore/docker-digest-refresh
+          delete-branch: true
+          add-paths: |
+            mcp-ecosystem-intelligence/assets/tools_database.json
 
   license-drift:
     name: Weekly license-drift check
@@ -185,9 +330,10 @@ jobs:
     if: (github.event_name == 'schedule' && github.event.schedule == '17 6 * * 1') || github.event_name == 'workflow_dispatch'
     needs: smoke
     runs-on: self-hosted
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v7.0.0
         with:
           node-version: '20'
       - name: check_license_drift --strict
@@ -216,12 +362,13 @@ jobs:
     if: (github.event_name == 'schedule' && github.event.schedule == '23 6 * * 4') || github.event_name == 'workflow_dispatch'
     needs: smoke
     runs-on: self-hosted
+    timeout-minutes: 30
     permissions:
       contents: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v7.0.0
         with:
           node-version: '20'
       - name: discover.cjs (readme + npm + gh)
@@ -257,7 +404,7 @@ jobs:
             "
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Open PR if anything changed
-        uses: peter-evans/create-pull-request@v8
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1   # v8.1.1
         with:
           commit-message: 'chore(discovery): weekly candidates refresh'
           title: 'chore(discovery): weekly candidates refresh'
@@ -292,22 +439,39 @@ jobs:
     # whether to update the DB. Nothing here writes to the DB.
     if: github.event_name != 'pull_request' && ((github.event_name == 'schedule' && github.event.schedule == '17 6 * * 1') || github.event_name == 'workflow_dispatch')
     needs: unit-tests
+    permissions:
+      contents: write        # the snapshot lands on a branch
+      pull-requests: write
+    # This job downloads and runs 100+ third-party MCP servers. A verified hash
+    # says which artifact ran, not that it was benign — this project's own
+    # SECURITY.md says so. It used to run `--unsafe` directly on this machine
+    # because the runner was "trusted"; the runner being trusted says nothing
+    # about the 100+ packages. It now runs `--sandbox`, so each server starts in
+    # a container with no capabilities, a read-only rootfs, a non-root user and
+    # memory/pid caps. `--unsafe` on a long-lived machine is the one mode this
+    # project should never use on code it did not write.
     runs-on: self-hosted
+    timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v7.0.0
         with:
           node-version: '20'
-      - name: Install uv (for uvx)
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      # No uv on the host any more: with --sandbox the uvx entries run inside
+      # ghcr.io/astral-sh/uv, which ships it. The step this replaces was
+      # `curl -LsSf https://astral.sh/uv/install.sh | sh`, in a tool whose pitch
+      # is that installing an MCP server stops feeling like curl | bash.
+      - name: Docker preflight
+        uses: ./.github/actions/docker-preflight
+        with:
+          required: 'true'
       - name: mcp_eval --json
         # Long timeout per entry — npx cold-fetches can take 20–30s in CI;
         # the script's per-entry timeout (default 30s) is the inner gate.
-        # --unsafe: trusted self-hosted runner, explicit opt-out of the sandbox
-        # (default-deny requires either --sandbox or --unsafe).
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --unsafe --json > eval_results_run.json
+        # --pace: a gap between container starts. Without one, 113 back-to-back
+        # `docker run`s took the daemon down on a developer laptop and every
+        # entry after that was reported as a crashed server.
+        run: node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --sandbox --pace 750 --json > eval_results_run.json
       - name: Summary
         if: always()
         run: |
@@ -338,10 +502,81 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload eval results
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
         with:
           name: eval-results
           path: eval_results_run.json
+          # The default 90-day retention filled this account's artifact quota,
+          # and "Artifact storage quota has been hit" is what failed the run —
+          # not the eval itself. A week is longer than anyone reads these.
+          retention-days: 7
+      # An artifact is operational evidence: it expires, and someone who clones
+      # the repo or installs the package cannot see it. The shipped
+      # eval_results.json was `results: []`, so the behavioural layer existed in
+      # CI and nowhere a user could check. Commit it through a reviewed PR —
+      # evidence, still not policy: nothing here promotes an entry.
+      - name: Refresh the shipped eval snapshot
+        if: always()
+        run: |
+          set -euo pipefail
+          node -e '
+            const fs = require("fs");
+            const run = JSON.parse(fs.readFileSync("eval_results_run.json", "utf8"));
+            const path = "mcp-ecosystem-intelligence/assets/eval_results.json";
+            const prev = JSON.parse(fs.readFileSync(path, "utf8"));
+            // Keep only the fields a reader needs; drop stderr tails, which can
+            // carry paths and tokens from a failing server.
+            const slim = (r) => ({
+              name: r.name, status: r.status, error_code: r.error_code || null,
+              tool_count: r.tool_count, tool_count_db: r.tool_count_db,
+              tool_count_drift: r.tool_count_drift, tools_payload_bytes: r.tools_payload_bytes,
+              boot_ms: r.boot_ms,
+              // A count, under its own name: `schema_errors` is an array that
+              // `mcp_eval --no-spawn` iterates, and turning it into a number
+              // made that mode throw.
+              schema_errors: r.schema_errors || [],
+              schema_error_count: (r.schema_errors || []).length,
+              sandboxed: r.sandboxed, checked_at: r.checked_at,
+            });
+            const byName = new Map((prev.results || []).map((r) => [r.name, r]));
+            for (const r of (run.results || [])) byName.set(r.name, slim(r));
+            fs.writeFileSync(path, JSON.stringify({
+              $schema: prev.$schema || "describes shape; not enforced",
+              generated_at: new Date().toISOString(),
+              generator: run.generator || prev.generator || null,
+              note: "Behavioural evidence, not policy. Nothing here promotes an entry; tools_database.json stays the source of truth.",
+              results: [...byName.values()].sort((a, b) => a.name.localeCompare(b.name)),
+            }, null, 2) + "\n");
+          '
+          git --no-pager diff --stat -- mcp-ecosystem-intelligence/assets/eval_results.json
+      - name: Open a PR with the refreshed eval snapshot
+        if: always()
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1   # v8.1.1
+        with:
+          commit-message: 'chore(eval): refresh behavioural snapshot'
+          title: 'chore(eval): refresh behavioural snapshot'
+          body: |
+            Last-known behavioural state for the DB entries, from this week's
+            sandboxed eval run.
+
+            This is **evidence, not policy**: nothing here promotes or demotes an
+            entry, and `tools_database.json` remains the source of truth. It is
+            committed so that someone who clones the repo or installs the package
+            can see whether each server was observed to start and list tools —
+            which a CI artifact, expiring in a week, cannot tell them.
+
+            ## Reviewer checklist
+            - [ ] New `fail` entries: is it the server, or the environment (missing credentials read as a failure)?
+            - [ ] `tool_count_drift`: upstream changed its tool surface — check whether `est_tools_count` should move
+            - [ ] A server that went from pass to CRASH deserves a look before the next release
+          branch: chore/eval-snapshot
+          delete-branch: true
+          add-paths: |
+            mcp-ecosystem-intelligence/assets/eval_results.json
+          # The default 90-day retention filled this account's artifact quota,
+          # and "Artifact storage quota has been hit" is what failed the run —
+          # not the eval itself. A week is longer than anyone reads these.
+          retention-days: 7
 
   mcp-eval-pr:
     name: MCP eval (sandboxed, changed entries)
@@ -349,22 +584,43 @@ jobs:
     # server runs in a jailed container (mcp_eval --sandbox: --cap-drop ALL,
     # read-only rootfs, non-root, mem/pid caps).
     #
-    # Ideal home is a disposable github-hosted VM (untrusted PR code), but this
-    # org has none available, so it runs self-hosted. The docker --sandbox jail
-    # is the isolation boundary, and the job is `continue-on-error` (advisory,
-    # never blocks merge) — a maintainer reads the summary and decides. Don't
-    # hard-gate untrusted-code execution on the shared runner.
+    # Trusted code, untrusted data. The scripts are checked out from the PR's
+    # BASE commit — i.e. code that is already reviewed — and only
+    # tools_database.json comes from the PR head. Otherwise a PR could edit
+    # mcp_eval.cjs itself and the sandbox would be whatever that edit said it
+    # was. With the code fixed, `--sandbox` rebuilds every docker launch from
+    # its pinned digest, so a hostile `install_cmd` has nothing to work with.
     if: github.event_name == 'pull_request'
     needs: unit-tests
     runs-on: self-hosted
+    timeout-minutes: 30
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
         with:
-          fetch-depth: 0   # need the base commit to diff the DB
-      - uses: actions/setup-node@v7
+          ref: ${{ github.event.pull_request.base.sha }}   # reviewed code only
+          fetch-depth: 0                                    # need history to diff the DB
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v7.0.0
         with:
           node-version: '20'
+      # Bring in the one file this job is about, and nothing else from the PR.
+      - name: Take the DB from the PR head
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "+$HEAD_SHA:refs/mcp-vault/pr-head"
+          git checkout refs/mcp-vault/pr-head -- mcp-ecosystem-intelligence/assets/tools_database.json
+          git --no-pager diff --stat -- mcp-ecosystem-intelligence/assets/tools_database.json
+      # Note the consequence of checking out the base commit above: the actions
+      # this job uses come from base too, so a change to them takes effect after
+      # merge, not in the PR that makes it. That is the intended direction — the
+      # PR must not be able to redefine the machinery that contains it — but it
+      # does mean this step fails in the PR that first adds the action.
+      - name: Docker preflight
+        uses: ./.github/actions/docker-preflight
+        with:
+          required: 'true'
       - name: Smoke changed entries
         uses: ./.github/actions/smoke-changed-entries
         with:

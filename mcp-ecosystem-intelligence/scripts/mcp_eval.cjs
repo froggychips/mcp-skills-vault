@@ -37,6 +37,11 @@
  *   mcp_eval.cjs --sandbox              run each server in a locked-down container (needs docker)
  *   mcp_eval.cjs --unsafe               run servers directly on the host (explicit opt-out of the sandbox)
  *   mcp_eval.cjs --db <path>            override DB path
+ *   mcp_eval.cjs --pace <ms>            gap between container starts (default 400)
+ *   mcp_eval.cjs --record-evidence      write the smoke result into the DB as
+ *                                       dated evidence (smoke dimension)
+ *   mcp_eval.cjs --installed            smoke the servers your hosts launch,
+ *                                       not DB entries (feeds `mcp-vault budget`)
  *   mcp_eval.cjs --results <path>       override results file path
  *   mcp_eval.cjs --strict               exit 1 on any failure or unavailable launcher
  *   mcp_eval.cjs --help                 print this help
@@ -61,6 +66,64 @@ const path          = require('path');
 const { spawn }     = require('child_process');
 const { performance } = require('perf_hooks');
 const { exitAfterFlush } = require('./lib/exit.cjs');
+const { readInstalledServers } = require('./lib/installed.cjs');
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Is the container runtime actually unavailable?
+ *
+ * Text matching alone cannot answer this: a server can print "Cannot connect to
+ * the Docker daemon" and exit 1 before ever answering initialize, and be
+ * recorded as an infrastructure failure — skipped rather than failed, with
+ * three of them stopping the run. The runtime itself is the authority, so ask
+ * it. Cached per process: the answer does not change mid-run in a way worth
+ * paying for repeatedly, and a genuine outage is confirmed once.
+ */
+let dockerAliveCache = null;
+function dockerIsAlive() {
+  if (dockerAliveCache !== null) return dockerAliveCache;
+  const probe = require('child_process').spawnSync('docker', ['version', '--format', '{{.Server.Version}}'], {
+    encoding: 'utf8', timeout: 10000, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  dockerAliveCache = probe.status === 0 && /\S/.test(probe.stdout || '');
+  return dockerAliveCache;
+}
+
+// Is this launch spec a single, immutable version? `latest`, a range, or a tag
+// is not, and a smoke result against one cannot be attributed to a release.
+function isExactVersion(installCmd, version) {
+  if (!version) return false;
+  if (/^docker\s+run/.test(String(installCmd))) return /^sha256:[a-f0-9]{64}$/.test(version);
+  if (/^npx\s/.test(String(installCmd))) return /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version);
+  return /^\d+(?:\.\d+)*(?:(?:a|b|rc)\d+)?(?:\.post\d+)?(?:\.dev\d+)?(?:\+[0-9A-Za-z.]+)?$/.test(version);
+}
+const { dockerImageRef, npmPkgName, pypiPkgName } = require('./lib/install_cmd.cjs');
+
+// Which version a launch command actually asks for; null means it resolves at
+// launch time, so no result can be attributed to a specific release.
+function versionFromInstallCmd(cmd) {
+  if (typeof cmd !== 'string' || !cmd) return null;
+  if (/^docker\s+run/.test(cmd)) {
+    const ref = dockerImageRef(cmd);
+    const m = ref && ref.match(/@(sha256:[a-f0-9]{64})$/);
+    return m ? m[1] : null;
+  }
+  const npm = npmPkgName(cmd);
+  if (npm) {
+    const token = cmd.split(/\s+/).find((t) => t.startsWith(`${npm}@`));
+    return token ? token.slice(npm.length + 1) : null;
+  }
+  const py = pypiPkgName(cmd);
+  if (py) {
+    const token = cmd.split(/\s+/).find((t) => t.startsWith(`${py}==`));
+    return token ? token.slice(py.length + 2) : null;
+  }
+  return null;
+}
+const { readDb, writeDb } = require('./lib/db_io.cjs');
+const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
+const { smokeEvidence, mergeEvidence } = require('./lib/evidence.cjs');
 const stdio         = require('./lib/mcp_stdio.cjs'); // shared framing + sandbox + classifier (vendored, zero-dep)
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -86,6 +149,14 @@ function parseArgs(argv) {
     unsafe:   false,
     db:       DEFAULT_DB_PATH,
     results:  DEFAULT_RESULTS_PATH,
+    installed: false,
+    recordEvidence: false,
+    // Breathing room between container starts. 113 back-to-back `docker run`s
+    // took the daemon down on a developer laptop, and every entry after that
+    // was reported as a crashed server. Cheap insurance for a job whose whole
+    // output is a claim about other people's software.
+    paceMs: 400,
+    cwd:      process.cwd(),
     strict:   false,
     help:     false,
   };
@@ -98,9 +169,13 @@ function parseArgs(argv) {
       case '--timeout': opts.timeout = Math.max(1000, parseInt(next, 10) || DEFAULT_TIMEOUT_MS); i++; break;
       case '--json':    opts.json    = true; break;
       case '--no-spawn':opts.noSpawn = true; break;
+      case '--installed': opts.installed = true; break;
+      case '--record-evidence': opts.recordEvidence = true; break;
+      case '--pace':    opts.paceMs = Number(next); i++; break;
       case '--sandbox': opts.sandbox = true; break;
       case '--unsafe':  opts.unsafe  = true; break;
       case '--db':      opts.db      = next; i++; break;
+      case '--cwd':     opts.cwd     = next; i++; break;
       case '--results': opts.results = next; i++; break;
       case '--strict':  opts.strict  = true; break;
       case '-h':
@@ -312,6 +387,10 @@ async function smokeEntry(tool, opts) {
     boot_ms:          null,
     list_latency_ms:  null,
     tool_count:       null,
+    // Size of the tools/list payload. This is what a server actually injects
+    // into the system prompt on every request, so `token_budget` can measure a
+    // config's cost instead of estimating it from a tool count.
+    tools_payload_bytes: null,
     tool_count_db:    typeof tool.est_tools_count === 'number' ? tool.est_tools_count : null,
     tool_count_drift: false,
     schema_errors:    [],
@@ -326,6 +405,12 @@ async function smokeEntry(tool, opts) {
   // pre-resolved {command, args} so the fake server (which doesn't
   // look like npx/uvx/docker) can drive the smoke loop end-to-end
   // without forking the parser. Production DB entries never carry it.
+  // Captured before anything is launched: re-reading the DB afterwards can see
+  // a different version than the one that actually ran.
+  result.launched = {
+    install_cmd: tool.install_cmd || null,
+    db_version:  tool.version || null,
+  };
   const parsed = tool._evalSpawn || parseInstallCmd(tool.install_cmd);
   if (!parsed) {
     result.error_code = 'unrecognized install method';
@@ -339,8 +424,25 @@ async function smokeEntry(tool, opts) {
 
   // Sandbox real entries when asked; the test fake-server (_evalSpawn) always
   // runs on the host. docker-run entries pass through (already containerized).
-  const launch = (opts.sandbox && !tool._evalSpawn) ? stdio.sandboxWrap(parsed) : parsed;
+  // Whether to jail is decided by the flags, never by a field in the entry.
+  // `_evalSpawn` used to disable the sandbox, which meant (a) `--installed
+  // --sandbox` ran local commands straight on the host, and (b) a DB entry
+  // carrying `_evalSpawn` — the DB is a file a PR can edit — opted itself out
+  // of the jail. `opts.hostSpawn` is the in-process escape hatch tests use; it
+  // cannot be expressed in JSON.
+  const launch = opts.sandbox && !opts.hostSpawn
+    ? stdio.sandboxWrap(parsed, { imageRef: dockerImageRef(tool.install_cmd || '') })
+    : parsed;
   result.sandboxed = !!launch.sandboxed;
+
+  // sandboxWrap refuses a launch it cannot make safe — a docker entry with no
+  // digest to rebuild from. Refusing and then running it anyway would be the
+  // worst of both.
+  if (launch.refused) {
+    result.status = 'skip';
+    result.error_code = launch.sandbox_note || 'sandbox refused this launch command';
+    return result;
+  }
 
   // Track stderr for failure diagnostics (last 4 lines, capped at 4KB).
   const stderrChunks = [];
@@ -444,6 +546,9 @@ async function smokeEntry(tool, opts) {
       ? listResp.result.tools
       : [];
     result.tool_count = tools.length;
+    // The payload, not the count: what the server injects into the system
+    // prompt is this JSON, so its size is the honest input to a token budget.
+    try { result.tools_payload_bytes = Buffer.byteLength(JSON.stringify(tools)); } catch { /* keep null */ }
     if (typeof result.tool_count_db === 'number') {
       result.tool_count_drift = result.tool_count !== result.tool_count_db;
     }
@@ -497,7 +602,18 @@ async function smokeEntry(tool, opts) {
     errorCode: result.error_code,
     stderr:    result.stderr_tail || '',
     toolCount: result.tool_count,
+    // Once the handshake landed, the process is a server, and what it prints
+    // is its own business — it may not reclassify itself as an infrastructure
+    // failure and be skipped.
+    handshakeReached: result.boot_ms !== null || result.tool_count !== null,
   });
+
+  // A claimed infrastructure failure is only believed if the infrastructure
+  // agrees. Otherwise it is a crashing server that found the magic words.
+  if (result.failure_class === 'SANDBOX_UNAVAILABLE' && opts.sandbox && dockerIsAlive()) {
+    result.failure_class = 'CRASH';
+    result.error_code = `${result.error_code || 'exit failure'} (claimed a docker failure, but docker is up)`;
+  }
 
   return result;
 }
@@ -515,6 +631,29 @@ function pickTools(db, opts) {
   }
   // Default = --all: every entry whose install_cmd we can parse.
   return db.tools.filter(t => parseInstallCmd(t.install_cmd));
+}
+
+/**
+ * Subjects taken from the local host configs instead of the DB.
+ *
+ * `_evalSpawn` carries the command and args exactly as configured, so this
+ * works for servers the install-command parsers know nothing about — a local
+ * binary, a script, a wrapper. Remote servers are skipped: there is nothing to
+ * spawn, and their tool surface costs context on the client's side only once
+ * the client connects.
+ */
+function pickInstalledTools(opts) {
+  const servers = readInstalledServers({ cwd: opts.cwd });
+  const wanted = opts.name ? servers.filter(s => s.name === opts.name || s.name.toLowerCase().includes(opts.name.toLowerCase())) : servers;
+  return wanted
+    .filter(s => !s.remote && s.command)
+    .map(s => ({
+      name: s.name,
+      install_cmd: s.install_cmd || `${s.command} ${(s.args || []).join(' ')}`.trim(),
+      est_tools_count: null,
+      _evalSpawn: { command: s.command, args: s.args || [] },
+      _installed: { host: s.host, scope: s.scope, source: s.source },
+    }));
 }
 
 // ── Results file IO ────────────────────────────────────────────────────────
@@ -603,7 +742,12 @@ async function main() {
         process.stdout.write(`  - ${m.name}: ${m.schema_errors_recheck.length} malformed entries\n`);
       }
     }
-    exitAfterFlush(opts.strict && malformed.length ? 1 : 0);
+    // `return`, because exitAfterFlush() is asynchronous: it queues the real
+    // process.exit() behind a stdout drain callback. Without the return, the
+    // synchronous code below kept running in the same tick and reached
+    // spawn() — `--no-spawn` executed the very third-party servers it promises
+    // not to touch before the exit landed.
+    return exitAfterFlush(opts.strict && malformed.length ? 1 : 0);
   }
 
   // Default-deny: refuse a live smoke unless a spawn policy was chosen.
@@ -614,31 +758,74 @@ async function main() {
   }
 
   // Live smoke.
-  let db;
-  try {
-    db = JSON.parse(fs.readFileSync(opts.db, 'utf8'));
-  } catch (e) {
-    process.stderr.write(`Failed to read DB ${opts.db}: ${e.message}\n`);
-    process.exit(2);
-  }
-
-  const picked = pickTools(db, opts);
-  if (opts.name && picked.length === 0) {
-    process.stderr.write(`No entries match --name "${opts.name}"\n`);
-    process.exit(2);
+  let picked;
+  if (opts.installed) {
+    picked = pickInstalledTools(opts);
+    if (!picked.length) {
+      process.stderr.write(`No local (non-remote) MCP servers configured for ${opts.cwd}\n`);
+      process.exit(2);
+    }
+  } else {
+    let db;
+    try {
+      db = JSON.parse(fs.readFileSync(opts.db, 'utf8'));
+    } catch (e) {
+      process.stderr.write(`Failed to read DB ${opts.db}: ${e.message}\n`);
+      process.exit(2);
+    }
+    picked = pickTools(db, opts);
+    if (opts.name && picked.length === 0) {
+      process.stderr.write(`No entries match --name "${opts.name}"\n`);
+      process.exit(2);
+    }
   }
 
   const payload = readResults(opts.results);
   // We replace any existing record for the same name (per-run freshness),
   // but keep records for entries we didn't touch this run.
-  const touched = new Set(picked.map(t => t.name));
-  const kept = (payload.results || []).filter(r => !touched.has(r.name));
+  // Filled in as entries are actually smoked. Using the planned list meant an
+  // early stop deleted the stored results of every entry the run never got to.
+  const touched = new Set();
+  const priorResults = payload.results || [];
 
   const newResults = [];
+  let consecutiveSandboxFailures = 0;
+  let runAborted = false;
   for (const tool of picked) {
     if (!opts.json) process.stderr.write(`smoking ${tool.name}…\n`);
     const r = await smokeEntry(tool, opts);
+    touched.add(tool.name);
+    // "The sandbox could not run" is not a finding about the entry. Retry once
+    // after a pause — a daemon under load recovers — then report it as a skip,
+    // and give up once it is plainly the environment: continuing produces a
+    // report that blames 100 entries for one broken daemon.
+    if (r.failure_class === 'SANDBOX_UNAVAILABLE' && opts.sandbox) {
+      await sleep(Math.max(2000, (opts.paceMs || 0) * 5));
+      const retry = await smokeEntry(tool, opts);
+      if (retry.failure_class !== 'SANDBOX_UNAVAILABLE') {
+        newResults.push(retry);
+        consecutiveSandboxFailures = 0;
+        if (opts.paceMs) await sleep(opts.paceMs);
+        continue;
+      }
+    }
+    if (r.failure_class === 'SANDBOX_UNAVAILABLE') {
+      r.status = 'skip';
+      consecutiveSandboxFailures++;
+      if (consecutiveSandboxFailures >= 3) {
+        newResults.push(r);
+        runAborted = true;
+        process.stderr.write(
+          `\nStopping: the sandbox failed ${consecutiveSandboxFailures} times in a row ` +
+          `(${r.error_code || 'docker unavailable'}). That is the environment, not these servers.\n`
+        );
+        break;
+      }
+    } else {
+      consecutiveSandboxFailures = 0;
+    }
     newResults.push(r);
+    if (opts.paceMs) await sleep(opts.paceMs);
     if (!opts.json) {
       const tag = r.status === 'pass' ? 'PASS' : (r.status === 'fail' ? 'FAIL' : 'SKIP');
       const drift = r.tool_count_drift ? ` (drift ${r.tool_count_db}→${r.tool_count})` : '';
@@ -648,6 +835,65 @@ async function main() {
       process.stderr.write(`  ${tag} ${tool.name}${detail}\n`);
     }
   }
+
+  // Behavioural evidence belongs in the same dated structure as everything
+  // else, keyed to the artifact it was observed on — a smoke result for 1.2.3
+  // says nothing about 1.2.4.
+  if (opts.recordEvidence && !opts.installed) {
+    try {
+      const { db } = readDb(opts.db);
+      let recorded = 0;
+      for (const r of newResults) {
+        const tool = (db.tools || []).find((t) => t.name === r.name);
+        if (!tool) continue;
+        const dim = smokeEvidence(r);
+        if (!dim) continue;
+        const typed = toTypedEntry(tool);
+        // Only attribute the result to a version if that version is what
+        // started. `npx -y pkg` resolves latest at launch, so attaching the
+        // result to the DB's `version` would claim a release was smoked when
+        // something else ran. Record it unattributed instead, and say so.
+        // Attribution requires three things to line up: the launch command
+        // names a version, that version is exact, and it is the version the DB
+        // says was verified. `npx -y pkg@latest` satisfied the old check while
+        // running anything at all, and a command pinned to 2.0.0 recorded its
+        // result against the DB's 1.0.0.
+        // Attribute against what was launched, recorded at spawn time — not
+        // against whatever the DB says now. A refresh landing mid-run would
+        // otherwise file this result under a version that never started.
+        const launchedCmd = (r.launched && r.launched.install_cmd) || tool.install_cmd;
+        const launchedDbVersion = r.launched ? r.launched.db_version : tool.version;
+        const stillSameEntry = launchedCmd === tool.install_cmd && launchedDbVersion === tool.version;
+        const launched = versionFromInstallCmd(launchedCmd);
+        const attributable = stillSameEntry
+          && launched !== null
+          && isExactVersion(launchedCmd, launched)
+          && (!tool.version || launched === tool.version || launched === `sha256:${String(tool.pkg_integrity || '').replace(/^sha256-/, '')}`);
+
+        if (attributable && typed) {
+          tool.trust_evidence = mergeEvidence(tool.trust_evidence, {
+            artifact_id: artifactId(typed.artifact),
+            dimensions: { smoke: dim },
+          });
+        } else {
+          // Unattributed: kept beside the evidence rather than merged into it.
+          // Merging it with a null id made mergeEvidence treat the artifact as
+          // different and discard artifact/signature/advisories wholesale.
+          dim.launch = launched === null ? 'unpinned' : `ran ${launched}`;
+          tool.smoke_unattributed = dim;
+        }
+        recorded++;
+      }
+      if (recorded) {
+        writeDb(opts.db, db);
+        process.stderr.write(`Recorded smoke evidence for ${recorded} entr${recorded === 1 ? 'y' : 'ies'}\n`);
+      }
+    } catch (e) {
+      process.stderr.write(`Could not record evidence: ${e.message}\n`);
+    }
+  }
+
+  const kept = priorResults.filter(r => !touched.has(r.name));
 
   const finalPayload = {
     $schema: payload.$schema || 'describes shape; not enforced',
@@ -666,6 +912,13 @@ async function main() {
   const skippedLauncher = newResults.filter(
     r => r.status === 'skip' && /^launcher unavailable: /.test(r.error_code || '')
   ).length;
+  // The sandbox failing is an infrastructure problem too: a run that could not
+  // start containers has checked nothing, and must not exit 0 on the strength
+  // of "no failures". `runAborted` covers the early stop, where most entries
+  // were never attempted at all.
+  const sandboxUnavailable = newResults.filter(r => r.failure_class === 'SANDBOX_UNAVAILABLE').length;
+  const attempted = newResults.length;
+  const notAttempted = Math.max(0, picked.length - attempted);
 
   if (opts.json) {
     process.stdout.write(JSON.stringify({
@@ -674,11 +927,22 @@ async function main() {
       checked: newResults.length,
       pass, fail, skip,
       skipped_launcher: skippedLauncher,
+      sandbox_unavailable: sandboxUnavailable,
+      aborted: runAborted,
+      planned: picked.length,
+      not_attempted: notAttempted,
       results: newResults,
     }, null, 2) + '\n');
   } else {
     process.stderr.write(`\n${newResults.length} checked — ${pass} pass, ${fail} fail, ${skip} skip\n`);
+    if (notAttempted) process.stderr.write(`${notAttempted} of ${picked.length} entries were never attempted\n`);
     process.stderr.write(`Results written to ${opts.results}\n`);
+  }
+  if (sandboxUnavailable > 0) {
+    process.stderr.write(
+      `WARNING: the sandbox was unavailable for ${sandboxUnavailable} entr${sandboxUnavailable === 1 ? 'y' : 'ies'}` +
+      `${runAborted ? ' and the run stopped early' : ''} — those entries were not checked.\n`
+    );
   }
   if (skippedLauncher > 0) {
     const missing = [...new Set(newResults
@@ -692,7 +956,11 @@ async function main() {
 
   // --json writes the whole result set to stdout just above; process.exit()
   // would truncate it mid-object into "Unexpected end of JSON input".
-  exitAfterFlush(opts.strict && (fail > 0 || skippedLauncher > 0) ? 1 : 0);
+  // A run that was cut short, or that could not use the sandbox, has not
+  // produced the evidence it was asked for — under --strict that is a failure
+  // regardless of how few entries got as far as failing.
+  const incomplete = runAborted || notAttempted > 0 || sandboxUnavailable > 0;
+  exitAfterFlush(opts.strict && (fail > 0 || skippedLauncher > 0 || incomplete) ? 1 : 0);
 }
 
 if (require.main === module) {
@@ -706,6 +974,7 @@ module.exports = {
   parseInstallCmd,
   lintSchema,
   pickTools,
+  pickInstalledTools,
   smokeEntry,
   readResults,
   writeResults,

@@ -152,17 +152,95 @@ class Correlator {
 // isolation (prefetch-then-run with `--network none`) is a separate, heavier
 // mode and is deliberately not the default.
 //
-// `docker run` entries are already containerized by their own flags, so they
-// pass through unchanged (sandboxed:false).
+// A `docker run` entry is NOT passed through. "Already containerized" is not
+// the same as "sandboxed": the flags come from the DB, and a database entry is
+// something a pull request can edit. `docker run -v /:/host …`, `--privileged`,
+// `--network host`, `--pid host` are all one diff away, and running the string
+// as given would hand a stranger's PR the host. So the launch is rebuilt from
+// the one field that is evidence — the pinned `image@sha256:…` — under the same
+// jail flags everything else gets. An image without a digest is refused
+// outright: there is nothing to rebuild from.
+const DIGEST_RE = /^[^\s]+@sha256:[a-f0-9]{64}$/;
+
+// Runners this wrapper knows how to jail. Anything else — a local binary, a
+// wrapper script, a compiled server — cannot be put inside a container by
+// wrapping its argv, because the container does not contain it. Saying so is
+// better than running it on the host under a flag that promised a sandbox.
+const JAILABLE = new Set(['npx', 'uvx', 'docker']);
+
 function sandboxWrap(parsed, opts = {}) {
   if (!parsed || typeof parsed.command !== 'string') return parsed;
-  if (parsed.command === 'docker') {
-    return { ...parsed, sandboxed: false, sandbox_note: 'docker entry is already containerized' };
+
+  if (!JAILABLE.has(parsed.command)) {
+    return {
+      ...parsed,
+      sandboxed: false,
+      refused: true,
+      sandbox_note: `cannot sandbox "${parsed.command}": not a package runner, so there is nothing to run inside a container`,
+    };
   }
-  const image = opts.image || (parsed.command === 'uvx'
+
+  if (parsed.command === 'docker') {
+    // The caller passes the image it parsed positionally (lib/install_cmd.cjs).
+    // Scanning the argv here for something digest-shaped picked the wrong one:
+    // `docker run --label ghcr.io/x/decoy@sha256:… ghcr.io/x/real@sha256:…`
+    // jailed the decoy and never touched the server under test.
+    const imageRef = opts.imageRef;
+    if (!imageRef) {
+      return {
+        ...parsed,
+        sandboxed: false,
+        refused: true,
+        sandbox_note: 'no positionally-parsed image reference supplied — refusing to guess which argument is the image',
+      };
+    }
+    if (!DIGEST_RE.test(imageRef)) {
+      return {
+        ...parsed,
+        sandboxed: false,
+        refused: true,
+        sandbox_note: `image ${imageRef} is not pinned by digest — refusing to run DB-supplied docker flags`,
+      };
+    }
+    // Everything else from the entry is dropped on purpose.
+    return {
+      command: 'docker',
+      args: dockerJail(opts).concat([imageRef]),
+      sandboxed: true,
+      image: imageRef,
+      sandbox_note: 'rebuilt from the pinned digest; flags from the DB entry were discarded',
+    };
+  }
+
+  const uvx = parsed.command === 'uvx';
+  const image = opts.image || (uvx
     ? 'ghcr.io/astral-sh/uv:python3.12-bookworm-slim'  // ships uv/uvx
     : 'node:22-alpine');                               // ships node/npx
-  const jail = [
+  const jail = dockerJail(opts).concat([
+    // `:exec` is required, not incidental: tmpfs mounts default to noexec, and
+    // npx/uvx fetch the server into this cache and then run it from there.
+    // Without it every npm entry died with "Permission denied" from sh — which
+    // is what a whole-DB run produced: 112 of 113 "failures" that were the jail
+    // refusing to execute what it had just downloaded, not servers being broken.
+    ...(uvx
+      // uv caches wheels and runs them from the cache, so the same exec rule
+      // applies; the uv image has no unprivileged `node` user.
+      ? ['--tmpfs', '/home/uv:exec', '-e', 'HOME=/home/uv', '-e', 'UV_CACHE_DIR=/home/uv/.cache/uv']
+      : ['--tmpfs', '/home/node/.npm:exec', '-e', 'HOME=/home/node',
+         '-e', 'npm_config_ignore_scripts=true', // hooks already vetted by verify_integrity
+         '-u', 'node']),
+    image,
+    parsed.command, ...parsed.args,
+  ]);
+  return { command: 'docker', args: jail, sandboxed: true, image };
+}
+
+// The flags both sandbox paths share. Kept in one function so the jail for a
+// docker entry and the jail for an npx/uvx entry cannot drift apart — the last
+// time two copies of a launch parser lived side by side in this repo, they
+// disagreed about which token was the package.
+function dockerJail(opts = {}) {
+  return [
     'run', '--rm', '-i',
     '--cap-drop', 'ALL',
     '--security-opt', 'no-new-privileges',
@@ -170,14 +248,7 @@ function sandboxWrap(parsed, opts = {}) {
     '--pids-limit', String(opts.pidsLimit || 256),
     '--read-only',
     '--tmpfs', '/tmp:exec',
-    '--tmpfs', '/home/node/.npm',
-    '-e', 'HOME=/home/node',
-    '-e', 'npm_config_ignore_scripts=true', // install hooks already vetted by verify_integrity
-    '-u', 'node',
-    image,
-    parsed.command, ...parsed.args,
   ];
-  return { command: 'docker', args: jail, sandboxed: true, image };
 }
 
 // ── 3. Failure classification ────────────────────────────────────────────────
@@ -187,13 +258,19 @@ const FAILURE_CLASS = {
   NEEDS_ENV: 'NEEDS_ENV',  // server demanded credentials/config and bailed
   NEEDS_NET: 'NEEDS_NET',  // server failed reaching the network
   NO_TOOLS:  'NO_TOOLS',   // handshake fine, zero tools advertised
+  // The sandbox itself could not run: the docker daemon went away, the socket
+  // refused, the image could not be pulled. This says nothing about the server
+  // under test, and calling it CRASH puts the blame on the entry. A whole-DB
+  // run once reported 76 CRASHes that were all this — the daemon buckling under
+  // 113 consecutive container starts.
+  SANDBOX:   'SANDBOX_UNAVAILABLE',
   CRASH:     'CRASH',      // exited / protocol error for some other reason
 };
 
 // Map a raw failure into one honest class. Pure function over the signals the
 // smoke already collects (error_code string + stderr tail + tool count).
 // Returns null when nothing failed.
-function classifyFailure({ status, errorCode = '', stderr = '', toolCount = null } = {}) {
+function classifyFailure({ status, errorCode = '', stderr = '', toolCount = null, handshakeReached = false } = {}) {
   if (status === 'pass') {
     return toolCount === 0 ? FAILURE_CLASS.NO_TOOLS : null;
   }
@@ -201,6 +278,16 @@ function classifyFailure({ status, errorCode = '', stderr = '', toolCount = null
   const ec = String(errorCode || '');
   if (/timeout/i.test(ec)) return FAILURE_CLASS.TIMEOUT;
   const s = `${ec}\n${stderr}`.toLowerCase();
+  // A sandbox failure is a claim about the *infrastructure*, and infrastructure
+  // failures happen before the server exists. Once a server has spoken —
+  // handshake completed, or output that only a running server produces — its
+  // words cannot demote a crash into "the environment was broken": a hostile
+  // entry would just print "error during connect" and be recorded as skipped.
+  // `handshakeReached` is supplied by the caller, which knows.
+  if (!handshakeReached
+      && /error during connect|cannot connect to the docker daemon|docker daemon is not running|is the docker daemon running|\/docker\.sock|docker: not found|error waiting for container|pull access denied|toomanyrequests/.test(s)) {
+    return FAILURE_CLASS.SANDBOX;
+  }
   if (/api[_ ]?key|token|credential|unauthor|forbidden|missing .*(key|token|secret)|env(ironment)? var|not set/.test(s)) return FAILURE_CLASS.NEEDS_ENV;
   if (/econnrefused|enotfound|etimedout|eai_again|network|fetch failed|getaddrinfo|socket hang up|dns/.test(s)) return FAILURE_CLASS.NEEDS_NET;
   return FAILURE_CLASS.CRASH;
@@ -217,6 +304,7 @@ module.exports = {
   Correlator,
   // eval policy
   sandboxWrap,
+  dockerJail,
   classifyFailure,
   FAILURE_CLASS,
 };

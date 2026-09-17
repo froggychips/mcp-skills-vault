@@ -30,6 +30,7 @@
 
 const fs   = require('fs');
 const path = require('path');
+const { exitAfterFlush } = require('./lib/exit.cjs');
 
 const DEFAULT_DB = path.resolve(__dirname, '../assets/tools_database.json');
 
@@ -427,7 +428,7 @@ function main(argv) {
 }
 
 if (require.main === module) {
-  process.exit(main(process.argv.slice(2)));
+  exitAfterFlush(main(process.argv.slice(2)));
 }
 
 module.exports = {

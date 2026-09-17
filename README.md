@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@froggychips/mcp-vault.svg)](https://www.npmjs.com/package/@froggychips/mcp-vault)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Zero deps](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](./PHILOSOPHY.md)
-[![Tests](https://img.shields.io/badge/tests-285%20pass-brightgreen.svg)](./tests)
+[![Tests](https://img.shields.io/badge/tests-535%20pass-brightgreen.svg)](./tests)
 
 **Homepage:** [mcp.froggychips.xyz](https://mcp.froggychips.xyz) · **npm:** [`@froggychips/mcp-vault`](https://www.npmjs.com/package/@froggychips/mcp-vault)
 
@@ -41,8 +41,14 @@ $ npx -y @froggychips/mcp-vault verify --offline
 | **Trust** | unknown publisher, unknown last commit | `trust: verified` per entry, **94/114 (82%)** hand-vetted against a written checklist; the remaining 20 are `trust: "candidate"` (18 held by upstream install hooks, 2 freshly promoted from discovery pending a verified smoke) (see [Install-Hook Policy](./CONTRIBUTING.md#install-hook-policy)) |
 | **Integrity** | `npx -y whatever@latest` runs whatever ships today | sha512/sha256/Docker `@sha256:` pinned + re-verified against the live registry on every check |
 | **Vulnerabilities** | `npm audit` after the fact, if you remember | 4 advisory feeds merged: npm bulk + OSV.dev + GHSA + Snyk† — checked *before* the install command is written |
+| **Depth** | the package you asked for | `--deps` resolves the whole tree without installing it: **19,377 transitive packages** across the DB, 25 entries whose *dependencies* run install scripts, 38 with a high/critical advisory somewhere in the tree |
+| **Is the hash even yours?** | trust `dist.integrity` from the host serving the tarball | `--deep` downloads and hashes the bytes; npm's registry signature is verified on every run (**100/102** npm entries today), and provenance claims are read and compared with `source_url` |
+| **"Verified" as a word** | a label someone typed once | dated evidence per dimension — a hash match holds for 90 days, "no advisories" for 7 — and `trust` is computed from it, dropped when the version moves |
+| **Context cost** | unknown until the window fills | `budget` totals what your configured servers inject on every request, each number stating whether it was measured or estimated |
+| **Which host** | Claude Code | `install --host` writes Claude Code, Claude Desktop, Cursor, VS Code, or prints a TOML block for Codex |
 | **Stack matching** | manual reading of awesome-lists | detects 40+ env-key patterns + 14 file paths + docker-compose images → suggests what to install |
 | **Offline use** | doesn't | `--offline` makes no network calls and validates stored pins; `--no-audit` still checks live registries but skips advisory APIs |
+| **What actually launches** | `npx -y pkg` resolves `latest` at every start — not the artifact anyone reviewed | `install` writes the version the gate hashed (`pkg@1.2.3`, `pkg==1.2.3`, `image@sha256:…`), and refuses to write an unpinned command without `--allow-unpinned` |
 | **Telemetry** | varies | none. Ever. |
 
 † Snyk requires `SNYK_TOKEN` (no public anonymous API)
@@ -55,6 +61,8 @@ $ npx -y @froggychips/mcp-vault verify --offline
 npx -y @froggychips/mcp-vault scan --cwd ./my-project
 npx -y @froggychips/mcp-vault audit --strict
 npx -y @froggychips/mcp-vault verify --offline
+npx -y @froggychips/mcp-vault verify --installed     # what your hosts actually launch
+npx -y @froggychips/mcp-vault budget                 # what they cost in context
 npx -y @froggychips/mcp-vault doctor
 ```
 
@@ -140,7 +148,159 @@ Flags:
 | `--update` | Refresh `version` + `pkg_integrity` from registries |
 | `--strict` | Treat WARNs (hooks, repo mismatch, unpinned docker) as hard failures |
 | `--no-audit` | Skip advisory APIs; still fetch registry metadata for live hash/repo/hook checks |
+| `--record-evidence` | Write what this run established back into the DB, dated per dimension (`trust_evidence`), and recompute `trust` from it |
+| `--no-policy` | Ignore `.mcp-vault.policy.json` |
+| `--show-policy` | Print the policy in force and the switches it implies |
 | `--offline` | True offline mode; no network calls, validates stored DB pins only |
+| `--fail-unverified` | Treat `UNVERIFIED` (registry unreachable, unparsable install command, wheel-only PyPI release) as a hard failure. Implied by `--strict` |
+| `--entry <name>` | Check a single DB entry instead of all of them |
+| `--installed` | Verify what the local hosts are configured to launch (`.mcp.json`, `~/.claude.json`, Claude Desktop, Cursor, VS Code, Codex) instead of the DB. Unpinned launch commands, servers not in the vault, and remote endpoints are each reported as what they are |
+| `--deep` | Download each artifact and hash it locally, instead of comparing the DB pin against metadata from the same registry that serves the tarball. Docker digests are verified by hashing the manifest |
+| `--deps` | Resolve each package's dependency tree (`npm install --package-lock-only --ignore-scripts`, nothing is installed or executed) and check it: transitive install scripts, and every package in the tree against OSV |
+| `--fail-dep-advisories` | A high/critical advisory anywhere in the tree is a failure |
+| `--require-signatures` | An npm release with no verifiable registry signature is a failure |
+| `--require-provenance` | An npm release with no provenance attestation is a failure |
+
+This project publishes itself with npm provenance (`npm publish --provenance`,
+signed against a GitHub OIDC token — which works on a self-hosted runner, since
+the token comes from GitHub rather than the runner). If provenance cannot be
+produced, the publish stops rather than shipping without it.
+
+Every npm entry's registry signature is checked on every run: npm signs
+`<name>@<version>:<integrity>` with a published ECDSA key, so a response with a
+swapped `dist.integrity` cannot pass. 100 of the DB's 102 npm entries verify
+today; 45 also publish a provenance attestation, whose claimed source
+repository is compared against `source_url`. Provenance is reported as a claim,
+not a proof — verifying the sigstore bundle itself (Fulcio chain, Rekor
+inclusion) is not something this tool does, and it says so rather than implying
+otherwise.
+| `--json` | Structured report on stdout (progress goes to stderr); exit code unchanged |
+| `--sarif` | SARIF 2.1.0 for GitHub code scanning — each finding anchored to its `tools_database.json` line |
+
+An entry the gate could not actually compare against a registry reports
+`UNVERIFIED`, never `OK` — "the feed was down" is not "the pin is good". It is
+advisory by default and a failure under `--fail-unverified`, which is what
+`install` passes.
+
+### Hosts
+
+`install` writes whichever host's config you point it at, not just Claude
+Code's. The vault entry is the same; only the file and (for two of them) the
+shape differ.
+
+```bash
+mcp-vault install --list-hosts              # ids, scopes, formats
+mcp-vault install <name>                    # Claude Code, project  (./.mcp.json)
+mcp-vault install <name> --global           # Claude Code, user     (~/.claude.json)
+mcp-vault install <name> --host cursor      # Cursor                (./.cursor/mcp.json)
+mcp-vault install <name> --host vscode      # VS Code               (./.vscode/mcp.json, `servers` key)
+mcp-vault install <name> --host claude-desktop --scope user
+mcp-vault install <name> --host codex       # prints a TOML block to paste
+```
+
+An existing config is backed up before it is touched, unrelated keys are left
+alone, and a config that exists but does not parse is never overwritten — it is
+more likely a file worth keeping than a file worth clobbering. Codex keeps TOML;
+rewriting that without a TOML parser would destroy comments and formatting, so
+`mcp-vault` prints the three correct lines and lets you paste them.
+
+### Health, trust and fit
+
+`health_score` mixes stars, recency, registry presence and a licence penalty.
+That is a fair *discovery* signal — is this project maintained — and it was
+being read as a measure of trust. It is not one: a package can have 30k stars,
+weekly commits, an official listing, and also a broken pin, an unsigned release
+and seventy tools with filesystem access.
+
+`scan --json` now reports three axes per entry and a verdict over them:
+
+```json
+"scores": {
+  "health": 78,
+  "trust": { "score": 85, "gate": "ok", "reasons": ["artifact: verified", "signature: verified"] },
+  "fit":   { "score": 73, "reasons": ["maps to \"postgres\" (detected, package.json dependency, confidence 0.95)"] },
+  "recommendation": { "verdict": "recommended", "reasons": ["fits this project (fit 73/100)"] }
+}
+```
+
+Trust **gates**; health and fit **rank**. A blocking trust verdict (hash
+mismatch, known-vulnerable version) is never outweighed by the other two, which
+is precisely what adding the numbers together would do. Thin trust — nothing
+recorded yet — never reads as `recommended` either. `health_score` keeps its
+name and formula: it is consumed by discovery and policy, and renaming a field
+to make a point is a poor trade.
+
+Stack signals carry their own provenance, so a recommendation can be explained
+rather than asserted:
+
+```json
+{ "dimension": "db", "value": "postgres", "kind": "detected", "sources": ["package.json dependency"], "confidence": 0.95 }
+{ "dimension": "infra", "value": "aws",   "kind": "inferred", "sources": [".env key name"],            "confidence": 0.6 }
+```
+
+`detected` means the project declares it; `inferred` means something suggests
+it. A credential in `.env` says someone has an account, not that this repo
+calls that service — and the weaker signal produces a weaker fit.
+
+### Trust as dated evidence
+
+`trust: "verified"` collapsed several claims with different lifetimes into one
+word: that a hash matched, that the repo URL agreed, that the licence was OSI,
+that no advisory applied, that the server booted. Those were true on different
+days, and read as one word the oldest claim inherits the confidence of the
+newest. A hash match is good until the pin changes; "no advisories" is good
+until the next disclosure.
+
+`verify --record-evidence` writes each dimension with the date it was
+established:
+
+```json
+"trust_evidence": {
+  "artifact_id": "npm:@mapbox/mcp-server@0.11.0",
+  "dimensions": {
+    "artifact":       { "status": "verified", "checked_at": "2026-09-17", "method": "deep-hash" },
+    "signature":      { "status": "verified", "checked_at": "2026-09-17", "keyid": "SHA256:…" },
+    "source_binding": { "status": "verified", "checked_at": "2026-09-17" }
+  }
+}
+```
+
+`trust` becomes a derived value. Evidence is keyed to an artifact id including
+the version, so it is dropped rather than inherited when the version moves —
+what was learned about 1.2.3 says nothing about 1.2.4. A run records only what
+it actually examined: a `--no-audit` run writes nothing about advisories rather
+than writing "clean". Each dimension has its own shelf life (advisories 7 days,
+a hash 90), overridable with `maxEvidenceAgeDays`; evidence past it is reported
+as `UNVERIFIED` — "verified, eight months ago" is a different claim from
+"verified".
+
+The weekly refresh job records evidence as part of its run.
+
+### Policy file
+
+The flags above answer one question each. A project usually wants the same
+answers every time, in CI and in a developer's shell — so write them down once
+in `.mcp-vault.policy.json` (nearest file at or above `--cwd`; see
+[`.mcp-vault.policy.example.json`](./.mcp-vault.policy.example.json)):
+
+```json
+{
+  "unverified": "fail",
+  "signatures": "require",
+  "dependencyHooks": "warn",
+  "licenses": { "deny": ["BUSL-1.1", "SSPL-1.0"] },
+  "minHealthScore": 60,
+  "trust": ["verified"]
+}
+```
+
+A policy can only raise the bar; an explicit flag still wins. Rules that aren't
+facts about the artifact — license lists, trust tiers, a health floor — appear
+as ordinary findings, so JSON and SARIF carry them too. An unknown key is a
+hard error rather than a no-op: a policy with a typo that silently enforces
+nothing is worse than no policy, because it reads as a bar being enforced.
+
+`mcp-vault verify --show-policy` prints what is in force and where it came from.
 
 ### Doctor
 
@@ -166,6 +326,8 @@ Checks Node version, optional `gh` / Docker / `uvx`, project `.mcp.json`, projec
 ```bash
 mcp-vault docker-drift           # human-readable
 mcp-vault docker-drift --json    # machine-readable
+mcp-vault docker-drift           # report drift
+mcp-vault docker-drift --write   # move the pins, for review as a diff
 mcp-vault docker-drift --strict  # exit 1 on any drift
 ```
 
@@ -179,8 +341,9 @@ For each DB entry with a recognized install method (`npx -y`, `uvx`, `docker run
 
 ```bash
 mcp-vault eval --name memory --sandbox   # one entry, jailed in a container
+mcp-vault eval --name memory --sandbox   # one entry, jailed container (preferred)
 mcp-vault eval --name memory --unsafe    # one entry, on the host (no docker)
-mcp-vault eval --unsafe --json --strict  # whole DB, CI form (trusted runner)
+mcp-vault eval --sandbox --json --strict # whole DB, CI form
 mcp-vault eval --no-spawn                # offline self-test
 ```
 
@@ -188,7 +351,9 @@ Spawn policy is **default-deny**: a live smoke runs third-party code, so it refu
 
 Output: `assets/eval_results.json` — `{name, status, boot_ms, list_latency_ms, tool_count, tool_count_db, tool_count_drift, schema_errors[], error_code, failure_class, sandboxed, checked_at}` per entry, sorted by name for deterministic diffs. Results never flow back into `tools_database.json` — DB stays the source of truth, eval is a separate evidence stream.
 
-Network policy: real smoke needs to fetch packages (`npx` cache miss, `uvx` wheel download, `docker pull`), so it is NOT offline (network stays on even under `--sandbox` — the jail constrains everything else). The weekly `mcp-eval-smoke` CI job runs the whole DB `--unsafe` on the trusted self-hosted runner; the `mcp-eval-pr` job smokes only the entries changed in a PR with `--sandbox` on a disposable github-hosted runner. The `--no-spawn` flag re-lints existing results without spawning anything; that path IS offline.
+A `docker run` entry is **not** passed through as written. "Already containerized" is not the same as sandboxed: the flags come from the DB, and the DB is a file a pull request can edit — `-v /:/host`, `--privileged`, `--network host` are one diff away. Under `--sandbox` the launch is rebuilt from the pinned `image@sha256:…` under our own jail flags, and everything else in the entry is discarded. An image with no digest is refused rather than run.
+
+Network policy: real smoke needs to fetch packages (`npx` cache miss, `uvx` wheel download, `docker pull`), so it is NOT offline (network stays on even under `--sandbox` — the jail constrains everything else). Both CI eval jobs use `--sandbox`; `--unsafe` is never used in CI, because a verified hash says which artifact ran, not that it was benign. The `--no-spawn` flag re-lints existing results without spawning anything; that path IS offline.
 
 What it does NOT validate: behavioural correctness (we don't call any tool), business logic, or security of the server's tool implementations. This is a *smoke* check, not a fitness test.
 
@@ -309,37 +474,102 @@ Entry schema:
 
 ### CI
 
-`.github/workflows/security-scan.yml` runs six jobs across PRs, pushes, and two weekly crons:
+`.github/workflows/security-scan.yml` runs eight jobs across PRs, pushes and two
+weekly crons.
 
-- **unit-tests** — `node --test tests/*.test.cjs` on every PR / push (fast, no network). Covers parser helpers, advisory dedup, drift parsing, signal mapping, eval schema lint. Smoke depends on this.
-- **smoke** — `verify_integrity.cjs --offline` on every PR / push to master (network-free, fast).
-- **refresh-hashes** — Monday cron, opens a PR refreshing `version` + `pkg_integrity` from live registries. Human-gated before merge.
-- **docker-drift** — Monday cron + manual dispatch. Compares each Docker entry's pinned `@sha256:` against the upstream registry digest; fails the job on any drift so a maintainer reviews before refreshing the pin.
-- **discover-candidates** — Thursday cron + manual dispatch. Runs `discover.cjs` against the three sources and opens a PR with a fresh `assets/discovery/candidates.json`. The file is an *inbox* — never auto-merged into `tools_database.json`.
-- **mcp-eval-smoke** — Monday cron + manual dispatch. Runs `mcp_eval.cjs --json` against the whole DB, uploads `eval_results.json` as an artifact. Cron-only — needs network to fetch packages. Results never auto-commit to the DB.
+**Isolation first.** GitHub-hosted runners do not start on this account, so
+everything lands on one self-hosted machine — which means pull-request code
+cannot simply be executed. PR builds run inside a container with no network, the
+repo mounted read-only, no capabilities and no docker socket; `mcp-eval-pr`
+additionally takes its *scripts* from the PR's base commit and only
+`tools_database.json` from the PR head. If no container runtime answers, those
+jobs check nothing and say so rather than falling back to the host. The rules
+are asserted in [`tests/ci_manifest.test.cjs`](./tests/ci_manifest.test.cjs) —
+per step, so a later edit cannot quietly add an unjailed one. See
+[SECURITY.md](./SECURITY.md#ci-isolation-model).
+
+- **unit-tests** — `node --test tests/*.test.cjs` on every PR / push. Jailed on
+  PRs, direct in trusted contexts.
+- **smoke** — `verify_integrity.cjs --offline` on every PR / push, plus a SARIF
+  upload so each finding lands on the `tools_database.json` line that caused it
+  instead of in a log.
+- **refresh-hashes** — Monday cron. Refreshes `version` + `pkg_integrity` from
+  live registries, re-verifies with `--deep --record-evidence`, opens a PR.
+  Human-gated before merge.
+- **docker-drift** — Monday cron + manual. Compares each pinned `@sha256:`
+  against upstream, then **opens a PR moving the pins** with a link to the
+  upstream releases page. A red job says something moved; a diff says what.
+  Registry errors still fail the job — nothing was compared then.
+- **license-drift** — Monday cron + manual. `--strict` fails on an OSI →
+  restrictive move *and* on fetch errors: a run that read no licences is not a
+  run that found no drift.
+- **discover-candidates** — Thursday cron + manual. Opens a PR with a fresh
+  `assets/discovery/candidates.json`. An *inbox*, never auto-merged.
+- **mcp-eval-smoke** — Monday cron + manual. Smokes the whole DB under
+  `--sandbox` (never `--unsafe` — a verified hash says which artifact ran, not
+  that it was benign), paced so 100+ container starts don't take the daemon
+  down, and opens a PR refreshing the shipped `eval_results.json`.
+- **mcp-eval-pr** — on PRs touching the DB. Behavioural smoke of just the
+  changed entries, advisory (never blocks merge).
 
 ---
 
 ## Roadmap
 
-The following are described in [`SKILL.md`](./mcp-ecosystem-intelligence/SKILL.md) as intended behaviour but are not yet scripted — Claude performs them interactively using available tools (Bash, WebFetch, Read) on each invocation:
+Everything in this table is scripted and tested; the column says where it lives.
 
-| Feature | Status |
+| Feature | Where |
 |---|---|
-| Stack detection from manifests (`package.json`, `pyproject.toml`, …) | [`orchestrate.cjs detectStack()`](./mcp-ecosystem-intelligence/scripts/orchestrate.cjs) — done |
-| Registry / aggregator / `gh search` discovery pipeline | [`scripts/discover.cjs`](./mcp-ecosystem-intelligence/scripts/discover.cjs) — done |
-| Reject heuristics (5-Minute Rule, Bloat, Duplication) | Claude-executed judgment, no dedicated script |
-| Formatted recommendation output (terse / verbose) | Claude-generated, no dedicated formatter |
-| Project-scoped `.mcp.json` install (default path) | [`orchestrate.cjs --install`](./mcp-ecosystem-intelligence/scripts/orchestrate.cjs) — done |
-| `allowedTools` per-project filtering for heavy servers | Pattern documented in SKILL.md §10; [`audit_setup.cjs`](./mcp-ecosystem-intelligence/scripts/audit_setup.cjs) flags unscoped heavy servers |
-| Audit installed setup (drift / untrusted / heavy / scope) | [`scripts/audit_setup.cjs`](./mcp-ecosystem-intelligence/scripts/audit_setup.cjs) — done |
-| Wrapper generator (CLI/API → MCP boilerplate) | [`scripts/generate_wrapper.cjs`](./mcp-ecosystem-intelligence/scripts/generate_wrapper.cjs) — done |
+| Stack detection, with a source and confidence per signal | [`orchestrate.cjs detectStack()`](./mcp-ecosystem-intelligence/scripts/orchestrate.cjs) |
+| Integrity gate that fails closed on anything it could not check | [`verify_integrity.cjs`](./mcp-ecosystem-intelligence/scripts/verify_integrity.cjs) |
+| Artifacts hashed locally (`--deep`), npm registry signatures, provenance claims | [`lib/artifact.cjs`](./mcp-ecosystem-intelligence/scripts/lib/artifact.cjs), [`lib/npm_signatures.cjs`](./mcp-ecosystem-intelligence/scripts/lib/npm_signatures.cjs) |
+| Dependency trees resolved and checked (`--deps`) | [`lib/deps.cjs`](./mcp-ecosystem-intelligence/scripts/lib/deps.cjs) |
+| Trust as dated, per-dimension evidence | [`lib/evidence.cjs`](./mcp-ecosystem-intelligence/scripts/lib/evidence.cjs) |
+| Health / trust / fit as separate axes | [`lib/scores.cjs`](./mcp-ecosystem-intelligence/scripts/lib/scores.cjs) |
+| Policy file instead of a garland of flags | [`lib/policy.cjs`](./mcp-ecosystem-intelligence/scripts/lib/policy.cjs) |
+| Install into any host's config | [`lib/hosts.cjs`](./mcp-ecosystem-intelligence/scripts/lib/hosts.cjs) |
+| Verify what the hosts actually launch (`--installed`) | [`lib/installed.cjs`](./mcp-ecosystem-intelligence/scripts/lib/installed.cjs) |
+| Token budget for a real config | [`token_budget.cjs`](./mcp-ecosystem-intelligence/scripts/token_budget.cjs) |
+| Machine-readable report + SARIF | [`lib/report.cjs`](./mcp-ecosystem-intelligence/scripts/lib/report.cjs) |
+| Behavioural smoke in a rebuilt jail | [`mcp_eval.cjs`](./mcp-ecosystem-intelligence/scripts/mcp_eval.cjs), [`lib/mcp_stdio.cjs`](./mcp-ecosystem-intelligence/scripts/lib/mcp_stdio.cjs) |
+| Discovery pipeline (npm / gh / README) | [`discover.cjs`](./mcp-ecosystem-intelligence/scripts/discover.cjs) |
+| Wrapper generator (CLI/API → MCP) | [`generate_wrapper.cjs`](./mcp-ecosystem-intelligence/scripts/generate_wrapper.cjs) |
+
+Still judgement, not script — deliberately: the reject heuristics (5-Minute
+Rule, Bloat, Duplication) and promoting a candidate to `trust: verified`. The
+typed `artifact`/`launch` model exists in
+[`lib/entry_model.cjs`](./mcp-ecosystem-intelligence/scripts/lib/entry_model.cjs)
+and is asserted to reproduce every entry's `install_cmd`; consumers still read
+the string, and moving them over is the next step.
 
 ---
 
 ## Token cost management
 
 Every active MCP server injects its full tool list into Claude's system prompt (~200–500 tokens per tool). With 114 servers in the DB the spread is wide: `mcp-server-fetch` = 1 tool vs. `gitlab-mcp` = 153 tools.
+
+**First, measure.** `mcp-vault budget` reads your host configs and totals the
+surface, stating where each number came from:
+
+```bash
+mcp-vault eval --installed --unsafe --results /tmp/eval.json   # measure real tools/list payloads
+mcp-vault budget --results /tmp/eval.json                      # add it up
+mcp-vault budget --budget 25                                   # exit 1 over 25% of the window
+```
+
+```
+server                     tools    tokens  source
+hostinger                    396    87,831  measured
+chrome-devtools               29     6,505  measured
+github                        26     3,964  measured
+teamcity                      13     2,668  measured
+codex                          4     1,065  measured
+TOTAL                        468   102,034  ≈51% of a 200,000-token window
+```
+
+`measured` is a real payload (bytes ÷ 4); `eval`/`db` is a tool count times the
+200–500 range above; `unknown` is counted as unknown, never as zero. Where the
+DB knows how to narrow a server, the report says so.
 
 Three levers, in order of preference:
 

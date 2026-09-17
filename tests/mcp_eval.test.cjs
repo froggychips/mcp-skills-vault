@@ -454,3 +454,182 @@ test('classifyFailure: network error → NEEDS_NET', () => {
 test('classifyFailure: unexplained exit → CRASH', () => {
   assert.equal(e.classifyFailure({ status: 'fail', errorCode: 'exit 1', stderr: 'Segmentation fault' }), 'CRASH');
 });
+
+// ── --no-spawn really does not spawn ───────────────────────────────────────
+
+test('CLI --no-spawn never reaches the live smoke', () => {
+  const { spawnSync } = require('node:child_process');
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'eval-nospawn-'));
+  const dbPath = path.join(tmp, 'db.json');
+  const resPath = path.join(tmp, 'results.json');
+  // A parsable entry: if the no-spawn branch falls through, smokeEntry() runs
+  // spawn() on this before the queued exit lands.
+  fs.writeFileSync(dbPath, JSON.stringify({
+    tools: [{ name: 'fake-entry', category: 'test',
+              install_cmd: `docker run ghcr.io/nonexistent/nope@sha256:${'0'.repeat(64)}` }],
+  }));
+  fs.writeFileSync(resPath, JSON.stringify({ results: [] }));
+
+  const r = spawnSync(process.execPath, [
+    path.resolve(__dirname, '../mcp-ecosystem-intelligence/scripts/mcp_eval.cjs'),
+    '--no-spawn', '--db', dbPath, '--results', resPath,
+  ], { encoding: 'utf8' });
+
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /no-spawn mode/);
+  // "smoking <name>…" is printed right before spawn(). exitAfterFlush() is
+  // asynchronous, so a missing `return` let the whole live path run first.
+  assert.doesNotMatch(r.stderr, /smoking/, 'no-spawn must not enter the live smoke');
+  assert.equal(fs.readFileSync(resPath, 'utf8'), JSON.stringify({ results: [] }));
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+// ── sandboxWrap: a DB entry is not a trusted argv ──────────────────────────
+
+test('sandboxWrap: a docker entry is rebuilt from its digest, not trusted', () => {
+  const { dockerImageRef } = require('../mcp-ecosystem-intelligence/scripts/lib/install_cmd.cjs');
+  const digest = 'a'.repeat(64);
+  const cmd = `docker run -i --rm --cap-drop ALL ghcr.io/x/y@sha256:${digest}`;
+  const w = e.sandboxWrap(e.parseInstallCmd(cmd), { imageRef: dockerImageRef(cmd) });
+  assert.equal(w.sandboxed, true);
+  assert.equal(w.image, `ghcr.io/x/y@sha256:${digest}`);
+  assert.equal(w.args.at(-1), `ghcr.io/x/y@sha256:${digest}`);
+  for (const flag of ['--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--read-only', '--rm']) {
+    assert.ok(w.args.includes(flag), flag);
+  }
+});
+
+test('sandboxWrap: hostile flags in a DB entry are discarded', () => {
+  // The DB is a file a pull request can edit. `-v /:/host` is one diff away,
+  // and "already containerized" is not the same as sandboxed.
+  const { dockerImageRef } = require('../mcp-ecosystem-intelligence/scripts/lib/install_cmd.cjs');
+  const digest = 'b'.repeat(64);
+  const cmd = `docker run -i --rm -v /:/host --privileged --network host --pid host ghcr.io/evil/x@sha256:${digest}`;
+  const w = e.sandboxWrap(e.parseInstallCmd(cmd), { imageRef: dockerImageRef(cmd) });
+  assert.equal(w.sandboxed, true);
+  const argv = w.args.join(' ');
+  assert.doesNotMatch(argv, /-v /);
+  assert.doesNotMatch(argv, /\/:\/host/);
+  assert.doesNotMatch(argv, /--privileged/);
+  assert.doesNotMatch(argv, /--network host/);
+  assert.doesNotMatch(argv, /--pid host/);
+  assert.match(w.sandbox_note, /discarded/);
+});
+
+test('sandboxWrap: the image comes from the positional parse, not from a flag value', () => {
+  // A digest-shaped string in `--label` used to win, so the jail ran a decoy
+  // image and the server under test was never smoked.
+  const { dockerImageRef } = require('../mcp-ecosystem-intelligence/scripts/lib/install_cmd.cjs');
+  const decoy = 'a'.repeat(64);
+  const real  = 'b'.repeat(64);
+  const cmd = `docker run --label ghcr.io/x/decoy@sha256:${decoy} ghcr.io/x/real@sha256:${real}`;
+  const w = e.sandboxWrap(e.parseInstallCmd(cmd), { imageRef: dockerImageRef(cmd) });
+  assert.equal(w.image, `ghcr.io/x/real@sha256:${real}`);
+});
+
+test('sandboxWrap: refuses rather than guesses when no image was parsed', () => {
+  const digest = 'c'.repeat(64);
+  const w = e.sandboxWrap(e.parseInstallCmd(`docker run -i ghcr.io/x/y@sha256:${digest}`));
+  assert.equal(w.sandboxed, false);
+  assert.equal(w.refused, true);
+  assert.match(w.sandbox_note, /refusing to guess/);
+});
+
+test('sandboxWrap: refuses a docker entry with nothing to rebuild from', () => {
+  const { dockerImageRef } = require('../mcp-ecosystem-intelligence/scripts/lib/install_cmd.cjs');
+  const cmd = 'docker run -i --rm --network host ghcr.io/x/y:latest';
+  const w = e.sandboxWrap(e.parseInstallCmd(cmd), { imageRef: dockerImageRef(cmd) });
+  assert.equal(w.sandboxed, false);
+  assert.equal(w.refused, true);
+  assert.match(w.sandbox_note, /not pinned by digest/);
+});
+
+test('sandboxWrap: a local binary cannot be jailed by wrapping its argv', () => {
+  // `--installed --sandbox` used to run these straight on the host, because a
+  // field in the entry switched the sandbox off.
+  const w = e.sandboxWrap({ command: '/opt/bin/my-mcp', args: [] });
+  assert.equal(w.sandboxed, false);
+  assert.equal(w.refused, true);
+  assert.match(w.sandbox_note, /not a package runner/);
+});
+
+test('sandboxWrap: a field in the entry cannot switch the sandbox off', async () => {
+  // The DB is PR-editable; `_evalSpawn` used to mean "skip the jail".
+  const sneaky = {
+    name: 'sneaky',
+    install_cmd: 'npx -y innocent@1.0.0',
+    _evalSpawn: { command: '/bin/sh', args: ['-c', 'echo pwned'] },
+  };
+  const r = await e.smokeEntry(sneaky, { sandbox: true, timeoutMs: 1000 });
+  // Either jailed or refused — never executed as given.
+  assert.equal(r.status === 'skip' || r.sandboxed === true, true, JSON.stringify(r));
+});
+
+test('a refused sandbox means the entry is skipped, not run', async () => {
+  const digestless = {
+    name: 'no-digest',
+    install_cmd: 'docker run -i --rm --privileged ghcr.io/x/y:latest',
+  };
+  const r = await e.smokeEntry(digestless, { sandbox: true, timeoutMs: 1000 });
+  assert.equal(r.status, 'skip');
+  assert.match(r.error_code, /not pinned by digest/);
+  assert.equal(r.sandboxed, false);
+});
+
+test('sandboxWrap: caches are mounted exec, or nothing can run', () => {
+  // tmpfs defaults to noexec. npx and uvx fetch the server into the cache and
+  // then execute it from there, so without :exec every entry fails with
+  // "Permission denied" — a whole-DB run produced 112 of 113 such "failures",
+  // which were the jail refusing to run what it had just downloaded.
+  for (const cmd of ['npx -y pkg@1.0.0', 'uvx pkg==1.0.0']) {
+    const w = e.sandboxWrap(e.parseInstallCmd(cmd));
+    const mounts = w.args.filter((a, i) => w.args[i - 1] === '--tmpfs');
+    assert.ok(mounts.length > 0, cmd);
+    for (const m of mounts) {
+      assert.match(m, /:exec$/, `${cmd}: ${m} is mounted noexec, so the fetched server cannot start`);
+    }
+  }
+});
+
+test('sandboxWrap: each runtime gets a writable HOME its package manager can use', () => {
+  const npx = e.sandboxWrap(e.parseInstallCmd('npx -y pkg@1.0.0'));
+  assert.ok(npx.args.includes('HOME=/home/node'));
+  assert.ok(npx.args.includes('-u') && npx.args.includes('node'), 'npm entries run unprivileged');
+
+  const uvx = e.sandboxWrap(e.parseInstallCmd('uvx pkg==1.0.0'));
+  assert.ok(uvx.args.includes('HOME=/home/uv'));
+  assert.ok(uvx.args.some(a => a.startsWith('UV_CACHE_DIR=')), 'uv needs its cache pointed somewhere writable');
+});
+
+test('classifyFailure: a dead sandbox is not a crashed server', () => {
+  const stdio = require('../mcp-ecosystem-intelligence/scripts/lib/mcp_stdio.cjs');
+  // A whole-DB run once reported 76 CRASHes that were all the docker daemon
+  // buckling under 113 consecutive container starts. Blaming the entries for
+  // that is the report lying about the DB.
+  const sandboxNoise = [
+    'error during connect: Get "http://%2FUsers%2Fy%2F.rd%2Fdocker.sock/v1.51/containers": EOF',
+    'Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?',
+    'docker: not found',
+    'error waiting for container: context canceled',
+    'toomanyrequests: You have reached your pull rate limit',
+  ];
+  for (const stderr of sandboxNoise) {
+    assert.equal(stdio.classifyFailure({ status: 'fail', stderr }), 'SANDBOX_UNAVAILABLE', stderr.slice(0, 40));
+  }
+  // And the real classes still work: the sandbox pattern is checked first
+  // because "error during connect" would otherwise read as a network failure.
+  assert.equal(stdio.classifyFailure({ status: 'fail', stderr: 'Error: API_KEY is not set' }), 'NEEDS_ENV');
+  assert.equal(stdio.classifyFailure({ status: 'fail', stderr: 'getaddrinfo ENOTFOUND registry.npmjs.org' }), 'NEEDS_NET');
+  assert.equal(stdio.classifyFailure({ status: 'fail', stderr: 'TypeError: x is not a function' }), 'CRASH');
+  assert.equal(stdio.classifyFailure({ status: 'fail', errorCode: 'timeout after 30000ms' }), 'TIMEOUT');
+});
+
+test('classifyFailure: a server cannot claim the sandbox is broken', () => {
+  const stdio = require('../mcp-ecosystem-intelligence/scripts/lib/mcp_stdio.cjs');
+  const stderr = 'error during connect: Get "http://%2Fvar%2Frun%2Fdocker.sock/v1.51/x": EOF';
+  // Before the handshake, that line is the infrastructure talking.
+  assert.equal(stdio.classifyFailure({ status: 'fail', stderr, handshakeReached: false }), 'SANDBOX_UNAVAILABLE');
+  // After it, the process is a server, and a server printing the same line is
+  // a crashed server — otherwise a hostile entry prints it and is skipped.
+  assert.equal(stdio.classifyFailure({ status: 'fail', stderr, handshakeReached: true }), 'CRASH');
+});

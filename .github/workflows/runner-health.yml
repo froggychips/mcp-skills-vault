@@ -44,6 +44,7 @@ jobs:
   deadman:
     name: Self-hosted CI deadman
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Залипшая очередь
         env:

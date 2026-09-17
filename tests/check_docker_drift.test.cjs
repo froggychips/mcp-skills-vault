@@ -85,3 +85,48 @@ test('apiHostFor: the mapping only rewrites requests, not the stored namespace',
   assert.equal(ref.registry, 'docker.io');
   assert.notEqual(d.apiHostFor(ref.registry), ref.registry);
 });
+
+test('ALLOWED_REGISTRIES: the header list, enforced', () => {
+  for (const host of ['docker.io', 'ghcr.io', 'quay.io', 'mcr.microsoft.com']) {
+    assert.equal(d.ALLOWED_REGISTRIES.has(host), true, host);
+  }
+  // A DB entry must not be able to point the prober at an arbitrary host.
+  for (const host of ['internal.corp:5000', 'localhost', '169.254.169.254', 'evil.example']) {
+    assert.equal(d.ALLOWED_REGISTRIES.has(host), false, host);
+  }
+});
+
+test('realmAllowed: only follows a bearer realm back to a known registry', () => {
+  assert.equal(d.realmAllowed('https://auth.docker.io/token'),       true);
+  assert.equal(d.realmAllowed('https://ghcr.io/token'),              true);
+  assert.equal(d.realmAllowed('https://quay.io/v2/auth'),            true);
+  assert.equal(d.realmAllowed('https://mcr.microsoft.com/oauth2/token'), true);
+  // The realm arrives in a response header — untrusted input.
+  assert.equal(d.realmAllowed('https://metadata.internal/token'),    false);
+  assert.equal(d.realmAllowed('https://169.254.169.254/latest/meta-data'), false);
+  assert.equal(d.realmAllowed('http://ghcr.io/token'),               false);  // plaintext
+  assert.equal(d.realmAllowed('https://ghcr.io.evil.example/token'), false);  // suffix trick
+  assert.equal(d.realmAllowed('not a url'),                          false);
+  assert.equal(d.realmAllowed(undefined),                            false);
+});
+
+test('driftExitCode: a registry we could not read is never a pass', () => {
+  assert.equal(d.driftExitCode({ drifts: 0, errors: 0, strict: false }), 0);
+  // Was exit 0: `errors: 1, drifts: 0` read as "clean" to the CI step.
+  assert.equal(d.driftExitCode({ drifts: 0, errors: 1, strict: false }), 1);
+  assert.equal(d.driftExitCode({ drifts: 0, errors: 1, strict: true  }), 1);
+  // Drift alone stays advisory unless --strict.
+  assert.equal(d.driftExitCode({ drifts: 2, errors: 0, strict: false }), 0);
+  assert.equal(d.driftExitCode({ drifts: 2, errors: 0, strict: true  }), 1);
+  assert.equal(d.driftExitCode(), 0);
+});
+
+test('--write is reflected in the exit code: a diff is not a failure', () => {
+  // The point of --write is to turn drift into a reviewable diff, so drift
+  // stops being the failure. An unreachable registry still is one: nothing was
+  // compared in that case.
+  assert.equal(d.driftExitCode({ drifts: 0, errors: 0, strict: false }), 0);
+  assert.equal(d.driftExitCode({ drifts: 2, errors: 0, strict: false }), 0);
+  assert.equal(d.driftExitCode({ drifts: 2, errors: 0, strict: true }), 1);
+  assert.equal(d.driftExitCode({ drifts: 0, errors: 1, strict: false }), 1);
+});
