@@ -243,7 +243,7 @@ async function publishedVersions(ecosystem, name) {
   return { ok: true, versions: Object.keys((res.data && res.data.releases) || {}) };
 }
 
-async function checkEntry(tool) {
+async function checkEntry(tool, { osv = osvFor, published = publishedVersions } = {}) {
   const typed = toTypedEntry(tool);
   const eco = typed ? typed.artifact.ecosystem : null;
   const row = { name: tool.name, ecosystem: eco, package: null, current: tool.version || null, plan: { state: 'unknown' } };
@@ -259,7 +259,7 @@ async function checkEntry(tool) {
     return row;
   }
 
-  const now = await osvFor(eco, pkg, tool.version);
+  const now = await osv(eco, pkg, tool.version);
   if (!now.ok) {
     // An unreachable feed is not "clear".
     row.plan = { state: 'unknown', reason: `OSV did not answer: ${now.error}` };
@@ -270,7 +270,7 @@ async function checkEntry(tool) {
     return row;
   }
 
-  const pub = await publishedVersions(eco, pkg);
+  const pub = await published(eco, pkg);
   const plan = planUpgrade({
     ecosystem: eco, pkg, current: tool.version, vulns: now.vulns,
     published: pub.versions, allowPrerelease: false,
@@ -280,7 +280,7 @@ async function checkEntry(tool) {
   // recommendation that moves someone onto a version with a *different* CVE is
   // worse than none.
   if (plan.state === 'upgrade') {
-    const after = await osvFor(eco, pkg, plan.target);
+    const after = await osv(eco, pkg, plan.target);
     if (!after.ok) {
       // The check did not run. Saying "upgrade to X" on the strength of a
       // check that failed is the bug this whole repo is about, so the state
@@ -295,7 +295,7 @@ async function checkEntry(tool) {
         const latest = plan.latest;
         let cleanFound = false;
         if (latest && latest !== plan.target) {
-          const atLatest = await osvFor(eco, pkg, latest);
+          const atLatest = await osv(eco, pkg, latest);
           if (atLatest.ok && !atLatest.vulns.length) {
             plan.target = latest;
             plan.target_check = { ok: true, remaining: [], note: 'the shortest hop still had advisories; the latest release is clean' };
@@ -312,7 +312,11 @@ async function checkEntry(tool) {
           // version of this code left `state: 'upgrade'` with a target whose
           // own advisories it had just read.
           plan.state = 'no-clean-target';
-          plan.reason = `${plan.target} clears the advisories against ${current} but has `
+          // `current` is not in scope here — it is `planUpgrade`'s parameter,
+          // not this function's. The only path that reached this line is the
+          // one where a fix exists but is not clean, so the bug hid where it
+          // did the most damage: a ReferenceError instead of an honest verdict.
+          plan.reason = `${plan.target} clears the advisories against ${row.current} but has `
             + `${plan.target_check.remaining.length} of its own`
             + `${latest && latest !== plan.target ? `, and ${latest} is not clean either` : ''}`;
         }

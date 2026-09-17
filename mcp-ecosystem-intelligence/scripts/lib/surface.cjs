@@ -21,13 +21,17 @@
  *
  *   artifact changed + surface changed    an upgrade: expected, still read it
  *   artifact changed + surface unchanged  a patch release, nothing to see
- *   artifact unchanged + surface changed  the same bytes are now saying
- *                                         something different — which for a
- *                                         local server means something is not
- *                                         deterministic, and for a remote one
- *                                         means the server was changed under
- *                                         you. This is the case with no
- *                                         innocent explanation.
+ *   artifact unchanged + surface changed  **unexplained**, and the case worth
+ *                                         looking at. Not impossible, though:
+ *                                         an unvendored launch re-resolves its
+ *                                         transitive tree at every start, and
+ *                                         feature flags, credentials and a
+ *                                         remote backend can each change what a
+ *                                         server advertises. It becomes a hard
+ *                                         finding only when the artifact bytes,
+ *                                         the dependency closure (`lock`) and
+ *                                         the launch contract are all identical
+ *                                         and the surface still differs.
  *
  * API:
  *   fingerprintTools(tools)          -> { sha256, count, tools: {name: {…}} }

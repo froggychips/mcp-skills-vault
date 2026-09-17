@@ -125,6 +125,7 @@ function versionFromInstallCmd(cmd) {
   return null;
 }
 const { readDb, writeDb } = require('./lib/db_io.cjs');
+const crypto = require('crypto');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { smokeEvidence, mergeEvidence } = require('./lib/evidence.cjs');
 const { fingerprintTools, diffSurface, describeDiff, isEmpty: surfaceUnchanged } = require('./lib/surface.cjs');
@@ -398,6 +399,71 @@ function waitForExitOrTimeout(child, ms, isExited) {
   });
 }
 
+/**
+ * What ran, as comparable fields.
+ *
+ * `launch_digest` is over the *contract* — the command and arguments the entry
+ * asks for — not over the sandbox-wrapped invocation, so it changes when the
+ * entry changes and not when our jail flags do.
+ *
+ * Every field can be null, and a null is not a mismatch: a comparison against
+ * a missing field is `unknown`, which is the third answer this repo insists on
+ * having.
+ */
+function artifactIdentity(tool, parsed) {
+  const typed = toTypedEntry(tool);
+  const contract = parsed ? `${parsed.command} ${(parsed.args || []).join(' ')}`.trim() : null;
+  return {
+    artifact_id:        typed ? artifactId(typed.artifact) : null,
+    artifact_integrity: tool.pkg_integrity || null,
+    db_version:         tool.version || null,
+    launch_digest:      contract ? crypto.createHash('sha256').update(contract).digest('hex').slice(0, 32) : null,
+  };
+}
+
+/**
+ * Did the artifact change between two runs? yes / no / we cannot tell.
+ *
+ * The third answer is the point. The previous version compared
+ * `launched.install_cmd` strings and treated a missing field as a change, so
+ * a snapshot written without that field — which is exactly what the weekly
+ * job wrote — made *every* surface change look like it came with a version
+ * bump. That silently destroyed the one comparison this feature exists for.
+ */
+function artifactChangedBetween(prior, fresh) {
+  const a = prior && prior.identity;
+  const b = fresh && fresh.identity;
+  if (!a || !b) return null;                       // nothing recorded: unknown
+  const fields = ['artifact_id', 'artifact_integrity', 'db_version', 'launch_digest'];
+  // A field present on one side and absent on the other tells us nothing
+  // about that field; only two present, differing values are a change.
+  const comparable = fields.filter((f) => a[f] != null && b[f] != null);
+  if (!comparable.length) return null;
+  return comparable.some((f) => a[f] !== b[f]);
+}
+
+function surfaceDrift(prior, fresh) {
+  if (!fresh.surface || !prior || !prior.surface) return null;
+  const diff = diffSurface(prior.surface, fresh.surface);
+  if (surfaceUnchanged(diff)) return null;
+  const changed = artifactChangedBetween(prior, fresh);
+  return {
+    since:            prior.checked_at || null,
+    // true / false / null, where null means the snapshot carried no identity
+    // to compare against. Readers must not coerce it.
+    artifact_changed: changed,
+    artifact_comparison: changed === null ? 'not-recorded' : 'compared',
+    previous_identity: (prior && prior.identity) || null,
+    identity:          (fresh && fresh.identity) || null,
+    previous_sha256:  prior.surface.sha256,
+    sha256:           fresh.surface.sha256,
+    added:            diff.added,
+    removed:          diff.removed,
+    changed:          diff.changed,
+    lines:            describeDiff(diff),
+  };
+}
+
 // ── Smoke one entry ────────────────────────────────────────────────────────
 
 async function smokeEntry(tool, opts) {
@@ -414,6 +480,8 @@ async function smokeEntry(tool, opts) {
     // { sha256, count, tools: { name: { description, schema } } } — hashes.
     surface:          null,
     surface_drift:    null,
+    // What ran, as comparable fields; the baseline a later run diffs against.
+    identity:         null,
     tool_count_db:    typeof tool.est_tools_count === 'number' ? tool.est_tools_count : null,
     tool_count_drift: false,
     schema_errors:    [],
@@ -435,6 +503,14 @@ async function smokeEntry(tool, opts) {
     db_version:  tool.version || null,
   };
   const parsed = tool._evalSpawn || parseInstallCmd(tool.install_cmd);
+  // The identity of what is about to run, as fields rather than as a string.
+  //
+  // Comparing `install_cmd` text answered "did the entry's prose change", which
+  // is not the question: a reformatted command read as a different artifact,
+  // and — worse — a snapshot that had dropped the field read as *no* artifact,
+  // which made every later surface change look explained by a version bump.
+  // See surfaceDrift().
+  result.identity = artifactIdentity(tool, parsed);
   if (!parsed) {
     result.error_code = 'unrecognized install method';
     return result;
@@ -843,24 +919,17 @@ async function main() {
    * deterministic, and for a remote one it means the server was changed under
    * whoever trusted it.
    */
-  function surfaceDrift(prior, fresh) {
-    if (!fresh.surface || !prior || !prior.surface) return null;
-    const diff = diffSurface(prior.surface, fresh.surface);
-    if (surfaceUnchanged(diff)) return null;
-    const before = prior.launched || {};
-    const after  = fresh.launched || {};
-    const artifactChanged = before.install_cmd !== after.install_cmd
-      || before.db_version !== after.db_version;
-    return {
-      since:            prior.checked_at || null,
-      artifact_changed: artifactChanged,
-      previous_sha256:  prior.surface.sha256,
-      sha256:           fresh.surface.sha256,
-      added:            diff.added,
-      removed:          diff.removed,
-      changed:          diff.changed,
-      lines:            describeDiff(diff),
-    };
+  /**
+   * Attach everything that depends on the *final* result for an entry.
+   *
+   * Called once per entry, after a retry has decided the outcome. The drift
+   * computation used to run only on the first attempt, so a transient sandbox
+   * failure followed by a successful retry lost that run's surface comparison
+   * entirely — the one run where something had just gone wrong.
+   */
+  function finalize(result) {
+    result.surface_drift = surfaceDrift(priorByName.get(result.name), result);
+    return result;
   }
 
   const newResults = [];
@@ -869,7 +938,6 @@ async function main() {
   for (const tool of picked) {
     if (!opts.json) process.stderr.write(`smoking ${tool.name}…\n`);
     const r = await smokeEntry(tool, opts);
-    r.surface_drift = surfaceDrift(priorByName.get(tool.name), r);
     touched.add(tool.name);
     // "The sandbox could not run" is not a finding about the entry. Retry once
     // after a pause — a daemon under load recovers — then report it as a skip,
@@ -879,7 +947,7 @@ async function main() {
       await sleep(Math.max(2000, (opts.paceMs || 0) * 5));
       const retry = await smokeEntry(tool, opts);
       if (retry.failure_class !== 'SANDBOX_UNAVAILABLE') {
-        newResults.push(retry);
+        newResults.push(finalize(retry));
         consecutiveSandboxFailures = 0;
         if (opts.paceMs) await sleep(opts.paceMs);
         continue;
@@ -889,7 +957,7 @@ async function main() {
       r.status = 'skip';
       consecutiveSandboxFailures++;
       if (consecutiveSandboxFailures >= 3) {
-        newResults.push(r);
+        newResults.push(finalize(r));
         runAborted = true;
         process.stderr.write(
           `\nStopping: the sandbox failed ${consecutiveSandboxFailures} times in a row ` +
@@ -900,7 +968,7 @@ async function main() {
     } else {
       consecutiveSandboxFailures = 0;
     }
-    newResults.push(r);
+    newResults.push(finalize(r));
     if (opts.paceMs) await sleep(opts.paceMs);
     if (!opts.json) {
       const tag = r.status === 'pass' ? 'PASS' : (r.status === 'fail' ? 'FAIL' : 'SKIP');
@@ -910,9 +978,11 @@ async function main() {
         : (r.status === 'skip' ? ` — ${r.error_code || ''}` : ` — ${r.tool_count} tools, boot ${r.boot_ms}ms${drift}`);
       process.stderr.write(`  ${tag} ${tool.name}${detail}\n`);
       if (r.surface_drift) {
-        const how = r.surface_drift.artifact_changed
-          ? 'the artifact changed too'
-          : 'THE ARTIFACT DID NOT CHANGE';
+        const how = r.surface_drift.artifact_changed === null
+          ? 'the previous snapshot recorded no identity, so the artifact cannot be compared'
+          : (r.surface_drift.artifact_changed
+            ? 'the artifact changed too'
+            : 'THE ARTIFACT DID NOT CHANGE');
         process.stderr.write(`       tool surface changed since ${r.surface_drift.since || 'the last run'} — ${how}\n`);
         for (const line of r.surface_drift.lines) process.stderr.write(`         ${line}\n`);
       }
@@ -1003,7 +1073,11 @@ async function main() {
   const surfaceDrifted = newResults.filter(r => r.surface_drift);
   // Split on the one distinction that matters: an upgrade changing its surface
   // is expected, the same artifact changing its surface is not.
-  const unexplainedDrift = surfaceDrifted.filter(r => !r.surface_drift.artifact_changed);
+  // Strictly false, not falsy: `null` means the previous snapshot carried no
+  // identity, and counting "we could not tell" as "the artifact did not change"
+  // is the overstatement this distinction exists to prevent.
+  const unexplainedDrift = surfaceDrifted.filter(r => r.surface_drift.artifact_changed === false);
+  const uncomparableDrift = surfaceDrifted.filter(r => r.surface_drift.artifact_changed === null);
   const attempted = newResults.length;
   const notAttempted = Math.max(0, picked.length - attempted);
 
@@ -1017,6 +1091,7 @@ async function main() {
       sandbox_unavailable: sandboxUnavailable,
       surface_drift: surfaceDrifted.length,
       surface_drift_unexplained: unexplainedDrift.length,
+      surface_drift_uncomparable: uncomparableDrift.length,
       aborted: runAborted,
       planned: picked.length,
       not_attempted: notAttempted,
@@ -1034,12 +1109,19 @@ async function main() {
     process.stderr.write(`Results written to ${opts.results}\n`);
   }
   if (unexplainedDrift.length) {
-    // Said loudly and separately: for a pinned local server this means the
-    // launch is not deterministic, and for a remote one it means the server was
-    // changed under whoever trusted it.
+    // Said separately because it is the interesting case — and worded as
+    // *unexplained* rather than impossible: an unvendored launch re-resolves
+    // its dependency tree at every start, and flags, credentials and a remote
+    // backend can each change what a server advertises.
     process.stderr.write(
-      `\nWARNING: ${unexplainedDrift.map(r => r.name).join(', ')} presented a different tool surface ` +
-      `from the same artifact. Nothing about the package changed.\n`
+      `\nUNEXPLAINED: ${unexplainedDrift.map(r => r.name).join(', ')} presented a different tool surface ` +
+      `from the same artifact identity. Worth a look: an unvendored tree, a feature flag, or a changed server.\n`
+    );
+  }
+  if (uncomparableDrift.length) {
+    process.stderr.write(
+      `NOTE: ${uncomparableDrift.length} surface change(s) could not be attributed — the previous ` +
+      `snapshot recorded no artifact identity to compare against.\n`
     );
   }
   if (sandboxUnavailable > 0) {
@@ -1076,6 +1158,9 @@ if (require.main === module) {
 }
 
 module.exports = {
+  artifactIdentity,
+  artifactChangedBetween,
+  surfaceDrift,
   parseInstallCmd,
   lintSchema,
   pickTools,

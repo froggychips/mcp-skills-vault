@@ -157,3 +157,72 @@ test('fixedVersions keeps an unfixed advisory in the list', () => {
   const list = u.fixedVersions([vuln('GHSA-a', '1.0.0'), vuln('GHSA-b', null)], 'pkg');
   assert.deepEqual(list.map((a) => [a.id, a.fixed]), [['GHSA-a', ['1.0.0']], ['GHSA-b', []]]);
 });
+
+// ── the paths that only run when something is wrong ────────────────────────
+
+const vulnAt = (id, fixed, pkg = 'pkg') => ({
+  id,
+  database_specific: { severity: 'HIGH' },
+  affected: [{
+    package: { name: pkg, ecosystem: 'npm' },
+    ranges: [{ type: 'SEMVER', events: [{ introduced: '0' }, ...(fixed ? [{ fixed }] : [])] }],
+  }],
+});
+
+test('a target that is itself vulnerable, with no clean latest, returns a verdict rather than throwing', async () => {
+  // This path built its message from a variable that does not exist in that
+  // scope, so the *only* way to reach it was a ReferenceError — the bug hid
+  // exactly where it did the most damage: the case where a naive tool would
+  // recommend a still-vulnerable version.
+  const tool = { name: 'x', install_cmd: 'npx -y pkg@1.0.0', version: '1.0.0' };
+  const osv = async (_eco, _pkg, version) => {
+    if (version === '1.0.0') return { ok: true, vulns: [vulnAt('GHSA-a', '1.1.0')] };
+    // Everything newer has an advisory of its own, and none of them is fixed.
+    return { ok: true, vulns: [vulnAt('GHSA-b', null)] };
+  };
+  const published = async () => ({ ok: true, versions: ['1.0.0', '1.1.0', '1.2.0'] });
+
+  const row = await u.checkEntry(tool, { osv, published });
+  assert.equal(row.plan.state, 'no-clean-target');
+  assert.match(row.plan.reason, /1\.1\.0 clears the advisories against 1\.0\.0/);
+  assert.match(row.plan.reason, /1 of its own/);
+  assert.match(row.plan.reason, /1\.2\.0 is not clean either/);
+});
+
+test('a target check that could not run is not counted as a safe upgrade', async () => {
+  const tool = { name: 'x', install_cmd: 'npx -y pkg@1.0.0', version: '1.0.0' };
+  const osv = async (_eco, _pkg, version) => (version === '1.0.0'
+    ? { ok: true, vulns: [vulnAt('GHSA-a', '1.1.0')] }
+    : { ok: false, error: 'timeout after 15000ms' });
+  const published = async () => ({ ok: true, versions: ['1.0.0', '1.1.0'] });
+
+  const row = await u.checkEntry(tool, { osv, published });
+  assert.equal(row.plan.state, 'upgrade-unconfirmed');
+  assert.equal(row.plan.target, '1.1.0');
+  assert.equal(row.plan.target_check.ok, false);
+});
+
+test('the shortest hop being dirty but the latest being clean moves the target', async () => {
+  const tool = { name: 'x', install_cmd: 'npx -y pkg@1.0.0', version: '1.0.0' };
+  const osv = async (_eco, _pkg, version) => {
+    if (version === '1.0.0') return { ok: true, vulns: [vulnAt('GHSA-a', '1.1.0')] };
+    if (version === '1.1.0') return { ok: true, vulns: [vulnAt('GHSA-b', '1.2.0')] };
+    return { ok: true, vulns: [] };
+  };
+  const published = async () => ({ ok: true, versions: ['1.0.0', '1.1.0', '1.2.0'] });
+
+  const row = await u.checkEntry(tool, { osv, published });
+  assert.equal(row.plan.state, 'upgrade');
+  assert.equal(row.plan.target, '1.2.0');
+  assert.match(row.plan.target_check.note, /latest release is clean/);
+});
+
+test('an unreachable advisory feed for the current version is unknown, never clear', async () => {
+  const tool = { name: 'x', install_cmd: 'npx -y pkg@1.0.0', version: '1.0.0' };
+  const row = await u.checkEntry(tool, {
+    osv: async () => ({ ok: false, error: 'HTTP 503' }),
+    published: async () => ({ ok: true, versions: [] }),
+  });
+  assert.equal(row.plan.state, 'unknown');
+  assert.match(row.plan.reason, /OSV did not answer/);
+});

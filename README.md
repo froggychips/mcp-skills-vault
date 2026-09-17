@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@froggychips/mcp-vault.svg)](https://www.npmjs.com/package/@froggychips/mcp-vault)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Zero deps](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](./PHILOSOPHY.md)
-[![Tests](https://img.shields.io/badge/tests-711%20pass-brightgreen.svg)](./tests)
+[![Tests](https://img.shields.io/badge/tests-724%20pass-brightgreen.svg)](./tests)
 
 **Homepage:** [mcp.froggychips.xyz](https://mcp.froggychips.xyz) · **npm:** [`@froggychips/mcp-vault`](https://www.npmjs.com/package/@froggychips/mcp-vault)
 
@@ -50,7 +50,7 @@ $ npx -y @froggychips/mcp-vault verify --offline
 | **Who published it** | whatever `repository.url` says | cross-referenced with the official MCP registry, whose namespaces are **ownership-verified** at publish (`io.github.<owner>/…`) |
 | **Does it run?** | find out after installing | behavioural eval, and the result caps the recommendation: **40 of 113** complete a handshake, and an entry nothing has seen start cannot read as "recommended" |
 | **What can it do?** | read the source, if it isn't minified | `capabilities` records what each package is able to do with a file and a line — 35 of 99 can shell out, 84 read `process.env` — and reports what a new version **gained** |
-| **Did the tools change?** | invisible | every passing eval fingerprints the tool surface per tool; the same artifact presenting a different surface is reported as the case with no innocent explanation |
+| **Did the tools change?** | invisible | every passing eval fingerprints the tool surface per tool and records what ran, so a later run can say whether a change came with a new artifact, came without one (**unexplained**), or cannot be attributed at all |
 | **So what do I install instead?** | read four advisories | `upgrade` computes the shortest version that clears all of them (8 entries today, all with a safe path) |
 | **Why was it denied?** | read four outputs | `explain` prints the evidence with dates, the policy in force, every rule with its outcome, and the rule that decided it |
 | **What runs, exactly** | `npx` re-resolves the tree at every start | `lock` freezes npm's own lockfile per server; `--vendor` installs it so nothing resolves at launch |
@@ -558,7 +558,27 @@ Drift = upstream rebuilt the tag under a new digest. The weekly CI job (`docker-
 
 **What the last full run found.** 40 of the 113 entries with a runnable launch command complete a handshake in a clean container; 39 of them list at least one tool, listing 1,021 tools between them, ≈294k tokens of `tools/list` payload if every one were enabled at once. The rest fail for their own reasons — 62 crash, 7 exceed a 90-second deadline, 2 want network access they are not given, 1 wants credentials, 1 needs an argument you have to supply by hand. Those results live in [`assets/eval_results.json`](./mcp-ecosystem-intelligence/assets/eval_results.json) and feed the `behaviour` axis of a recommendation: an entry nothing has ever seen start cannot read as "recommended". 8 entries report a tool count that differs from the DB's (`tool_count_drift`), which is a reviewer's decision rather than an automatic correction.
 
-Each passing run also records a **tool-surface fingerprint** — every tool's name with its description and input schema hashed separately (hashes only: a tool description is attacker-controlled text, and it reaches the model's system prompt). A later run compares against it, which is what makes a rug pull visible: the same artifact presenting a different surface is the case with no innocent explanation, and `tool_count` alone never saw a rename or a rewritten description.
+Each passing run also records a **tool-surface fingerprint** — every tool's name with its description and input schema hashed separately (hashes only: a tool description is attacker-controlled text, and it reaches the model's system prompt) — together with the **identity of what ran**: the artifact id, its integrity value, the DB version and a digest of the launch contract. `tool_count` alone never saw a rename or a rewritten description.
+
+A later run compares both, and can give three answers rather than two:
+
+| | |
+|---|---|
+| artifact changed + surface changed | an upgrade. Read the diff, then move on |
+| artifact unchanged + surface changed | **unexplained**, and the one worth looking at |
+| no identity recorded to compare | *not attributable* — said out loud rather than guessed |
+
+"Unexplained" is deliberately not "impossible". An unvendored launch re-resolves
+its transitive tree at every start, and feature flags, credentials and a remote
+backend can each change what a server advertises. It becomes a hard finding when
+the artifact bytes, the dependency closure (`mcp-vault lock`) and the launch
+contract are all identical and the surface still differs.
+
+The third answer exists because the first version of this compared `install_cmd`
+*strings* and treated a missing field as a change — and the weekly job's snapshot
+did not carry that field at all, so every drift read as "explained by a version
+bump". A feature that looked like it worked and could not see the case it was
+built for.
 
 For each DB entry with a recognized install method (`npx -y`, `uvx`, `docker run`), the script spawns the subprocess and runs the canonical JSON-RPC handshake — `initialize` → `notifications/initialized` → `tools/list` — then lints each returned tool's `inputSchema` with a minimal validator (intentionally narrower than full JSON Schema Draft 2020-12; covers only what Claude Code actually reads: `type`, `properties`, `required`, `enum`, `description`, plus nested objects + array items).
 

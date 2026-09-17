@@ -666,14 +666,18 @@ jobs:
             if (!drifted.length) {
               lines.push("No server changed the tools it exposes since the last run.");
             } else {
-              lines.push(`${drifted.length} server(s) changed their tool surface; ${unexplained.length} did so **without the artifact changing**.`, "");
+              const unknown = drifted.filter((r) => r.surface_drift.artifact_changed === null).length;
+              lines.push(`${drifted.length} server(s) changed their tool surface; ${unexplained.length} did so with **no change to the artifact**`
+                + `${unknown ? `, and ${unknown} could not be compared (no identity recorded in the previous snapshot)` : ""}.`, "");
               lines.push("| server | artifact | change |", "| --- | --- | --- |");
               for (const r of drifted) {
                 const d = r.surface_drift;
-                lines.push(`| ${r.name} | ${d.artifact_changed ? "changed too" : "**unchanged**"} | ${d.lines.join("; ").replace(/\|/g, "\\|").slice(0, 160)} |`);
+                const artifact = d.artifact_changed === null ? "not comparable"
+                  : (d.artifact_changed ? "changed too" : "**unchanged**");
+                lines.push(`| ${r.name} | ${artifact} | ${d.lines.join("; ").replace(/\|/g, "\\|").slice(0, 160)} |`);
               }
               if (unexplained.length) {
-                lines.push("", "> The same artifact presenting a different tool surface has no innocent explanation for a pinned local server: either the launch is not deterministic, or the server was changed under whoever trusted it.");
+                lines.push("", "> A different tool surface from the same pinned artifact is **unexplained**, not impossible: a re-resolved transitive dependency, a feature flag, credentials or a remote backend can all do it. It becomes a hard finding when the artifact bytes, the dependency closure (`mcp-vault lock`) and the launch contract are all identical and the surface still differs.");
               }
             }
             require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
@@ -716,6 +720,12 @@ jobs:
               // attacker-controlled text and must not land in this repository.
               surface: r.surface || null,
               surface_drift: r.surface_drift || null,
+              // And the identity of what ran. Without it the next run cannot
+              // tell whether a changed surface came with a changed artifact —
+              // which is the entire question — and would report every drift as
+              // explained by a version bump. Dropping this field once made the
+              // feature useless while looking like it worked.
+              identity: r.identity || null,
               // A count, under its own name: `schema_errors` is an array that
               // `mcp_eval --no-spawn` iterates, and turning it into a number
               // made that mode throw.
