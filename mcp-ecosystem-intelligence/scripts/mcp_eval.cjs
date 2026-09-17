@@ -417,6 +417,20 @@ async function smokeEntry(tool, opts) {
     return result;
   }
 
+  // A command with a documented placeholder (`… server-filesystem <path>`) is
+  // not runnable as written: launching it passes the literal string "<path>"
+  // and the server exits. That is our harness failing, not the server, and
+  // recording it as CRASH was a false accusation — it read as "never started"
+  // in every report downstream.
+  const placeholder = (tool._evalSpawn ? [] : [tool.install_cmd || ''])
+    .join(' ')
+    .match(/[<{][A-Za-z0-9_.\/-]+[>}]/);
+  if (placeholder) {
+    result.error_code    = `launch command needs an argument supplied by hand: ${placeholder[0]}`;
+    result.failure_class = 'NEEDS_ARGS';
+    return result;   // status stays 'skip'
+  }
+
   // Once a process is actually talking to us the verdict is pass/fail;
   // `skip` stays reserved for "we never got to ask" — an install_cmd we
   // couldn't parse, or a launcher binary missing on this host (below).

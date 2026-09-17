@@ -16,7 +16,7 @@
  *   trust_evidence: {
  *     artifact:       { status: 'verified',  checked_at: '2026-09-17', method: 'deep-hash' },
  *     signature:      { status: 'verified',  checked_at: '2026-09-17', keyid: 'SHA256:…' },
- *     provenance:     { status: 'claimed',   checked_at: '2026-09-17', repository: '…' },
+ *     provenance:     { status: 'bound',     checked_at: '2026-09-17', identity: '…' },
  *     source_binding: { status: 'verified',  checked_at: '2026-09-17' },
  *     license:        { status: 'osi',       checked_at: '2026-09-17', value: 'MIT' },
  *     advisories:     { status: 'clean',     checked_at: '2026-09-17' },
@@ -66,7 +66,7 @@ const today = (now = Date.now()) => new Date(now).toISOString().slice(0, 10);
 // What counts as an answer in the affirmative, per dimension vocabulary. Used
 // where "did this actually check out?" is being asked, so that a new status
 // added later defaults to "not established" rather than to "fine".
-const POSITIVE_STATUSES = new Set(['verified', 'clean', 'claimed', 'pass', 'hooks', 'advisories-present', 'osi']);
+const POSITIVE_STATUSES = new Set(['verified', 'clean', 'claimed', 'bound', 'pass', 'hooks', 'advisories-present', 'osi']);
 
 /**
  * Turn one run's *typed check results* into dated evidence.
@@ -102,7 +102,11 @@ function buildEvidence(checks, { now = Date.now(), artifactId = null } = {}) {
     put('signature', c.signature.state, c.signature.keyid ? { keyid: c.signature.keyid } : {});
   }
   if (c.provenance) {
-    put('provenance', c.provenance.state, c.provenance.repository ? { repository: c.provenance.repository } : {});
+    const extra = {};
+    if (c.provenance.repository) extra.repository = c.provenance.repository;
+    // The signing identity is what makes a 'bound' result checkable later.
+    if (c.provenance.identity) extra.identity = c.provenance.identity;
+    put('provenance', c.provenance.state, extra);
   }
   if (c.source_binding) put('source_binding', c.source_binding.state);
   if (c.advisories)     put('advisories', c.advisories.state);

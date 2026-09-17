@@ -28,7 +28,7 @@ const path          = require('path');
 const { spawnSync } = require('child_process');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { listHosts, resolveTarget, writeServerEntry } = require('./lib/hosts.cjs');
-const { trustScore, fitScore, recommend } = require('./lib/scores.cjs');
+const { trustScore, fitScore, behaviour, recommend } = require('./lib/scores.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 // Reuse the gate's parsers so "what gets pinned" and "what gets checked" can
 // never drift apart — they were two independent regexes before.
@@ -37,6 +37,7 @@ const {
 } = require('./verify_integrity.cjs');
 
 const DB_PATH    = path.resolve(__dirname, '../assets/tools_database.json');
+const EVAL_PATH  = path.resolve(__dirname, '../assets/eval_results.json');
 const VERIFY_CJS = path.resolve(__dirname, 'verify_integrity.cjs');
 
 // ── CLI args ────────────────────────────────────────────────────────────────
@@ -657,10 +658,42 @@ function buildServerEntry(tool) {
   return { command: parts[0], args: parts.slice(1) };
 }
 
+// ── Behavioural results ────────────────────────────────────────────────────
+
+// Behavioural results, read once. The eval has always recorded whether an
+// entry can complete a handshake; until now nothing consulted it at the point
+// a recommendation was printed, which is the one place it changes a decision.
+let _evalIndex = null;
+function evalIndex() {
+  if (_evalIndex) return _evalIndex;
+  _evalIndex = new Map();
+  try {
+    const doc = JSON.parse(fs.readFileSync(EVAL_PATH, 'utf8'));
+    for (const r of doc.results || []) if (r && r.name) _evalIndex.set(r.name, r);
+  } catch {
+    /* no snapshot in this install: behaviour reads as 'unknown', which is the
+       honest answer rather than a failure */
+  }
+  return _evalIndex;
+}
+
+function behaviourFor(name) {
+  return behaviour(evalIndex().get(name) || null);
+}
+
 // ── Report formatting ───────────────────────────────────────────────────────
 
 const HEAVY = 30;
 const HR    = '─'.repeat(60);
+
+// How a behavioural state reads in one glance, next to the entry it describes.
+const BEHAVIOUR_TAG = {
+  starts:              () => '',
+  unknown:             () => '',
+  'needs-credentials': () => `${YL}needs credentials${RS}`,
+  'needs-network':     () => `${YL}needs network${RS}`,
+  'never-started':     () => `${RD}never started${RS}`,
+};
 
 function printTool(t) {
   const heavy   = t.est_tools_count >= HEAVY;
@@ -669,10 +702,17 @@ function printTool(t) {
     : `${DM}${t.est_tools_count} tools${RS}`;
   const tier  = t.classification.padEnd(13);
   const name  = t.name.padEnd(26);
-  process.stdout.write(`  ${B}${tier}${RS} ${name} ${toolTag}  ${DM}score ${t.health_score}${RS}\n`);
+  const behav = behaviourFor(t.name);
+  const tag   = (BEHAVIOUR_TAG[behav.state] || (() => ''))();
+  process.stdout.write(`  ${B}${tier}${RS} ${name} ${toolTag}  ${DM}score ${t.health_score}${RS}${tag ? `  ${tag}` : ''}\n`);
   process.stdout.write(`  ${' '.repeat(13)}  ${DM}${t.install_cmd}${RS}\n`);
   if (heavy && t.toolsets) {
     process.stdout.write(`  ${' '.repeat(13)}  ${YL}→ ${t.toolsets}${RS}\n`);
+  }
+  // The reason, not just the label: "crashed" and "wants an API key" are
+  // different amounts of work for whoever reads this.
+  if (behav.state === 'never-started') {
+    process.stdout.write(`  ${' '.repeat(13)}  ${DM}${behav.reason}${RS}\n`);
   }
 }
 
@@ -819,6 +859,7 @@ if (require.main === module) {
 module.exports = {
   detectStack,
   slim,
+  behaviourFor,
   matchDB,
   unmappedSignals,
   fallbackBySignal,
@@ -847,6 +888,7 @@ function slim(t, stack = null) {
     trust.reasons.unshift(`stored evidence describes ${t.trust_evidence.artifact_id}, not ${currentId} — ignored`);
   }
   const fit   = stack ? fitScore(t, stack, { signalToTools: SIGNAL_TO_TOOLS, universal: UNIVERSAL_TOOLS }) : null;
+  const behav = behaviourFor(t.name);
   return {
     name:            t.name,
     category:        t.category,
@@ -861,7 +903,11 @@ function slim(t, stack = null) {
       health: Number.isFinite(t.health_score) ? t.health_score : null,
       trust:  { score: trust.score, gate: trust.gate, reasons: trust.reasons.slice(0, 4) },
       fit:    fit ? { score: fit.score, reasons: fit.reasons.slice(0, 4) } : null,
-      recommendation: recommend({ trust, health: t.health_score, fit }),
+      // Behaviour is reported next to the scores rather than folded into one
+      // of them: "it does not start" is not a trust finding and not a fit
+      // penalty, it is a different kind of fact.
+      behaviour: { state: behav.state, tools: behav.tools, reason: behav.reason },
+      recommendation: recommend({ trust, health: t.health_score, fit, behaviour: behav }),
     },
   };
 }

@@ -13,6 +13,13 @@
  *   trust  — do we know what we are running?     (artifact, signature, advisories)
  *   fit    — does this project need it?          (stack match, tool surface)
  *
+ * And one more thing that is none of the three: whether the server *runs*. The
+ * eval has recorded that all along (40 of 113 entries start and list tools in a
+ * clean sandbox) and nothing read it before a recommendation was printed, so a
+ * server that has never once completed a handshake could be "recommended". That
+ * is the single most useful thing to know before installing something, and it
+ * belongs in the verdict rather than in a separate report nobody runs.
+ *
  * And a recommendation is a policy over the three, not their sum. The rule that
  * matters: trust is a gate, not a term. Stars cannot compensate for a hash
  * mismatch, so a failing trust verdict is never outweighed by the other axes —
@@ -25,7 +32,8 @@
  * API:
  *   trustScore(evidence, opts)        -> { score, gate, reasons }
  *   fitScore(tool, stack, opts)       -> { score, reasons }
- *   recommend({ trust, health, fit }) -> { verdict, reasons }
+ *   behaviour(evalResult)             -> { state, tools, reason, requires }
+ *   recommend({ trust, health, fit, behaviour }) -> { verdict, reasons }
  */
 
 const { staleDimensions, DEFAULT_MAX_AGE_DAYS } = require('./evidence.cjs');
@@ -36,7 +44,10 @@ const { staleDimensions, DEFAULT_MAX_AGE_DAYS } = require('./evidence.cjs');
 const TRUST_WEIGHTS = {
   artifact:       { verified: 40, unverified: 0, mismatch: -100 },
   signature:      { verified: 20, absent: 0 },
-  provenance:     { claimed: 10 },
+  // 'bound' means the attestation's subject digest is the artifact we verified
+  // and the signing identity is the source repository's own workflow; 'claimed'
+  // means it was merely readable and did not contradict anything.
+  provenance:     { bound: 15, claimed: 10 },
   source_binding: { verified: 10, mismatch: -20 },
   advisories:     { clean: 15, 'advisories-present': 5, unverified: 0, vulnerable: -100 },
   dependencies:   { clean: 5, hooks: 2, 'advisories-present': 0 },
@@ -163,17 +174,95 @@ function fitScore(tool, stack, { signalToTools = {}, universal = [] } = {}) {
 }
 
 /**
+ * What a behavioural run says about whether this server can be used.
+ *
+ * Reads one `eval_results.json` row. The distinction that matters is between
+ * "it needs something from you" and "it does not work": the first is a setup
+ * step, the second is a dead entry, and the old single `status` field made them
+ * look alike in a report nobody read before installing.
+ *
+ *   starts            — handshake completed and tools/list answered
+ *   needs-credentials — refused to start without an API key or token
+ *   needs-network     — refused to start without network access
+ *   needs-arguments   — the launch command has a placeholder to fill in
+ *   never-started     — crashed or hung with no reason it declared
+ *   unknown           — never evaluated, or the sandbox itself was unavailable
+ *
+ * 'unknown' is not a negative result. A run that could not be performed
+ * (SANDBOX_UNAVAILABLE) says nothing about the server, and treating it as a
+ * failure is how 76 entries were once blamed for a Docker daemon falling over.
+ */
+function behaviour(evalResult) {
+  const r = evalResult || null;
+  if (!r || !r.status) return { state: 'unknown', tools: null, reason: 'never evaluated' };
+
+  const tools = Number.isFinite(r.tool_count) ? r.tool_count : null;
+  if (r.status === 'pass') {
+    return { state: 'starts', tools, reason: `starts and lists ${tools === null ? 'its' : tools} tools` };
+  }
+  const cls = r.failure_class || null;
+  // A skip with no class is a run that did not happen; a skip *with* a class
+  // (a placeholder argument) is a reason, and the reason is the useful part.
+  if (cls === 'SANDBOX_UNAVAILABLE' || (r.status === 'skip' && !cls)) {
+    return {
+      state:  'unknown',
+      tools,
+      reason: cls === 'SANDBOX_UNAVAILABLE'
+        ? 'the sandbox was unavailable, so nothing was established'
+        : (r.error_code ? `not evaluated: ${r.error_code}` : 'not evaluated'),
+    };
+  }
+  if (cls === 'NEEDS_ENV') {
+    return { state: 'needs-credentials', tools, reason: 'will not start without credentials in the environment', requires: 'credentials' };
+  }
+  if (cls === 'NEEDS_NET') {
+    return { state: 'needs-network', tools, reason: 'will not start without network access', requires: 'network' };
+  }
+  if (cls === 'NEEDS_ARGS') {
+    return { state: 'needs-arguments', tools, reason: 'the launch command takes an argument you have to supply', requires: 'arguments' };
+  }
+  return {
+    state:  'never-started',
+    tools,
+    reason: `did not complete a handshake in a clean sandbox (${cls || r.status}${r.error_code ? `, ${r.error_code}` : ''})`,
+  };
+}
+
+// Worst to best. A cap is applied by index, so "lower it by one step" and
+// "never above this" are the same operation.
+const VERDICTS = ['avoid', 'not-now', 'consider', 'recommended'];
+const capVerdict = (verdict, ceiling) =>
+  VERDICTS[Math.min(VERDICTS.indexOf(verdict), VERDICTS.indexOf(ceiling))] || verdict;
+
+// How far each behavioural state is allowed to let a verdict rise. Trust still
+// gates absolutely; this is a second, weaker ceiling — a server that does not
+// run is not dangerous, it is just not usable yet, and the two failures deserve
+// different words.
+const BEHAVIOUR_CEILING = {
+  'never-started':     'not-now',
+  'needs-credentials': 'consider',
+  'needs-network':     'consider',
+  // A placeholder to fill in is a documented step, not a defect: it does not
+  // lower the entry, it just has to be said before someone copies the command.
+  'needs-arguments':   'recommended',
+  starts:              'recommended',
+  unknown:             'recommended',
+};
+
+/**
  * The recommendation.
  *
- * Trust gates; health and fit rank. This is the asymmetry that makes the three
- * axes worth separating: no amount of popularity turns a mismatched hash into
- * an acceptable install.
+ * Trust gates; health and fit rank; behaviour caps. This is the asymmetry that
+ * makes the axes worth separating: no amount of popularity turns a mismatched
+ * hash into an acceptable install, and no amount of fit makes a server that
+ * has never started a recommendation.
  */
-function recommend({ trust, health, fit } = {}) {
+function recommend({ trust, health, fit, behaviour: behav } = {}) {
   const reasons = [];
   const t = trust || { score: 0, gate: 'thin', reasons: [] };
   const f = fit   || { score: 0, reasons: [] };
   const h = Number.isFinite(health) ? health : null;
+  const b = behav || null;
 
   if (t.gate === 'block') {
     return { verdict: 'avoid', reasons: ['trust: ' + (t.reasons[0] || 'a check failed'), ...t.reasons.slice(1, 3)] };
@@ -193,7 +282,23 @@ function recommend({ trust, health, fit } = {}) {
   // A thin trust score never reads as "recommended": that is the word doing
   // the work the evidence has not done.
   if (verdict === 'recommended' && t.gate !== 'ok') verdict = 'consider';
+
+  // Behaviour caps last, and always says why — the reason is the point. Before
+  // this, "recommended" could mean "we have never seen it start".
+  if (b && b.state && b.state !== 'starts' && b.state !== 'unknown') {
+    const capped = capVerdict(verdict, BEHAVIOUR_CEILING[b.state] || 'consider');
+    if (capped !== verdict) reasons.unshift(`${b.reason} — ${verdict} → ${capped}`);
+    else reasons.unshift(b.reason);
+    verdict = capped;
+  } else if (b && b.state === 'starts') {
+    reasons.push(b.reason);
+  } else if (b && b.state === 'unknown' && verdict === 'recommended') {
+    // Not a downgrade: an absent measurement is absent, and saying so is
+    // better than implying one exists.
+    reasons.push('never evaluated behaviourally — `mcp-vault eval --name <n> --sandbox` measures it');
+  }
+
   return { verdict, reasons };
 }
 
-module.exports = { trustScore, fitScore, recommend, TRUST_WEIGHTS };
+module.exports = { trustScore, fitScore, behaviour, recommend, TRUST_WEIGHTS, BEHAVIOUR_CEILING, VERDICTS };
