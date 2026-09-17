@@ -37,6 +37,8 @@
  *   mcp_eval.cjs --sandbox              run each server in a locked-down container (needs docker)
  *   mcp_eval.cjs --unsafe               run servers directly on the host (explicit opt-out of the sandbox)
  *   mcp_eval.cjs --db <path>            override DB path
+ *   mcp_eval.cjs --installed            smoke the servers your hosts launch,
+ *                                       not DB entries (feeds `mcp-vault budget`)
  *   mcp_eval.cjs --results <path>       override results file path
  *   mcp_eval.cjs --strict               exit 1 on any failure or unavailable launcher
  *   mcp_eval.cjs --help                 print this help
@@ -61,6 +63,7 @@ const path          = require('path');
 const { spawn }     = require('child_process');
 const { performance } = require('perf_hooks');
 const { exitAfterFlush } = require('./lib/exit.cjs');
+const { readInstalledServers } = require('./lib/installed.cjs');
 const stdio         = require('./lib/mcp_stdio.cjs'); // shared framing + sandbox + classifier (vendored, zero-dep)
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -86,6 +89,8 @@ function parseArgs(argv) {
     unsafe:   false,
     db:       DEFAULT_DB_PATH,
     results:  DEFAULT_RESULTS_PATH,
+    installed: false,
+    cwd:      process.cwd(),
     strict:   false,
     help:     false,
   };
@@ -98,9 +103,11 @@ function parseArgs(argv) {
       case '--timeout': opts.timeout = Math.max(1000, parseInt(next, 10) || DEFAULT_TIMEOUT_MS); i++; break;
       case '--json':    opts.json    = true; break;
       case '--no-spawn':opts.noSpawn = true; break;
+      case '--installed': opts.installed = true; break;
       case '--sandbox': opts.sandbox = true; break;
       case '--unsafe':  opts.unsafe  = true; break;
       case '--db':      opts.db      = next; i++; break;
+      case '--cwd':     opts.cwd     = next; i++; break;
       case '--results': opts.results = next; i++; break;
       case '--strict':  opts.strict  = true; break;
       case '-h':
@@ -312,6 +319,10 @@ async function smokeEntry(tool, opts) {
     boot_ms:          null,
     list_latency_ms:  null,
     tool_count:       null,
+    // Size of the tools/list payload. This is what a server actually injects
+    // into the system prompt on every request, so `token_budget` can measure a
+    // config's cost instead of estimating it from a tool count.
+    tools_payload_bytes: null,
     tool_count_db:    typeof tool.est_tools_count === 'number' ? tool.est_tools_count : null,
     tool_count_drift: false,
     schema_errors:    [],
@@ -444,6 +455,9 @@ async function smokeEntry(tool, opts) {
       ? listResp.result.tools
       : [];
     result.tool_count = tools.length;
+    // The payload, not the count: what the server injects into the system
+    // prompt is this JSON, so its size is the honest input to a token budget.
+    try { result.tools_payload_bytes = Buffer.byteLength(JSON.stringify(tools)); } catch { /* keep null */ }
     if (typeof result.tool_count_db === 'number') {
       result.tool_count_drift = result.tool_count !== result.tool_count_db;
     }
@@ -515,6 +529,29 @@ function pickTools(db, opts) {
   }
   // Default = --all: every entry whose install_cmd we can parse.
   return db.tools.filter(t => parseInstallCmd(t.install_cmd));
+}
+
+/**
+ * Subjects taken from the local host configs instead of the DB.
+ *
+ * `_evalSpawn` carries the command and args exactly as configured, so this
+ * works for servers the install-command parsers know nothing about — a local
+ * binary, a script, a wrapper. Remote servers are skipped: there is nothing to
+ * spawn, and their tool surface costs context on the client's side only once
+ * the client connects.
+ */
+function pickInstalledTools(opts) {
+  const servers = readInstalledServers({ cwd: opts.cwd });
+  const wanted = opts.name ? servers.filter(s => s.name === opts.name || s.name.toLowerCase().includes(opts.name.toLowerCase())) : servers;
+  return wanted
+    .filter(s => !s.remote && s.command)
+    .map(s => ({
+      name: s.name,
+      install_cmd: s.install_cmd || `${s.command} ${(s.args || []).join(' ')}`.trim(),
+      est_tools_count: null,
+      _evalSpawn: { command: s.command, args: s.args || [] },
+      _installed: { host: s.host, scope: s.scope, source: s.source },
+    }));
 }
 
 // ── Results file IO ────────────────────────────────────────────────────────
@@ -619,18 +656,26 @@ async function main() {
   }
 
   // Live smoke.
-  let db;
-  try {
-    db = JSON.parse(fs.readFileSync(opts.db, 'utf8'));
-  } catch (e) {
-    process.stderr.write(`Failed to read DB ${opts.db}: ${e.message}\n`);
-    process.exit(2);
-  }
-
-  const picked = pickTools(db, opts);
-  if (opts.name && picked.length === 0) {
-    process.stderr.write(`No entries match --name "${opts.name}"\n`);
-    process.exit(2);
+  let picked;
+  if (opts.installed) {
+    picked = pickInstalledTools(opts);
+    if (!picked.length) {
+      process.stderr.write(`No local (non-remote) MCP servers configured for ${opts.cwd}\n`);
+      process.exit(2);
+    }
+  } else {
+    let db;
+    try {
+      db = JSON.parse(fs.readFileSync(opts.db, 'utf8'));
+    } catch (e) {
+      process.stderr.write(`Failed to read DB ${opts.db}: ${e.message}\n`);
+      process.exit(2);
+    }
+    picked = pickTools(db, opts);
+    if (opts.name && picked.length === 0) {
+      process.stderr.write(`No entries match --name "${opts.name}"\n`);
+      process.exit(2);
+    }
   }
 
   const payload = readResults(opts.results);
@@ -711,6 +756,7 @@ module.exports = {
   parseInstallCmd,
   lintSchema,
   pickTools,
+  pickInstalledTools,
   smokeEntry,
   readResults,
   writeResults,

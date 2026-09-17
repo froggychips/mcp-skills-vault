@@ -42,6 +42,7 @@ const COMMANDS = {
   refresh:         "refresh_scores.cjs",
   wrap:            "generate_wrapper.cjs",
   "site-registry": "generate_registry_page.cjs",
+  budget:          "token_budget.cjs",
 };
 
 const HELP = `mcp-vault — make MCP supply-chain boring.
@@ -66,6 +67,7 @@ COMMANDS
   refresh           Refresh pinned versions + integrity hashes from registries
   wrap              Generate MCP wrapper boilerplate for a CLI / API tool
   site-registry     Generate docs/site/registry.html from tools_database.json
+  budget            What your configured servers cost in context tokens
 
 COMMON OPTIONS
   --json            Machine-readable output
