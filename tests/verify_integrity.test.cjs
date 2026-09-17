@@ -171,3 +171,179 @@ test('CLI --offline rejects --update', () => {
   assert.equal(r.status, 2);
   assert.match(r.stderr, /--offline cannot be combined with --update/);
 });
+
+// ── CVSS scoring ────────────────────────────────────────────────────────────
+// OSV usually ships a vector and no severity word. Before these, a bare vector
+// scored UNKNOWN, severityIsHard() said "not hard", and a 9.8 printed as a note
+// instead of failing the gate.
+
+test('cvss3BaseScore: matches the spec examples', () => {
+  const cases = [
+    ['CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H', 9.8],
+    ['CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N', 7.5],
+    ['CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H', 7.8],
+    ['CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N', 6.1],
+    ['CVSS:3.0/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H', 6.5],
+    ['CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:N/A:N', 5.9],
+    ['CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H', 10],
+  ];
+  for (const [vector, expected] of cases) {
+    assert.equal(v.cvss3BaseScore(vector), expected, vector);
+  }
+});
+
+test('cvss3BaseScore: null for vectors it does not fully understand', () => {
+  // v4.0 uses a lookup-table scoring model we deliberately don't implement.
+  assert.equal(v.cvss3BaseScore('CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N'), null);
+  assert.equal(v.cvss3BaseScore('AV:N/AC:L/Au:N/C:P/I:P/A:P'), null);   // v2
+  assert.equal(v.cvss3BaseScore('CVSS:3.1/AV:N/AC:L'), null);           // truncated
+  assert.equal(v.cvss3BaseScore(''), null);
+});
+
+test('scoreToSeverity: CVSS qualitative rating scale', () => {
+  assert.equal(v.scoreToSeverity(9.8), 'CRITICAL');
+  assert.equal(v.scoreToSeverity(9.0), 'CRITICAL');
+  assert.equal(v.scoreToSeverity(7.0), 'HIGH');
+  assert.equal(v.scoreToSeverity(6.9), 'MEDIUM');
+  assert.equal(v.scoreToSeverity(0.1), 'LOW');
+  assert.equal(v.scoreToSeverity(0),   'UNKNOWN');
+  assert.equal(v.scoreToSeverity(null), 'UNKNOWN');
+});
+
+test('osvSeverity: scores a bare CVSS vector instead of giving up', () => {
+  const crit = { severity: [{ type: 'CVSS_V3', score: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H' }] };
+  assert.equal(v.osvSeverity(crit), 'CRITICAL');
+  assert.equal(v.severityIsHard(v.osvSeverity(crit)), true);
+  // Numeric score, no words.
+  assert.equal(v.osvSeverity({ severity: [{ score: '7.5' }] }), 'HIGH');
+  // affected[].database_specific is the last place to look.
+  assert.equal(v.osvSeverity({ affected: [{ database_specific: { severity: 'critical' } }] }), 'CRITICAL');
+});
+
+test('osvSeverity: picks the worst of several shapes', () => {
+  assert.equal(v.osvSeverity({
+    severity: [
+      { score: 'CVSS:3.1/AV:N/AC:H/PR:H/UI:R/S:U/C:L/I:N/A:N' },  // LOW
+      { score: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H' },  // CRITICAL
+    ],
+    database_specific: { severity: 'moderate' },
+  }), 'CRITICAL');
+});
+
+test('severityRank: orders severities, moderate == medium', () => {
+  assert.equal(v.severityRank('CRITICAL') > v.severityRank('HIGH'), true);
+  assert.equal(v.severityRank('MODERATE'), v.severityRank('MEDIUM'));
+  assert.equal(v.severityRank('UNKNOWN'), 0);
+  assert.equal(v.severityRank(undefined), 0);
+});
+
+test('unifyAdvisories: a dedupe keeps the worst severity, not the first', () => {
+  // Same GHSA id from OSV (severity unreadable) and GHSA (CRITICAL). Keeping
+  // the first silently downgraded a hard failure to a printed line.
+  const out = v.unifyAdvisories({
+    osvList:  [{ id: 'GHSA-x', severity: [{ score: 'CVSS:4.0/AV:N/AC:L' }], summary: 'osv view' }],
+    ghsaList: [{ id: 'GHSA-x', severity: 'CRITICAL', title: 'the real one', source: 'GHSA' }],
+  });
+  assert.equal(out.length, 1);
+  assert.equal(out[0].severity, 'CRITICAL');
+  assert.equal(v.severityIsHard(out[0].severity), true);
+  assert.match(out[0].source, /OSV\+GHSA/);
+});
+
+test('unifyAdvisories: does not mutate the callerlists', () => {
+  const ghsaList = [{ id: 'GHSA-y', severity: 'LOW', source: 'GHSA' }];
+  v.unifyAdvisories({ npmList: [{ id: 'GHSA-y', severity: 'critical', url: 'u' }], ghsaList });
+  assert.equal(ghsaList[0].severity, 'LOW');
+});
+
+test('npmPkgName: scopes may contain dots', () => {
+  // `@yoda.digital/gitlab-mcp-server` returned null, so the entry fell through
+  // to a SKIP and was never integrity-checked at all.
+  assert.equal(v.npmPkgName('npx -y @yoda.digital/gitlab-mcp-server'), '@yoda.digital/gitlab-mcp-server');
+  assert.equal(v.npmPkgName('npx -y @yoda.digital/gitlab-mcp-server@1.2.3'), '@yoda.digital/gitlab-mcp-server');
+});
+
+test('dockerDigestPinned: anchored at the end of the reference', () => {
+  const d = 'a'.repeat(64);
+  assert.equal(v.dockerDigestPinned(`ghcr.io/x/y@sha256:${d}`),      true);
+  assert.equal(v.dockerDigestPinned(`ghcr.io/x/y@sha256:${d}oops`),  false);
+  assert.equal(v.dockerDigestPinned('ghcr.io/x/y:latest'),           false);
+  assert.equal(v.dockerDigestPinned(null),                           false);
+});
+
+// ── CLI: --entry and fail-closed behaviour ──────────────────────────────────
+
+const REPO = require('node:path').resolve(__dirname, '..');
+const runVerify = (args) => spawnSync(process.execPath, [
+  'mcp-ecosystem-intelligence/scripts/verify_integrity.cjs', ...args,
+], { cwd: REPO, encoding: 'utf8' });
+
+test('CLI --entry: unknown name is a usage error, not a silent pass', () => {
+  const r = runVerify(['--offline', '--entry', 'no-such-entry-in-the-db']);
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /no DB entry named/);
+});
+
+test('CLI --entry: checks exactly one entry', () => {
+  const db = require('../mcp-ecosystem-intelligence/assets/tools_database.json');
+  const name = db.tools[0].name;
+  const r = runVerify(['--offline', '--entry', name]);
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /^1 entry checked/m);
+});
+
+test('CLI --fail-unverified: an entry the gate cannot check is a failure', () => {
+  const db = require('../mcp-ecosystem-intelligence/assets/tools_database.json');
+  // uvx --from installs from a git URL: there is no PyPI release to compare.
+  const unverifiable = db.tools.find(t => /^uvx\s+--from/.test(t.install_cmd || ''));
+  if (!unverifiable) return;   // DB no longer carries one — nothing to assert
+  const lenient = runVerify(['--offline', '--entry', unverifiable.name]);
+  assert.equal(lenient.status, 0, 'unverified is advisory by default');
+  assert.match(lenient.stdout, /UNVERIFIED/);
+
+  const closed = runVerify(['--offline', '--entry', unverifiable.name, '--fail-unverified']);
+  assert.equal(closed.status, 1, 'unverified must fail under --fail-unverified');
+});
+
+test('cvss3BaseScore: rejects vectors that only look valid', () => {
+  // S:X is legal in a temporal/environmental vector, not in a Base one. It used
+  // to score as if Scope were Unchanged — a plausible number for a vector we
+  // did not actually understand.
+  assert.equal(v.cvss3BaseScore('CVSS:3.1/AV:P/AC:H/PR:L/UI:N/S:X/C:L/I:H/A:H'), null);
+  // A repeated metric is malformed; silently taking the last value is guessing.
+  assert.equal(v.cvss3BaseScore('CVSS:3.1/AV:N/AV:P/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H'), null);
+  assert.equal(v.cvss3BaseScore('CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H'), 9.8);
+});
+
+test('verdictFor: an UNVERIFIED line keeps the entry out of OK', () => {
+  assert.equal(v.verdictFor(0, []), 'OK');
+  assert.equal(v.verdictFor(0, [['NOTE', 'x'], ['HOOK', 'y']]), 'OK');
+  assert.equal(v.verdictFor(0, [['UNVERIFIED', 'feed down']]), 'UNVERIFIED');
+  assert.equal(v.verdictFor(1, [['UNVERIFIED', 'feed down']]), 'FAIL');
+  assert.equal(v.verdictFor(0, undefined), 'OK');
+});
+
+test('CLI: an entry with no stored hash is UNVERIFIED, not OK', () => {
+  const db = require('../mcp-ecosystem-intelligence/assets/tools_database.json');
+  const nohash = db.tools.find(t => !t.pkg_integrity && /^(npx|uvx)\s/.test(t.install_cmd || ''));
+  if (!nohash) return;   // DB no longer has one — nothing to assert
+  const lenient = runVerify(['--offline', '--entry', nohash.name]);
+  assert.equal(lenient.status, 0);
+  assert.match(lenient.stdout, /UNVERIFIED/);
+  assert.doesNotMatch(lenient.stdout, new RegExp(`^OK\\s+${nohash.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'm'));
+
+  const closed = runVerify(['--offline', '--entry', nohash.name, '--fail-unverified']);
+  assert.equal(closed.status, 1, 'a missing hash must fail an install gate');
+});
+
+test('CLI: --json output of the sibling CLIs stays parseable', () => {
+  // exitAfterFlush() is asynchronous, so a JSON branch that forgets to return
+  // keeps running and appends a human-readable report after the document.
+  for (const script of ['list_entries.cjs', 'orchestrate.cjs']) {
+    const r = spawnSync(process.execPath, [
+      `mcp-ecosystem-intelligence/scripts/${script}`, '--json',
+    ], { cwd: REPO, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+    assert.equal(r.status, 0, script);
+    assert.doesNotThrow(() => JSON.parse(r.stdout), `${script} --json must be a single JSON document`);
+  }
+});

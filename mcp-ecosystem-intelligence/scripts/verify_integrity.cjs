@@ -24,26 +24,50 @@
  *   node scripts/verify_integrity.cjs --strict     treat WARNs as hard failures
  *   node scripts/verify_integrity.cjs --no-audit   skip advisory APIs; still checks live registries
  *   node scripts/verify_integrity.cjs --offline    true offline mode; validate DB pins only
+ *   node scripts/verify_integrity.cjs --entry NAME  check a single DB entry by name
+ *   node scripts/verify_integrity.cjs --fail-unverified  UNVERIFIED → hard failure
  *
  * Exit codes:
  *   0  all checks passed
  *   1  one or more hard failures detected — do NOT install
+ *   2  bad arguments (unknown --entry, --offline with --update)
+ *
+ * A registry that cannot be reached is UNVERIFIED, never OK: the gate can only
+ * assert an artifact matches its pin when it has actually seen the artifact.
+ * Callers that must not proceed on a maybe (`orchestrate --install`) pass
+ * --fail-unverified, which turns every UNVERIFIED into a hard failure.
  */
 
 'use strict';
 
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const https       = require('https');
 const fs          = require('fs');
 const path        = require('path');
 const { writeDb } = require('./lib/db_io.cjs');
 const { exitAfterFlush } = require('./lib/exit.cjs');
+// install_cmd parsing lives in one place — see lib/install_cmd.cjs for why.
+const {
+  npmPkgName, pypiPkgName, dockerImageRef, dockerDigestPinned,
+} = require('./lib/install_cmd.cjs');
 
 const DB_PATH   = path.resolve(__dirname, '../assets/tools_database.json');
 const UPDATE    = process.argv.includes('--update');
 const STRICT    = process.argv.includes('--strict');
 const NO_AUDIT  = process.argv.includes('--no-audit');
 const OFFLINE   = process.argv.includes('--offline');
+// --entry NAME: check one DB entry instead of all 100+. `orchestrate --install`
+// uses it so a single install doesn't drag the whole registry over the wire.
+const ENTRY     = (() => {
+  const i = process.argv.indexOf('--entry');
+  return i !== -1 ? process.argv[i + 1] : null;
+})();
+// Two separate kinds of severity, kept separate on purpose:
+//   --strict           WARNs (repo mismatch, install hooks, missing pins) are failures
+//   --fail-unverified  "we could not check this at all" is a failure
+// --strict implies --fail-unverified; an install gate wants the latter without
+// necessarily refusing every entry that ships a postinstall hook.
+const FAIL_UNVERIFIED = STRICT || process.argv.includes('--fail-unverified');
 
 const INSTALL_HOOKS = ['preinstall', 'install', 'postinstall', 'prepare', 'prepack'];
 
@@ -61,39 +85,6 @@ function normalizeGitUrl(url) {
     .replace(/^git@github\.com:/, 'https://github.com/')
     .replace(/\.git$/, '')
     .replace(/\/issues\/?$/, '');                       // strip /issues from Bug Tracker URLs
-}
-
-// "npx -y @scope/pkg@1.2.3 args" → "@scope/pkg"
-function npmPkgName(cmd) {
-  const m = cmd.match(/^npx\s+-y\s+((?:@[\w-]+\/)?[\w.-]+?)(?:@[^\s]+)?(?:\s|$)/);
-  return m ? m[1] : null;
-}
-
-// "uvx pkg-name==1.2.3 args" → "pkg-name"; returns null when --from is used
-// (git/url installs cannot be verified through PyPI).
-function pypiPkgName(cmd) {
-  if (/^uvx\s+--from/.test(cmd)) return null;
-  const m = cmd.match(/^uvx\s+([\w.-]+?)(?:==[\d.\w]+)?(?:\s|$)/);
-  return m ? m[1] : null;
-}
-
-// "docker run ... ghcr.io/foo/bar[@digest|:tag] [args]" → image reference
-function dockerImageRef(cmd) {
-  if (!/^docker\s+run/.test(cmd)) return null;
-  // Drop the "docker run" prefix and walk tokens, skipping flags and their values.
-  const tokens = cmd.split(/\s+/).slice(2);
-  const FLAG_WITH_VAL = new Set(['-e', '--env', '-v', '--volume', '--cap-drop', '--cap-add',
-                                  '--security-opt', '-p', '--publish', '--name', '--user',
-                                  '--network', '--mount', '--tmpfs']);
-  for (let i = 0; i < tokens.length; i++) {
-    const t = tokens[i];
-    if (t.startsWith('-')) {
-      if (FLAG_WITH_VAL.has(t)) i++;     // skip flag's value
-      continue;
-    }
-    return t;                            // first non-flag token is the image
-  }
-  return null;
 }
 
 // POST helper for JSON APIs.
@@ -263,36 +254,126 @@ function pypiSdistSha256(meta) {
   return sdist?.digests?.sha256 || null;
 }
 
+// Severity ordering. MODERATE is npm's word for MEDIUM; UNKNOWN sorts lowest so
+// a feed that couldn't tell us never outranks one that could.
+const SEVERITY_RANK = { CRITICAL: 4, HIGH: 3, MODERATE: 2, MEDIUM: 2, LOW: 1 };
+
+function severityRank(sev) {
+  return SEVERITY_RANK[String(sev || '').toUpperCase()] || 0;
+}
+
 function severityIsHard(sev) {
-  return ['CRITICAL', 'HIGH', 'critical', 'high'].includes(sev || '');
+  return severityRank(sev) >= SEVERITY_RANK.HIGH;
+}
+
+// CVSS v3.x base-score weights (CVSS:3.1 specification, §7.1).
+const CVSS3_W = {
+  AV:   { N: 0.85, A: 0.62, L: 0.55, P: 0.2 },
+  AC:   { L: 0.77, H: 0.44 },
+  UI:   { N: 0.85, R: 0.62 },
+  CIA:  { H: 0.56, L: 0.22, N: 0 },   // v3 impact metrics are High/Low/None
+  PR_U: { N: 0.85, L: 0.62, H: 0.27 },
+  PR_C: { N: 0.85, L: 0.68, H: 0.5 },
+};
+
+// The spec's Roundup(): smallest 1-decimal number >= x, computed over integers
+// because the float form rounds 8.6-ish values the wrong way.
+function roundUp1(x) {
+  const i = Math.round(x * 100000);
+  return i % 10000 === 0 ? i / 100000 : (Math.floor(i / 10000) + 1) / 10;
+}
+
+// Compute the base score from a CVSS v3.x vector string. Returns null for
+// anything we don't fully understand (including v4.0, whose scoring is a lookup
+// table, and v2 vectors) — callers treat null as "severity unknown", not "fine".
+function cvss3BaseScore(vector) {
+  const m = {};
+  for (const part of String(vector).split('/')) {
+    const [k, v, ...rest] = part.split(':');
+    if (!k || !v || rest.length) return null;   // malformed component
+    if (k in m) return null;                    // a repeated metric is not a valid vector
+    m[k] = v;
+  }
+  if (!/^3\.[01]$/.test(m.CVSS || '')) return null;
+  // Base Scope is U or C and nothing else (spec §6). `S:X` — legal only in a
+  // temporal/environmental vector — otherwise scored as if it were Unchanged
+  // and produced a plausible-looking number for a vector we didn't understand.
+  if (m.S !== 'U' && m.S !== 'C') return null;
+  const changed = m.S === 'C';
+  const av = CVSS3_W.AV[m.AV];
+  const ac = CVSS3_W.AC[m.AC];
+  const ui = CVSS3_W.UI[m.UI];
+  const pr = (changed ? CVSS3_W.PR_C : CVSS3_W.PR_U)[m.PR];
+  const c  = CVSS3_W.CIA[m.C];
+  const i  = CVSS3_W.CIA[m.I];
+  const a  = CVSS3_W.CIA[m.A];
+  if ([av, ac, ui, pr, c, i, a].some((w) => w === undefined)) return null;
+  const iss    = 1 - (1 - c) * (1 - i) * (1 - a);
+  const impact = changed
+    ? 7.52 * (iss - 0.029) - 3.25 * Math.pow(iss - 0.02, 15)
+    : 6.42 * iss;
+  if (impact <= 0) return 0;
+  const exploitability = 8.22 * av * ac * pr * ui;
+  return roundUp1(Math.min((changed ? 1.08 : 1) * (impact + exploitability), 10));
+}
+
+// CVSS qualitative severity rating scale (CVSS:3.1, §5).
+function scoreToSeverity(score) {
+  if (typeof score !== 'number' || Number.isNaN(score)) return 'UNKNOWN';
+  if (score >= 9.0) return 'CRITICAL';
+  if (score >= 7.0) return 'HIGH';
+  if (score >= 4.0) return 'MEDIUM';
+  if (score >  0.0) return 'LOW';
+  return 'UNKNOWN';                       // 0.0 is CVSS "None" — nothing to rate
 }
 
 // OSV vulns expose severity in a few possible shapes; pick the worst we find.
+// Most OSV records carry only a CVSS vector — no severity word anywhere — so
+// without scoring the vector a 9.8 came back UNKNOWN and severityIsHard() said
+// "not hard": a critical advisory that printed but didn't fail the gate.
 function osvSeverity(vuln) {
-  const sevs = vuln.severity || [];
-  for (const s of sevs) {
-    if (s.score && /CRITICAL|HIGH|MEDIUM|LOW/i.test(s.score)) {
-      const m = s.score.match(/CRITICAL|HIGH|MEDIUM|LOW/i);
-      if (m) return m[0].toUpperCase();
+  let worst = 'UNKNOWN';
+  const consider = (sev) => { if (severityRank(sev) > severityRank(worst)) worst = sev; };
+
+  for (const s of (vuln.severity || [])) {
+    const score = s && s.score;
+    if (!score) continue;
+    if (/^CVSS:/i.test(String(score))) {
+      const computed = scoreToSeverity(cvss3BaseScore(score));
+      if (computed !== 'UNKNOWN') { consider(computed); continue; }
     }
+    const word = String(score).match(/CRITICAL|HIGH|MEDIUM|MODERATE|LOW/i);
+    if (word) { consider(word[0].toUpperCase()); continue; }
+    const numeric = Number(score);
+    if (String(score).trim() !== '' && !Number.isNaN(numeric)) consider(scoreToSeverity(numeric));
   }
-  // Fallback: parse database_specific or affected[].database_specific
+
   const db = vuln.database_specific || {};
-  if (db.severity) return String(db.severity).toUpperCase();
-  return 'UNKNOWN';
+  if (db.severity) consider(String(db.severity).toUpperCase());
+  for (const aff of (vuln.affected || [])) {
+    const s = aff && aff.database_specific && aff.database_specific.severity;
+    if (s) consider(String(s).toUpperCase());
+  }
+  return worst;
 }
 
 // Merge advisories from npm + OSV + GHSA + Snyk into a unified array per
 // package, deduplicated by ID (GHSA shares IDs with OSV — keep one).
 // Unified shape: { id, severity, title, url, source }.
 function unifyAdvisories({ npmList, osvList, ghsaList, snykList }) {
-  const seen = new Set();
-  const out  = [];
+  const byKey = new Map();
   const push = (a) => {
-    const key = a.id || `${a.source}:${a.title || a.url}`;
-    if (seen.has(key)) return;
-    seen.add(key);
-    out.push(a);
+    const key  = a.id || `${a.source}:${a.title || a.url}`;
+    const prev = byKey.get(key);
+    if (!prev) { byKey.set(key, { ...a }); return; }
+    // Same advisory seen through two feeds: keep the worst severity either one
+    // reported. Keeping the first meant an OSV record whose severity we couldn't
+    // read masked the CRITICAL that GHSA had for the very same GHSA id — the
+    // merge silently downgraded a hard failure to a printed note.
+    if (severityRank(a.severity) > severityRank(prev.severity)) {
+      prev.severity = a.severity;
+      prev.source   = `${prev.source}+${a.source}`;
+    }
   };
   for (const a of (npmList || [])) {
     push({
@@ -314,7 +395,7 @@ function unifyAdvisories({ npmList, osvList, ghsaList, snykList }) {
   }
   for (const a of (ghsaList || [])) push(a);
   for (const a of (snykList || [])) push(a);
-  return out;
+  return [...byKey.values()];
 }
 
 // ── feed-health adjudication ─────────────────────────────────────────────────
@@ -355,6 +436,16 @@ function summarizeFeedSources(health) {
   return s;
 }
 
+// A run that printed an [UNVERIFIED] line did not verify that entry, so the
+// headline verdict must not read OK. Without this, a wheel-only PyPI release or
+// a degraded advisory feed showed `OK` on the entry line and the summary
+// counted zero unverified entries, because the counter only looks at statuses.
+function verdictFor(failures, lines) {
+  if (failures > 0) return 'FAIL';
+  if ((lines || []).some(([tag]) => tag === 'UNVERIFIED')) return 'UNVERIFIED';
+  return 'OK';
+}
+
 // ── per-tool processors ────────────────────────────────────────────────────
 
 async function processNpm(tool, pkg, advisoriesForTool, degraded, results) {
@@ -365,9 +456,18 @@ async function processNpm(tool, pkg, advisoriesForTool, degraded, results) {
   const versionSpec = tool.version ? `${pkg}@${tool.version}` : `${pkg}@latest`;
   let meta;
   try {
-    meta = JSON.parse(execSync(`npm view "${versionSpec}" --json`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }));
+    // execFileSync, not execSync: `versionSpec` carries DB-supplied strings
+    // (`tool.version`) into the call, and a shell would treat `$(…)`/backticks
+    // in them as code. argv form has no shell to interpret.
+    meta = JSON.parse(execFileSync('npm', ['view', versionSpec, '--json'], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }));
   } catch (e) {
-    results.push({ tool, status: 'SKIP', msg: `npm view failed: ${e.message.split('\n')[0]}` });
+    // Registry unreachable ≠ "pin is fine". Fail closed under --strict.
+    results.push({
+      tool,
+      status: 'UNVERIFIED',
+      msg: `${tool.name}: npm view failed: ${e.message.split('\n')[0]}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`,
+      failures: FAIL_UNVERIFIED ? 1 : 0,
+    });
     return;
   }
 
@@ -389,7 +489,11 @@ async function processNpm(tool, pkg, advisoriesForTool, degraded, results) {
 
   // Integrity
   if (!tool.pkg_integrity) {
-    lines.push(['MISS', `no stored pkg_integrity — run --update`]);
+    // No stored hash means nothing was compared. That is UNVERIFIED, not a
+    // cosmetic MISS: an install used to sail through on an entry with a
+    // version and no hash at all.
+    lines.push(['UNVERIFIED', `no stored pkg_integrity — run --update${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+    if (FAIL_UNVERIFIED) failures++;
   } else if (tool.pkg_integrity !== npmIntegrity) {
     lines.push(['FAIL', `integrity mismatch\n        stored: ${tool.pkg_integrity}\n        npm   : ${npmIntegrity}`]);
     failures++;
@@ -426,13 +530,13 @@ async function processNpm(tool, pkg, advisoriesForTool, degraded, results) {
   // Unreachable advisory feeds: we cannot assert "no known CVEs" when a feed was
   // down. Surface it loudly; hard-fail under --strict (never silently pass).
   if (degraded.length) {
-    lines.push(['UNVERIFIED', `advisory feeds unreachable: ${degraded.join(', ')} — cannot assert "no known CVEs"${STRICT ? '' : ' (use --strict to fail closed)'}`]);
-    if (STRICT) failures++;
+    lines.push(['UNVERIFIED', `advisory feeds unreachable: ${degraded.join(', ')} — cannot assert "no known CVEs"${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+    if (FAIL_UNVERIFIED) failures++;
   }
 
   results.push({
     tool,
-    status: failures > 0 ? 'FAIL' : 'OK',
+    status: verdictFor(failures, lines),
     msg: `${tool.name}@${npmVersion}`,
     lines,
     failures,
@@ -446,7 +550,12 @@ async function processPypi(tool, pkg, advisoriesForTool, degraded, results) {
   }
   const meta = await fetchPypiMeta(pkg, tool.version);
   if (!meta) {
-    results.push({ tool, status: 'SKIP', msg: `${pkg}: PyPI lookup failed` });
+    results.push({
+      tool,
+      status: 'UNVERIFIED',
+      msg: `${tool.name}: ${pkg} PyPI lookup failed${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`,
+      failures: FAIL_UNVERIFIED ? 1 : 0,
+    });
     return;
   }
 
@@ -468,9 +577,18 @@ async function processPypi(tool, pkg, advisoriesForTool, degraded, results) {
 
   // Integrity (PyPI sha256 hex)
   const expected = pySha256 ? `sha256-${pySha256}` : null;
+  // Two independent conditions, not a chain: an entry with no stored hash AND a
+  // wheel-only release used to report only the first and still come back OK.
   if (!tool.pkg_integrity) {
-    lines.push(['MISS', `no stored pkg_integrity — run --update`]);
-  } else if (expected && tool.pkg_integrity !== expected) {
+    lines.push(['UNVERIFIED', `no stored pkg_integrity — run --update${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+    if (FAIL_UNVERIFIED) failures++;
+  }
+  if (!expected) {
+    // Wheel-only release: there is no sdist to hash, so a stored pin cannot be
+    // compared against anything. Saying OK here would bless an unchecked file.
+    lines.push(['UNVERIFIED', `PyPI ${pyVersion} publishes no sdist — integrity cannot be compared${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+    if (FAIL_UNVERIFIED) failures++;
+  } else if (tool.pkg_integrity && tool.pkg_integrity !== expected) {
     lines.push(['FAIL', `integrity mismatch\n        stored: ${tool.pkg_integrity}\n        pypi  : ${expected}`]);
     failures++;
   }
@@ -498,13 +616,13 @@ async function processPypi(tool, pkg, advisoriesForTool, degraded, results) {
   // Unreachable advisory feeds: we cannot assert "no known CVEs" when a feed was
   // down. Surface it loudly; hard-fail under --strict (never silently pass).
   if (degraded.length) {
-    lines.push(['UNVERIFIED', `advisory feeds unreachable: ${degraded.join(', ')} — cannot assert "no known CVEs"${STRICT ? '' : ' (use --strict to fail closed)'}`]);
-    if (STRICT) failures++;
+    lines.push(['UNVERIFIED', `advisory feeds unreachable: ${degraded.join(', ')} — cannot assert "no known CVEs"${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+    if (FAIL_UNVERIFIED) failures++;
   }
 
   results.push({
     tool,
-    status: failures > 0 ? 'FAIL' : 'OK',
+    status: verdictFor(failures, lines),
     msg: `${tool.name}@${pyVersion}`,
     lines,
     failures,
@@ -514,10 +632,15 @@ async function processPypi(tool, pkg, advisoriesForTool, degraded, results) {
 function processDocker(tool, results) {
   const ref = dockerImageRef(tool.install_cmd);
   if (!ref) {
-    results.push({ tool, status: 'SKIP', msg: 'cannot parse docker image reference' });
+    results.push({
+      tool,
+      status: 'UNVERIFIED',
+      msg: `${tool.name}: cannot parse docker image reference${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`,
+      failures: FAIL_UNVERIFIED ? 1 : 0,
+    });
     return;
   }
-  const pinned = /@sha256:[a-f0-9]{64}/.test(ref);
+  const pinned = dockerDigestPinned(ref);
   if (pinned) {
     results.push({ tool, status: 'OK', msg: `${tool.name}: docker pinned by digest` });
   } else {
@@ -535,13 +658,15 @@ function processOfflinePackage(tool, pkg, ecosystem, results) {
   let failures = 0;
   const lines = [];
 
+  // Offline, the pins *are* the evidence. A missing one means this entry was
+  // never verified — the same verdict the online path now gives.
   if (!tool.version) {
-    lines.push(['MISS', 'no pinned version in DB']);
-    if (STRICT) failures++;
+    lines.push(['UNVERIFIED', `no pinned version in DB${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+    if (FAIL_UNVERIFIED) failures++;
   }
   if (!tool.pkg_integrity) {
-    lines.push(['MISS', 'no stored pkg_integrity — cannot compare without network']);
-    if (STRICT) failures++;
+    lines.push(['UNVERIFIED', `no stored pkg_integrity — cannot compare without network${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+    if (FAIL_UNVERIFIED) failures++;
   }
   if (!tool.source_url) {
     lines.push(['NOTE', 'no source_url in DB']);
@@ -550,7 +675,7 @@ function processOfflinePackage(tool, pkg, ecosystem, results) {
   const pin = tool.version ? `@${tool.version}` : '@?';
   results.push({
     tool,
-    status: failures > 0 ? 'FAIL' : 'OK',
+    status: verdictFor(failures, lines),
     msg: `${tool.name}${pin} (${ecosystem} offline pin present for ${pkg})`,
     lines,
     failures,
@@ -570,24 +695,40 @@ async function main() {
   let totalFails  = 0;
   let updated     = 0;
 
+  const allTools = Array.isArray(db.tools) ? db.tools : [];
+  const scope    = ENTRY ? allTools.filter((t) => t.name === ENTRY) : allTools;
+  if (ENTRY && scope.length === 0) {
+    console.error(`--entry: no DB entry named "${ENTRY}"`);
+    process.exit(2);
+  }
+
   // Bucket tools by ecosystem.
   const npmTools    = [];     // [{ tool, pkg }]
   const pypiTools   = [];     // [{ tool, pkg }]
   const dockerTools = [];
 
-  for (const tool of db.tools) {
+  // An entry we can't route to a registry is UNVERIFIED, not SKIP: nothing about
+  // its pin was ever checked, so --strict must refuse to call the run clean.
+  const unroutable = (tool, why) => results.push({
+    tool,
+    status: 'UNVERIFIED',
+    msg: `${tool.name}: ${why}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`,
+    failures: FAIL_UNVERIFIED ? 1 : 0,
+  });
+
+  for (const tool of scope) {
     if (/^npx\s+-y/.test(tool.install_cmd)) {
       const p = npmPkgName(tool.install_cmd);
       if (p) npmTools.push({ tool, pkg: p });
-      else results.push({ tool, status: 'SKIP', msg: 'cannot parse npm pkg name' });
+      else unroutable(tool, 'cannot parse npm pkg name');
     } else if (/^uvx/.test(tool.install_cmd)) {
       const p = pypiPkgName(tool.install_cmd);
       if (p) pypiTools.push({ tool, pkg: p });
-      else results.push({ tool, status: 'SKIP', msg: 'uvx --from / git URL not verifiable' });
+      else unroutable(tool, 'uvx --from / git URL not verifiable');
     } else if (/^docker\s+run/.test(tool.install_cmd)) {
       dockerTools.push({ tool });
     } else {
-      results.push({ tool, status: 'SKIP', msg: 'unknown install method' });
+      unroutable(tool, 'unknown install method');
     }
   }
 
@@ -676,9 +817,14 @@ async function main() {
     writeDb(DB_PATH, db);
     console.log(`\nWrote ${updated} updated entries to ${DB_PATH}`);
   } else if (!UPDATE) {
-    const checked = Array.isArray(db.tools) ? db.tools.length : (npmTools.length + pypiTools.length + dockerTools.length);
-    console.log(`\n${checked} entries checked — ${totalFails} failure(s)`);
-    if (totalFails > 0) console.error('DO NOT install until failures are resolved.');
+    const checked    = scope.length || (npmTools.length + pypiTools.length + dockerTools.length);
+    const unverified = results.filter((r) => r.status === 'UNVERIFIED').length;
+    const tail       = unverified ? `, ${unverified} unverified` : '';
+    console.log(`\n${checked} entr${checked === 1 ? 'y' : 'ies'} checked — ${totalFails} failure(s)${tail}`);
+    if (totalFails > 0)  console.error('DO NOT install until failures are resolved.');
+    if (unverified && !FAIL_UNVERIFIED) {
+      console.error(`${unverified} entr${unverified === 1 ? 'y was' : 'ies were'} not verified — re-run with --fail-unverified to treat that as a failure.`);
+    }
   }
 
   // Not process.exit(): the summary above is still buffered when stdout is a
@@ -696,6 +842,11 @@ module.exports = {
   pypiPkgName,
   dockerImageRef,
   severityIsHard,
+  severityRank,
+  cvss3BaseScore,
+  scoreToSeverity,
+  dockerDigestPinned,
+  verdictFor,
   osvSeverity,
   unifyAdvisories,
   degradedFeedsFor,
