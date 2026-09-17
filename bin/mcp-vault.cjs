@@ -41,6 +41,7 @@ const COMMANDS = {
   identity:        "check_identity.cjs",
   posture:         "check_posture.cjs",
   explain:         "explain.cjs",
+  upgrade:         "suggest_upgrade.cjs",
   "license-drift": "check_license_drift.cjs",
   health:          "calculate_health.cjs",
   refresh:         "refresh_scores.cjs",
@@ -71,6 +72,7 @@ COMMANDS
   identity          Who published it, per the ownership-verified official registry
   posture           How each upstream repo is run (OpenSSF Scorecard via deps.dev)
   explain <name>    Why this entry is allowed or denied, with the evidence and the rule
+  upgrade           Shortest version that clears the advisories against a pin
   docker-drift      Detect upstream Docker @sha256 drift
   license-drift     Detect MIT → BSL / SSPL relicensing
   health <args>     Score a candidate by stars / recency / license / registry
