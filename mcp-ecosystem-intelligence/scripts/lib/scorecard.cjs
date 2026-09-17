@@ -42,6 +42,8 @@
  */
 
 const { getJson } = require('./http.cjs');
+// One definition of what a repository URL names, anchored: see lib/repo_url.cjs.
+const { githubSlug: repoSlug } = require('./repo_url.cjs');
 
 // Scorecard check name → our field, with the reason it is worth recording.
 // Only checks whose meaning survives being reduced to found/absent are here:
@@ -99,16 +101,6 @@ function mapChecks(scorecard) {
   return out;
 }
 
-/** github.com/owner/repo (any URL form) → "owner/repo". */
-function repoSlug(url) {
-  // Anchored at the start of the string on purpose. An unanchored
-// `github\.com[:/]+…` matched anywhere, so
-// `https://evil.example/github.com/acme/server` produced the slug
-// `acme/server` — an attacker-chosen URL in a DB entry could borrow another
-// project's identity for every check that compares repositories.
-  const m = String(url || '').match(/^(?:git\+)?(?:https?:\/\/|ssh:\/\/git@|git@)?(?:www\.)?github\.com[:/]+([^/]+)\/([^/#?]+?)(?:\.git)?(?:[/#?].*)?$/i);
-  return m ? `${m[1]}/${m[2]}` : null;
-}
 
 /**
  * The posture of one repository.

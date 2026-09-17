@@ -52,6 +52,7 @@ const https = require('https');
 const path  = require('path');
 const { execFileSync } = require('child_process');
 const { exitAfterFlush } = require('./lib/exit.cjs');
+const { githubSlug, isGithubUrl } = require('./lib/repo_url.cjs');
 
 const DB_PATH      = path.resolve(__dirname, '../assets/tools_database.json');
 const CALC_HEALTH  = path.resolve(__dirname, 'calculate_health.cjs');
@@ -129,8 +130,13 @@ function normalizeRepoUrl(url) {
 }
 
 function ownerRepoFromUrl(url) {
-  const m = url && url.match(/github\.com\/([^/]+)\/([^/]+)/);
-  return m ? { owner: m[1], repo: m[2] } : null;
+  // Anchored via lib/repo_url.cjs: `https://evil.example/github.com/o/r` used
+  // to parse as the repository `o/r`, and a discovery candidate's source URL is
+  // exactly the field an attacker would choose.
+  const slug = githubSlug(url);
+  if (!slug) return null;
+  const [owner, repo] = slug.split('/');
+  return { owner, repo };
 }
 
 // ── sources ────────────────────────────────────────────────────────────────
@@ -308,7 +314,7 @@ function parsePypiJson(body) {
   ].filter(Boolean);
   let repo = null;
   for (const u of repoCandidates) {
-    if (typeof u === 'string' && /github\.com/.test(u)) {
+    if (typeof u === 'string' && isGithubUrl(u)) {
       repo = normalizeRepoUrl(u);
       break;
     }

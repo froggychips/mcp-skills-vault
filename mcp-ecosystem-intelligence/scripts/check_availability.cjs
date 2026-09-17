@@ -67,6 +67,8 @@ const { getJson, mapLimit } = require('./lib/http.cjs');
 const { npmPkgName, pypiPkgName } = require('./lib/install_cmd.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { buildEvidence, mergeEvidence } = require('./lib/evidence.cjs');
+// One definition of what a repository URL names, anchored: see lib/repo_url.cjs.
+const { githubSlug: repoSlug } = require('./lib/repo_url.cjs');
 
 const DB_PATH     = path.resolve(__dirname, '../assets/tools_database.json');
 const CONCURRENCY = 8;
@@ -131,16 +133,6 @@ function successorFrom(message) {
   return token;
 }
 
-/** github.com/owner/repo → "owner/repo", for comparing two URLs' identity. */
-function repoSlug(url) {
-  // Anchored at the start of the string on purpose. An unanchored
-// `github\.com[:/]+…` matched anywhere, so
-// `https://evil.example/github.com/acme/server` produced the slug
-// `acme/server` — an attacker-chosen URL in a DB entry could borrow another
-// project's identity for every check that compares repositories.
-  const m = String(url || '').match(/^(?:git\+)?(?:https?:\/\/|ssh:\/\/git@|git@)?(?:www\.)?github\.com[:/]+([^/]+)\/([^/#?]+?)(?:\.git)?(?:[/#?].*)?$/i);
-  return m ? `${m[1]}/${m[2]}`.toLowerCase() : null;
-}
 
 /**
  * npm: does the package exist, does our pinned version exist, is it deprecated,

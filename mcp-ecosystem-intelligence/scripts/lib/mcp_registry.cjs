@@ -35,6 +35,7 @@
  */
 
 const { getJson } = require('./http.cjs');
+const { githubSlug } = require('./repo_url.cjs');
 
 const REGISTRY = 'https://registry.modelcontextprotocol.io';
 const META_KEY = 'io.modelcontextprotocol.registry/official';
@@ -127,13 +128,11 @@ function namespaceOwner(name) {
 }
 
 function repoSlug(url) {
-  // Anchored at the start of the string on purpose. An unanchored
-// `github\.com[:/]+…` matched anywhere, so
-// `https://evil.example/github.com/acme/server` produced the slug
-// `acme/server` — an attacker-chosen URL in a DB entry could borrow another
-// project's identity for every check that compares repositories.
-  const m = String(url || '').match(/^(?:git\+)?(?:https?:\/\/|ssh:\/\/git@|git@)?(?:www\.)?github\.com[:/]+([^/]+)\/([^/#?]+?)(?:\.git)?(?:[/#?].*)?$/i);
-  return m ? { owner: m[1].toLowerCase(), repo: `${m[1]}/${m[2]}`.toLowerCase() } : null;
+  // One definition of what a repository URL names, anchored: lib/repo_url.cjs.
+  const slug = githubSlug(url);
+  if (!slug) return null;
+  const [owner] = slug.split('/');
+  return { owner, repo: slug };
 }
 
 /**
