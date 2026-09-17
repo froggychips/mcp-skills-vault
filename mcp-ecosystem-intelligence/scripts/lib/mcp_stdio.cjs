@@ -212,14 +212,23 @@ function sandboxWrap(parsed, opts = {}) {
     };
   }
 
-  const image = opts.image || (parsed.command === 'uvx'
+  const uvx = parsed.command === 'uvx';
+  const image = opts.image || (uvx
     ? 'ghcr.io/astral-sh/uv:python3.12-bookworm-slim'  // ships uv/uvx
     : 'node:22-alpine');                               // ships node/npx
   const jail = dockerJail(opts).concat([
-    '--tmpfs', '/home/node/.npm',
-    '-e', 'HOME=/home/node',
-    '-e', 'npm_config_ignore_scripts=true', // install hooks already vetted by verify_integrity
-    '-u', 'node',
+    // `:exec` is required, not incidental: tmpfs mounts default to noexec, and
+    // npx/uvx fetch the server into this cache and then run it from there.
+    // Without it every npm entry died with "Permission denied" from sh — which
+    // is what a whole-DB run produced: 112 of 113 "failures" that were the jail
+    // refusing to execute what it had just downloaded, not servers being broken.
+    ...(uvx
+      // uv caches wheels and runs them from the cache, so the same exec rule
+      // applies; the uv image has no unprivileged `node` user.
+      ? ['--tmpfs', '/home/uv:exec', '-e', 'HOME=/home/uv', '-e', 'UV_CACHE_DIR=/home/uv/.cache/uv']
+      : ['--tmpfs', '/home/node/.npm:exec', '-e', 'HOME=/home/node',
+         '-e', 'npm_config_ignore_scripts=true', // hooks already vetted by verify_integrity
+         '-u', 'node']),
     image,
     parsed.command, ...parsed.args,
   ]);

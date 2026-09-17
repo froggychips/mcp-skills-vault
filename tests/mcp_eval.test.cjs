@@ -575,3 +575,28 @@ test('a refused sandbox means the entry is skipped, not run', async () => {
   assert.match(r.error_code, /not pinned by digest/);
   assert.equal(r.sandboxed, false);
 });
+
+test('sandboxWrap: caches are mounted exec, or nothing can run', () => {
+  // tmpfs defaults to noexec. npx and uvx fetch the server into the cache and
+  // then execute it from there, so without :exec every entry fails with
+  // "Permission denied" — a whole-DB run produced 112 of 113 such "failures",
+  // which were the jail refusing to run what it had just downloaded.
+  for (const cmd of ['npx -y pkg@1.0.0', 'uvx pkg==1.0.0']) {
+    const w = e.sandboxWrap(e.parseInstallCmd(cmd));
+    const mounts = w.args.filter((a, i) => w.args[i - 1] === '--tmpfs');
+    assert.ok(mounts.length > 0, cmd);
+    for (const m of mounts) {
+      assert.match(m, /:exec$/, `${cmd}: ${m} is mounted noexec, so the fetched server cannot start`);
+    }
+  }
+});
+
+test('sandboxWrap: each runtime gets a writable HOME its package manager can use', () => {
+  const npx = e.sandboxWrap(e.parseInstallCmd('npx -y pkg@1.0.0'));
+  assert.ok(npx.args.includes('HOME=/home/node'));
+  assert.ok(npx.args.includes('-u') && npx.args.includes('node'), 'npm entries run unprivileged');
+
+  const uvx = e.sandboxWrap(e.parseInstallCmd('uvx pkg==1.0.0'));
+  assert.ok(uvx.args.includes('HOME=/home/uv'));
+  assert.ok(uvx.args.some(a => a.startsWith('UV_CACHE_DIR=')), 'uv needs its cache pointed somewhere writable');
+});
