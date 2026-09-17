@@ -40,6 +40,34 @@ What `bound` does **not** mean, and the output never says otherwise:
 Validating the Fulcio chain (with a pinned root) is the obvious next step and is
 not done yet.
 
+## Our own releases
+
+`@froggychips/mcp-vault` is published from
+[.github/workflows/release.yml](.github/workflows/release.yml), which refuses to
+publish without an npm provenance attestation unless the refusal is overridden
+explicitly (`allow_unprovenanced`). A tool that argues for provenance should
+ship with it.
+
+**0.14.0 was published with that override, and therefore has no provenance
+attestation.** The reason is worth writing down because it is not a choice:
+
+- npm accepts a provenance bundle only from a **GitHub-hosted** runner
+  (`Unsupported GitHub Actions runner environment: "self-hosted"`, HTTP 422).
+- Every job in this repository runs on a self-hosted runner, because
+  GitHub-hosted runners do not start on this account — the account is locked
+  over a failed card authorization, and a hosted job dies with zero steps and
+  the annotation *"The job was not started because your account is locked due to
+  a billing issue."*
+
+So the two constraints exclude each other, and the release was published
+unprovenanced on purpose rather than silently. What is still true for 0.14.0:
+npm's **registry signature** over `name@version:integrity` is present, as it is
+for every version, and `npm audit signatures` verifies it.
+
+Provenance returns as soon as the hosted runner can start; the publish job is
+the only one that needs it, and moving that single job to `ubuntu-latest` is the
+whole fix.
+
 ## Static analysis (CodeQL)
 
 CodeQL runs as **advanced setup** on the self-hosted runner
