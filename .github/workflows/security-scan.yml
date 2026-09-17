@@ -421,6 +421,9 @@ jobs:
     # whether to update the DB. Nothing here writes to the DB.
     if: github.event_name != 'pull_request' && ((github.event_name == 'schedule' && github.event.schedule == '17 6 * * 1') || github.event_name == 'workflow_dispatch')
     needs: unit-tests
+    permissions:
+      contents: write        # the snapshot lands on a branch
+      pull-requests: write
     # This job downloads and runs 100+ third-party MCP servers. A verified hash
     # says which artifact ran, not that it was benign — this project's own
     # SECURITY.md says so. It used to run `--unsafe` directly on this machine
@@ -478,6 +481,68 @@ jobs:
         with:
           name: eval-results
           path: eval_results_run.json
+          # The default 90-day retention filled this account's artifact quota,
+          # and "Artifact storage quota has been hit" is what failed the run —
+          # not the eval itself. A week is longer than anyone reads these.
+          retention-days: 7
+      # An artifact is operational evidence: it expires, and someone who clones
+      # the repo or installs the package cannot see it. The shipped
+      # eval_results.json was `results: []`, so the behavioural layer existed in
+      # CI and nowhere a user could check. Commit it through a reviewed PR —
+      # evidence, still not policy: nothing here promotes an entry.
+      - name: Refresh the shipped eval snapshot
+        if: always()
+        run: |
+          set -euo pipefail
+          node -e '
+            const fs = require("fs");
+            const run = JSON.parse(fs.readFileSync("eval_results_run.json", "utf8"));
+            const path = "mcp-ecosystem-intelligence/assets/eval_results.json";
+            const prev = JSON.parse(fs.readFileSync(path, "utf8"));
+            // Keep only the fields a reader needs; drop stderr tails, which can
+            // carry paths and tokens from a failing server.
+            const slim = (r) => ({
+              name: r.name, status: r.status, error_code: r.error_code || null,
+              tool_count: r.tool_count, tool_count_db: r.tool_count_db,
+              tool_count_drift: r.tool_count_drift, tools_payload_bytes: r.tools_payload_bytes,
+              boot_ms: r.boot_ms, schema_errors: (r.schema_errors || []).length,
+              sandboxed: r.sandboxed, checked_at: r.checked_at,
+            });
+            const byName = new Map((prev.results || []).map((r) => [r.name, r]));
+            for (const r of (run.results || [])) byName.set(r.name, slim(r));
+            fs.writeFileSync(path, JSON.stringify({
+              $schema: prev.$schema || "describes shape; not enforced",
+              generated_at: new Date().toISOString(),
+              generator: run.generator || prev.generator || null,
+              note: "Behavioural evidence, not policy. Nothing here promotes an entry; tools_database.json stays the source of truth.",
+              results: [...byName.values()].sort((a, b) => a.name.localeCompare(b.name)),
+            }, null, 2) + "\n");
+          '
+          git --no-pager diff --stat -- mcp-ecosystem-intelligence/assets/eval_results.json
+      - name: Open a PR with the refreshed eval snapshot
+        if: always()
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1   # v8.1.1
+        with:
+          commit-message: 'chore(eval): refresh behavioural snapshot'
+          title: 'chore(eval): refresh behavioural snapshot'
+          body: |
+            Last-known behavioural state for the DB entries, from this week's
+            sandboxed eval run.
+
+            This is **evidence, not policy**: nothing here promotes or demotes an
+            entry, and `tools_database.json` remains the source of truth. It is
+            committed so that someone who clones the repo or installs the package
+            can see whether each server was observed to start and list tools —
+            which a CI artifact, expiring in a week, cannot tell them.
+
+            ## Reviewer checklist
+            - [ ] New `fail` entries: is it the server, or the environment (missing credentials read as a failure)?
+            - [ ] `tool_count_drift`: upstream changed its tool surface — check whether `est_tools_count` should move
+            - [ ] A server that went from pass to CRASH deserves a look before the next release
+          branch: chore/eval-snapshot
+          delete-branch: true
+          add-paths: |
+            mcp-ecosystem-intelligence/assets/eval_results.json
           # The default 90-day retention filled this account's artifact quota,
           # and "Artifact storage quota has been hit" is what failed the run —
           # not the eval itself. A week is longer than anyone reads these.

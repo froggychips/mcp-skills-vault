@@ -37,6 +37,8 @@
  *   mcp_eval.cjs --sandbox              run each server in a locked-down container (needs docker)
  *   mcp_eval.cjs --unsafe               run servers directly on the host (explicit opt-out of the sandbox)
  *   mcp_eval.cjs --db <path>            override DB path
+ *   mcp_eval.cjs --record-evidence      write the smoke result into the DB as
+ *                                       dated evidence (smoke dimension)
  *   mcp_eval.cjs --installed            smoke the servers your hosts launch,
  *                                       not DB entries (feeds `mcp-vault budget`)
  *   mcp_eval.cjs --results <path>       override results file path
@@ -65,6 +67,9 @@ const { performance } = require('perf_hooks');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { readInstalledServers } = require('./lib/installed.cjs');
 const { dockerImageRef } = require('./lib/install_cmd.cjs');
+const { readDb, writeDb } = require('./lib/db_io.cjs');
+const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
+const { smokeEvidence, mergeEvidence } = require('./lib/evidence.cjs');
 const stdio         = require('./lib/mcp_stdio.cjs'); // shared framing + sandbox + classifier (vendored, zero-dep)
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -91,6 +96,7 @@ function parseArgs(argv) {
     db:       DEFAULT_DB_PATH,
     results:  DEFAULT_RESULTS_PATH,
     installed: false,
+    recordEvidence: false,
     cwd:      process.cwd(),
     strict:   false,
     help:     false,
@@ -105,6 +111,7 @@ function parseArgs(argv) {
       case '--json':    opts.json    = true; break;
       case '--no-spawn':opts.noSpawn = true; break;
       case '--installed': opts.installed = true; break;
+      case '--record-evidence': opts.recordEvidence = true; break;
       case '--sandbox': opts.sandbox = true; break;
       case '--unsafe':  opts.unsafe  = true; break;
       case '--db':      opts.db      = next; i++; break;
@@ -714,6 +721,34 @@ async function main() {
         ? ` — ${r.error_code || 'unknown error'}`
         : (r.status === 'skip' ? ` — ${r.error_code || ''}` : ` — ${r.tool_count} tools, boot ${r.boot_ms}ms${drift}`);
       process.stderr.write(`  ${tag} ${tool.name}${detail}\n`);
+    }
+  }
+
+  // Behavioural evidence belongs in the same dated structure as everything
+  // else, keyed to the artifact it was observed on — a smoke result for 1.2.3
+  // says nothing about 1.2.4.
+  if (opts.recordEvidence && !opts.installed) {
+    try {
+      const { db } = readDb(opts.db);
+      let recorded = 0;
+      for (const r of newResults) {
+        const tool = (db.tools || []).find((t) => t.name === r.name);
+        if (!tool) continue;
+        const dim = smokeEvidence(r);
+        if (!dim) continue;
+        const typed = toTypedEntry(tool);
+        tool.trust_evidence = mergeEvidence(tool.trust_evidence, {
+          artifact_id: typed ? artifactId(typed.artifact) : null,
+          dimensions: { smoke: dim },
+        });
+        recorded++;
+      }
+      if (recorded) {
+        writeDb(opts.db, db);
+        process.stderr.write(`Recorded smoke evidence for ${recorded} entr${recorded === 1 ? 'y' : 'ies'}\n`);
+      }
+    } catch (e) {
+      process.stderr.write(`Could not record evidence: ${e.message}\n`);
     }
   }
 
