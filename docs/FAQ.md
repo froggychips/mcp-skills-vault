@@ -37,6 +37,36 @@ If the hash doesn't match — the install is blocked. If there's a known CVE —
 
 ---
 
+## Does it check the dependencies too?
+
+With `--deps`, yes. The tree is resolved with `npm install --package-lock-only
+--ignore-scripts` — nothing is installed and no package code runs — and every
+distinct package in it goes to OSV. This matters more than it sounds: across the
+shipped DB that is 19,377 transitive packages, 25 entries whose *dependencies*
+run install scripts, and 38 with a high or critical advisory somewhere in the
+tree. A one-level check is a check at the wrong depth.
+
+## What does `trust: "verified"` mean, exactly?
+
+It is computed, not typed. Each dimension — artifact, signature, provenance,
+source binding, advisories, dependencies, smoke — carries its own status and the
+date it was established, and each has a shelf life: a hash match holds for 90
+days, "no advisories" for 7, because disclosures do not wait. `trust` is derived
+from that, and evidence is keyed to the artifact including its version, so it is
+dropped rather than inherited when the version moves.
+
+A run records only what it examined. A `--no-audit` run writes nothing about
+advisories rather than writing "clean".
+
+## Can I make it stricter without remembering seven flags?
+
+`.mcp-vault.policy.json`, resolved from the working directory upwards. It sets
+the bar once — `unverified: fail`, `signatures: require`, licence allow/deny
+lists, a minimum health score, acceptable trust tiers — and CI and your shell
+then enforce the same one. A policy can only raise the bar; an explicit flag
+still wins. An unknown key is a hard error, because a policy with a typo that
+silently enforces nothing is worse than no policy.
+
 ## What do Core / Recommended / Experimental mean?
 
 Servers are scored by a formula:
@@ -91,6 +121,17 @@ mcp-vault install mcp-server-memory --global
 ```
 
 Global installs go to `~/.claude.json`.
+
+Other hosts work too — `--host cursor`, `--host vscode`, `--host claude-desktop`,
+and `--host codex` (which prints a TOML block to paste, because rewriting
+someone's TOML without a parser destroys their comments). `--list-hosts` shows
+what exists. An existing config is backed up before it is touched, unrelated
+keys survive, and a config that exists but does not parse is refused rather than
+replaced.
+
+Whatever the host, the command written is the version the gate verified:
+`pkg@1.2.3`, `pkg==1.2.3`, `image@sha256:…`. Writing `npx -y pkg` would mean the
+thing that runs is not the thing that was checked.
 
 ---
 

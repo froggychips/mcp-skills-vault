@@ -80,7 +80,7 @@ Promotion PR title format: `chore: promote <name> to trust:verified` — body mu
 #### Install-time safety
 - [ ] No `preinstall` / `install` / `postinstall` / `prepack` hooks; `prepare` is allowed only if it's `npm run build` (verified by reading the published `package.json`)
 - [ ] No native binary downloads in install hooks
-- [ ] `est_tools_count` filled in from a real smoke — `node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --name <name> --sandbox --json` reports `tool_count` (use `--unsafe` if you have no docker)
+- [ ] `est_tools_count` filled in from a real smoke — `node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --name <name> --sandbox --json` reports `tool_count`. `--sandbox` needs a container runtime; `--unsafe` runs the server on your machine, so use it only on something you have read
 
 #### Operational fit
 - [ ] `category` is specific (not `utility`) — or there's a note explaining why utility is right
@@ -116,7 +116,13 @@ To promote a hooked candidate to `verified`, a maintainer must:
 
 1. Read the actual hook script in the published package — e.g. `npm view <pkg>@<ver> dist.tarball`, unpack, inspect.
 2. Document in the entry's `notes` field: `[VERIFIED <date>] hook reviewed: <one-line description of what it does>`.
-3. Open a PR that explains *why* this specific hook is acceptable. The promotion is opt-in per entry, not a class-wide carve-out. (Implementation detail TBD: either run `verify_integrity.cjs --strict` with a per-entry waiver, or add a `hook_review: "approved"` field that the gate reads.)
+3. Open a PR that explains *why* this specific hook is acceptable. The promotion is opt-in per entry, not a class-wide carve-out.
+
+A project consuming the vault can set its own bar without touching the DB:
+`.mcp-vault.policy.json` has `installHooks` and `dependencyHooks` (`fail` /
+`warn` / `allow`), and `--deps` is what makes the second one answerable — an
+install hook is more often in a transitive dependency than in the package
+itself.
 
 PyPI (`uvx`) and Docker (`docker run`) entries are not subject to this policy because they have no equivalent automatic-execution surface at install time — `uvx` runs the entrypoint, not arbitrary build scripts; Docker images execute only their `CMD`/`ENTRYPOINT`.
 
@@ -131,7 +137,8 @@ See [`mcp-ecosystem-intelligence/assets/triage_notes.md`](./mcp-ecosystem-intell
 This file is the single most security-sensitive script in the repo. Changes require:
 
 1. Pass the existing self-checks in [SECURITY.md §`verify_integrity.cjs`](./SECURITY.md)
-2. Unit-test coverage for the change (see `tests/` directory if it exists; otherwise add it)
+2. Unit-test coverage for the change — and specifically for the failure path. The recurring bug in this file has one shape: a check that did not run being indistinguishable from a check that passed. A test that only asserts the happy path would have caught none of them.
+3. If the change adds a conclusion, it belongs in the typed `checks` a processor returns, not only in the report text. Evidence is built from `checks`; deriving it from prose is how a digest-pinned entry once recorded three verifications that never happened.
 3. CI smoke job must stay green on the same DB after the change
 4. PR description must call out *what specifically can no longer pass the gate* after this change — even if the answer is "nothing, this only adds a new check"
 
@@ -143,7 +150,8 @@ A logic bug here is treated as Critical severity (48-hour patch SLA per SECURITY
 
 - Commit messages: [Conventional Commits](https://www.conventionalcommits.org). `feat:` → minor version bump, `fix:` → patch, `BREAKING CHANGE:` → major. PR titles are read by `release-please` to drive the next version.
 - Imperative mood, focused on *why* not *what*. Reviewers will read the diff for what.
-- Run `verify_integrity.cjs --no-audit` before every push if you touched `tools_database.json` or any script.
+- Run `verify_integrity.cjs --no-audit` before every push if you touched `tools_database.json` or any script. `--deep` additionally hashes the artifacts; `--entry <name>` checks one entry instead of all 114.
+- If you touched anything under `.github/`, `node --test tests/ci_manifest.test.cjs` asserts the CI invariants: no PR code running unjailed on the runner, every action pinned to a SHA, no `curl | sh`, every job timed out.
 - When editing `tools_database.json` programmatically, use `mcp-ecosystem-intelligence/scripts/lib/db_io.cjs::writeDb()` — it preserves the file's `\uXXXX` escape convention for non-ASCII characters. A regression test in `tests/db_io.test.cjs` enforces this.
 - Don't add dependencies to the scripts — they intentionally use only Node built-ins so the supply-chain attack surface is the same as Node itself.
 - For UI / docs PRs, no need for triage checklist; just describe the change in plain English.

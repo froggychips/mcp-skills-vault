@@ -34,6 +34,19 @@
       <h3>4. Audit installed MCP servers</h3>
       <pre><code>npx -y @froggychips/mcp-vault audit --strict</code></pre>
     </section>
+    <section class="step">
+      <h3>5. Check what your hosts actually launch</h3>
+      <p>The DB is one thing; the servers your editor starts are another. This reads
+         <code>.mcp.json</code>, <code>~/.claude.json</code>, Claude Desktop, Cursor, VS Code and Codex,
+         and reports unpinned launch commands, servers that aren't in the vault, and remote endpoints
+         as what they are.</p>
+      <pre><code>npx -y @froggychips/mcp-vault verify --installed</code></pre>
+    </section>
+    <section class="step">
+      <h3>6. See what they cost in context</h3>
+      <p>Every enabled server injects its whole tool list into the system prompt, on every request.</p>
+      <pre><code>npx -y @froggychips/mcp-vault budget</code></pre>
+    </section>
   </main>
 </body>
 </html>

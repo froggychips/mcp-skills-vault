@@ -52,15 +52,42 @@ Residual risk: a compromised npm/PyPI release that publishes under the same vers
 
 ### `verify_integrity.cjs` — the integrity gate
 
-A logic error here makes the entire pinning story worthless. Specifically dangerous failure modes:
-- Comparing hash with `==` against a non-string (coerces away difference)
-- Returning early on a parse error instead of failing
-- Falling back to a "warning" when the registry is unreachable
+A logic error here makes the entire pinning story worthless. The dangerous
+failure mode has a shape: **a check that did not happen must never be
+indistinguishable from a check that passed.** Every real instance found so far
+was a variant of it — a registry timeout recorded as `SKIP` and not counted, a
+wheel-only release where the comparison was skipped and the entry still read
+`OK`, an advisory severity that could not be parsed and therefore was not
+"hard", a feed outage coalescing into "no advisories".
+
+What the gate does today:
+- **Artifact** — the stored pin against the registry's metadata, and with
+  `--deep` against the bytes themselves (npm tarball sha512, PyPI sdist sha256,
+  OCI manifest sha256, hashed locally)
+- **Signature** — npm signs `<name>@<version>:<integrity>` with a published
+  ECDSA key; verified on every run, so a response with a swapped
+  `dist.integrity` cannot pass
+- **Provenance** — the attestation is read and its claimed repository compared
+  with `source_url`. Reported as a *claim*: verifying the sigstore bundle
+  (Fulcio chain, Rekor inclusion) is not something this tool does
+- **Advisories** — four feeds merged, severity taken from the worst any of them
+  reported, CVSS vectors scored rather than pattern-matched
+- **Dependencies** — with `--deps`, the resolved tree's install scripts and its
+  packages against OSV
+- **Source binding, install hooks, licence, digest pinning** — as before
+
+Anything the gate could not establish is `UNVERIFIED`: reported, counted, and a
+hard failure under `--fail-unverified` (which `--strict` implies, and which
+`install` passes). Evidence written back to the DB records *what was checked*,
+per dimension, with the date — so "verified" cannot quietly mean "verified
+eight months ago, by a run that skipped this part".
 
 Mitigations:
-- Unit tests in `tests/verify_integrity.test.cjs` cover the parser, advisory dedup, and gate logic
-- Smoke job runs on every PR (`--offline` mode), fast and network-free — would catch a regression that breaks the local gate
-- `--strict` mode treats WARNs as failures and is what CI uses
+- 535 tests, including the fail-closed paths and the CI manifests themselves
+- Smoke job on every PR (`--offline`), network-free, plus a SARIF upload so a
+  finding lands on the DB line that caused it
+- `--strict` treats WARNs as failures; `--fail-unverified` treats "could not
+  check" as one
 
 ### Weekly hash refresh PR
 

@@ -13,15 +13,25 @@ Steps marked **[scripted]** have a dedicated script you call via Bash. Steps mar
 
 ```
 1. Detect stack         → [scripted] node scripts/orchestrate.cjs --cwd $CWD
+                                     signals carry source + confidence
 2. Cache lookup         → [scripted] included in orchestrate.cjs output
-3. Discovery (if miss)  → [Claude]   WebFetch registry + Bash gh search
-4. Validate (5 checks)  → [scripted] node scripts/verify_integrity.cjs
-5. Score                → [scripted] node scripts/calculate_health.cjs <args>
+3. Discovery (if miss)  → [scripted] node scripts/discover.cjs  (inbox only)
+4. Validate             → [scripted] node scripts/verify_integrity.cjs
+                                     --deep hashes the artifact, --deps the tree,
+                                     signatures + provenance checked by default
+5. Score                → [scripted] health (calculate_health.cjs) + trust + fit
+                                     (lib/scores.cjs), trust gates the rest
 6. Reject heuristics    → [Claude]   apply 5-Minute / Bloat / Duplication rules
-7. Recommend            → [scripted] included in orchestrate.cjs output (with tool count)
+7. Recommend            → [scripted] orchestrate.cjs --json carries the three axes
 8. Install (on consent) → [scripted] node scripts/orchestrate.cjs --install <name>
+                                     writes the verified version, any host
 9. Update DB            → [Claude]   append/update assets/tools_database.json
+                                     evidence via verify --record-evidence
 ```
+
+What stays [Claude] is deliberate: taste (step 6) and promoting an entry to
+`trust: verified` (step 9). Neither should become automatic — an LLM can help a
+human read a diff, but it must not be the trust root.
 
 Default output mode is **terse**. The user can ask for "verbose" / "explain" to flip into the long form.
 
@@ -149,9 +159,14 @@ npm search mcp-server-<keyword> --json | jq '.[0:5] | .[] | {name, description, 
 
 If all tiers return nothing, proceed to §8 (wrapper generation).
 
-## 4. Validation (all five required)
+## 4. Validation
 
-A candidate is **rejected** if any check fails:
+A candidate is **rejected** if any check fails. The five below are the entry
+requirements; the gate additionally verifies the npm registry signature, reads
+any provenance attestation, and — with `--deep` / `--deps` — hashes the artifact
+itself and checks the resolved dependency tree. Anything it *could not* check is
+`UNVERIFIED`, which is a failure under `--fail-unverified`; "the feed was down"
+is not "the pin is good".
 
 1. **Install command** is documented (`npx -y …`, `uvx …`, `pip install …`, `docker run …`).
 2. **MCP wiring** is detectable: `server.json` present **or** `@modelcontextprotocol/sdk` / `mcp` (Python) imported in source.
@@ -416,9 +431,15 @@ docker run -i --rm \
 
 For npm/PyPI servers without an upstream image, the verifier still catches integrity drift via `pkg_integrity`. Whether to additionally wrap them in a generic container is an extra (manual) hardening step — `--read-only` breaks many servers that cache locally, so apply it case-by-case.
 
-### Step 3 — write to `.mcp.json` (project-scoped) or `~/.claude.json` (global)
+### Step 3 — write the host config
 
 **Default: project-scoped `.mcp.json`** in the repository root. This keeps the server active only in that project and avoids injecting unused tools into unrelated conversations.
+
+`orchestrate.cjs --install` writes it for you, and writes the version the gate
+verified rather than the entry's command verbatim — `npx -y pkg` resolves
+`latest` at every start, which is not the artifact that was checked. Other hosts:
+`--host cursor|vscode|claude-desktop|codex` (`--list-hosts` to see them, and
+Codex gets a TOML block to paste rather than a rewritten config).
 
 **Use `~/.claude.json` only for servers needed in every project** — typically `mcp-server-filesystem` and `mcp-server-memory`.
 
