@@ -450,7 +450,10 @@ jobs:
       - name: mcp_eval --json
         # Long timeout per entry — npx cold-fetches can take 20–30s in CI;
         # the script's per-entry timeout (default 30s) is the inner gate.
-        run: node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --sandbox --json > eval_results_run.json
+        # --pace: a gap between container starts. Without one, 113 back-to-back
+        # `docker run`s took the daemon down on a developer laptop and every
+        # entry after that was reported as a crashed server.
+        run: node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --sandbox --pace 750 --json > eval_results_run.json
       - name: Summary
         if: always()
         run: |

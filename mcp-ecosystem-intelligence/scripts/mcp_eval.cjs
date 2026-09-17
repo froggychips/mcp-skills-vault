@@ -37,6 +37,7 @@
  *   mcp_eval.cjs --sandbox              run each server in a locked-down container (needs docker)
  *   mcp_eval.cjs --unsafe               run servers directly on the host (explicit opt-out of the sandbox)
  *   mcp_eval.cjs --db <path>            override DB path
+ *   mcp_eval.cjs --pace <ms>            gap between container starts (default 400)
  *   mcp_eval.cjs --record-evidence      write the smoke result into the DB as
  *                                       dated evidence (smoke dimension)
  *   mcp_eval.cjs --installed            smoke the servers your hosts launch,
@@ -66,6 +67,8 @@ const { spawn }     = require('child_process');
 const { performance } = require('perf_hooks');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { readInstalledServers } = require('./lib/installed.cjs');
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const { dockerImageRef, npmPkgName, pypiPkgName } = require('./lib/install_cmd.cjs');
 
 // Which version a launch command actually asks for; null means it resolves at
@@ -119,6 +122,11 @@ function parseArgs(argv) {
     results:  DEFAULT_RESULTS_PATH,
     installed: false,
     recordEvidence: false,
+    // Breathing room between container starts. 113 back-to-back `docker run`s
+    // took the daemon down on a developer laptop, and every entry after that
+    // was reported as a crashed server. Cheap insurance for a job whose whole
+    // output is a claim about other people's software.
+    paceMs: 400,
     cwd:      process.cwd(),
     strict:   false,
     help:     false,
@@ -134,6 +142,7 @@ function parseArgs(argv) {
       case '--no-spawn':opts.noSpawn = true; break;
       case '--installed': opts.installed = true; break;
       case '--record-evidence': opts.recordEvidence = true; break;
+      case '--pace':    opts.paceMs = Number(next); i++; break;
       case '--sandbox': opts.sandbox = true; break;
       case '--unsafe':  opts.unsafe  = true; break;
       case '--db':      opts.db      = next; i++; break;
@@ -736,11 +745,21 @@ async function main() {
   for (const tool of picked) {
     if (!opts.json) process.stderr.write(`smoking ${tool.name}…\n`);
     const r = await smokeEntry(tool, opts);
-    // "The sandbox could not run" is not a finding about the entry. Report it
-    // as a skip, and give up once it is plainly the environment: continuing
-    // produces a report that blames 100 entries for one broken daemon.
-    if (r.failure_class === stdio.classifyFailure.SANDBOX_UNAVAILABLE
-        || r.failure_class === 'SANDBOX_UNAVAILABLE') {
+    // "The sandbox could not run" is not a finding about the entry. Retry once
+    // after a pause — a daemon under load recovers — then report it as a skip,
+    // and give up once it is plainly the environment: continuing produces a
+    // report that blames 100 entries for one broken daemon.
+    if (r.failure_class === 'SANDBOX_UNAVAILABLE' && opts.sandbox) {
+      await sleep(Math.max(2000, (opts.paceMs || 0) * 5));
+      const retry = await smokeEntry(tool, opts);
+      if (retry.failure_class !== 'SANDBOX_UNAVAILABLE') {
+        newResults.push(retry);
+        consecutiveSandboxFailures = 0;
+        if (opts.paceMs) await sleep(opts.paceMs);
+        continue;
+      }
+    }
+    if (r.failure_class === 'SANDBOX_UNAVAILABLE') {
       r.status = 'skip';
       consecutiveSandboxFailures++;
       if (consecutiveSandboxFailures >= 3) {
@@ -755,6 +774,7 @@ async function main() {
       consecutiveSandboxFailures = 0;
     }
     newResults.push(r);
+    if (opts.paceMs) await sleep(opts.paceMs);
     if (!opts.json) {
       const tag = r.status === 'pass' ? 'PASS' : (r.status === 'fail' ? 'FAIL' : 'SKIP');
       const drift = r.tool_count_drift ? ` (drift ${r.tool_count_db}→${r.tool_count})` : '';
