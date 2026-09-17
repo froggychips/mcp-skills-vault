@@ -270,7 +270,7 @@ const FAILURE_CLASS = {
 // Map a raw failure into one honest class. Pure function over the signals the
 // smoke already collects (error_code string + stderr tail + tool count).
 // Returns null when nothing failed.
-function classifyFailure({ status, errorCode = '', stderr = '', toolCount = null } = {}) {
+function classifyFailure({ status, errorCode = '', stderr = '', toolCount = null, handshakeReached = false } = {}) {
   if (status === 'pass') {
     return toolCount === 0 ? FAILURE_CLASS.NO_TOOLS : null;
   }
@@ -278,9 +278,14 @@ function classifyFailure({ status, errorCode = '', stderr = '', toolCount = null
   const ec = String(errorCode || '');
   if (/timeout/i.test(ec)) return FAILURE_CLASS.TIMEOUT;
   const s = `${ec}\n${stderr}`.toLowerCase();
-  // Checked before the credential and network patterns, which it would
-  // otherwise match: a dead docker socket says "error during connect".
-  if (/error during connect|cannot connect to the docker daemon|docker daemon is not running|is the docker daemon running|docker\.sock|docker: not found|error waiting for container|pull access denied|toomanyrequests/.test(s)) {
+  // A sandbox failure is a claim about the *infrastructure*, and infrastructure
+  // failures happen before the server exists. Once a server has spoken —
+  // handshake completed, or output that only a running server produces — its
+  // words cannot demote a crash into "the environment was broken": a hostile
+  // entry would just print "error during connect" and be recorded as skipped.
+  // `handshakeReached` is supplied by the caller, which knows.
+  if (!handshakeReached
+      && /error during connect|cannot connect to the docker daemon|docker daemon is not running|is the docker daemon running|\/docker\.sock|docker: not found|error waiting for container|pull access denied|toomanyrequests/.test(s)) {
     return FAILURE_CLASS.SANDBOX;
   }
   if (/api[_ ]?key|token|credential|unauthor|forbidden|missing .*(key|token|secret)|env(ironment)? var|not set/.test(s)) return FAILURE_CLASS.NEEDS_ENV;

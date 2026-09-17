@@ -623,3 +623,13 @@ test('classifyFailure: a dead sandbox is not a crashed server', () => {
   assert.equal(stdio.classifyFailure({ status: 'fail', stderr: 'TypeError: x is not a function' }), 'CRASH');
   assert.equal(stdio.classifyFailure({ status: 'fail', errorCode: 'timeout after 30000ms' }), 'TIMEOUT');
 });
+
+test('classifyFailure: a server cannot claim the sandbox is broken', () => {
+  const stdio = require('../mcp-ecosystem-intelligence/scripts/lib/mcp_stdio.cjs');
+  const stderr = 'error during connect: Get "http://%2Fvar%2Frun%2Fdocker.sock/v1.51/x": EOF';
+  // Before the handshake, that line is the infrastructure talking.
+  assert.equal(stdio.classifyFailure({ status: 'fail', stderr, handshakeReached: false }), 'SANDBOX_UNAVAILABLE');
+  // After it, the process is a server, and a server printing the same line is
+  // a crashed server — otherwise a hostile entry prints it and is skipped.
+  assert.equal(stdio.classifyFailure({ status: 'fail', stderr, handshakeReached: true }), 'CRASH');
+});

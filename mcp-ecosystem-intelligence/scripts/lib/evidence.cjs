@@ -83,7 +83,14 @@ function buildEvidence(checks, { now = Date.now(), artifactId = null } = {}) {
   const at = today(now);
   const dimensions = {};
   const put = (name, status, extra = {}) => {
-    dimensions[name] = { status, checked_at: at, ...extra };
+    // `checked_at` is when we looked; `verified_at` is when it last checked
+    // out. Only the second ages: an offline run that records
+    // `unverified (offline-pin-present)` was a look, not a confirmation, and
+    // letting it refresh the date made stale evidence look current by running
+    // a check that verifies nothing.
+    const entry = { status, checked_at: at, ...extra };
+    if (POSITIVE_STATUSES.has(status)) entry.verified_at = at;
+    dimensions[name] = entry;
   };
 
   const c = checks || {};
@@ -126,15 +133,26 @@ function smokeEvidence(evalResult, { now = Date.now() } = {}) {
  * examine keeps its previous (dated) answer — that is the point of the dates.
  */
 function mergeEvidence(existing, fresh) {
-  const sameArtifact = existing && fresh && existing.artifact_id && fresh.artifact_id
-    && existing.artifact_id === fresh.artifact_id;
-  const base = sameArtifact ? (existing.dimensions || {}) : {};
+  // An id that differs means a different release, and the old evidence goes.
+  // An id that is *missing* means we could not tell — which is not the same
+  // statement, and discarding the history on it would throw away real answers
+  // because one side failed to compute a name.
+  const freshId = fresh && fresh.artifact_id;
+  const existingId = existing && existing.artifact_id;
+  const differentArtifact = Boolean(freshId && existingId && freshId !== existingId);
+  const base = differentArtifact ? {} : ((existing && existing.dimensions) || {});
   const merged = { ...base };
   for (const [name, value] of Object.entries((fresh && fresh.dimensions) || {})) {
     if (!value) continue;
     const prev = merged[name];
     // Newest wins; equal dates prefer the fresh answer.
-    if (!prev || !prev.checked_at || String(value.checked_at) >= String(prev.checked_at)) merged[name] = value;
+    if (!prev || !prev.checked_at || String(value.checked_at) >= String(prev.checked_at)) {
+      // Carry the last confirmation forward. A fresh negative or inconclusive
+      // result replaces the status but must not erase when the thing last
+      // actually checked out — that date is what staleness is measured on.
+      const carried = value.verified_at || (prev && prev.verified_at) || null;
+      merged[name] = carried ? { ...value, verified_at: carried } : { ...value };
+    }
   }
   const ordered = {};
   for (const name of DIMENSIONS) if (merged[name]) ordered[name] = merged[name];
@@ -157,7 +175,8 @@ function staleDimensions(evidence, maxAgeDays = DEFAULT_MAX_AGE_DAYS, now = Date
   for (const [name, value] of Object.entries(dims)) {
     const limit = typeof maxAgeDays === 'number' ? maxAgeDays : (maxAgeDays[name] ?? DEFAULT_MAX_AGE_DAYS[name]);
     if (!Number.isFinite(limit)) continue;
-    const age = daysBetween(value.checked_at, now);
+    // Age is measured from the last *confirmation*, not the last look.
+    const age = daysBetween(value.verified_at || (POSITIVE_STATUSES.has(value.status) ? value.checked_at : null) || value.checked_at, now);
     if (age > limit) out.push({ dimension: name, age_days: age, max_age_days: limit, checked_at: value.checked_at });
   }
   return out;

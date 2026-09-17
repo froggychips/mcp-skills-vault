@@ -69,6 +69,15 @@ const { exitAfterFlush } = require('./lib/exit.cjs');
 const { readInstalledServers } = require('./lib/installed.cjs');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Is this launch spec a single, immutable version? `latest`, a range, or a tag
+// is not, and a smoke result against one cannot be attributed to a release.
+function isExactVersion(installCmd, version) {
+  if (!version) return false;
+  if (/^docker\s+run/.test(String(installCmd))) return /^sha256:[a-f0-9]{64}$/.test(version);
+  if (/^npx\s/.test(String(installCmd))) return /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version);
+  return /^\d+(?:\.\d+)*(?:(?:a|b|rc)\d+)?(?:\.post\d+)?(?:\.dev\d+)?(?:\+[0-9A-Za-z.]+)?$/.test(version);
+}
 const { dockerImageRef, npmPkgName, pypiPkgName } = require('./lib/install_cmd.cjs');
 
 // Which version a launch command actually asks for; null means it resolves at
@@ -567,6 +576,10 @@ async function smokeEntry(tool, opts) {
     errorCode: result.error_code,
     stderr:    result.stderr_tail || '',
     toolCount: result.tool_count,
+    // Once the handshake landed, the process is a server, and what it prints
+    // is its own business — it may not reclassify itself as an infrastructure
+    // failure and be skipped.
+    handshakeReached: result.boot_ms !== null || result.tool_count !== null,
   });
 
   return result;
@@ -737,14 +750,18 @@ async function main() {
   const payload = readResults(opts.results);
   // We replace any existing record for the same name (per-run freshness),
   // but keep records for entries we didn't touch this run.
-  const touched = new Set(picked.map(t => t.name));
-  const kept = (payload.results || []).filter(r => !touched.has(r.name));
+  // Filled in as entries are actually smoked. Using the planned list meant an
+  // early stop deleted the stored results of every entry the run never got to.
+  const touched = new Set();
+  const priorResults = payload.results || [];
 
   const newResults = [];
   let consecutiveSandboxFailures = 0;
+  let runAborted = false;
   for (const tool of picked) {
     if (!opts.json) process.stderr.write(`smoking ${tool.name}…\n`);
     const r = await smokeEntry(tool, opts);
+    touched.add(tool.name);
     // "The sandbox could not run" is not a finding about the entry. Retry once
     // after a pause — a daemon under load recovers — then report it as a skip,
     // and give up once it is plainly the environment: continuing produces a
@@ -764,6 +781,7 @@ async function main() {
       consecutiveSandboxFailures++;
       if (consecutiveSandboxFailures >= 3) {
         newResults.push(r);
+        runAborted = true;
         process.stderr.write(
           `\nStopping: the sandbox failed ${consecutiveSandboxFailures} times in a row ` +
           `(${r.error_code || 'docker unavailable'}). That is the environment, not these servers.\n`
@@ -802,12 +820,28 @@ async function main() {
         // started. `npx -y pkg` resolves latest at launch, so attaching the
         // result to the DB's `version` would claim a release was smoked when
         // something else ran. Record it unattributed instead, and say so.
-        const launchPinned = versionFromInstallCmd(tool.install_cmd) !== null;
-        if (!launchPinned) dim.launch = 'unpinned';
-        tool.trust_evidence = mergeEvidence(tool.trust_evidence, {
-          artifact_id: launchPinned && typed ? artifactId(typed.artifact) : null,
-          dimensions: { smoke: dim },
-        });
+        // Attribution requires three things to line up: the launch command
+        // names a version, that version is exact, and it is the version the DB
+        // says was verified. `npx -y pkg@latest` satisfied the old check while
+        // running anything at all, and a command pinned to 2.0.0 recorded its
+        // result against the DB's 1.0.0.
+        const launched = versionFromInstallCmd(tool.install_cmd);
+        const attributable = launched !== null
+          && isExactVersion(tool.install_cmd, launched)
+          && (!tool.version || launched === tool.version || launched === `sha256:${String(tool.pkg_integrity || '').replace(/^sha256-/, '')}`);
+
+        if (attributable && typed) {
+          tool.trust_evidence = mergeEvidence(tool.trust_evidence, {
+            artifact_id: artifactId(typed.artifact),
+            dimensions: { smoke: dim },
+          });
+        } else {
+          // Unattributed: kept beside the evidence rather than merged into it.
+          // Merging it with a null id made mergeEvidence treat the artifact as
+          // different and discard artifact/signature/advisories wholesale.
+          dim.launch = launched === null ? 'unpinned' : `ran ${launched}`;
+          tool.smoke_unattributed = dim;
+        }
         recorded++;
       }
       if (recorded) {
@@ -818,6 +852,8 @@ async function main() {
       process.stderr.write(`Could not record evidence: ${e.message}\n`);
     }
   }
+
+  const kept = priorResults.filter(r => !touched.has(r.name));
 
   const finalPayload = {
     $schema: payload.$schema || 'describes shape; not enforced',
@@ -836,6 +872,13 @@ async function main() {
   const skippedLauncher = newResults.filter(
     r => r.status === 'skip' && /^launcher unavailable: /.test(r.error_code || '')
   ).length;
+  // The sandbox failing is an infrastructure problem too: a run that could not
+  // start containers has checked nothing, and must not exit 0 on the strength
+  // of "no failures". `runAborted` covers the early stop, where most entries
+  // were never attempted at all.
+  const sandboxUnavailable = newResults.filter(r => r.failure_class === 'SANDBOX_UNAVAILABLE').length;
+  const attempted = newResults.length;
+  const notAttempted = Math.max(0, picked.length - attempted);
 
   if (opts.json) {
     process.stdout.write(JSON.stringify({
@@ -844,11 +887,22 @@ async function main() {
       checked: newResults.length,
       pass, fail, skip,
       skipped_launcher: skippedLauncher,
+      sandbox_unavailable: sandboxUnavailable,
+      aborted: runAborted,
+      planned: picked.length,
+      not_attempted: notAttempted,
       results: newResults,
     }, null, 2) + '\n');
   } else {
     process.stderr.write(`\n${newResults.length} checked — ${pass} pass, ${fail} fail, ${skip} skip\n`);
+    if (notAttempted) process.stderr.write(`${notAttempted} of ${picked.length} entries were never attempted\n`);
     process.stderr.write(`Results written to ${opts.results}\n`);
+  }
+  if (sandboxUnavailable > 0) {
+    process.stderr.write(
+      `WARNING: the sandbox was unavailable for ${sandboxUnavailable} entr${sandboxUnavailable === 1 ? 'y' : 'ies'}` +
+      `${runAborted ? ' and the run stopped early' : ''} — those entries were not checked.\n`
+    );
   }
   if (skippedLauncher > 0) {
     const missing = [...new Set(newResults
@@ -862,7 +916,11 @@ async function main() {
 
   // --json writes the whole result set to stdout just above; process.exit()
   // would truncate it mid-object into "Unexpected end of JSON input".
-  exitAfterFlush(opts.strict && (fail > 0 || skippedLauncher > 0) ? 1 : 0);
+  // A run that was cut short, or that could not use the sandbox, has not
+  // produced the evidence it was asked for — under --strict that is a failure
+  // regardless of how few entries got as far as failing.
+  const incomplete = runAborted || notAttempted > 0 || sandboxUnavailable > 0;
+  exitAfterFlush(opts.strict && (fail > 0 || skippedLauncher > 0 || incomplete) ? 1 : 0);
 }
 
 if (require.main === module) {

@@ -153,3 +153,47 @@ test('deriveTrust: nothing checkable never becomes verified', () => {
   const empty = { artifact_id: 'git:git+https://x/y', dimensions: {} };
   assert.equal(ev.deriveTrust(empty, { now: NOW, require: ev.requiredFor('git') }), 'candidate');
 });
+
+test('staleness is measured from the last confirmation, not the last look', () => {
+  // An offline run records `unverified (offline-pin-present)`. That is a look,
+  // not a confirmation — letting it refresh the date made stale evidence look
+  // current by running a check that verifies nothing.
+  const confirmed = ev.buildEvidence({ artifact: { state: 'verified', method: 'deep-hash' } }, { now: Date.parse('2026-01-01T00:00:00Z') });
+  assert.equal(confirmed.dimensions.artifact.verified_at, '2026-01-01');
+
+  const looked = ev.buildEvidence({ artifact: { state: 'unverified', method: 'offline-pin-present' } }, { now: NOW });
+  assert.equal(looked.dimensions.artifact.verified_at, undefined);
+
+  const merged = ev.mergeEvidence(
+    { ...confirmed, artifact_id: 'npm:p@1' },
+    { ...looked, artifact_id: 'npm:p@1' },
+  );
+  assert.equal(merged.dimensions.artifact.status, 'unverified');
+  assert.equal(merged.dimensions.artifact.verified_at, '2026-01-01', 'the confirmation date must survive');
+  // And it is that date that makes it stale.
+  const stale = ev.staleDimensions(merged, ev.DEFAULT_MAX_AGE_DAYS, NOW);
+  assert.deepEqual(stale.map(s => s.dimension), ['artifact']);
+});
+
+test('a confirmed vulnerability is not softened by another feed being down', () => {
+  // Reporting 'unverified' first meant a known-vulnerable version lost its
+  // blocking status the moment any other feed stumbled.
+  const e = ev.buildEvidence({ advisories: { state: 'vulnerable', complete: false } }, { now: NOW });
+  assert.equal(e.dimensions.advisories.status, 'vulnerable');
+  assert.equal(ev.deriveTrust({ artifact_id: 'x', dimensions: { artifact: { status: 'verified', checked_at: '2026-09-17', verified_at: '2026-09-17' }, ...e.dimensions } }, { now: NOW }), 'unverified');
+});
+
+test('mergeEvidence: an unknown id is not a different id', () => {
+  // A run that could not compute an artifact name must not wipe the history;
+  // only a name that actually differs means a different release.
+  const stored = { artifact_id: 'npm:p@1', dimensions: { artifact: { status: 'verified', checked_at: '2026-09-17', verified_at: '2026-09-17' } } };
+  const anonymous = { artifact_id: null, dimensions: { smoke: { status: 'pass', checked_at: '2026-09-17' } } };
+  const merged = ev.mergeEvidence(stored, anonymous);
+  assert.equal(merged.dimensions.artifact.status, 'verified');
+  assert.equal(merged.dimensions.smoke.status, 'pass');
+  assert.equal(merged.artifact_id, 'npm:p@1');
+
+  // A different id still discards.
+  const other = { artifact_id: 'npm:p@2', dimensions: { smoke: { status: 'pass', checked_at: '2026-09-17' } } };
+  assert.equal(ev.mergeEvidence(stored, other).dimensions.artifact, undefined);
+});

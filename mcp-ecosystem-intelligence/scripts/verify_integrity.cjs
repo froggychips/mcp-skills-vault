@@ -739,6 +739,9 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
       status: 'UNVERIFIED',
       msg: `${tool.name}: ${pkg}@${tool.version || 'latest'} ${why}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`,
       failures: FAIL_UNVERIFIED ? 1 : 0,
+      // An early return is still a result: without this, a package that has
+      // since 404'd kept its recorded `artifact: verified` from last week.
+      checks: { ...newChecks(), artifact: { state: 'unverified', method: gone ? 'registry-404' : 'registry-unreachable' } },
     });
     return;
   }
@@ -870,12 +873,21 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
       registryIntegrity: npmIntegrity,
       storedIntegrity:   tool.pkg_integrity,
     });
-    if (deep.state === 'fail') { lines.push(['FAIL', deep.message]); failures++; }
-    else if (deep.state === 'unverified') {
+    // These overwrite the metadata-level conclusion on purpose: hashing the
+    // bytes is a stronger statement than comparing two values the registry
+    // supplied. Without this, a tarball that disagreed with its own metadata
+    // reported FAIL while the recorded evidence still said verified.
+    if (deep.state === 'fail') {
+      lines.push(['FAIL', deep.message]);
+      checks.artifact = { state: 'mismatch', method: 'deep-hash' };
+      failures++;
+    } else if (deep.state === 'unverified') {
       lines.push(['UNVERIFIED', `${deep.message}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+      checks.artifact = { state: 'unverified', method: 'deep-hash' };
       if (FAIL_UNVERIFIED) failures++;
     } else {
       lines.push(['DEEP', deep.message]);
+      checks.artifact = { state: 'verified', method: 'deep-hash' };
     }
   }
 
@@ -977,10 +989,20 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
   // Only a run that actually queried the feeds may state an advisory result,
   // and a degraded feed or an unreadable severity is 'unverified', not 'clean'.
   if (!NO_AUDIT && !UPDATE && !OFFLINE) {
-    if (degraded.length || unresolved.length) checks.advisories = { state: 'unverified' };
-    else if (advisoriesForTool.some((a) => severityIsHard(a.severity))) checks.advisories = { state: 'vulnerable' };
-    else if (advisoriesForTool.length) checks.advisories = { state: 'advisories-present' };
-    else checks.advisories = { state: 'clean' };
+    // Order matters. A feed that confirmed a high-severity advisory has told us
+    // something definite; another feed being down does not unsay it. Reporting
+    // 'unverified' first meant a known-vulnerable version lost its blocking
+    // status the moment any other feed stumbled.
+    const complete = !degraded.length && !unresolved.length;
+    if (advisoriesForTool.some((a) => severityIsHard(a.severity))) {
+      checks.advisories = { state: 'vulnerable', complete };
+    } else if (!complete) {
+      checks.advisories = { state: 'unverified', complete: false };
+    } else if (advisoriesForTool.length) {
+      checks.advisories = { state: 'advisories-present', complete: true };
+    } else {
+      checks.advisories = { state: 'clean', complete: true };
+    }
   }
 
   // Unreachable advisory feeds: we cannot assert "no known CVEs" when a feed was
@@ -1013,6 +1035,7 @@ async function processPypi(tool, pkg, meta, advisoriesForTool, degraded, results
       status: 'UNVERIFIED',
       msg: `${tool.name}: ${pkg} PyPI lookup failed${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`,
       failures: FAIL_UNVERIFIED ? 1 : 0,
+      checks: { ...newChecks(), artifact: { state: 'unverified', method: 'registry-unreachable' } },
     });
     return;
   }
@@ -1118,10 +1141,20 @@ async function processPypi(tool, pkg, meta, advisoriesForTool, degraded, results
   // Only a run that actually queried the feeds may state an advisory result,
   // and a degraded feed or an unreadable severity is 'unverified', not 'clean'.
   if (!NO_AUDIT && !UPDATE && !OFFLINE) {
-    if (degraded.length || unresolved.length) checks.advisories = { state: 'unverified' };
-    else if (advisoriesForTool.some((a) => severityIsHard(a.severity))) checks.advisories = { state: 'vulnerable' };
-    else if (advisoriesForTool.length) checks.advisories = { state: 'advisories-present' };
-    else checks.advisories = { state: 'clean' };
+    // Order matters. A feed that confirmed a high-severity advisory has told us
+    // something definite; another feed being down does not unsay it. Reporting
+    // 'unverified' first meant a known-vulnerable version lost its blocking
+    // status the moment any other feed stumbled.
+    const complete = !degraded.length && !unresolved.length;
+    if (advisoriesForTool.some((a) => severityIsHard(a.severity))) {
+      checks.advisories = { state: 'vulnerable', complete };
+    } else if (!complete) {
+      checks.advisories = { state: 'unverified', complete: false };
+    } else if (advisoriesForTool.length) {
+      checks.advisories = { state: 'advisories-present', complete: true };
+    } else {
+      checks.advisories = { state: 'clean', complete: true };
+    }
   }
 
   // Unreachable advisory feeds: we cannot assert "no known CVEs" when a feed was
@@ -1370,6 +1403,7 @@ async function main() {
       status: 'UNVERIFIED',
       msg: `${tool.name}: ${reason}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`,
       failures: FAIL_UNVERIFIED ? 1 : 0,
+      checks: { ...newChecks(), artifact: { state: 'unverified', method: 'unroutable' } },
     });
   };
 
@@ -1593,9 +1627,29 @@ async function main() {
   }
 
   if (POLICY.ok && POLICY.policy) {
+    // Judge the policy on what this run established, merged over what was
+    // stored — not on a `trust` field that only moves when --record-evidence
+    // is passed. Otherwise an entry that just passed every check still failed
+    // `trust: ["verified"]`, and the only way to satisfy the policy was to
+    // write to the DB during a verification.
+    for (const r of results) {
+      if (!r.tool) continue;
+      const typed = toTypedEntry(r.tool);
+      const fresh = buildEvidence(r.checks, { artifactId: typed ? artifactId(typed.artifact) : null });
+      if (!Object.keys(fresh.dimensions).length) continue;
+      const effective = mergeEvidence(r.tool.trust_evidence, fresh);
+      r.effective_trust = deriveTrust(effective, {
+        maxAgeDays: evidenceMaxAge(),
+        require: requiredFor(typed ? typed.artifact.ecosystem : null),
+      });
+    }
     const draft = toJsonReport({ results });
     for (let i = 0; i < results.length; i++) {
-      const verdicts = evaluateEntry(draft.entries[i], POLICY.policy, results[i].tool);
+      // The policy sees the effective trust, not the stored word.
+      const subject = results[i].effective_trust
+        ? { ...results[i].tool, trust: results[i].effective_trust }
+        : results[i].tool;
+      const verdicts = evaluateEntry(draft.entries[i], POLICY.policy, subject);
       if (!verdicts.length) continue;
       results[i].lines = results[i].lines || [];
       for (const v of verdicts) {
