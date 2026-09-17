@@ -9,6 +9,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
+const { exitAfterFlush } = require("./lib/exit.cjs");
 
 function parseArgs(argv) {
   const out = { json: false, strict: false, help: false, cwd: process.cwd() };
@@ -171,7 +172,7 @@ function main() {
   else printHuman(result);
 
   const hard = result.counts.fail > 0 || (args.strict && result.counts.warn > 0);
-  process.exit(hard ? 1 : 0);
+  exitAfterFlush(hard ? 1 : 0);
 }
 
 if (require.main === module) main();

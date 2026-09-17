@@ -10,6 +10,21 @@ const { spawnSync } = require("child_process");
 const SCRIPTS_DIR = path.join(
   __dirname, "..", "mcp-ecosystem-intelligence", "scripts"
 );
+const DB_PATH = path.join(
+  __dirname, "..", "mcp-ecosystem-intelligence", "assets", "tools_database.json"
+);
+
+// Read the count instead of hardcoding it — the hardcoded "112" was already
+// two entries stale, and a wrong number in the help text of a tool whose whole
+// pitch is "deterministic" is the wrong first impression.
+function dbEntryCount() {
+  try {
+    const db = JSON.parse(require("fs").readFileSync(DB_PATH, "utf8"));
+    return Array.isArray(db.tools) ? db.tools.length : null;
+  } catch {
+    return null;
+  }
+}
 
 const COMMANDS = {
   audit:           "audit_setup.cjs",
@@ -55,6 +70,8 @@ COMMON OPTIONS
   --strict          Treat warnings as failures (exit 1)
   --no-audit        Skip advisory APIs; verify still checks live registries
   --offline         True offline verify mode; validate stored DB pins only
+  --fail-unverified Treat "could not check" as a failure (verify)
+  --allow-unpinned  Allow install to write a launch command with no version pin
   --cwd <path>      Target project directory (scan / audit)
 
   Each command also accepts its own flags — run with --help for details.
@@ -106,7 +123,7 @@ function main(argv) {
       process.stderr.write(
         "mcp-vault install: package name required.\n\n" +
         "Find one:\n" +
-        "  mcp-vault list                          # all 112 servers\n" +
+        `  mcp-vault list                          # all ${dbEntryCount() ?? "available"} servers\n` +
         "  mcp-vault list --category database      # filter by category\n" +
         "  mcp-vault list --query github           # substring search\n" +
         "  mcp-vault scan --cwd ./your-project     # stack-aware recommendations\n\n" +

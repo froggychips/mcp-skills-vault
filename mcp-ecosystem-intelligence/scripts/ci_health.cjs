@@ -45,6 +45,7 @@
 'use strict';
 
 const { execFileSync } = require('child_process');
+const { exitAfterFlush } = require('./lib/exit.cjs');
 
 const DEFAULTS = {
   queueLimitMin:  30,
@@ -248,6 +249,6 @@ function main() {
   return verdict.level === 'fail' ? 1 : 0;
 }
 
-if (require.main === module) process.exit(main());
+if (require.main === module) exitAfterFlush(main());
 
 module.exports = { evaluate, parseArgs, DEFAULTS };

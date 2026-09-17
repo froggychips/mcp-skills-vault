@@ -40,6 +40,7 @@
 const path = require('path');
 const cp   = require('child_process');
 const { readDb } = require('./lib/db_io.cjs');
+const { exitAfterFlush } = require('./lib/exit.cjs');
 
 const DEFAULT_DB_PATH = path.resolve(__dirname, '../assets/tools_database.json');
 // Repo-relative path is what `git show <ref>:<path>` needs.
@@ -83,7 +84,7 @@ function changedEntries(baseTools, headTools) {
 // "everything in head is new".
 function loadFromRef(ref, dbRepoPath) {
   try {
-    const raw = cp.execSync(`git show ${ref}:${dbRepoPath}`, {
+    const raw = cp.execFileSync('git', ['show', `${ref}:${dbRepoPath}`], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
       maxBuffer: 64 * 1024 * 1024,
@@ -118,6 +119,6 @@ function main() {
   return 0;
 }
 
-if (require.main === module) process.exit(main());
+if (require.main === module) exitAfterFlush(main());
 
 module.exports = { changedEntries, smokeKey, parseArgs };

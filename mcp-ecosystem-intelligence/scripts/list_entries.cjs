@@ -18,6 +18,7 @@
 
 const fs   = require("fs");
 const path = require("path");
+const { exitAfterFlush } = require("./lib/exit.cjs");
 
 const DB_PATH = path.join(
   __dirname, "..", "assets", "tools_database.json"
@@ -103,7 +104,10 @@ if (AS_JSON) {
     })),
   }, null, 2));
   process.stdout.write("\n");
-  process.exit(0);
+  // `return` as well as the exit: exitAfterFlush() queues the real exit behind
+  // a stdout drain, so without it the human-readable table below printed
+  // straight after the JSON and `JSON.parse(stdout)` failed.
+  return exitAfterFlush(0);
 }
 
 // Pretty table — terminal-friendly, no ANSI to keep --json pipeable separately.
