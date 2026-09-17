@@ -454,3 +454,32 @@ test('classifyFailure: network error → NEEDS_NET', () => {
 test('classifyFailure: unexplained exit → CRASH', () => {
   assert.equal(e.classifyFailure({ status: 'fail', errorCode: 'exit 1', stderr: 'Segmentation fault' }), 'CRASH');
 });
+
+// ── --no-spawn really does not spawn ───────────────────────────────────────
+
+test('CLI --no-spawn never reaches the live smoke', () => {
+  const { spawnSync } = require('node:child_process');
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'eval-nospawn-'));
+  const dbPath = path.join(tmp, 'db.json');
+  const resPath = path.join(tmp, 'results.json');
+  // A parsable entry: if the no-spawn branch falls through, smokeEntry() runs
+  // spawn() on this before the queued exit lands.
+  fs.writeFileSync(dbPath, JSON.stringify({
+    tools: [{ name: 'fake-entry', category: 'test',
+              install_cmd: `docker run ghcr.io/nonexistent/nope@sha256:${'0'.repeat(64)}` }],
+  }));
+  fs.writeFileSync(resPath, JSON.stringify({ results: [] }));
+
+  const r = spawnSync(process.execPath, [
+    path.resolve(__dirname, '../mcp-ecosystem-intelligence/scripts/mcp_eval.cjs'),
+    '--no-spawn', '--db', dbPath, '--results', resPath,
+  ], { encoding: 'utf8' });
+
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /no-spawn mode/);
+  // "smoking <name>…" is printed right before spawn(). exitAfterFlush() is
+  // asynchronous, so a missing `return` let the whole live path run first.
+  assert.doesNotMatch(r.stderr, /smoking/, 'no-spawn must not enter the live smoke');
+  assert.equal(fs.readFileSync(resPath, 'utf8'), JSON.stringify({ results: [] }));
+  fs.rmSync(tmp, { recursive: true, force: true });
+});

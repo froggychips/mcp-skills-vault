@@ -603,7 +603,12 @@ async function main() {
         process.stdout.write(`  - ${m.name}: ${m.schema_errors_recheck.length} malformed entries\n`);
       }
     }
-    exitAfterFlush(opts.strict && malformed.length ? 1 : 0);
+    // `return`, because exitAfterFlush() is asynchronous: it queues the real
+    // process.exit() behind a stdout drain callback. Without the return, the
+    // synchronous code below kept running in the same tick and reached
+    // spawn() — `--no-spawn` executed the very third-party servers it promises
+    // not to touch before the exit landed.
+    return exitAfterFlush(opts.strict && malformed.length ? 1 : 0);
   }
 
   // Default-deny: refuse a live smoke unless a spawn policy was chosen.
