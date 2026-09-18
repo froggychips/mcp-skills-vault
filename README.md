@@ -856,8 +856,17 @@ Everything in this table is scripted and tested; the column says where it lives.
 | CycloneDX SBOM | [`sbom.cjs`](./mcp-ecosystem-intelligence/scripts/sbom.cjs) |
 | Context ceiling enforced where the set changes | [`lib/budget.cjs`](./mcp-ecosystem-intelligence/scripts/lib/budget.cjs) |
 | Tier derived from evidence, not from a score | [`lib/tiers.cjs`](./mcp-ecosystem-intelligence/scripts/lib/tiers.cjs) |
+| One command instead of six | [`status.cjs`](./mcp-ecosystem-intelligence/scripts/status.cjs) |
 | The documented numbers checked against the data | [`tests/docs_numbers.test.cjs`](./tests/docs_numbers.test.cjs) |
 | What will not change without a major bump | [`docs/COMPATIBILITY.md`](./docs/COMPATIBILITY.md) |
+
+**Not shipping the next feature until three people have used this and said
+something about it.** 33 npm downloads a month, 0 stars, 0 referrers, 41 clones
+against 7 views — the honest reading is that no human has used it yet, and with
+no telemetry (by promise) the only instrument left is somebody saying so. The
+reasoning, what counts as a user, and what to ask them:
+[`docs/ADOPTION.md`](./docs/ADOPTION.md); re-measure with
+`node .github/scripts/adoption.cjs`.
 
 Still judgement, not script — deliberately: the reject heuristics (5-Minute
 Rule, Bloat, Duplication) and promoting a candidate to `trust: verified`. And
