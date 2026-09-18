@@ -210,27 +210,31 @@ issues=$(echo "$META"  | jq -r '.open_issues_count')
 days=$(( ( $(date -u +%s) - $(date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$pushed" +%s) ) / 86400 ))
 # 'critical_issues' heuristic: open_issues_count / 10 (rough proxy for noise level).
 crit=$(( issues / 10 ))
-in_registry=true   # true only if listed under registry.modelcontextprotocol.io
 license=$(echo "$META" | jq -r '.license // "Unknown"')
 node mcp-ecosystem-intelligence/scripts/calculate_health.cjs \
-     "$stars" "$days" "$in_registry" true "$crit" "$license"
+     "$stars" "$days" true "$crit" "$license"
 ```
 
 Output:
 ```json
-{ "health_score": 90, "classification": "Core",
-  "breakdown": { "popularity": 20, "recency": 20, "registry": 30, "install_cmd": 15, "low_issues": 5 } }
+{ "health_score": 60,
+  "breakdown": { "popularity": 20, "recency": 20, "install_cmd": 15, "low_issues": 5 } }
 ```
 
-Formula (max 110):
+Formula (max 80):
 ```
 score = min(20, 10·log10(stars+1))   # popularity, capped
       + {40|20|10|0} by last_commit  # <30d / <90d / <180d / older
-      + 30 if in_registry
       + 15 if install_cmd
       + 5  if open_issues/10 < 5
       − 10 if license is non-OSI / source-available / Unknown
 ```
+
+Health answers *is this project maintained?* and nothing else. It names no
+tier: a `+30 if in_registry` term used to dominate it and was wrong for 26 of
+114 entries, and without that term 91 of 114 curated entries score into one
+bucket. Core/Recommended/Experimental/Deprecated is derived from measured
+evidence — see `scripts/lib/tiers.cjs` — and is not stored in the DB.
 
 The license penalty applies to FSL/BSL/SSPL/Elastic-2.0/Commons Clause and similar source-available licenses, plus packages with no published license. OSI-approved permissive (MIT/Apache/BSD/ISC/MPL) and copyleft (GPL/LGPL/AGPL) get no penalty — they're still open source.
 
@@ -273,12 +277,9 @@ Log every rejection as a one-line entry for the Skipped section of §9 output.
       "stars": 0,
       "last_commit_days": 0,
       "open_issues": 0,
-      "in_registry": true,
       "health_score": 0.0,
-      "classification": "Core|Recommended|Experimental|Deprecated",
       "est_tools_count": 10,
       "toolsets": "--flag value  # how to filter; null = no filtering available",
-      "last_checked": "YYYY-MM-DD",
       "version": "1.2.3 or null for non-npm",
       "pkg_integrity": "sha512-… or null for non-npm",
       "trust": "verified|candidate",
@@ -288,6 +289,17 @@ Log every rejection as a one-line entry for the Skipped section of §9 output.
   ]
 }
 ```
+
+**Three fields are deliberately absent.** `classification` is derived from
+evidence at read time (`scripts/lib/tiers.cjs`), because it depends on how old
+the evidence is and a stored copy goes wrong while the file sits unchanged.
+`in_registry` was a hand-set boolean worth 30 health points that disagreed with
+the live registry for 26 entries — the answer is measured by
+`check_identity.cjs` and recorded as the `registry` dimension. `last_checked`
+was one entry-level date that read 2026-07-31 across all 114 entries while the
+evidence beneath it was a day old; every dimension in `trust_evidence` carries
+its own `checked_at`, which is the only version of that date that can say
+*what* was checked.
 
 **Field semantics:**
 - `install_cmd` — always pin to an explicit version (`@1.2.3`), never `@latest`.
@@ -305,7 +317,7 @@ Sorted by `(category, -health_score, name)` for deterministic diffs.
 { "extensions": [ { "name": "", "cli_or_api": "", "wrapper_generated": false, "notes": "" } ] }
 ```
 
-After every discovery+validation cycle, append/update entries in both files. Bump `last_checked`. New entries from discovery always start with `"trust": "candidate"` — upgrade to `"verified"` only after §4 check 5 passes.
+After every discovery+validation cycle, append/update entries in both files. New entries from discovery always start with `"trust": "candidate"` — upgrade to `"verified"` only after §4 check 5 passes. There is no date to bump: the dates live on the evidence, written by the check that established each claim.
 
 ## 8. Wrapper generation (only when nothing fits)
 
@@ -315,7 +327,7 @@ Only generate when validation in §4 returned **zero** viable MCP servers for th
 - `package.json` — set `name` and `description`, keep pinned `@modelcontextprotocol/sdk` major.
 - Add a one-paragraph README with the install command.
 
-After generation, register the resulting wrapper in `tools_database.json` with `in_registry=false` and re-score.
+After generation, register the resulting wrapper in `tools_database.json` with `"trust": "candidate"` and re-score.
 
 ## 9. Recommendation output
 

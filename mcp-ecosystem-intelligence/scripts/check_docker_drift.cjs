@@ -127,7 +127,6 @@ async function main() {
       if (typeof tool.pkg_integrity === 'string' && tool.pkg_integrity.startsWith('sha256-')) {
         tool.pkg_integrity = `sha256-${item.upstream.replace(/^sha256:/, '')}`;
       }
-      tool.last_checked = new Date().toISOString().slice(0, 10);
       updated.push({
         name: tool.name,
         repo: item.repo,

@@ -285,9 +285,6 @@ jobs:
               lines.push("| entry | state | finding |", "| --- | --- | --- |");
               for (const e of rows) lines.push(`| ${e.name} | ${e.registry.state} | ${(e.registry.findings[0] || "").replace(/\|/g, "\\|").slice(0, 160)} |`);
             }
-            if (s.in_registry_flag_drift) {
-              lines.push("", `${s.in_registry_flag_drift} entries have an \`in_registry\` flag that disagrees with the live registry (it adds 30 points to health_score).`);
-            }
             require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
           '
       - name: Upstream repository posture (OpenSSF Scorecard)
@@ -363,7 +360,7 @@ jobs:
             - `verify_integrity.cjs --update` — refreshes `version` + `pkg_integrity`
             - `verify_integrity.cjs --deep --record-evidence` — dated evidence per dimension
             - `refresh_scores.cjs --write` — refreshes `stars`, `last_commit_days`,
-              `open_issues`, `health_score`, `classification` from GitHub API
+              `open_issues`, `health_score` from GitHub API
             - `check_availability.cjs --write` — gone / yanked / deprecated / relocated
             - `check_identity.cjs --write` — the official registry's ownership-verified listing
             - `check_posture.cjs --write` — OpenSSF Scorecard for the upstream repo
@@ -551,10 +548,10 @@ jobs:
               console.log();
               console.log('### Top 10');
               console.log();
-              console.log('| name | score | tier | license |');
-              console.log('|---|---|---|---|');
+              console.log('| name | score | license |');
+              console.log('|---|---|---|');
               for (const c of j.candidates.slice(0, 10)) {
-                console.log(\`| \${c.name} | \${c.health_score} | \${c.classification} | \${c.license} |\`);
+                console.log(\`| \${c.name} | \${c.health_score} | \${c.license} |\`);
               }
             "
           } >> "$GITHUB_STEP_SUMMARY"

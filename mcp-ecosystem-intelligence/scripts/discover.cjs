@@ -410,26 +410,21 @@ function annotateHealthFromGh(cand) {
 }
 
 // Same formula as calculate_health.cjs, kept inline so we don't shell out
-// once per candidate.
-function scoreHealth({ stars, last_commit_days, has_install_cmd, in_registry, open_issues, license }) {
+// once per candidate. Both dropped a `+30 if in_registry` term: here it was
+// even less of a measurement than in the DB — it was true for any candidate
+// that had an npm or PyPI package at all, so nearly every row got the 30 and
+// the ranking this file exists to produce was mostly noise.
+function scoreHealth({ stars, last_commit_days, has_install_cmd, open_issues, license }) {
   let s = 0;
   s += Math.min(20, 10 * Math.log10((stars || 0) + 1));
   if      (last_commit_days < 30)  s += 40;
   else if (last_commit_days < 90)  s += 20;
   else if (last_commit_days < 180) s += 10;
-  if (in_registry)     s += 30;
   if (has_install_cmd) s += 15;
   if (((open_issues || 0) / 10) < 5) s += 5;
   const ok = ['MIT', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', 'MPL-2.0', 'LGPL-2.1', 'LGPL-3.0', 'GPL-2.0', 'GPL-3.0', 'AGPL-3.0'];
   if (!license || !ok.includes(license)) s -= 10;
   return Math.round(s * 10) / 10;
-}
-
-function classifyScore(score) {
-  if (score >= 85) return 'Core';
-  if (score >= 65) return 'Recommended';
-  if (score >= 40) return 'Experimental';
-  return 'Deprecated';
 }
 
 // ── reject heuristics ──────────────────────────────────────────────────────
@@ -532,16 +527,10 @@ async function main() {
       last_commit_days: cand.last_commit_days,
       // registry/pypi entries already carry install_cmd; npm-search implies one.
       has_install_cmd: !!(cand.install_cmd || cand.npm_package || cand.pypi_package),
-      // True if the candidate is published in the official registry, or if it
-      // ships through any package registry we already trust.
-      in_registry:     !!(cand.source && cand.source.includes('mcp-registry'))
-                       || !!cand.npm_package
-                       || !!cand.pypi_package,
       open_issues:     cand.open_issues,
       license:         cand.license,
     });
     cand.health_score   = score;
-    cand.classification = classifyScore(score);
     enriched.push(cand);
   }
 
@@ -579,7 +568,9 @@ async function main() {
     trust:           'candidate',
     license:         c.license || 'Unknown',
     health_score:    c.health_score,
-    classification:  c.classification,
+    // No tier: a tier is derived from evidence (lib/tiers.cjs) and a candidate
+    // has none yet. Anything merged in with trust 'candidate' reads as
+    // Experimental until its artifact is verified.
     est_tools_count: null,                              // human estimate
     toolsets:        null,
     notes:           c.description || null,
@@ -630,7 +621,6 @@ module.exports = {
   normalizeRepoUrl,
   ownerRepoFromUrl,
   scoreHealth,
-  classifyScore,
   looksLikeMcpServer,
   rejectReason,
   parseRegistryPage,

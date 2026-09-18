@@ -46,7 +46,13 @@ function capabilityCounts() {
 }
 
 const count   = (fn) => db.filter(fn).length;
-const tier    = (name) => count((t) => t.classification === name);
+// The tier is derived, not stored — lib/tiers.cjs explains why. Deriving it
+// here too keeps the README's distribution honest without the DB carrying a
+// copy that goes stale.
+const { classifyEntry, evalIndex } = require('../mcp-ecosystem-intelligence/scripts/lib/tiers.cjs');
+const evalByName = evalIndex(evals);
+const tierOf  = (t) => classifyEntry(t, evalByName.get(t.name) || null).classification;
+const tier    = (name) => count((t) => tierOf(t) === name);
 const withTools = db.filter((t) => Number.isFinite(t.est_tools_count));
 const heaviest  = withTools.reduce((m, t) => (t.est_tools_count > m.est_tools_count ? t : m), withTools[0]);
 
@@ -70,8 +76,8 @@ const CLAIMS = [
   {
     what:  'tier distribution',
     file:  'README.md',
-    re:    /Distribution: \*\*(\d+) Core \/ (\d+) Recommended \/ (\d+) Experimental\*\*/,
-    expected: () => [tier('Core'), tier('Recommended'), tier('Experimental')],
+    re:    /Distribution: \*\*(\d+) Core \/ (\d+) Recommended \/ (\d+) Experimental \/ (\d+) Deprecated\*\*/,
+    expected: () => [tier('Core'), tier('Recommended'), tier('Experimental'), tier('Deprecated')],
   },
   {
     what:  'npm entry count',

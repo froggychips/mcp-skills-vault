@@ -19,9 +19,13 @@
 const fs   = require("fs");
 const path = require("path");
 const { exitAfterFlush } = require("./lib/exit.cjs");
+const { classifyEntry, evalIndex, TIER_ORDER } = require("./lib/tiers.cjs");
 
 const DB_PATH = path.join(
   __dirname, "..", "assets", "tools_database.json"
+);
+const EVAL_PATH = path.join(
+  __dirname, "..", "assets", "eval_results.json"
 );
 
 function argVal(flag) {
@@ -66,7 +70,18 @@ try {
   process.exit(2);
 }
 
-let rows = Array.isArray(db?.tools) ? db.tools.slice() : [];
+// Behaviour is a separate stream and may be absent; an unreadable file means
+// "not observed", never "observed to fail".
+let evals = new Map();
+try {
+  evals = evalIndex(JSON.parse(fs.readFileSync(EVAL_PATH, "utf8")).results);
+} catch { /* no results shipped */ }
+
+// The tier is derived from evidence, not stored: see lib/tiers.cjs.
+let rows = (Array.isArray(db?.tools) ? db.tools : []).map((r) => {
+  const tier = classifyEntry(r, evals.get(r.name) || null);
+  return { ...r, classification: tier.classification, tier_reason: tier.why };
+});
 
 if (CATEGORY) rows = rows.filter(r => r.category === CATEGORY);
 if (TIER)     rows = rows.filter(r => r.classification === TIER);
@@ -77,7 +92,6 @@ if (QUERY) {
 }
 
 // Stable sort: tier order, then score desc, then name asc.
-const TIER_ORDER = { Core: 0, Recommended: 1, Experimental: 2, Deprecated: 3 };
 rows.sort((a, b) => {
   const ta = TIER_ORDER[a.classification] ?? 9;
   const tb = TIER_ORDER[b.classification] ?? 9;
@@ -96,6 +110,7 @@ if (AS_JSON) {
       name:           r.name,
       category:       r.category,
       classification: r.classification,
+      tier_reason:    r.tier_reason,
       trust:          r.trust,
       est_tools_count: r.est_tools_count,
       install_cmd:    r.install_cmd,

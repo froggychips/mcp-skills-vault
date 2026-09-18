@@ -48,11 +48,16 @@ test('unmappedSignals: signal resolved via fallback is marked fallback, not gap'
 });
 
 test('fallbackBySignal: substring match against name+notes, skips Deprecated', () => {
+  // `Deprecated` is derived from evidence now, not read off the entry: it
+  // means "do not install" — nothing to install, wrong bytes, or a known
+  // vulnerability at the pinned version. A yanked package is the clearest
+  // case, and no stored label can override or fake it.
+  const yanked = { dimensions: { availability: { status: 'yanked', checked_at: '2026-09-17' } } };
   const db = {
     tools: [
-      { name: '@salesforce/mcp', notes: 'CRM server', classification: 'Core' },
-      { name: 'salesforce-legacy', notes: '', classification: 'Deprecated' },
-      { name: 'irrelevant', notes: 'no match', classification: 'Core' },
+      { name: '@salesforce/mcp', notes: 'CRM server' },
+      { name: 'salesforce-legacy', notes: '', trust_evidence: yanked },
+      { name: 'irrelevant', notes: 'no match' },
     ],
   };
   const hits = o.fallbackBySignal(db, 'salesforce');

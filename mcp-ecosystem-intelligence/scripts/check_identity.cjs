@@ -25,18 +25,18 @@
  *                 disagrees with this entry
  *   withdrawn     the registry marks the server deleted or deprecated
  *
- * It also audits `in_registry`, the DB's own hand-set boolean that adds 30
- * points to a health score. Whether that flag is true has never been checked
- * against anything; where it disagrees with the live registry, that is reported
- * — but not rewritten, because the flag predates this registry and may well
- * have meant "listed in the official servers README".
+ * This check used to also audit `in_registry`, a hand-set boolean in the DB
+ * that added 30 points to every health score and had never been compared with
+ * anything. It disagreed with the live registry for 26 of 114 entries. The
+ * field is gone: the answer is measured here, dated, and recorded as the
+ * `registry` dimension, worth 5 points of trust.
  *
  * Usage:
- *   node scripts/check_identity.cjs [--json] [--write] [--entry <name>] [--strict]
+ *   node scripts/check_identity.cjs [--json] [--write] [--entry <name>]
  *
  * Exit codes:
  *   0  nothing contradicts
- *   1  at least one contradiction / withdrawal (with --strict: also in_registry drift)
+ *   1  at least one contradiction / withdrawal
  *   2  bad arguments
  */
 
@@ -58,7 +58,6 @@ const CONCURRENCY = 4;
 
 const T  = process.stdout.isTTY;
 const RD = T ? '\x1b[31m' : '';
-const YL = T ? '\x1b[33m' : '';
 const GN = T ? '\x1b[32m' : '';
 const DM = T ? '\x1b[2m'  : '';
 const RS = T ? '\x1b[0m'  : '';
@@ -66,12 +65,11 @@ const RS = T ? '\x1b[0m'  : '';
 const FINDING_STATES = new Set(['contradicted', 'withdrawn']);
 
 function parseArgs(argv) {
-  const opts = { json: false, write: false, entry: null, strict: false, help: false };
+  const opts = { json: false, write: false, entry: null, help: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--json') opts.json = true;
     else if (a === '--write') opts.write = true;
-    else if (a === '--strict') opts.strict = true;
     else if (a === '--entry') opts.entry = argv[++i] || null;
     else if (a === '-h' || a === '--help') opts.help = true;
     else return { ...opts, error: `unknown flag ${a}` };
@@ -81,10 +79,9 @@ function parseArgs(argv) {
 
 const HELP = `check_identity — who published this, per the official MCP registry
 
-  node scripts/check_identity.cjs [--json] [--write] [--entry <name>] [--strict]
+  node scripts/check_identity.cjs [--json] [--write] [--entry <name>]
 
   --write    record 'registry' evidence in the DB
-  --strict   also fail when in_registry disagrees with the live registry
   --entry    check one entry by name
 `;
 
@@ -106,7 +103,6 @@ async function checkEntry(tool, { find = findByPackage } = {}) {
     ecosystem,
     identifier,
     artifact_id: typed ? artifactId(typed.artifact) : null,
-    in_registry_flag: tool.in_registry === true,
     registry: { state: 'unknown', findings: [] },
   };
   if (!identifier) {
@@ -149,10 +145,6 @@ function main(argv) {
   return mapLimit(tools, CONCURRENCY, (t) => checkEntry(t)).then((rows) => {
     const byState = (state) => rows.filter((r) => r.registry.state === state);
     const findings = rows.filter((r) => FINDING_STATES.has(r.registry.state));
-    // The flag that feeds +30 into every health score, against the live answer.
-    const flagDrift = rows.filter((r) =>
-      r.registry.state !== 'unknown'
-      && r.in_registry_flag !== (r.registry.state === 'listed' || r.registry.state === 'contradicted'));
 
     if (opts.write) {
       const byName = new Map(rows.map((r) => [r.name, r]));
@@ -189,7 +181,6 @@ function main(argv) {
           contradicted: byState('contradicted').length,
           withdrawn:    byState('withdrawn').length,
           unknown:      byState('unknown').length,
-          in_registry_flag_drift: flagDrift.length,
         },
         entries: rows,
       }, null, 2)}\n`);
@@ -207,21 +198,9 @@ function main(argv) {
         `${byState('unknown').length} not checkable\n`
       );
       process.stdout.write(`${DM}"Not listed" is not a finding: listing is opt-in and the registry is young.${RS}\n`);
-      if (flagDrift.length) {
-        process.stdout.write(
-          `\n${YL}${flagDrift.length} entr${flagDrift.length === 1 ? 'y has' : 'ies have'} an in_registry flag that `
-          + `disagrees with the live registry${RS} (the flag adds 30 points to health_score and has never been checked):\n`
-        );
-        for (const r of flagDrift.slice(0, 20)) {
-          process.stdout.write(`  ${r.name}: flag says ${r.in_registry_flag}, registry says ${r.registry.state}\n`);
-        }
-        if (flagDrift.length > 20) process.stdout.write(`  …and ${flagDrift.length - 20} more\n`);
-        process.stdout.write(`${DM}Not rewritten: the flag predates this registry and may have meant the official servers README.${RS}\n`);
-      }
     }
 
     if (findings.length) return 1;
-    if (opts.strict && flagDrift.length) return 1;
     return 0;
   });
 }

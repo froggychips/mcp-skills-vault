@@ -5,6 +5,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { classifyEntry } = require("./lib/tiers.cjs");
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const DB_PATH = path.join(ROOT, "mcp-ecosystem-intelligence", "assets", "tools_database.json");
@@ -20,10 +21,15 @@ function esc(s) {
 }
 
 function slimEntry(t, evidence = null, smoke = null) {
+  // The tier is derived here rather than read off the entry: it is a function
+  // of the evidence and of today's date (claims age out), so a stored copy
+  // would go quietly wrong while the file sat unchanged.
+  const tier = classifyEntry(t, smoke);
   return {
     name: t.name,
     category: t.category,
-    classification: t.classification,
+    classification: tier.classification,
+    tier_reason: tier.why,
     trust: t.trust,
     license: t.license,
     health_score: t.health_score,

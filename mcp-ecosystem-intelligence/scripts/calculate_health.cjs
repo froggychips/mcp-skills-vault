@@ -1,16 +1,28 @@
 /**
- * Calculate the Health Score for an MCP tool based on the specified formula.
+ * Is this project maintained? One number, and only that question.
  *
  * Formula:
  *   Health Score = min(20, 10 × log10(stars + 1))  [0–20,  popularity component, capped]
  *                + recency bonus                   [0–40,  how recently maintained]
- *                + 30 (if present in official registry)
  *                + 15 (if install command exists)
  *                + 5  (if critical issues < 5)
  *                − 10 (if license is non-OSI / source-available / Unknown)
  *
- * Popularity is capped at 20 so that mega-repos (50k+ stars) cannot dominate the
- * score and crowd everything into the Core tier; max total = 110, min = -10.
+ * Popularity is capped at 20 so that mega-repos (50k+ stars) cannot dominate
+ * the score; max total = 80, min = -10.
+ *
+ * A `+30 if in_registry` term was removed. It was a hand-set boolean that
+ * disagreed with the live registry for 26 of 114 entries, and at 30 points it
+ * outweighed every measured term combined — so the score, and the tier derived
+ * from it, were mostly a function of a field nobody checked. Whether an entry
+ * is listed in the official registry is now *measured* and lives in
+ * `trust_evidence.dimensions.registry` (`check_identity.cjs`), where it is
+ * worth 5 points of trust and carries the date it was established.
+ *
+ * This function no longer names a tier. Thresholds over a score built from
+ * stars and recency put 91 of 114 curated entries in the top bucket — measured,
+ * not assumed — because a curated DB is popular and recent by construction.
+ * The tier is derived from evidence instead: see `lib/tiers.cjs`.
  *
  * Recency bonus (graduated to reward freshness, not just a binary cutoff):
  *   40  – last commit < 30 days   (actively maintained)
@@ -24,19 +36,13 @@
  * no penalty. The license argument is OPTIONAL for backward compatibility:
  * callers that omit it skip the license adjustment entirely.
  *
- * Classification thresholds (out of 110):
- *   85+    → Core
- *   65–84  → Recommended
- *   40–64  → Experimental
- *   <40    → Deprecated
- *
  * Usage:
- *   node calculate_health.cjs <stars> <last_commit_days> <in_registry> <has_install_cmd> <critical_issues> [license]
+ *   node calculate_health.cjs <stars> <last_commit_days> <has_install_cmd> <critical_issues> [license]
  *
  * Examples:
- *   node calculate_health.cjs 1200 15 true true 2 MIT
- *   node calculate_health.cjs 50 200 false true 10 FSL-1.1-ALv2
- *   node calculate_health.cjs 1200 15 true true 2            # license check skipped (back-compat)
+ *   node calculate_health.cjs 1200 15 true 2 MIT
+ *   node calculate_health.cjs 50 200 true 10 FSL-1.1-ALv2
+ *   node calculate_health.cjs 1200 15 true 2                 # license check skipped (back-compat)
  */
 
 'use strict';
@@ -170,39 +176,29 @@ function licensePenaltyOf(license) {
 }
 
 /**
- * Map a raw health score to a human-readable tier label.
- * @returns {'Core'|'Recommended'|'Experimental'|'Deprecated'}
- */
-function classify(s) {
-  if (s >= 85) return 'Core';
-  if (s >= 65) return 'Recommended';
-  if (s >= 40) return 'Experimental';
-  return 'Deprecated';
-}
-
-/**
  * Full health-score computation. Pure function — no I/O.
- * @returns {{health_score:number, classification:string, breakdown:object}}
+ *
+ * Returns no tier: a tier over this number was measured to put 91 of 114
+ * curated entries in one bucket. `lib/tiers.cjs` derives it from evidence.
+ *
+ * @returns {{health_score:number, breakdown:object}}
  */
-function calculateHealth({ stars, lastCommitDays, inRegistry, hasInstallCmd, criticalIssues, license }) {
+function calculateHealth({ stars, lastCommitDays, hasInstallCmd, criticalIssues, license }) {
   const popularityScore = popularityScoreOf(stars);
   const recencyBonus    = recencyBonusOf(lastCommitDays);
-  const registryBonus   = inRegistry ? 30 : 0;
   const installBonus    = hasInstallCmd ? 15 : 0;
   const issueBonus      = criticalIssues < 5 ? 5 : 0;
   const licensePenalty  = licensePenaltyOf(license);
 
-  const score = popularityScore + recencyBonus + registryBonus + installBonus + issueBonus + licensePenalty;
+  const score = popularityScore + recencyBonus + installBonus + issueBonus + licensePenalty;
   // Round to 2 decimal places for stable, readable output
   const healthScore = Math.round(score * 100) / 100;
 
   return {
     health_score: healthScore,
-    classification: classify(healthScore),
     breakdown: {
       popularity: Math.round(popularityScore * 100) / 100,
       recency: recencyBonus,
-      registry: registryBonus,
       install_cmd: installBonus,
       low_issues: issueBonus,
       license: licensePenalty,
@@ -217,22 +213,25 @@ function main() {
 
   if (args[0] === '--help' || args[0] === '-h') {
     console.log(
-      'Usage: node calculate_health.cjs <stars> <last_commit_days> <in_registry> <has_install_cmd> <critical_issues> [license]\n' +
+      'Usage: node calculate_health.cjs <stars> <last_commit_days> <has_install_cmd> <critical_issues> [license]\n' +
       '\n' +
       'Arguments:\n' +
       '  stars            GitHub star count (integer >= 0)\n' +
       '  last_commit_days Days since last commit (integer >= 0)\n' +
-      '  in_registry      true/1 if listed in official MCP registry\n' +
       '  has_install_cmd  true/1 if a clear install command is documented\n' +
       '  critical_issues  Number of open critical issues (integer >= 0)\n' +
-      '  license          (optional) SPDX identifier; non-OSI licenses incur -10\n'
+      '  license          (optional) SPDX identifier; non-OSI licenses incur -10\n' +
+      '\n' +
+      'Health answers "is this project maintained?" only. The Core/Recommended/\n' +
+      'Experimental/Deprecated tier is derived from measured evidence, not from\n' +
+      'this number — see lib/tiers.cjs and `mcp-vault list`.\n'
     );
     process.exit(0);
   }
 
-  if (args.length < 5) {
+  if (args.length < 4) {
     console.error(
-      'Usage: node calculate_health.cjs <stars> <last_commit_days> <in_registry> <has_install_cmd> <critical_issues>\n' +
+      'Usage: node calculate_health.cjs <stars> <last_commit_days> <has_install_cmd> <critical_issues>\n' +
       'Run with --help for details.'
     );
     process.exit(1);
@@ -240,10 +239,9 @@ function main() {
 
   const stars          = parseInt(args[0], 10);
   const lastCommitDays = parseInt(args[1], 10);
-  const inRegistry     = args[2] === 'true' || args[2] === '1';
-  const hasInstallCmd  = args[3] === 'true' || args[3] === '1';
-  const criticalIssues = parseInt(args[4], 10);
-  const license        = args[5];   // optional — undefined skips the license check
+  const hasInstallCmd  = args[2] === 'true' || args[2] === '1';
+  const criticalIssues = parseInt(args[3], 10);
+  const license        = args[4];   // optional — undefined skips the license check
 
   if (isNaN(stars) || stars < 0) {
     console.error('Error: <stars> must be a non-negative integer.');
@@ -258,7 +256,7 @@ function main() {
     process.exit(1);
   }
 
-  const result = calculateHealth({ stars, lastCommitDays, inRegistry, hasInstallCmd, criticalIssues, license });
+  const result = calculateHealth({ stars, lastCommitDays, hasInstallCmd, criticalIssues, license });
   console.log(JSON.stringify(result, null, 2));
 }
 
@@ -273,7 +271,6 @@ module.exports = {
   classifyLicense,
   classifySpdxExpression,
   licensePenaltyOf,
-  classify,
   calculateHealth,
   // legacy alias for callers written against an earlier C2 draft
   computeHealth: calculateHealth,

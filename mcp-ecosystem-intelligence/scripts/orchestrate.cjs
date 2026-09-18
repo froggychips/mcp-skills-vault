@@ -29,6 +29,7 @@ const { spawnSync } = require('child_process');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { listHosts, resolveTarget, writeServerEntry } = require('./lib/hosts.cjs');
 const { trustScore, fitScore, behaviour, recommend } = require('./lib/scores.cjs');
+const { classifyEntry } = require('./lib/tiers.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { loadPolicy } = require('./lib/policy.cjs');
 const { readInstalledServers } = require('./lib/installed.cjs');
@@ -398,7 +399,7 @@ function fallbackBySignal(db, signal) {
   const sig = signal.toLowerCase();
   const hits = [];
   for (const t of db.tools) {
-    if (t.classification === 'Deprecated') continue;
+    if (isDeprecated(t)) continue;
     const hay = `${t.name} ${t.notes || ''}`.toLowerCase();
     if (hay.includes(sig)) hits.push(t.name);
   }
@@ -426,7 +427,7 @@ function matchDB(db, stack, query) {
     }
   }
 
-  return db.tools.filter(t => names.has(t.name) && t.classification !== 'Deprecated');
+  return db.tools.filter(t => names.has(t.name) && !isDeprecated(t));
 }
 
 // For every stack signal, decide whether the DB actually had something
@@ -742,6 +743,17 @@ function behaviourFor(name) {
   return behaviour(evalIndex().get(name) || null);
 }
 
+// The tier is derived from evidence, not read off the entry — `lib/tiers.cjs`
+// explains why it is not stored. `Deprecated` here means "do not install":
+// nothing to install, wrong bytes, or a known vulnerability at the pinned
+// version. That is the filter `matchDB` and `fallbackBySignal` apply.
+function tierFor(tool) {
+  return classifyEntry(tool, evalIndex().get(tool.name) || null);
+}
+function isDeprecated(tool) {
+  return tierFor(tool).classification === 'Deprecated';
+}
+
 // ── Report formatting ───────────────────────────────────────────────────────
 
 const HEAVY = 30;
@@ -761,7 +773,7 @@ function printTool(t) {
   const toolTag = heavy
     ? `${YL}${t.est_tools_count} tools ⚠${RS}`
     : `${DM}${t.est_tools_count} tools${RS}`;
-  const tier  = t.classification.padEnd(13);
+  const tier  = tierFor(t).classification.padEnd(13);
   const name  = t.name.padEnd(26);
   const behav = behaviourFor(t.name);
   const tag   = (BEHAVIOUR_TAG[behav.state] || (() => ''))();
@@ -816,13 +828,22 @@ function printReport(stack, matched, installed, db, unmapped) {
   // Integrity summary from DB fields
   const matchedVerified  = matched.filter(t => t.trust === 'verified').length;
   const matchedCandidate = matched.filter(t => t.trust === 'candidate').length;
-  const dates = matched.map(t => t.last_checked).filter(Boolean).sort();
+  // The oldest *measurement* under the matched entries. This used to print
+  // `last_checked`, one entry-level date that said 2026-07-31 across all 114
+  // entries while the evidence beneath it was a day old — a field nobody
+  // updated, reporting on checks that had in fact just run. Every dimension
+  // carries its own `checked_at`; the oldest of those is the honest answer.
+  const dates = matched
+    .flatMap(t => Object.values((t.trust_evidence && t.trust_evidence.dimensions) || {}))
+    .map(d => d && d.checked_at)
+    .filter(Boolean)
+    .sort();
   const oldest = dates[0] || 'unknown';
 
   process.stdout.write(`${B}── Integrity (DB snapshot) ${HR.slice(26)}${RS}\n`);
   process.stdout.write(`  Matched: ${GN}${matchedVerified} verified${RS}`);
   if (matchedCandidate) process.stdout.write(`  ${YL}${matchedCandidate} candidate${RS} (install with ⚠)`);
-  process.stdout.write(`\n  DB last refreshed: ${oldest}\n`);
+  process.stdout.write(`\n  Oldest evidence among these: ${oldest}\n`);
   process.stdout.write(`  ${DM}Full scan: node scripts/verify_integrity.cjs${RS}\n\n`);
 
   // Coverage gaps: stack signals the DB has nothing specific for. UNIVERSAL_TOOLS
@@ -921,6 +942,7 @@ module.exports = {
   detectStack,
   slim,
   behaviourFor,
+  tierFor,
   matchDB,
   unmappedSignals,
   fallbackBySignal,
@@ -953,13 +975,13 @@ function slim(t, stack = null) {
   return {
     name:            t.name,
     category:        t.category,
-    classification:  t.classification,
+    classification:  tierFor(t).classification,
+    tier_reason:     tierFor(t).why,
     health_score:    t.health_score,
     est_tools_count: t.est_tools_count,
     toolsets:        t.toolsets,
     trust:           t.trust,
     install_cmd:     t.install_cmd,
-    last_checked:    t.last_checked,
     scores: {
       health: Number.isFinite(t.health_score) ? t.health_score : null,
       trust:  { score: trust.score, gate: trust.gate, reasons: trust.reasons.slice(0, 4) },

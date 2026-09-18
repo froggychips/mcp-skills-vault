@@ -339,9 +339,13 @@ mcp-vault          →  supply-chain evidence, policy, behaviour
 
 11 entries are listed today and all of them agree; a verified namespace under a
 different owner is the finding worth having. **Being unlisted is explicitly not
-a finding** — listing is opt-in and 102 entries simply are not listed. It also
-reports that `in_registry`, the hand-set boolean adding 30 points to every
-health score, disagrees with the live registry for 26 entries.
+a finding** — listing is opt-in and 102 entries simply are not listed.
+
+This check replaced a field. The DB used to carry `in_registry`, a hand-set
+boolean worth 30 points of health score that had never been compared with
+anything; it disagreed with the live registry for 26 of 114 entries. The
+boolean is gone, and whether an entry is listed is now measured here, dated,
+and worth 5 points of trust.
 
 ### How is the upstream repo run? (`posture`)
 
@@ -660,24 +664,24 @@ The generated page is static, searchable, and filterable by category, tier, and 
 
 ```bash
 mcp-vault health \
-  <stars> <last_commit_days> <in_registry> <has_install_cmd> <critical_issues> [license]
+  <stars> <last_commit_days> <has_install_cmd> <critical_issues> [license]
 ```
 
 ```
 score = min(20, 10·log10(stars+1))   # popularity, capped
       + {40|20|10|0}                  # recency: <30d / <90d / <180d / older
-      + 30 if in_registry
       + 15 if install_cmd documented
       + 5  if open_issues/10 < 5
       − 10 if license is non-OSI / source-available / Unknown
 ```
 
-| Score | Tier | Behaviour |
-|---|---|---|
-| 85+ | Core | recommend by default |
-| 65–84 | Recommended | recommend with note |
-| 40–64 | Experimental | mention only on ask |
-| < 40 | Deprecated | hide unless asked |
+It answers one question — *is this project maintained?* — and it names no tier.
+Thresholds over it were measured against the real DB and abandoned: with the
+registry bonus removed, scores run 40–80 with a median of 75 and **91 of 114
+entries land in the top bucket**, because a curated database is popular and
+recently committed by construction. A label 80% of rows share is not a label.
+The tier comes from evidence instead — see the table under [Vetted
+database](#vetted-database).
 
 ### Vetted database
 
@@ -690,7 +694,23 @@ maps      memory    meta       mobile     observability   payments
 pm        reasoning search     testing    utility         vcs       web-scraping
 ```
 
-Distribution: **20 Core / 71 Recommended / 23 Experimental**.
+Distribution: **37 Core / 63 Recommended / 4 Experimental / 10 Deprecated**.
+
+The tier is derived from the evidence below, not stored in the DB and not a
+threshold on `health_score`:
+
+| Tier | What was established |
+|---|---|
+| Core | the artifact is verified **and** it started and listed tools in a clean sandbox |
+| Recommended | the artifact is verified and nothing contradicts it; it has not been observed to start |
+| Experimental | too little is known — the artifact was never verified, or so few dimensions were measured that "verified" stands alone |
+| Deprecated | do not install: nothing to install, wrong bytes, or a known vulnerability at the pinned version |
+
+Behaviour promotes but never demotes. 59 verified entries did not complete a
+handshake, and the sandbox runs with an empty environment — `@azure/mcp`,
+`@heroku/mcp-server` and their kind exit 1 because no API key was present.
+Recording that as a fact about the server would be the same mistake as reading
+a check that did not happen as a check that passed.
 
 **Verified hand-curated core** (the original 30): the seven official `modelcontextprotocol/servers` (filesystem, fetch, git, memory, sequentialthinking, time, everything) plus vendor-maintained servers (`github`, `microsoft/playwright`, `cloudflare`, `notion`, `sentry`, `stripe`, `neon`, `mongodb`, `redis`, `clickhouse`, `awslabs/mcp`, `context7`, …) and high-quality community entries (`mcp-atlassian`, `firecrawl`, `tavily`, `exa`, `brave`, `kubernetes`, `duckduckgo`, …).
 
@@ -803,7 +823,9 @@ Everything in this table is scripted and tested; the column says where it lives.
 | A decision, with the rule that made it, as an audit record | [`explain.cjs`](./mcp-ecosystem-intelligence/scripts/explain.cjs) |
 | CycloneDX SBOM | [`sbom.cjs`](./mcp-ecosystem-intelligence/scripts/sbom.cjs) |
 | Context ceiling enforced where the set changes | [`lib/budget.cjs`](./mcp-ecosystem-intelligence/scripts/lib/budget.cjs) |
+| Tier derived from evidence, not from a score | [`lib/tiers.cjs`](./mcp-ecosystem-intelligence/scripts/lib/tiers.cjs) |
 | The documented numbers checked against the data | [`tests/docs_numbers.test.cjs`](./tests/docs_numbers.test.cjs) |
+| What will not change without a major bump | [`docs/COMPATIBILITY.md`](./docs/COMPATIBILITY.md) |
 
 Still judgement, not script — deliberately: the reject heuristics (5-Minute
 Rule, Bloat, Duplication) and promoting a candidate to `trust: verified`. And

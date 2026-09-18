@@ -47,6 +47,7 @@ const fs     = require('fs');
 const path   = require('path');
 const crypto = require('crypto');
 const { exitAfterFlush } = require('./lib/exit.cjs');
+const { classifyEntry } = require('./lib/tiers.cjs');
 const { readInstalledServers, toInstallCmd } = require('./lib/installed.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { resolveNpmTreeCached, summarizeTree } = require('./lib/deps.cjs');
@@ -163,11 +164,14 @@ function propertiesFor(tool, evalResult) {
     props.push({ name: `mcp-vault:${name}`, value: String(value) });
   };
   put('trust', tool.trust);
-  put('classification', tool.classification);
+  // Derived from the evidence below rather than stored — see lib/tiers.cjs.
+  // The `last-checked` property is deliberately gone: it was one entry-level
+  // date that no longer tracked anything, and every `evidence.*` property here
+  // already carries the date its own claim was established.
+  put('classification', classifyEntry(tool, evalResult).classification);
   put('category', tool.category);
   put('health-score', tool.health_score);
   put('tools-estimated', tool.est_tools_count);
-  put('last-checked', tool.last_checked);
   put('launch-command', tool.install_cmd);
 
   const ev = tool.trust_evidence && tool.trust_evidence.dimensions;
