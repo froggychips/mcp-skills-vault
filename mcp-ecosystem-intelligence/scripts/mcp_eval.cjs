@@ -750,9 +750,20 @@ async function smokeEntry(tool, opts) {
       throw new Error('tools/list error');
     }
 
-    const tools = (listResp && listResp.result && Array.isArray(listResp.result.tools))
+    // A response with no `tools` array is malformed, and falling back to `[]`
+    // invented a measurement: `result: {}` came out as a *passing* server with
+    // a complete list of zero tools. An empty array is different — one entry
+    // in this DB genuinely answers `tools: []` — so the two are kept apart.
+    const listed = listResp && listResp.result && Array.isArray(listResp.result.tools)
       ? listResp.result.tools
-      : [];
+      : null;
+    if (listed === null) {
+      result.status     = 'fail';
+      result.error_code = 'tools/list answered without a `tools` array';
+      result.failure_class = FAILURE_CLASS.PROTOCOL;
+      throw new Error('tools/list malformed');
+    }
+    const tools = listed;
     result.tool_count = tools.length;
     // MCP paginates `tools/list`. This reads one page, so a server that
     // returns a cursor has more tools than this count — and until now nothing
@@ -1318,7 +1329,11 @@ async function main() {
   // clean smoke of no servers — and --strict reported 1, which reads as a
   // finding about somebody's code. A real finding still outranks it.
   const answered = newResults.filter((r) => r.status === 'pass' || r.status === 'fail').length;
-  const hard = (opts.strict && (fail > 0 || skippedLauncher > 0 || incomplete)) || driftFails;
+  // A genuine finding first — but `skippedLauncher` and `incomplete` are not
+  // findings about anybody's server, they are reasons this run established
+  // nothing. Counting them as `hard` made `--strict` answer 1 for a run that
+  // never started, which reads as a verdict on code nobody executed.
+  const hard = (opts.strict && fail > 0) || driftFails;
   if (hard) return exitAfterFlush(1);
   if (picked.length > 0 && answered === 0) {
     process.stderr.write(
@@ -1327,6 +1342,9 @@ async function main() {
     );
     return exitAfterFlush(2);
   }
+  // Something ran, and under --strict a partial run is still a failure to
+  // deliver what was asked for.
+  if (opts.strict && (skippedLauncher > 0 || incomplete)) return exitAfterFlush(1);
   exitAfterFlush(0);
 }
 

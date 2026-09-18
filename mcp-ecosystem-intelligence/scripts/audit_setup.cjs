@@ -360,7 +360,14 @@ function audit({ project, global, settings, db, evals = null }) {
       // the measurement is only ever used to *raise* the count, so a row with
       // unknown completeness falls back to exactly what the DB estimate alone
       // decided before any of this existed.
+      // Two values, deliberately: `truncated` is the *predicate* that may
+      // raise a verdict, and `truncationKnown` is the fact that gets reported.
+      // Reusing the boolean for both turned "we do not know whether that list
+      // was complete" into an assertion that it was.
       const truncated = measured && measured.tools_truncated === true;
+      const truncationKnown = measured && measured.tools_truncated !== undefined
+        ? measured.tools_truncated
+        : null;
       const estimated = (typeof tool.est_tools_count === 'number') ? tool.est_tools_count : null;
       const tools = (observed !== null && estimated !== null) ? Math.max(observed, estimated)
         : (estimated !== null ? estimated : observed);
@@ -381,7 +388,7 @@ function audit({ project, global, settings, db, evals = null }) {
             est_tools_count: tools,
             tool_count_source: (observed !== null && tools === observed) ? 'measured'
               : (estimated !== null ? 'db' : 'unknown'),
-            tool_count_truncated: observed !== null ? truncated : null,
+            tool_count_truncated: observed !== null ? truncationKnown : null,
             toolsets_hint:   tool.toolsets || null,
             message:         tools === null
               ? `tool count unknown and no scoping (--toolsets/--caps/allowedTools/enabledMcpjsonServers)`

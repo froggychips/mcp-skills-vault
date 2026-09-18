@@ -690,6 +690,7 @@ const BEHAVIOUR_TAG = {
   'needs-credentials': () => `${YL}needs credentials${RS}`,
   'needs-network':     () => `${YL}needs network${RS}`,
   'never-started':     () => `${RD}never started${RS}`,
+  'protocol-error':    () => `${RD}protocol error${RS}`,
 };
 
 function printTool(t) {

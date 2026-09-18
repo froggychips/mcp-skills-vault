@@ -330,3 +330,24 @@ test('a local version label is not a bag of numbers', () => {
   assert.equal(m.normalizePypiVersion('1.0+abc.01'), m.normalizePypiVersion('1.0+abc.1'));
   assert.equal(m.normalizePypiVersion('1.0+007'), m.normalizePypiVersion('1.0+7'));
 });
+
+test('a tools/list with no tools array is not a zero-tool pass', () => {
+  // `Array.isArray(result.tools) ? result.tools : []` invented a measurement:
+  // a server answering `result: {}` came out as a *passing* server with a
+  // complete list of zero tools, which then fed the token budget and the
+  // surface fingerprint. An empty array is different — one entry in this DB
+  // genuinely answers `tools: []` — so the two are kept apart.
+  const { behaviour, BEHAVIOUR_CEILING } = require('../mcp-ecosystem-intelligence/scripts/lib/scores.cjs');
+  const b = behaviour({ name: 'x', status: 'fail', failure_class: 'PROTOCOL', error_code: 'tools/list answered without a `tools` array' });
+  assert.equal(b.state, 'protocol-error');
+  assert.match(b.reason, /answered outside the protocol/);
+  // Not "did not complete a handshake": it completed one and then replied badly.
+  assert.doesNotMatch(b.reason, /did not complete a handshake/);
+  // And it caps as hard as never starting, rather than falling through to the
+  // more generous default.
+  assert.equal(BEHAVIOUR_CEILING['protocol-error'], 'not-now');
+
+  // It cannot reach Core either, however good the evidence is.
+  const r = classifyEntry(entry(verified()), { name: 'x', status: 'fail', failure_class: 'PROTOCOL', identity: { artifact_id: AID } }, at);
+  assert.equal(r.classification, 'Recommended');
+});
