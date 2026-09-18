@@ -287,13 +287,25 @@ function audit({ project, global, settings, db, evals = null }) {
       }
 
       // heavy-unbounded: large surface, no scoping anywhere
+      //
+      // A measurement may only *raise* the count, never lower it. `tools/list`
+      // is paginated and the eval reads one page, so a measured 10 can be the
+      // first page of 100 — using it to conclude "small enough" would delete a
+      // finding on the strength of a partial answer. The measurement therefore
+      // cannot rescue an entry whose estimate is missing either: unknown stays
+      // heavy, exactly as before.
       const measured = evals && evals.get ? evals.get(tool.name) : null;
-      const observed = measured && Number.isFinite(measured.tool_count) && measured.tool_count > 0
+      const observed = measured && measured.status === 'pass'
+        && Number.isFinite(measured.tool_count) && measured.tool_count > 0
         ? measured.tool_count
         : null;
+      const truncated = Boolean(measured && measured.tools_truncated);
       const estimated = (typeof tool.est_tools_count === 'number') ? tool.est_tools_count : null;
-      const tools = observed !== null ? observed : estimated;
-      const isHeavy = tools === null || tools > HEAVY_THRESHOLD;
+      const tools = (observed !== null && estimated !== null) ? Math.max(observed, estimated)
+        : (estimated !== null ? estimated : observed);
+      // `truncated` means the real count is *more* than `observed`, so it can
+      // never support the conclusion "small enough".
+      const isHeavy = estimated === null || truncated || tools > HEAVY_THRESHOLD;
       if (isHeavy) {
         const enabledOk = settings.enabled === null || settings.enabled.includes(name);
         const argScoped = hasArgScope(entry);
@@ -306,11 +318,15 @@ function audit({ project, global, settings, db, evals = null }) {
             db_name:         tool.name,
             scope,
             est_tools_count: tools,
-            tool_count_source: observed !== null ? 'measured' : (estimated !== null ? 'db' : 'unknown'),
+            tool_count_source: (observed !== null && tools === observed) ? 'measured'
+              : (estimated !== null ? 'db' : 'unknown'),
+            tool_count_truncated: observed !== null ? truncated : null,
             toolsets_hint:   tool.toolsets || null,
             message:         tools === null
               ? `tool count unknown and no scoping (--toolsets/--caps/allowedTools/enabledMcpjsonServers)`
-              : `${tools} tools${observed !== null ? ' (measured)' : ''}, no scoping (--toolsets/--caps/allowedTools/enabledMcpjsonServers)`,
+              : `${tools}${truncated && tools === observed ? '+' : ''} tools`
+                + `${observed !== null && tools === observed ? ' (measured)' : ''}`
+                + `, no scoping (--toolsets/--caps/allowedTools/enabledMcpjsonServers)`,
           });
         }
       }
@@ -428,6 +444,7 @@ function main(argv) {
 
   if (args.json) {
     process.stdout.write(JSON.stringify({
+      schema:      'mcp-vault/audit@1',
       cwd,
       db_path:     dbPath,
       global_path: globalCfg,

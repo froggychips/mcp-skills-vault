@@ -149,7 +149,14 @@ function readInstalledServers({ cwd = process.cwd(), home = os.homedir(), platfo
   for (const loc of locations) {
     let raw;
     try { raw = fs.readFileSync(loc.path, 'utf8'); }
-    catch { continue; }                       // not configured on this machine
+    catch (e) {
+      // ENOENT is the normal case: that host is not configured here. Anything
+      // else — EACCES, EISDIR, a dangling symlink — is a file we were meant to
+      // read and could not, and swallowing it made "no servers configured"
+      // indistinguishable from "we were not allowed to look".
+      if (e.code !== 'ENOENT' && onUnreadable) onUnreadable({ ...loc, error: `${e.code || 'read failed'}: ${e.message}` });
+      continue;
+    }
     let doc;
     try {
       doc = loc.path.endsWith('.toml') ? parseCodexToml(raw) : JSON.parse(raw);

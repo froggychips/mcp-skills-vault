@@ -23,8 +23,12 @@ const dim = (status) => ({ status, checked_at: DAY, verified_at: DAY });
 const NOW = new Date(`${DAY}T00:00:00Z`).getTime();
 const at  = { now: NOW };
 
-/** Evidence that clears the trust gate: artifact verified plus enough beside it. */
+const CMD = 'npx -y pkg@1.0.0';
+const AID = 'npm:pkg@1.0.0';
+
+/** Evidence that is enough to call an npm artifact verified, tied to AID. */
 const verified = (over = {}) => ({
+  artifact_id: AID,
   dimensions: {
     availability:   dim('present'),
     artifact:       dim('verified'),
@@ -35,9 +39,11 @@ const verified = (over = {}) => ({
   },
 });
 
-const entry = (evidence) => ({ name: 'x', trust_evidence: evidence });
-const pass  = { name: 'x', status: 'pass', tool_count: 7 };
-const crash = { name: 'x', status: 'fail', failure_class: 'CRASH', error_code: 'exit 1' };
+const entry = (evidence, over = {}) => ({ name: 'x', install_cmd: CMD, trust_evidence: evidence, ...over });
+// A passing eval that recorded *which artifact* it launched. Without that
+// field a pass cannot be attributed to this entry at all.
+const pass  = { name: 'x', status: 'pass', tool_count: 7, identity: { artifact_id: AID } };
+const crash = { name: 'x', status: 'fail', failure_class: 'CRASH', error_code: 'exit 1', identity: { artifact_id: AID } };
 
 test('Core needs both halves: verified bytes and an observed handshake', () => {
   assert.equal(classifyEntry(entry(verified()), pass, at).classification, 'Core');
@@ -79,21 +85,62 @@ test('Deprecated means "do not install", and each way of getting there is named'
   assert.match(mismatch.why, /artifact: mismatch/);
 });
 
-test('too little measured is Experimental, not Recommended', () => {
-  // A real shape from the DB: three OCI entries have exactly two dimensions
-  // recorded. "artifact verified" standing alone is not the same claim as
-  // "verified and nothing contradicts it", and the tier must not round up.
-  const thin = entry({ dimensions: { artifact: dim('verified'), registry: dim('unlisted') } });
-  assert.equal(classifyEntry(thin, pass, at).classification, 'Experimental');
+test('an omitted check cannot make an entry look stronger', () => {
+  // The first version of this file asked `trustScore().gate === 'ok'`, which
+  // is "artifact verified plus 55 points". `artifact: verified` (40) with
+  // `signature: verified` (20) and *no advisory check at all* cleared that bar
+  // and reached Core — a missing input paying for a stronger verdict. The tier
+  // now asks deriveTrust with requiredFor(ecosystem), which demands the
+  // dimensions that matter for the ecosystem.
+  const noAdvisories = entry({
+    artifact_id: AID,
+    dimensions: { artifact: dim('verified'), signature: dim('verified') },
+  });
+  const r = classifyEntry(noAdvisories, pass, at);
+  assert.equal(r.classification, 'Experimental');
+  assert.match(r.why, /never checked for this entry: advisories/);
+
+  // And enough positive points must not outweigh a contradiction.
+  const contradicted = entry(verified({ source_binding: dim('mismatch') }));
+  const c = classifyEntry(contradicted, pass, at);
+  assert.equal(c.classification, 'Deprecated');
+  assert.match(c.why, /source_binding: mismatch/);
 
   assert.equal(classifyEntry(entry(null), pass, at).classification, 'Experimental');
   assert.equal(classifyEntry({ name: 'x' }, pass, at).classification, 'Experimental');
 });
 
+test('evidence about other bytes is not evidence about these', () => {
+  // Change an entry from pkg@1.0.0 to pkg@2.0.0 and every stored claim under
+  // it is a statement about bytes that are no longer installed. mergeEvidence
+  // already refuses to inherit across artifact ids; so does the tier.
+  const moved = entry(verified(), { install_cmd: 'npx -y pkg@2.0.0' });
+  const r = classifyEntry(moved, pass, at);
+  assert.equal(r.classification, 'Experimental');
+  assert.match(r.why, /recorded evidence is about npm:pkg@1\.0\.0/);
+  assert.match(r.why, /now installs npm:pkg@2\.0\.0/);
+  assert.equal(r.bound.evidence.state, 'no');
+});
+
+test('a handshake against another artifact does not reach Core either', () => {
+  const old = { name: 'x', status: 'pass', tool_count: 7, identity: { artifact_id: 'npm:pkg@0.9.0' } };
+  const r = classifyEntry(entry(verified()), old, at);
+  assert.equal(r.classification, 'Recommended');
+  assert.match(r.why, /against npm:pkg@0\.9\.0 rather than npm:pkg@1\.0\.0/);
+
+  // And a pass that recorded no identity at all — which is every row in the
+  // shipped snapshot today — says so rather than counting.
+  const anonymous = { name: 'x', status: 'pass', tool_count: 7 };
+  const a = classifyEntry(entry(verified()), anonymous, at);
+  assert.equal(a.classification, 'Recommended');
+  assert.match(a.why, /did not record which artifact it launched/);
+  assert.equal(a.bound.behaviour.state, 'unknown');
+});
+
 test('a stored label cannot forge a tier', () => {
   // The whole point of deriving it: an entry arriving through a pull request
   // carries fields a contributor typed. None of them are read here.
-  const forged = { name: 'x', classification: 'Core', trust: 'verified', in_registry: true, health_score: 110 };
+  const forged = { name: 'x', install_cmd: CMD, classification: 'Core', trust: 'verified', in_registry: true, health_score: 110 };
   assert.equal(classifyEntry(forged, pass, at).classification, 'Experimental');
 });
 
@@ -114,6 +161,21 @@ test('evalIndex tolerates a missing or malformed snapshot', () => {
   assert.equal(evalIndex(undefined).size, 0);
   assert.equal(evalIndex(null).size, 0);
   assert.equal(evalIndex([{ name: 'a' }, { name: 'b' }]).get('b').name, 'b');
+});
+
+test('the shipped eval snapshot cannot promote anything to Core yet', () => {
+  // Not a defect in the tier — a gap in the data, and the tier saying so
+  // instead of guessing. No row in eval_results.json records the artifact it
+  // launched, so no pass can be attributed to the entry it sits next to.
+  // mcp_eval writes `identity` on every row now, so the next weekly run fills
+  // this in and Core comes back on its own.
+  const db = require('../mcp-ecosystem-intelligence/assets/tools_database.json').tools;
+  const results = require('../mcp-ecosystem-intelligence/assets/eval_results.json').results;
+  const ix = evalIndex(results);
+  const withIdentity = results.filter((r) => r.identity && r.identity.artifact_id);
+  const core = db.filter((t) => classifyEntry(t, ix.get(t.name) || null).classification === 'Core');
+  assert.equal(core.length, withIdentity.length === 0 ? 0 : core.length,
+    'a Core tier appeared from a snapshot that records no artifact identity');
 });
 
 test('the shipped DB stores no tier, no in_registry and no last_checked', () => {

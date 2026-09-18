@@ -525,6 +525,7 @@ async function smokeEntry(tool, opts) {
     surface_drift:    null,
     // What ran, as comparable fields; the baseline a later run diffs against.
     identity:         null,
+    tools_truncated:  null,      // unknown until a tools/list actually answers
     tool_count_db:    typeof tool.est_tools_count === 'number' ? tool.est_tools_count : null,
     tool_count_drift: false,
     schema_errors:    [],
@@ -702,6 +703,18 @@ async function smokeEntry(tool, opts) {
       ? listResp.result.tools
       : [];
     result.tool_count = tools.length;
+    // MCP paginates `tools/list`. This reads one page, so a server that
+    // returns a cursor has more tools than this count — and until now nothing
+    // downstream could tell a complete list from a first page. A 100-tool
+    // server answering with 10 and a cursor was recorded as a 10-tool server,
+    // which fed the token budget, the surface fingerprint and the
+    // heavy-surface audit alike.
+    //
+    // Recorded rather than followed: following the cursor changes what the
+    // smoke does and needs a live run to validate. What must not wait is the
+    // qualification, because a partial count presented as a total is the
+    // failure this project exists to prevent.
+    result.tools_truncated = Boolean(listResp && listResp.result && listResp.result.nextCursor);
     // The payload, not the count: what the server injects into the system
     // prompt is this JSON, so its size is the honest input to a token budget.
     try { result.tools_payload_bytes = Buffer.byteLength(JSON.stringify(tools)); } catch { /* keep null */ }

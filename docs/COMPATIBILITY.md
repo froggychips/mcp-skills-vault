@@ -44,10 +44,13 @@ Every JSON document this tool writes carries a schema identifier of the form
 
 | Identifier | Written by |
 |---|---|
+| `mcp-vault/audit@1` | `mcp-vault audit --json` |
 | `mcp-vault/availability@1` | `mcp-vault availability --json` |
 | `mcp-vault/capabilities@1` | `assets/capabilities.json` (the stored scan) |
 | `mcp-vault/capability-scan@1` | `mcp-vault capabilities --json` |
 | `mcp-vault/decision@1` | `mcp-vault explain --json` |
+| `mcp-vault/doctor@1` | `mcp-vault doctor --json` |
+| `mcp-vault/entries@1` | `mcp-vault list --json` |
 | `mcp-vault/identity@1` | `mcp-vault identity --json` |
 | `mcp-vault/lock@1` | `mcp.lock.json` |
 | `mcp-vault/lock-check@1` | `mcp-vault lock --check --json` |

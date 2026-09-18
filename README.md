@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@froggychips/mcp-vault.svg)](https://www.npmjs.com/package/@froggychips/mcp-vault)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Zero deps](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](./PHILOSOPHY.md)
-[![Tests](https://img.shields.io/badge/tests-758%20pass-brightgreen.svg)](./tests)
+[![Tests](https://img.shields.io/badge/tests-766%20pass-brightgreen.svg)](./tests)
 
 **Homepage:** [mcp.froggychips.xyz](https://mcp.froggychips.xyz) · **npm:** [`@froggychips/mcp-vault`](https://www.npmjs.com/package/@froggychips/mcp-vault)
 
@@ -73,21 +73,30 @@ npx -y @froggychips/mcp-vault status
 mcp-vault <version> · /Users/me/repos/my-project
 
 Environment     Node v22.3.0 · missing: uvx
-Installed       13 servers · 2 in the vault DB · 11 unvetted
-                2 Core
+Installed       13 servers · 1 matched in the vault DB · 2 on another version · 10 unvetted
+                1 Recommended
 Evidence        oldest claim 2026-09-17 (stored; nothing was re-checked just now)
-Context         94,336 tokens on every request · 47.2% of a 200k window
-                hostinger alone is 43.9% (396 tools, measured) — scope it with --toolsets or allowedTools
+Context         6,505 tokens on every request · 3.3% of a 200k window · 12 not measured
+                not counted: hostinger listed 396 tools (~87,831) when we measured
+                npm:hostinger-api-mcp@0.1.43, but this host launches npm:hostinger-api-mcp
 This project    postgres, aws, Node → 3 matching servers not installed (mcp-server-neon, …)
 
 Worth knowing
-  ! 11 configured servers are not in the vault DB, so nothing here has checked them: teamcity, github, …
+  ! 10 configured servers are not in the vault DB, so nothing here has checked them: teamcity, github, …
+  ! hostinger: the launch command is unpinned, so what starts is not the npm:hostinger-api-mcp@0.1.43 the vault verified
+  ! chrome-devtools: the vault verified npm:chrome-devtools-mcp@0.26.0; this host launches npm:chrome-devtools-mcp@latest
 
 Deeper:  verify --installed  re-hash what your hosts launch, live
          explain <name>      why one entry is allowed or denied
          scan                what to add for this stack
          audit --strict      every drift and scope finding in full
 ```
+
+Servers are matched by **artifact identity, not by the name in your config** —
+and the version is compared separately, because stored evidence about `x@1.0.0`
+is not a finding about `x@2.0.0` in either direction. A server on a version
+nobody verified gets no tier at all, and an unpinned `npx -y pkg` is reported
+as what it is: whatever is published at start-up.
 
 It makes **no network calls** — every claim comes from evidence already on
 disk, and says so rather than implying it was checked just now. Exit `1` means
@@ -726,17 +735,24 @@ maps      memory    meta       mobile     observability   payments
 pm        reasoning search     testing    utility         vcs       web-scraping
 ```
 
-Distribution: **37 Core / 63 Recommended / 4 Experimental / 10 Deprecated**.
+Distribution: **0 Core / 101 Recommended / 1 Experimental / 12 Deprecated**.
 
 The tier is derived from the evidence below, not stored in the DB and not a
 threshold on `health_score`:
 
 | Tier | What was established |
 |---|---|
-| Core | the artifact is verified **and** it started and listed tools in a clean sandbox |
-| Recommended | the artifact is verified and nothing contradicts it; it has not been observed to start |
-| Experimental | too little is known — the artifact was never verified, or so few dimensions were measured that "verified" stands alone |
-| Deprecated | do not install: nothing to install, wrong bytes, or a known vulnerability at the pinned version |
+| Core | the artifact is verified, the evidence is about *these* bytes, and a run **bound to these bytes** started and listed tools |
+| Recommended | the artifact is verified and current; either nothing watched it run, or what watched it cannot be tied to this artifact |
+| Experimental | too little is known — a required check never happened, a claim aged out, or the stored evidence is about a different artifact than this entry now installs |
+| Deprecated | do not install: nothing to install, or something failed (wrong bytes, a live advisory, a repository that disagrees) |
+
+**Core is empty today, and that is the tier working.** 38 entries start and
+list tools — but no row in the eval snapshot records *which artifact it
+launched*, and a pass for `x@1` is not a statement about `x@2`. The eval writes
+that field on every row now, so the next weekly run fills it in and Core comes
+back on its own. Guessing in the meantime is the one thing this repository
+cannot do.
 
 Behaviour promotes but never demotes. 59 verified entries did not complete a
 handshake, and the sandbox runs with an empty environment — `@azure/mcp`,

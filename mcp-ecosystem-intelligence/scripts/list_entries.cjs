@@ -104,6 +104,7 @@ rows.sort((a, b) => {
 
 if (AS_JSON) {
   process.stdout.write(JSON.stringify({
+    schema: "mcp-vault/entries@1",
     filters: { category: CATEGORY, tier: TIER, trust: TRUST, query: QUERY },
     count: rows.length,
     entries: rows.map(r => ({

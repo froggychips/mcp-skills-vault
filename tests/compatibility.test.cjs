@@ -64,6 +64,33 @@ test('every command in --help is a command the promise covers by name', () => {
     'commands that exist but are not in --help, so the promise does not reach them');
 });
 
+test('every offline --json command actually emits a listed schema', () => {
+  // The document said "every JSON document this tool writes carries a schema
+  // identifier" while `list --json`, `audit --json` and `doctor --json` wrote
+  // none. Grepping the source for schema strings could not catch that: the
+  // strings it found were the ones that existed. So this runs the commands.
+  //
+  // Only the offline ones: asserting on `availability --json` would make the
+  // suite fail on a bad afternoon at npm, which is its own dishonesty.
+  const { spawnSync } = require('child_process');
+  const os = require('os');
+  const cwd  = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-compat-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-compat-home-'));
+
+  for (const script of ['list_entries.cjs', 'doctor.cjs', 'audit_setup.cjs', 'status.cjs']) {
+    const r = spawnSync(process.execPath, [path.join(SCRIPTS, script), '--json', '--cwd', cwd], {
+      encoding: 'utf8',
+      env: { ...process.env, HOME: home, NO_COLOR: '1' },
+    });
+    assert.ok([0, 1].includes(r.status), `${script} exited ${r.status}: ${r.stderr}`);
+    let doc;
+    assert.doesNotThrow(() => { doc = JSON.parse(r.stdout); }, `${script} --json did not emit JSON`);
+    const id = doc.schema || doc.$schema;
+    assert.ok(id, `${script} --json emits no schema identifier`);
+    assert.ok(PROMISE.includes(id), `${script} emits ${id}, which docs/COMPATIBILITY.md does not list`);
+  }
+});
+
 test('the three exit codes are the ones the scripts actually document', () => {
   // The promise makes a specific claim — 2 never means "clean" — and it is
   // only true if every script agrees on the convention. Checked against the

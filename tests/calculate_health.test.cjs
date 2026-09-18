@@ -223,13 +223,15 @@ test('CLI: the old 5-argument form is not silently reinterpreted', () => {
   // Called against the new arity, `true` would land on <critical_issues> and
   // parse as NaN — the script must refuse rather than score something.
   const cli = spawnSync(process.execPath, [SCRIPT, '1200', '15', 'true', 'true', '2'], { encoding: 'utf8' });
-  assert.equal(cli.status, 1);
+  // 2, not 1: exit 1 means "answered, and there is a finding". A usage error
+  // answered nothing, and docs/COMPATIBILITY.md promises that distinction.
+  assert.equal(cli.status, 2);
   assert.match(cli.stderr, /critical_issues/);
 });
 
-test('CLI: missing args → exit 1 with usage', () => {
+test('CLI: missing args → exit 2 with usage, never 1', () => {
   const cli = spawnSync(process.execPath, [SCRIPT, '1', '2'], { encoding: 'utf8' });
-  assert.equal(cli.status, 1);
+  assert.equal(cli.status, 2);
   assert.match(cli.stderr, /Usage:/);
 });
 

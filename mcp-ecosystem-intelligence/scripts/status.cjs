@@ -36,7 +36,8 @@ const path = require('path');
 const { exitAfterFlush }   = require('./lib/exit.cjs');
 const { readInstalledServers, toInstallCmd } = require('./lib/installed.cjs');
 const { trustScore }       = require('./lib/scores.cjs');
-const { classifyEntry, evalIndex } = require('./lib/tiers.cjs');
+const { classifyEntry, evalIndex, currentArtifactId } = require('./lib/tiers.cjs');
+const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { staleDimensions, DEFAULT_MAX_AGE_DAYS } = require('./lib/evidence.cjs');
 const budget               = require('./lib/budget.cjs');
 const { runDoctor }        = require('./doctor.cjs');
@@ -103,33 +104,103 @@ function environment(cwd) {
 }
 
 /**
- * What the hosts actually launch, and what the DB knows about each.
+ * The package identity of an artifact, with the version dropped.
  *
- * `tier` and `trust` come from stored evidence with its dates. A server the DB
- * has never heard of is reported as exactly that — not as a problem, and not
- * as fine either.
+ * This is what "is this the same package?" means. `artifactId` deliberately
+ * includes the version, because evidence about 1.2.3 says nothing about 1.2.4
+ * — so matching needs the coarser key, and the version comparison happens
+ * separately and explicitly.
+ */
+function packageKey(artifact) {
+  if (!artifact) return null;
+  switch (artifact.ecosystem) {
+    case 'npm':
+    case 'pypi': return artifact.package ? `${artifact.ecosystem}:${artifact.package}` : null;
+    case 'oci':  return artifact.image ? `oci:${artifact.image}` : null;
+    case 'git':  return artifact.source ? `git:${artifact.source}` : null;
+    default:     return null;
+  }
+}
+
+/**
+ * What the hosts actually launch, and what the DB knows about *that*.
+ *
+ * Matching is by package identity, never by the name in the config. The first
+ * version used `budget.matchDbEntry`, which prefers the config key, and it was
+ * wrong in both directions: a server called `mcp-server-aws` launching
+ * `node ./innocent.js` inherited the real AWS entry's yanked status and failed
+ * the run, while a server called `mcp-server-fetch` actually launching the
+ * yanked AWS package passed. The config key is a label the user typed.
+ *
+ * The version is then compared separately, because stored evidence about
+ * `x@1.0.0` is not a finding about `x@2.0.0` in either direction. Three
+ * outcomes, and only the first carries a tier:
+ *
+ *   same       the evidence is about these bytes — tier and trust apply
+ *   different  the vault verified another version — reported as drift, no tier
+ *   unpinned   the command resolves at launch, so what runs is not knowable
+ *              from here at all
  */
 function installed({ cwd, db, evals }) {
   const unreadable = [];
   const servers = readInstalledServers({ cwd, onUnreadable: (loc) => unreadable.push(loc) });
+
+  const byPackage = new Map();
+  for (const tool of db.tools) {
+    const typed = toTypedEntry(tool);
+    const key = typed ? packageKey(typed.artifact) : null;
+    if (key && !byPackage.has(key)) byPackage.set(key, tool);
+  }
+
   const rows = [];
   for (const server of servers) {
     const withCmd = { ...server, install_cmd: server.install_cmd || toInstallCmd(server) };
-    const entry   = budget.matchDbEntry(withCmd, db.tools);
+    const typed   = toTypedEntry(withCmd);
+    const key     = typed ? packageKey(typed.artifact) : null;
+    const entry   = key ? byPackage.get(key) || null : null;
+    const base    = { name: server.name, host: server.host, scope: server.scope || null, launches: withCmd.install_cmd || null };
+
     if (!entry) {
-      rows.push({ name: server.name, host: server.host, scope: server.scope || null, in_db: false });
+      rows.push({ ...base, in_db: false, package: key });
       continue;
     }
+
+    const installedId = artifactId(typed.artifact);
+    const vaultId     = currentArtifactId(entry);
+    // An id with no version in it is an unpinned launch: `npx -y pkg` resolves
+    // whatever is published at start-up, which is by definition not the
+    // artifact anybody verified.
+    const pinned = Boolean(installedId && /@[^@/]+$/.test(installedId.replace(/^oci:[^@]*/, 'oci:')));
+    const version_match = !installedId || !vaultId ? 'unknown'
+      : (installedId === vaultId ? 'same' : 'different');
+
+    const row = {
+      ...base,
+      in_db: true,
+      db_entry: entry.name,
+      package: key,
+      installed_artifact: installedId,
+      vault_artifact: vaultId,
+      version_match,
+      pinned,
+    };
+
+    if (version_match !== 'same') {
+      // No tier: every stored claim under this entry is about `vault_artifact`.
+      row.tier = null;
+      row.tier_reason = pinned
+        ? `the vault verified ${vaultId}; this host launches ${installedId}`
+        : `the launch command is unpinned, so what starts is not the ${vaultId} the vault verified`;
+      rows.push(row);
+      continue;
+    }
+
     const tier  = classifyEntry(entry, evals.get(entry.name) || null);
     const trust = trustScore(entry.trust_evidence || null);
     const dims  = (entry.trust_evidence && entry.trust_evidence.dimensions) || {};
     const dates = Object.values(dims).map((d) => d.checked_at).filter(Boolean).sort();
     rows.push({
-      name: server.name,
-      host: server.host,
-      scope: server.scope || null,
-      in_db: true,
-      db_entry: entry.name,
+      ...row,
       tier: tier.classification,
       tier_reason: tier.why,
       trust_gate: trust.gate,
@@ -138,9 +209,15 @@ function installed({ cwd, db, evals }) {
       stale: staleDimensions(entry.trust_evidence || null).map((s) => s.dimension),
     });
   }
-  // A host config that could not be parsed is not a host with no servers.
+  // A host config that could not be read is not a host with no servers.
   for (const loc of unreadable) {
-    rows.push({ name: `(${loc.host || loc.path})`, host: loc.host || null, in_db: false, unreadable: loc.error || 'unparseable' });
+    rows.push({
+      name: `(${loc.host || loc.path})`,
+      host: loc.host || null,
+      in_db: false,
+      unreadable: loc.error || 'unparseable',
+      path: loc.path || null,
+    });
   }
   return rows;
 }
@@ -149,12 +226,22 @@ function installed({ cwd, db, evals }) {
 const HEAVY_SHARE = 20;   // percent of the window one server may take quietly
 
 function context(rows, db, evals) {
+  // Every configured server, including the ones the DB has never heard of.
+  // Filtering those out before `summarise` made `unknown_servers` read 0 and
+  // turned "we did not count eleven of your servers" into "your config costs
+  // this much" — the summary claiming more than its inputs support, which is
+  // the one thing this command must not do. `estimateServer` already returns
+  // `source: 'unknown'` with a null token count for an entry it cannot
+  // measure, and `summarise` already counts those separately.
   const estimates = rows
-    .filter((r) => r.in_db)
+    .filter((r) => !r.unreadable)
     .map((r) => budget.estimateServer({
       name: r.name,
-      dbEntry: db.tools.find((t) => t.name === r.db_entry) || null,
-      evalEntry: evals.get(r.db_entry) || null,
+      // A server whose launched version differs from the DB's is not measured
+      // by the DB's entry either: its tool surface is whatever that version
+      // ships. Only an exact artifact match contributes a number.
+      dbEntry: (r.in_db && r.version_match === 'same' && db.tools.find((t) => t.name === r.db_entry)) || null,
+      evalEntry: (r.in_db && r.version_match === 'same' && evals.get(r.db_entry)) || null,
     }));
   const summary = budget.summarise(estimates);
   // "47% of your window" is a number; *which server* spent it is the finding.
@@ -162,11 +249,31 @@ function context(rows, db, evals) {
     .filter((e) => e.tokens !== null)
     .sort((a, b) => b.tokens - a.tokens)[0] || null;
   const share = heaviest ? Number(((heaviest.tokens / 200000) * 100).toFixed(1)) : null;
+
+  // A server on a different version than the one we measured contributes no
+  // number — but throwing the measurement away entirely loses a real finding
+  // ("your hostinger server listed 396 tools") to protect against a small
+  // one (it was a different version). So it is reported, as what it is: a
+  // measurement of another artifact, named.
+  const elsewhere = rows
+    .filter((r) => r.in_db && r.version_match !== 'same')
+    .map((r) => {
+      const e = budget.estimateServer({
+        name: r.name,
+        dbEntry: db.tools.find((t) => t.name === r.db_entry) || null,
+        evalEntry: evals.get(r.db_entry) || null,
+      });
+      return e.tokens === null ? null : { ...e, measured_artifact: r.vault_artifact, installed_artifact: r.installed_artifact };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.tokens - a.tokens);
+
   return {
     ...summary,
     rows: estimates,
     heaviest: heaviest ? { ...heaviest, percent_of_context: share } : null,
     heavy: Boolean(share !== null && share >= HEAVY_SHARE),
+    measured_on_another_version: elsewhere,
   };
 }
 
@@ -200,10 +307,17 @@ function project({ cwd, db, installedRows }) {
  * default that failed on it would train people to pass --no-strict forever.
  */
 function verdict({ env, installedRows, auditFindings, strict }) {
-  const blocking = [];
-  const notable  = [];
+  const blocking   = [];   // something installed must not run  → 1
+  const notable    = [];   // worth knowing, not a blocker      → 1 only with --strict
+  const unanswered = [];   // a question we could not answer    → 2
 
-  for (const c of env.failed) blocking.push(`environment: ${c.check} — ${c.detail}`);
+  for (const c of env.failed) {
+    // A config file that exists but does not parse is not a failing
+    // environment, it is a question left unanswered. Doctor reports both as
+    // `fail`; only the parse failures belong in `unanswered`.
+    (/parse failed/i.test(c.detail) ? unanswered : blocking)
+      .push(`environment: ${c.check} — ${c.detail}`);
+  }
 
   // One line for all of them, not one line each: eleven near-identical rows
   // push the things that matter off the screen this command exists to fit.
@@ -213,21 +327,35 @@ function verdict({ env, installedRows, auditFindings, strict }) {
       + `so nothing here has checked ${unvetted.length === 1 ? 'it' : 'them'}: ${unvetted.slice(0, 8).join(', ')}`
       + (unvetted.length > 8 ? `, +${unvetted.length - 8}` : ''));
   }
+
   for (const r of installedRows) {
-    // A config we could not parse is not a config with nothing in it.
-    if (r.unreadable) { blocking.push(`${r.name}: host config could not be read — ${r.unreadable}`); continue; }
+    // A host config we could not read is not a host with nothing in it, and it
+    // is not a finding about anybody's server either — it is the reason this
+    // report is incomplete. Exit 2, because "nothing blocked" would be a claim
+    // about servers we never saw.
+    if (r.unreadable) {
+      unanswered.push(`${r.path || r.name}: host config could not be read — ${r.unreadable}`);
+      continue;
+    }
     if (!r.in_db) continue;
+    // Drift is a finding about *this host*, on every host — the audit below
+    // only reads Claude Code's two files, so without this a Cursor-only setup
+    // running an unpinned or superseded version came out clean.
+    if (r.version_match !== 'same') { notable.push(`${r.name}: ${r.tier_reason}`); continue; }
     if (r.tier === 'Deprecated') blocking.push(`${r.name}: ${r.tier_reason}`);
-    else if (r.stale.length) notable.push(`${r.name}: ${r.stale.length} claim(s) past their shelf life (${r.stale.join(', ')})`);
+    else if (r.stale && r.stale.length) notable.push(`${r.name}: ${r.stale.length} claim(s) past their shelf life (${r.stale.join(', ')})`);
   }
 
   for (const f of auditFindings) {
+    if (!auditSetup.STRICT_CATEGORIES.has(f.category)) continue;
     const line = `${f.server}: ${f.message}`;
-    if (auditSetup.STRICT_CATEGORIES.has(f.category)) notable.push(line);
+    // The drift loop above already said it, for every host rather than two.
+    if (f.category === 'drift' && installedRows.some((r) => r.name === f.server && r.version_match !== 'same')) continue;
+    if (!notable.includes(line)) notable.push(line);
   }
 
-  const code = blocking.length ? 1 : (strict && notable.length ? 1 : 0);
-  return { blocking, notable, exit_code: code };
+  const code = unanswered.length ? 2 : (blocking.length ? 1 : (strict && notable.length ? 1 : 0));
+  return { blocking, notable, unanswered, exit_code: code };
 }
 
 // ── report ──────────────────────────────────────────────────────────────────
@@ -245,22 +373,25 @@ function printReport(r) {
   for (const f of r.environment.failed) out(`${' '.repeat(16)}${RD}✗ ${f.check}${RS} ${f.detail}\n`);
 
   // 2. installed
-  const inDb   = r.installed.filter((x) => x.in_db);
-  const unknown = r.installed.length - inDb.length;
-  if (!r.installed.length) {
+  const readable = r.installed.filter((x) => !x.unreadable);
+  const matched  = readable.filter((x) => x.in_db && x.version_match === 'same');
+  const drifted  = readable.filter((x) => x.in_db && x.version_match !== 'same');
+  const unvetted = readable.filter((x) => !x.in_db);
+  if (!readable.length) {
     out(`${label('Installed')}${DM}no MCP servers configured in any host this can read${RS}\n`);
   } else {
-    out(`${label('Installed')}${r.installed.length} server${r.installed.length === 1 ? '' : 's'}`
-      + ` ${DM}·${RS} ${inDb.length} in the vault DB`
-      + (unknown ? ` ${DM}·${RS} ${YL}${unknown} unvetted${RS}` : '') + '\n');
+    out(`${label('Installed')}${readable.length} server${readable.length === 1 ? '' : 's'}`
+      + ` ${DM}·${RS} ${matched.length} matched in the vault DB`
+      + (drifted.length ? ` ${DM}·${RS} ${YL}${drifted.length} on another version${RS}` : '')
+      + (unvetted.length ? ` ${DM}·${RS} ${YL}${unvetted.length} unvetted${RS}` : '') + '\n');
     const tiers = {};
-    for (const x of inDb) tiers[x.tier] = (tiers[x.tier] || 0) + 1;
+    for (const x of matched) tiers[x.tier] = (tiers[x.tier] || 0) + 1;
     const tierLine = Object.entries(tiers).map(([t, n]) => `${n} ${t}`).join(' · ');
     if (tierLine) out(`${' '.repeat(16)}${DM}${tierLine}${RS}\n`);
   }
 
   // 3. evidence — with its date, never implying it was checked just now
-  const dates = r.installed.map((x) => x.oldest_evidence).filter(Boolean).sort();
+  const dates = matched.map((x) => x.oldest_evidence).filter(Boolean).sort();
   if (dates.length) {
     out(`${label('Evidence')}oldest claim ${dates[0]} ${DM}(stored; nothing was re-checked just now)${RS}\n`);
   }
@@ -275,6 +406,11 @@ function printReport(r) {
       out(`${' '.repeat(16)}${YL}${c.heaviest.name}${RS} alone is ${c.heaviest.percent_of_context}%`
         + ` ${DM}(${c.heaviest.tools} tools, ${c.heaviest.source}) — scope it with --toolsets or allowedTools${RS}\n`);
     }
+    const big = (c.measured_on_another_version || [])[0];
+    if (big) {
+      out(`${' '.repeat(16)}${DM}not counted: ${big.name} listed ${big.tools} tools (~${big.tokens.toLocaleString('en-US')})`
+        + ` when we measured ${big.measured_artifact}, but this host launches ${big.installed_artifact}${RS}\n`);
+    }
   }
 
   // 5. this project
@@ -288,6 +424,11 @@ function printReport(r) {
     + suggestion + '\n');
 
   // findings
+  if (r.verdict.unanswered.length) {
+    out(`\n${YL}${B}Could not answer${RS}\n`);
+    for (const line of r.verdict.unanswered) out(`  ${YL}?${RS} ${line}\n`);
+    out(`  ${DM}so "nothing blocked" below is not a claim about whatever is in there${RS}\n`);
+  }
   if (r.verdict.blocking.length) {
     out(`\n${RD}${B}Blocking${RS}\n`);
     for (const line of r.verdict.blocking) out(`  ${RD}✗${RS} ${line}\n`);
@@ -297,7 +438,7 @@ function printReport(r) {
     for (const line of r.verdict.notable.slice(0, 6)) out(`  ${YL}!${RS} ${line}\n`);
     if (r.verdict.notable.length > 6) out(`  ${DM}…and ${r.verdict.notable.length - 6} more (mcp-vault audit)${RS}\n`);
   }
-  if (!r.verdict.blocking.length && !r.verdict.notable.length) {
+  if (!r.verdict.blocking.length && !r.verdict.notable.length && !r.verdict.unanswered.length) {
     out(`\n${GN}Nothing blocked, nothing drifted.${RS}\n`);
   }
 
@@ -315,6 +456,15 @@ function main(argv) {
   const opts = parseArgs(argv);
   if (opts.error) { process.stderr.write(`status: ${opts.error}\n\n${HELP}`); return 2; }
   if (opts.help)  { process.stdout.write(HELP); return 0; }
+
+  // A `--cwd` that does not exist is not a project with no signals in it.
+  // Every block below would have reported cheerfully on nothing.
+  try {
+    if (!fs.statSync(opts.cwd).isDirectory()) throw new Error('not a directory');
+  } catch (e) {
+    process.stderr.write(`status: cannot read ${opts.cwd}: ${e.message}\n`);
+    return 2;
+  }
 
   const db = readJson(DB_PATH);
   if (!db || !Array.isArray(db.tools)) {

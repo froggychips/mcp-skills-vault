@@ -234,7 +234,9 @@ function main() {
       'Usage: node calculate_health.cjs <stars> <last_commit_days> <has_install_cmd> <critical_issues>\n' +
       'Run with --help for details.'
     );
-    process.exit(1);
+    // 2, not 1: exit 1 means "answered, and there is a finding". A usage
+    // error answered nothing. docs/COMPATIBILITY.md promises this.
+    process.exit(2);
   }
 
   const stars          = parseInt(args[0], 10);
@@ -245,15 +247,15 @@ function main() {
 
   if (isNaN(stars) || stars < 0) {
     console.error('Error: <stars> must be a non-negative integer.');
-    process.exit(1);
+    process.exit(2);
   }
   if (isNaN(lastCommitDays) || lastCommitDays < 0) {
     console.error('Error: <last_commit_days> must be a non-negative integer.');
-    process.exit(1);
+    process.exit(2);
   }
   if (isNaN(criticalIssues) || criticalIssues < 0) {
     console.error('Error: <critical_issues> must be a non-negative integer.');
-    process.exit(1);
+    process.exit(2);
   }
 
   const result = calculateHealth({ stars, lastCommitDays, hasInstallCmd, criticalIssues, license });
