@@ -104,13 +104,101 @@ function runGate(name, cwd) {
 }
 
 /**
+ * The policy rules that normally read a gate's findings, answered from stored
+ * evidence instead — with `unknown` where the evidence is silent.
+ *
+ * Each rule has three possible answers and they are different claims:
+ *   allow    the evidence establishes what the policy asks for
+ *   deny     the evidence establishes the opposite
+ *   unknown  nothing has been recorded about it; run `--verify`
+ *
+ * The middle one is the reason this function exists. `evaluateEntry` decides
+ * from the *absence* of a finding, which is correct when a gate has just run
+ * and wrong when no gate ran at all.
+ */
+function policyFromEvidence(policy, tool, evidence) {
+  const dims = (evidence && evidence.dimensions) || {};
+  const out = [];
+  const isNpm = /^npx\s/.test(tool.install_cmd || '');
+  const isDocker = /^docker\s+run/.test(tool.install_cmd || '');
+
+  const three = (rule, dim, { ok, bad, require: required, message }) => {
+    const value = dims[dim];
+    if (!value) {
+      if (!required) return;
+      out.push({ rule, outcome: 'unknown', detail: `${dim} has never been checked — run with --verify` });
+      return;
+    }
+    if (ok.includes(value.status)) {
+      out.push({ rule, outcome: 'allow', detail: `${dim}: ${value.status} (as of ${value.verified_at || value.checked_at})` });
+      return;
+    }
+    if (bad.includes(value.status)) {
+      out.push({ rule, outcome: required ? 'deny' : 'warn', detail: message(value) });
+      return;
+    }
+    out.push({ rule, outcome: 'unknown', detail: `${dim} is "${value.status}", which this rule cannot judge — run with --verify` });
+  };
+
+  if (isNpm) {
+    three('policy/signatures', 'signature', {
+      ok: ['verified'], bad: ['absent', 'mismatch'],
+      require: policy.signatures === 'require',
+      message: (v) => (v.status === 'mismatch'
+        ? 'the registry signature does not verify'
+        : 'the registry published no signature for this version'),
+    });
+    three('policy/provenance', 'provenance', {
+      ok: ['bound', 'claimed'], bad: ['absent', 'unreadable', 'mismatch'],
+      require: policy.provenance === 'require' || policy.provenance === 'bound',
+      message: (v) => `provenance is ${v.status}`,
+    });
+    // The stricter bar asks for a binding, so a mere claim does not clear it.
+    if (policy.provenance === 'bound' && dims.provenance && dims.provenance.status === 'claimed') {
+      out.push({ rule: 'policy/provenance', outcome: 'deny', detail: 'policy requires provenance bound to the artifact digest; this one is only claimed' });
+    }
+  }
+
+  three('policy/dependency-hooks', 'dependencies', {
+    ok: ['clean'], bad: ['hooks'],
+    require: policy.dependencyHooks === 'fail',
+    message: () => 'a dependency runs install-time scripts',
+  });
+  three('policy/dependency-advisories', 'dependencies', {
+    ok: ['clean', 'hooks'], bad: ['advisories-present'],
+    require: policy.dependencyAdvisories === 'fail',
+    message: () => 'an advisory affects a package in the dependency tree',
+  });
+  three('policy/unverified', 'artifact', {
+    ok: ['verified'], bad: ['unverified', 'mismatch'],
+    require: policy.unverified === 'fail',
+    message: (v) => (v.status === 'mismatch'
+      ? 'the artifact does not match its pin'
+      : 'nothing about this artifact could be verified'),
+  });
+
+  // The package's own install hooks are not an evidence dimension: only a gate
+  // run sees them. Saying so beats guessing either way.
+  if (policy.installHooks === 'fail') {
+    out.push({ rule: 'policy/install-hooks', outcome: 'unknown', detail: 'whether this package runs install-time scripts is only visible to a gate run — use --verify' });
+  }
+  if (isDocker && policy.docker === 'digest') {
+    const pinned = /@sha256:[a-f0-9]{64}(\s|$)/.test(tool.install_cmd || '');
+    out.push(pinned
+      ? { rule: 'policy/docker-digest', outcome: 'allow', detail: 'the image is pinned by @sha256 digest' }
+      : { rule: 'policy/docker-digest', outcome: 'deny', detail: 'container image is not pinned by digest' });
+  }
+  return out;
+}
+
+/**
  * The decision.
  *
  * Trust gates, policy rules refuse, behaviour and budget advise. Kept as an
  * ordered list of *rules with outcomes* rather than a single boolean, because
  * the useful part of a denial is which rule denied it.
  */
-function decide({ tool, policy, gateEntry, trust, behav, budget }) {
+function decide({ tool, policy, gateEntry, trust, behav, budget, evidence = null }) {
   const rules = [];
   const add = (rule, outcome, detail) => rules.push({ rule, outcome, detail });
 
@@ -130,8 +218,32 @@ function decide({ tool, policy, gateEntry, trust, behav, budget }) {
   else add('trust/ok', 'allow', `artifact verified and nothing contradicts it (${trust.score}/100)`);
 
   // 2. Policy rules, from the file that applies to this directory.
-  const policyFindings = gateEntry ? evaluateEntry(gateEntry, policy, tool) : evaluateEntry({ status: 'SKIP', findings: [], install_cmd: tool.install_cmd }, policy, tool);
-  for (const f of policyFindings) add(f.rule, f.level === 'fail' ? 'deny' : 'warn', f.message);
+  //
+  // Without a live gate there are no *findings* to judge, and handing
+  // `evaluateEntry` an empty list made it read "no SIG finding" as "no
+  // signature": `explain gitlab-mcp` denied on `policy/signatures` while the
+  // stored evidence said `signature: verified`, and the same command with
+  // `--verify` did not. A check that did not run had produced a finding — the
+  // usual bug, pointing the other way.
+  //
+  // So the rules that depend on gate findings are answered from the evidence
+  // when it exists, and reported as `unknown` when it does not. `unknown` never
+  // blocks: it is an invitation to run `--verify`, not a verdict.
+  if (gateEntry) {
+    for (const f of evaluateEntry(gateEntry, policy, tool)) {
+      add(f.rule, f.level === 'fail' ? 'deny' : 'warn', f.message);
+    }
+  } else {
+    for (const r of policyFromEvidence(policy, tool, evidence)) add(r.rule, r.outcome, r.detail);
+    // The rules that are properties of the entry rather than of a scan —
+    // licence lists, a health floor, accepted trust tiers — need no gate and
+    // are judged the same way in both paths.
+    const entryOnly = new Set(['policy/license', 'policy/health', 'policy/trust']);
+    for (const f of evaluateEntry({ status: 'SKIP', findings: [], install_cmd: tool.install_cmd }, policy, tool)) {
+      if (!entryOnly.has(f.rule)) continue;
+      add(f.rule, f.level === 'fail' ? 'deny' : 'warn', f.message);
+    }
+  }
 
   // 3. The live gate's own exit code, when we ran it.
   if (gateEntry && gateEntry.status === 'FAIL') add('gate/fail', 'deny', 'the integrity gate failed this entry');
@@ -151,9 +263,13 @@ function decide({ tool, policy, gateEntry, trust, behav, budget }) {
   }
 
   const denials = rules.filter((r) => r.outcome === 'deny');
+  const unknowns = rules.filter((r) => r.outcome === 'unknown');
   return {
     decision: denials.length ? 'deny' : 'allow',
     blocking: denials.map((r) => r.rule),
+    // Named separately so a caller can tell "allowed" from "allowed as far as
+    // anyone has looked".
+    unevaluated: unknowns.map((r) => r.rule),
     rules,
   };
 }
@@ -211,7 +327,7 @@ function main(argv) {
     ? (gate.report.entries || []).find((e) => e.name === tool.name) || null
     : null;
 
-  const verdict = decide({ tool, policy, gateEntry, trust, behav, budget });
+  const verdict = decide({ tool, policy, gateEntry, trust, behav, budget, evidence });
   const fit = null;   // fit is about a project's stack; `scan` is where that question lives
 
   const record = {
@@ -226,6 +342,7 @@ function main(argv) {
     decision: verdict.decision,
     blocking: verdict.blocking,
     rules:    verdict.rules,
+    unevaluated: verdict.unevaluated,
     policy: {
       path:   loaded.path,
       found:  loaded.found,
@@ -309,13 +426,16 @@ function main(argv) {
 
   process.stdout.write('\nRules:\n');
   for (const r of verdict.rules) {
-    const colour = r.outcome === 'deny' ? RD : (r.outcome === 'warn' ? YL : GN);
-    const mark   = r.outcome === 'deny' ? '✗' : (r.outcome === 'warn' ? '!' : '✓');
+    const colour = r.outcome === 'deny' ? RD : (r.outcome === 'warn' ? YL : (r.outcome === 'unknown' ? DM : GN));
+    const mark   = r.outcome === 'deny' ? '✗' : (r.outcome === 'warn' ? '!' : (r.outcome === 'unknown' ? '·' : '✓'));
     process.stdout.write(`  ${colour}${mark} ${r.rule.padEnd(30)}${RS} ${r.detail}\n`);
   }
 
   if (verdict.blocking.length) {
     process.stdout.write(`\n${RD}Blocking: ${verdict.blocking.join(', ')}${RS}\n`);
+  }
+  if (verdict.unevaluated.length) {
+    process.stdout.write(`${DM}Not evaluated without a gate run: ${verdict.unevaluated.join(', ')}${RS}\n`);
   }
   if (!record.live_gate.ran) {
     process.stdout.write(`\n${DM}This is the stored evidence, with the date each claim was established.\n`
@@ -329,4 +449,4 @@ if (require.main === module) {
   exitAfterFlush(main(process.argv.slice(2)));
 }
 
-module.exports = { parseArgs, decide, runGate };
+module.exports = { parseArgs, decide, runGate, policyFromEvidence };
