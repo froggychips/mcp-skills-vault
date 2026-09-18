@@ -40,10 +40,16 @@ Three consequences that are easy to get wrong, so they are written down:
   `lock`, `sbom`, `verify --installed`), and a test asserts it for each.
   `eval --installed` does the same but is not in that test, because asserting
   it would mean spawning servers. "No findings" would be a claim about servers nothing
-  ever saw. A real finding still outranks it, everywhere: `verify` exits `1`
-  for a hash mismatch and `status` exits `1` for a server that must not run,
-  even when another config was unreadable — a finding is more actionable than
-  an incomplete scope, and both are printed either way.
+  ever saw. A real finding still outranks it, everywhere and including a
+  `--strict` one: `verify` exits `1` for a hash mismatch, `status` for a
+  server that must not run, `audit --strict` for a version drift in a config
+  it *could* read, and `doctor` for an unsupported Node version — each even
+  when another config was unreadable. A finding is more actionable than an
+  incomplete scope, and both are printed either way.
+- A run where **nothing** could be attempted is `2`, not `0`: `eval` with no
+  launcher available for any selected entry, `identity` / `availability` /
+  `posture` when the registry answered for no entry, `eval --no-spawn` over a
+  snapshot it could not read. "No findings" over an empty set is not a result.
 - A registry that answered for **no** entry at all is `2`. "Nothing
   contradicts" is a statement about a comparison, and that comparison did not
   happen.

@@ -426,7 +426,14 @@ function artifactIdentity(tool, parsed, { launchedPinned = null } = {}) {
   // was not, so any path that skipped pinning — `_evalSpawn`, which a
   // submitted DB row can set, and `--installed` — kept an id it had not
   // earned. What survives is an id the launched command itself names, exactly.
-  const launched = contract ? toTypedEntry({ install_cmd: contract }) : null;
+  // Validated on the argv array, not on a joined string. A single argument
+  // containing a space — `['-y', 'pkg@1.0.0 something-else']` — rejoins into a
+  // command that parses as a clean pin while the process receives one token
+  // that is not that pin at all. A token with whitespace in it cannot be
+  // reconstructed, so it is refused rather than guessed at.
+  const tokens = parsed ? [parsed.command, ...(parsed.args || [])] : null;
+  const reconstructable = Boolean(tokens && tokens.every((t) => typeof t === 'string' && t.length && !/\s/.test(t)));
+  const launched = reconstructable ? toTypedEntry({ install_cmd: tokens.join(' ') }) : null;
   const launchedId = launched && isExactArtifact(launched.artifact)
     ? comparableArtifactId(launched.artifact)
     : null;
@@ -1161,7 +1168,15 @@ async function main() {
         // successful run wrote `smoke_unattributed` and a stale failing smoke
         // dimension survived it.
         const askedFor = (r.launched && r.launched.pinned_from) || launchedCmd;
-        const stillSameEntry = askedFor === tool.install_cmd && launchedDbVersion === tool.version;
+        // And the run has to have *named* an artifact. `identity.artifact_id`
+        // is the validated answer — it is null whenever the launch could not
+        // be tied to the entry's artifact — while `launched.install_cmd` is
+        // only what we intended to run: with `_evalSpawn` the two disagree,
+        // and the old predicates all passed, so a fake server's `pass` would
+        // have been filed under the real package.
+        const runIdentified = Boolean(r.identity && r.identity.artifact_id);
+        const stillSameEntry = runIdentified
+          && askedFor === tool.install_cmd && launchedDbVersion === tool.version;
         const launched = versionFromInstallCmd(launchedCmd);
         const attributable = stillSameEntry
           && launched !== null
@@ -1297,7 +1312,22 @@ async function main() {
     // is not evidence of anything, and failing a build on it would punish an
     // old snapshot rather than a changed server.
     || (opts.failUnexplainedDrift && unexplainedDrift.length > 0);
-  exitAfterFlush((opts.strict && (fail > 0 || skippedLauncher > 0 || incomplete)) || driftFails ? 1 : 0);
+  // A run where *nothing* could be attempted established nothing, and the
+  // CLI reserves 2 for that: the launcher was missing for every entry, or the
+  // sandbox was unavailable throughout. Default mode reported 0 for it — a
+  // clean smoke of no servers — and --strict reported 1, which reads as a
+  // finding about somebody's code. A real finding still outranks it.
+  const answered = newResults.filter((r) => r.status === 'pass' || r.status === 'fail').length;
+  const hard = (opts.strict && (fail > 0 || skippedLauncher > 0 || incomplete)) || driftFails;
+  if (hard) return exitAfterFlush(1);
+  if (picked.length > 0 && answered === 0) {
+    process.stderr.write(
+      `mcp_eval: none of the ${picked.length} selected entr${picked.length === 1 ? 'y' : 'ies'} could be run `
+      + `(${skippedLauncher} missing a launcher, ${sandboxUnavailable} with no sandbox) — nothing was established\n`,
+    );
+    return exitAfterFlush(2);
+  }
+  exitAfterFlush(0);
 }
 
 if (require.main === module) {

@@ -193,10 +193,16 @@ function main() {
   // — it is a question left unanswered, and the CLI's contract reserves 2 for
   // that (docs/COMPATIBILITY.md). `status` already routed these to 2 while
   // `doctor` reported the same input as 1.
+  //
+  // But a real failure outranks it, so the unreadable checks are excluded from
+  // the `fail` count *and* considered second: scheduling the 2 first meant an
+  // unsupported Node version was reported as "could not answer".
   const unreadable = result.checks.filter((c) => c.level === 'fail' && /parse failed|read failed/i.test(c.message));
-  if (unreadable.length) exitAfterFlush(2);
-  const hard = result.counts.fail > 0 || (args.strict && result.counts.warn > 0);
-  exitAfterFlush(hard ? 1 : 0);
+  const realFails  = result.counts.fail - unreadable.length;
+  const hard = realFails > 0 || (args.strict && result.counts.warn > 0);
+  if (hard) return exitAfterFlush(1);
+  if (unreadable.length) return exitAfterFlush(2);
+  exitAfterFlush(0);
 }
 
 if (require.main === module) main();

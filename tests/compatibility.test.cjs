@@ -151,3 +151,32 @@ test('the three exit codes are the ones the scripts actually document', () => {
   assert.deepEqual(offenders, [],
     `exit code 2 is documented as something other than "could not answer":\n${offenders.join('\n')}`);
 });
+
+test('a finding outranks an unreadable input, in every command that has both', () => {
+  // The document says so, and `status` was the only command that did it.
+  // `audit --strict` returned 2 for a definite version drift in a config it
+  // *could* read, because a second unreadable config took precedence — hiding
+  // the drift behind our own inability to read something else. `doctor`
+  // scheduled its 2 before considering an unsupported Node version.
+  const { spawnSync } = require('child_process');
+  const os = require('os');
+  const dir  = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-rank-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-rank-home-'));
+
+  // A readable project config with a drifted version…
+  fs.writeFileSync(path.join(dir, '.mcp.json'), JSON.stringify({
+    mcpServers: {
+      'mcp-server-filesystem': { command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem@0.0.1', '/tmp'] },
+    },
+  }));
+  // …and an unreadable global one.
+  fs.writeFileSync(path.join(home, '.claude.json'), '{ oops');
+
+  for (const [script, extra] of [['audit_setup.cjs', ['--strict']], ['status.cjs', ['--strict']]]) {
+    const r = spawnSync(process.execPath, [path.join(SCRIPTS, script), ...extra, '--cwd', dir], {
+      encoding: 'utf8',
+      env: { ...process.env, HOME: home, NO_COLOR: '1' },
+    });
+    assert.equal(r.status, 1, `${script} returned ${r.status}: a finding must outrank an incomplete scope`);
+  }
+});

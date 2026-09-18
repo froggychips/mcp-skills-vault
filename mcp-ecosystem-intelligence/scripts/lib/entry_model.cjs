@@ -199,16 +199,23 @@ function normalizePypiName(name) {
  * PEP 440 normalisation, as far as two pins need it to compare equal.
  *
  * Trailing zero segments of the release are not significant (`1.0.27.0` ==
- * `1.0.27`), and neither are leading zeros anywhere a number appears —
- * `1.0rc01` == `1.0rc1`, `1.0+abc.01` == `1.0+abc.1`.
+ * `1.0.27`), and leading zeros in a *numeric* field are not either — so
+ * `1.0rc01` == `1.0rc1` and `1.0+abc.01` == `1.0+abc.1`.
  *
- * Leading zeros are stripped **textually**, never through `Number`:
- * `9007199254740993` and `9007199254740992` are different releases and both
- * round to the same double, so a numeric pass merged two versions that are not
- * the same. A version string is not a number.
+ * Two traps, both found by review:
+ *
+ *   - **Never through `Number`.** `9007199254740993` and `9007199254740992`
+ *     are different releases and both round to the same double, so a numeric
+ *     pass merged two versions that are not the same. A version string is not
+ *     a number; leading zeros come off textually.
+ *   - **Not every digit run is a number.** A local label's components are
+ *     compared numerically only when they are *entirely* digits; one
+ *     containing a letter is compared as a string. Stripping zeros from every
+ *     `\d+` made `1.0+abc01` equal `1.0+abc1`, and they are distinct versions.
+ *     https://packaging.python.org/en/latest/specifications/version-specifiers/
  */
 function stripLeadingZeros(digits) {
-  const t = digits.replace(/^0+(?=\d)/, '');
+  const t = String(digits).replace(/^0+(?=\d)/, '');
   return t === '' ? '0' : t;
 }
 
@@ -216,12 +223,27 @@ function normalizePypiVersion(version) {
   const v = String(version).trim().toLowerCase();
   const m = /^(\d+(?:\.\d+)*)(.*)$/.exec(v);
   if (!m) return v;
+
   const release = m[1].split('.').map(stripLeadingZeros);
   while (release.length > 1 && release[release.length - 1] === '0') release.pop();
-  // Every remaining run of digits — in `rc01`, `.post007`, `.dev01` and each
-  // dot-separated part of a local label — normalises the same way.
-  const rest = m[2].replace(/\d+/g, stripLeadingZeros);
-  return release.join('.') + rest;
+
+  // Split the suffix at the local label: everything before it is made of
+  // purely numeric fields, everything after is component-wise.
+  const suffix = m[2];
+  const plus = suffix.indexOf('+');
+  const pre  = plus === -1 ? suffix : suffix.slice(0, plus);
+  const local = plus === -1 ? null : suffix.slice(plus + 1);
+
+  // a1 / b1 / rc1 / .post1 / .dev1 — the digits here are always a number.
+  const preNorm = pre.replace(/(a|b|rc|post|dev)(\d+)/g, (_, kind, n) => `${kind}${stripLeadingZeros(n)}`);
+
+  const localNorm = local === null ? '' : `+${local.split('.')
+    // Only an all-digit component is numeric; `abc01` is a string and keeps
+    // its zero.
+    .map((part) => (/^\d+$/.test(part) ? stripLeadingZeros(part) : part))
+    .join('.')}`;
+
+  return release.join('.') + preNorm + localNorm;
 }
 
 function packageKey(artifact) {

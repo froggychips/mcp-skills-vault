@@ -16,8 +16,15 @@
  *
  * So the tier answers the question a reader is actually asking:
  *
- *   Core          the artifact is verified, the evidence is about *these*
- *                 bytes, and a run bound to these bytes started and listed tools
+ *   Core          the artifact is verified, the evidence is about this
+ *                 artifact, and a run of *that pinned reference* started and
+ *                 listed tools. Deliberately narrower than "these bytes": the
+ *                 eval launches `pkg@1.2.3` and does not re-hash what the
+ *                 registry handed it, so a configured index could serve
+ *                 something else under that name — for npm and PyPI alike.
+ *                 Core says the reference was pinned, verified, and seen to
+ *                 run; `artifact` says the bytes at that reference matched
+ *                 their hash when the gate last fetched them.
  *   Recommended   the artifact is verified and current; either nothing has
  *                 watched it run, or what watched it cannot be tied to this
  *                 artifact

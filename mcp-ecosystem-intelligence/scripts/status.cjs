@@ -422,8 +422,12 @@ function verdict({ env, installedRows, auditFindings, auditUnreadable = [], stri
 
   // A finding outranks an incomplete scope: "one of your servers must not run"
   // is more actionable than "one of your configs would not parse", and
-  // docs/COMPATIBILITY.md says so. Both are printed either way.
-  const code = blocking.length ? 1 : (unanswered.length ? 2 : (strict && notable.length ? 1 : 0));
+  // docs/COMPATIBILITY.md says so. That includes a --strict finding, because
+  // the reader asked to be told about those — and because `audit --strict`
+  // answers the same input the same way. Everything is printed either way.
+  const code = blocking.length ? 1
+    : (strict && notable.length ? 1
+      : (unanswered.length ? 2 : 0));
   return { blocking, notable, unanswered, exit_code: code };
 }
 

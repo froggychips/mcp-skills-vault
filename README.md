@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@froggychips/mcp-vault.svg)](https://www.npmjs.com/package/@froggychips/mcp-vault)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Zero deps](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](./PHILOSOPHY.md)
-[![Tests](https://img.shields.io/badge/tests-781%20pass-brightgreen.svg)](./tests)
+[![Tests](https://img.shields.io/badge/tests-783%20pass-brightgreen.svg)](./tests)
 
 **Homepage:** [mcp.froggychips.xyz](https://mcp.froggychips.xyz) · **npm:** [`@froggychips/mcp-vault`](https://www.npmjs.com/package/@froggychips/mcp-vault)
 
@@ -744,7 +744,7 @@ threshold on `health_score`:
 
 | Tier | What was established |
 |---|---|
-| Core | the artifact is verified, the evidence is about *these* bytes, and a run **bound to these bytes** started and listed tools |
+| Core | the artifact is verified, the evidence is about this artifact, and a run of **that pinned reference** started and listed tools |
 | Recommended | the artifact is verified and current; either nothing watched it run, or what watched it cannot be tied to this artifact |
 | Experimental | too little is known — a required check never happened, a claim aged out, or the stored evidence is about a different artifact than this entry now installs |
 | Deprecated | do not install — and only for what the trust gate blocks on: nothing to install, bytes that are not the bytes we verified, or an advisory against this version |
@@ -761,6 +761,13 @@ version lives in `version`, and `install` pins it on the way out). So a run of
 pins before launching, and an entry it cannot pin records no artifact id at
 all. The next weekly run fills the field truthfully and Core comes back on its
 own; guessing in the meantime is the one thing this repository cannot do.
+
+`Core` is deliberately narrower than "we know these bytes ran". The eval
+launches `pkg@1.2.3` and does not re-hash what the registry handed it, so a
+configured index could serve something else under that name — true of npm and
+PyPI alike. Core says the reference was pinned, verified, and seen to run;
+`artifact` is the dimension that says the bytes at that reference matched their
+hash when the gate last fetched them.
 
 Behaviour promotes but never demotes. 59 verified entries did not complete a
 handshake, and the sandbox runs with an empty environment — `@azure/mcp`,

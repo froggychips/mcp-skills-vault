@@ -518,14 +518,16 @@ function main(argv) {
     printReport(findings, counts);
   }
 
-  // A config we could not read is not a clean config. 2, because "no findings"
-  // would be a claim about servers we never saw — the same rule `status` and
-  // `doctor` follow.
-  if (unreadable.length) {
-    for (const u of unreadable) process.stderr.write(`audit: ${u.path}: ${u.error}\n`);
-    return 2;
-  }
+  // Order matters, and it is stated in docs/COMPATIBILITY.md: a finding
+  // outranks an incomplete scope. A definite version drift in a config we
+  // *could* read is more actionable than a second config that would not
+  // parse, and returning 2 for it hid the drift behind our own inability to
+  // read something else. Both are reported either way.
+  for (const u of unreadable) process.stderr.write(`audit: ${u.path}: ${u.error}\n`);
   if (args.strict && findings.some(f => STRICT_CATEGORIES.has(f.category))) return 1;
+  // A config we could not read is still not a clean config: "no findings"
+  // would be a claim about servers we never saw.
+  if (unreadable.length) return 2;
   return 0;
 }
 

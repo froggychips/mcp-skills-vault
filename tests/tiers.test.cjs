@@ -316,3 +316,17 @@ test('an OCI digest has to look like one', () => {
   assert.equal(m.isExactArtifact({ ecosystem: 'oci', image: 'x', tag: 'latest' }), false);
   assert.equal(m.isExactArtifact({ ecosystem: 'git', source: 'git+https://x' }), false);
 });
+
+test('a local version label is not a bag of numbers', () => {
+  // The fix for `Number` overshot: stripping zeros from every run of digits
+  // made `1.0+abc01` equal `1.0+abc1`, and those are distinct versions. PEP
+  // 440 compares a local label component-wise, and only an *entirely* numeric
+  // component compares numerically.
+  const m = require('../mcp-ecosystem-intelligence/scripts/lib/entry_model.cjs');
+  for (const [a, b] of [['1.0+abc01', '1.0+abc1'], ['1.0+01abc', '1.0+1abc']]) {
+    assert.notEqual(m.normalizePypiVersion(a), m.normalizePypiVersion(b), `${a} vs ${b}`);
+  }
+  // A purely numeric component still folds.
+  assert.equal(m.normalizePypiVersion('1.0+abc.01'), m.normalizePypiVersion('1.0+abc.1'));
+  assert.equal(m.normalizePypiVersion('1.0+007'), m.normalizePypiVersion('1.0+7'));
+});
