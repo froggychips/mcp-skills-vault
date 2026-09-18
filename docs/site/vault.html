@@ -22,11 +22,13 @@
     <p class="lede">A deterministic registry + integrity scanner for MCP servers, so installing one stops feeling like <code>curl | bash</code>.</p>
 
     <h2>Install</h2>
-    <pre><code>npx -y @froggychips/mcp-vault scan --cwd ./my-project
-npx -y @froggychips/mcp-vault list
-npx -y @froggychips/mcp-vault audit --json
-npx -y @froggychips/mcp-vault verify --offline
-npx -y @froggychips/mcp-vault doctor</code></pre>
+    <p>One command. No network calls &mdash; every claim comes from evidence already on disk, with the date it was established.</p>
+    <pre><code>npx -y @froggychips/mcp-vault status</code></pre>
+    <p>Then, when you want a live answer or more detail:</p>
+    <pre><code>npx -y @froggychips/mcp-vault verify --installed   # re-hash what your hosts launch
+npx -y @froggychips/mcp-vault explain &lt;name&gt;      # why one entry is allowed or denied
+npx -y @froggychips/mcp-vault scan --cwd ./my-project
+npx -y @froggychips/mcp-vault audit --strict</code></pre>
 
     <h2>What this does NOT do</h2>
     <ul>
@@ -44,8 +46,8 @@ npx -y @froggychips/mcp-vault doctor</code></pre>
     "infra": ["kubernetes", "teamcity", "atlassian"]
   },
   "recommended": [
-    { "name": "mcp-server-neon", "classification": "Core", "health_score": 105 },
-    { "name": "teamcity-mcp", "classification": "Recommended", "health_score": 65 }
+    { "name": "mcp-server-neon", "classification": "Core", "tier_reason": "starts and lists 10 tools", "health_score": 80 },
+    { "name": "teamcity-mcp", "classification": "Recommended", "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)", "health_score": 65 }
   ],
   "heavy": [
     { "name": "mcp-atlassian", "est_tools_count": 72 }

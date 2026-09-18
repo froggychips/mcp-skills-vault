@@ -104,14 +104,95 @@ function dockerDigestPinned(ref) {
 //   npm:  semver, three components, optional pre-release/build
 //   PyPI: PEP 440 release segment, optional pre/post/dev/local
 const EXACT_NPM_VERSION  = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
-const EXACT_PYPI_VERSION = /^\d+(?:\.\d+)*(?:(?:a|b|rc)\d+)?(?:\.post\d+)?(?:\.dev\d+)?(?:\+[0-9A-Za-z.]+)?$/;
+// A local segment is `+` followed by dot-separated alphanumerics, each part
+// non-empty: `1.0+.` and `1.0+..` were accepted, and neither is a version.
+const EXACT_PYPI_VERSION = /^\d+(?:\.\d+)*(?:(?:a|b|rc)\d+)?(?:\.post\d+)?(?:\.dev\d+)?(?:\+[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$/;
 
 function isExactVersion(runner, version) {
   if (typeof version !== 'string' || !version) return false;
   return runner === 'npx' ? EXACT_NPM_VERSION.test(version) : EXACT_PYPI_VERSION.test(version);
 }
 
+
+// Pin the package token of an install command to the version the DB records —
+// and that verify_integrity actually hashed.
+//
+// Most DB entries store the command unpinned (`npx -y @scope/mcp-server`) with
+// the checked version in a separate `version` field. Copying that command into
+// .mcp.json verbatim means npx resolves `latest` every time the server starts:
+// the artifact that runs is not the artifact whose sha512 the gate compared, so
+// a compromised release published after our last refresh installs itself
+// silently. Synthesise the pin instead.
+//
+// Returns { parts, pinned, reason } — `parts` is the argv-style token list.
+//
+// "Pinned" means: the launch command names the exact version the gate verified.
+// A command that already carries *some* specifier is not automatically fine —
+// `pkg@latest`, `pkg@^1.2` and a stale `pkg@1.0.0` all launch something other
+// than the artifact whose hash was compared, so they get rewritten to the DB's
+// version rather than trusted.
+function pinInstallCmd(cmd, version) {
+  const raw    = String(cmd).trim();
+  const parts  = raw.split(/\s+/);
+  const runner = parts[0];
+
+  if (runner === 'docker') {
+    // The image is the first non-flag token; a digest sitting in some other
+    // argument (`-e REF=img@sha256:…`) is not a pin on the image that runs.
+    const ref = dockerImageRef(raw);
+    if (!ref) return { parts, pinned: false, reason: 'cannot parse the docker image reference' };
+    const ok = dockerDigestPinned(ref);
+    return { parts, pinned: ok, reason: ok ? null : `docker image ${ref} is not pinned by @sha256 digest` };
+  }
+
+  if (runner !== 'npx' && runner !== 'uvx') {
+    return { parts, pinned: false, reason: `unknown runner "${runner}" — cannot pin` };
+  }
+
+  // Resolve the package with the gate's own parser: a command shaped in a way
+  // the gate declines to check (flags before the package, --package, uvx
+  // --from/--with) must not be pinnable here either.
+  const pkg = runner === 'npx' ? npmPkgName(raw) : pypiPkgName(raw);
+  if (!pkg) {
+    return {
+      parts, pinned: false,
+      reason: runner === 'npx'
+        ? 'not a plain `npx -y <pkg>` command — the gate cannot check it either'
+        : 'not a plain `uvx <pkg>` command (--from / --with / flags) — the gate cannot check it either',
+    };
+  }
+
+  const sep = runner === 'npx' ? '@' : '==';
+  const idx = parts.findIndex((p) => p === pkg || p.startsWith(pkg + sep));
+  if (idx === -1) return { parts, pinned: false, reason: 'cannot locate the package token in install_cmd' };
+
+  const current = parts[idx] === pkg ? null : parts[idx].slice(pkg.length + sep.length);
+
+  if (!version) {
+    return {
+      parts, pinned: false,
+      reason: current
+        ? `install_cmd asks for "${current}", but the DB entry has no verified \`version\` — run verify_integrity.cjs --update`
+        : 'no `version` in the DB entry — run verify_integrity.cjs --update',
+    };
+  }
+  if (!isExactVersion(runner, version)) {
+    return {
+      parts, pinned: false,
+      reason: `DB version "${version}" is not an exact ${runner === 'npx' ? 'semver' : 'PEP 440'} version — a range is not a pin`,
+    };
+  }
+  if (current === version) return { parts, pinned: true, reason: null };
+
+  // Unpinned, or pinned to something the gate did not verify: rewrite it.
+  const pinnedParts = [...parts];
+  pinnedParts[idx] = `${pkg}${sep}${version}`;
+  return { parts: pinnedParts, pinned: true, reason: null };
+}
+
+
 module.exports = {
+  pinInstallCmd,
   isExactVersion,
   EXACT_NPM_VERSION,
   EXACT_PYPI_VERSION,

@@ -104,7 +104,7 @@ function isExactVersion(installCmd, version) {
   if (/^npx\s/.test(String(installCmd))) return /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version);
   return /^\d+(?:\.\d+)*(?:(?:a|b|rc)\d+)?(?:\.post\d+)?(?:\.dev\d+)?(?:\+[0-9A-Za-z.]+)?$/.test(version);
 }
-const { dockerImageRef, npmPkgName, pypiPkgName } = require('./lib/install_cmd.cjs');
+const { dockerImageRef, npmPkgName, pypiPkgName , pinInstallCmd } = require('./lib/install_cmd.cjs');
 
 // Which version a launch command actually asks for; null means it resolves at
 // launch time, so no result can be attributed to a specific release.
@@ -129,7 +129,7 @@ function versionFromInstallCmd(cmd) {
 }
 const { readDb, writeDb } = require('./lib/db_io.cjs');
 const crypto = require('crypto');
-const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
+const { toTypedEntry, artifactId, comparableArtifactId, isExactArtifact } = require('./lib/entry_model.cjs');
 const { smokeEvidence, mergeEvidence } = require('./lib/evidence.cjs');
 const { fingerprintTools, diffSurface, describeDiff, isEmpty: surfaceUnchanged } = require('./lib/surface.cjs');
 const stdio         = require('./lib/mcp_stdio.cjs'); // shared framing + sandbox + classifier (vendored, zero-dep)
@@ -418,14 +418,44 @@ function waitForExitOrTimeout(child, ms, isExited) {
  * a missing field is `unknown`, which is the third answer this repo insists on
  * having.
  */
-function artifactIdentity(tool, parsed) {
+function artifactIdentity(tool, parsed, { launchedPinned = null } = {}) {
   const typed = toTypedEntry(tool);
   const contract = parsed ? `${parsed.command} ${(parsed.args || []).join(' ')}`.trim() : null;
+  // Affirmative validation against the *actual* launch, rather than trust in a
+  // flag the caller passed. `launchedPinned === false` was cleared and `null`
+  // was not, so any path that skipped pinning — `_evalSpawn`, which a
+  // submitted DB row can set, and `--installed` — kept an id it had not
+  // earned. What survives is an id the launched command itself names, exactly.
+  // Validated on the argv array, not on a joined string. A single argument
+  // containing a space — `['-y', 'pkg@1.0.0 something-else']` — rejoins into a
+  // command that parses as a clean pin while the process receives one token
+  // that is not that pin at all. A token with whitespace in it cannot be
+  // reconstructed, so it is refused rather than guessed at.
+  const tokens = parsed ? [parsed.command, ...(parsed.args || [])] : null;
+  const reconstructable = Boolean(tokens && tokens.every((t) => typeof t === 'string' && t.length && !/\s/.test(t)));
+  const launched = reconstructable ? toTypedEntry({ install_cmd: tokens.join(' ') }) : null;
+  const launchedId = launched && isExactArtifact(launched.artifact)
+    ? comparableArtifactId(launched.artifact)
+    : null;
+  const claimedId = typed ? comparableArtifactId(typed.artifact) : null;
+  const attributable = Boolean(launchedId && claimedId && launchedId === claimedId);
+  // `artifact_id` says *which artifact this run was about*, and a run that
+  // launched an unpinned command was about whatever the registry served at
+  // start-up. 80 of the DB's 114 entries ship an unpinned `install_cmd` — the
+  // verified version lives in the `version` field and `install` pins it on the
+  // way out — so reading the id off `toTypedEntry` recorded `npm:pkg@1.0.0`
+  // for a run of `npx -y pkg`. Consumers then attributed the result to bytes
+  // nobody had pinned. `null` is the honest answer, and the tier treats a null
+  // identity as unattributable rather than as a pass.
+  const id = typed ? artifactId(typed.artifact) : null;
   return {
-    artifact_id:        typed ? artifactId(typed.artifact) : null,
+    artifact_id:        attributable ? id : null,
     artifact_integrity: tool.pkg_integrity || null,
     db_version:         tool.version || null,
     launch_digest:      contract ? crypto.createHash('sha256').update(contract).digest('hex').slice(0, 32) : null,
+    // What was actually launched, so a reader can see why an id is absent.
+    launch_pinned:      launchedPinned,
+    launched_artifact:  launchedId,
   };
 }
 
@@ -525,6 +555,7 @@ async function smokeEntry(tool, opts) {
     surface_drift:    null,
     // What ran, as comparable fields; the baseline a later run diffs against.
     identity:         null,
+    tools_truncated:  null,      // unknown until a tools/list actually answers
     tool_count_db:    typeof tool.est_tools_count === 'number' ? tool.est_tools_count : null,
     tool_count_drift: false,
     schema_errors:    [],
@@ -545,7 +576,28 @@ async function smokeEntry(tool, opts) {
     install_cmd: tool.install_cmd || null,
     db_version:  tool.version || null,
   };
-  const parsed = tool._evalSpawn || parseInstallCmd(tool.install_cmd);
+  // Pin before launching, so the run is about the artifact the gate verified
+  // rather than about whatever the registry serves this minute. An entry that
+  // cannot be pinned (a git source, a shape the gate declines to parse) is
+  // still smoked — a handshake is worth knowing — but the run carries no
+  // artifact id, because nothing can name what it launched.
+  let toLaunch = tool;
+  let launchedPinned = null;
+  if (!tool._evalSpawn && typeof tool.install_cmd === 'string') {
+    const pin = pinInstallCmd(tool.install_cmd, tool.version);
+    launchedPinned = pin.pinned;
+    if (pin.pinned) {
+      const pinnedCmd = pin.parts.join(' ');
+      if (pinnedCmd !== tool.install_cmd) {
+        toLaunch = { ...tool, install_cmd: pinnedCmd };
+        result.launched.install_cmd = pinnedCmd;
+        result.launched.pinned_from = tool.install_cmd;
+      }
+    } else {
+      result.launched.unpinned_reason = pin.reason || null;
+    }
+  }
+  const parsed = toLaunch._evalSpawn || parseInstallCmd(toLaunch.install_cmd);
   // The identity of what is about to run, as fields rather than as a string.
   //
   // Comparing `install_cmd` text answered "did the entry's prose change", which
@@ -553,7 +605,7 @@ async function smokeEntry(tool, opts) {
   // and — worse — a snapshot that had dropped the field read as *no* artifact,
   // which made every later surface change look explained by a version bump.
   // See surfaceDrift().
-  result.identity = artifactIdentity(tool, parsed);
+  result.identity = artifactIdentity(toLaunch, parsed, { launchedPinned });
   if (!parsed) {
     result.error_code = 'unrecognized install method';
     return result;
@@ -698,10 +750,33 @@ async function smokeEntry(tool, opts) {
       throw new Error('tools/list error');
     }
 
-    const tools = (listResp && listResp.result && Array.isArray(listResp.result.tools))
+    // A response with no `tools` array is malformed, and falling back to `[]`
+    // invented a measurement: `result: {}` came out as a *passing* server with
+    // a complete list of zero tools. An empty array is different — one entry
+    // in this DB genuinely answers `tools: []` — so the two are kept apart.
+    const listed = listResp && listResp.result && Array.isArray(listResp.result.tools)
       ? listResp.result.tools
-      : [];
+      : null;
+    if (listed === null) {
+      result.status     = 'fail';
+      result.error_code = 'tools/list answered without a `tools` array';
+      result.failure_class = FAILURE_CLASS.PROTOCOL;
+      throw new Error('tools/list malformed');
+    }
+    const tools = listed;
     result.tool_count = tools.length;
+    // MCP paginates `tools/list`. This reads one page, so a server that
+    // returns a cursor has more tools than this count — and until now nothing
+    // downstream could tell a complete list from a first page. A 100-tool
+    // server answering with 10 and a cursor was recorded as a 10-tool server,
+    // which fed the token budget, the surface fingerprint and the
+    // heavy-surface audit alike.
+    //
+    // Recorded rather than followed: following the cursor changes what the
+    // smoke does and needs a live run to validate. What must not wait is the
+    // qualification, because a partial count presented as a total is the
+    // failure this project exists to prevent.
+    result.tools_truncated = Boolean(listResp && listResp.result && listResp.result.nextCursor);
     // The payload, not the count: what the server injects into the system
     // prompt is this JSON, so its size is the honest input to a token budget.
     try { result.tools_payload_bytes = Buffer.byteLength(JSON.stringify(tools)); } catch { /* keep null */ }
@@ -804,8 +879,10 @@ function pickTools(db, opts) {
  * spawn, and their tool surface costs context on the client's side only once
  * the client connects.
  */
-function pickInstalledTools(opts) {
-  const servers = readInstalledServers({ cwd: opts.cwd });
+function pickInstalledTools(opts, unreadable = null) {
+  // A host config we could not read is not a host with no servers in it.
+  // Collected so the caller can say so instead of quietly describing a subset.
+  const servers = readInstalledServers({ cwd: opts.cwd, onUnreadable: unreadable ? (loc) => unreadable.push(loc) : null });
   const wanted = opts.name ? servers.filter(s => s.name === opts.name || s.name.toLowerCase().includes(opts.name.toLowerCase())) : servers;
   return wanted
     .filter(s => !s.remote && s.command)
@@ -820,10 +897,27 @@ function pickInstalledTools(opts) {
 
 // ── Results file IO ────────────────────────────────────────────────────────
 
-function readResults(resultsPath) {
+/**
+ * @param require_  when true, a file that exists and cannot be read or parsed
+ *                  throws instead of yielding an empty snapshot. `--no-spawn`
+ *                  needs that: `entries: 0, malformed: 0` and exit 0 over an
+ *                  unreadable snapshot reads as a clean lint.
+ */
+function readResults(resultsPath, { require_ = false } = {}) {
+  let raw;
+  try { raw = fs.readFileSync(resultsPath, 'utf8'); }
+  catch (e) {
+    if (require_) throw new Error(`cannot read ${resultsPath}: ${e.code || e.message}`);
+    return { generated_at: null, generator: `mcp_eval.cjs v${VERSION}`, results: [] };
+  }
   try {
-    return JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
-  } catch {
+    const doc = JSON.parse(raw);
+    if (require_ && (!doc || typeof doc !== 'object' || !Array.isArray(doc.results))) {
+      throw new Error(`${resultsPath} has no \`results\` array`);
+    }
+    return doc;
+  } catch (e) {
+    if (require_) throw new Error(`cannot parse ${resultsPath}: ${e.message}`);
     return { generated_at: null, generator: `mcp_eval.cjs v${VERSION}`, results: [] };
   }
 }
@@ -885,11 +979,22 @@ async function main() {
 
   // --no-spawn: schema-lint over the existing results file. Offline-safe.
   if (opts.noSpawn) {
-    const existing = readResults(opts.results);
+    // A results file that is not there is not a results file with nothing
+    // wrong in it. `entries: 0, malformed: 0` and exit 0 read as a clean lint.
+    let existing;
+    try {
+      existing = readResults(opts.results, { require_: true });
+    } catch (e) {
+      // Missing, unreadable, or not a results document: all three established
+      // nothing, and 2 is the code for that.
+      process.stderr.write(`mcp_eval: ${e.message} — nothing to lint\n`);
+      return exitAfterFlush(2);
+    }
     const recheck  = noSpawnLint(existing);
     const malformed = recheck.filter(r => r.schema_errors_recheck.length > 0);
     if (opts.json) {
       process.stdout.write(JSON.stringify({
+        schema: 'mcp-vault/eval@1',
         mode: 'no-spawn',
         results_path: opts.results,
         entries: recheck.length,
@@ -922,7 +1027,14 @@ async function main() {
   // Live smoke.
   let picked;
   if (opts.installed) {
-    picked = pickInstalledTools(opts);
+    const unreadableConfigs = [];
+    picked = pickInstalledTools(opts, unreadableConfigs);
+    // Smoking an unknown subset of what runs, and reporting it as the set, is
+    // the same overstatement everywhere else in this CLI refuses to make.
+    if (unreadableConfigs.length) {
+      for (const u of unreadableConfigs) process.stderr.write(`mcp_eval: ${u.path}: ${u.error}\n`);
+      return exitAfterFlush(2);
+    }
     if (!picked.length) {
       process.stderr.write(`No local (non-remote) MCP servers configured for ${opts.cwd}\n`);
       process.exit(2);
@@ -1059,7 +1171,23 @@ async function main() {
         // otherwise file this result under a version that never started.
         const launchedCmd = (r.launched && r.launched.install_cmd) || tool.install_cmd;
         const launchedDbVersion = r.launched ? r.launched.db_version : tool.version;
-        const stillSameEntry = launchedCmd === tool.install_cmd && launchedDbVersion === tool.version;
+        // The command the *entry* asked for, which since pinning may differ
+        // from the one that ran: `npx -y pkg` is launched as `npx -y pkg@1.0.0`
+        // and `pinned_from` records the original. Comparing the launched
+        // command against `tool.install_cmd` made 78 of the shipped entries
+        // fail attribution for the sole reason that we had pinned them — so a
+        // successful run wrote `smoke_unattributed` and a stale failing smoke
+        // dimension survived it.
+        const askedFor = (r.launched && r.launched.pinned_from) || launchedCmd;
+        // And the run has to have *named* an artifact. `identity.artifact_id`
+        // is the validated answer — it is null whenever the launch could not
+        // be tied to the entry's artifact — while `launched.install_cmd` is
+        // only what we intended to run: with `_evalSpawn` the two disagree,
+        // and the old predicates all passed, so a fake server's `pass` would
+        // have been filed under the real package.
+        const runIdentified = Boolean(r.identity && r.identity.artifact_id);
+        const stillSameEntry = runIdentified
+          && askedFor === tool.install_cmd && launchedDbVersion === tool.version;
         const launched = versionFromInstallCmd(launchedCmd);
         const attributable = stillSameEntry
           && launched !== null
@@ -1126,6 +1254,7 @@ async function main() {
 
   if (opts.json) {
     process.stdout.write(JSON.stringify({
+      schema: 'mcp-vault/eval@1',
       mode: 'spawn',
       results_path: opts.results,
       checked: newResults.length,
@@ -1194,7 +1323,29 @@ async function main() {
     // is not evidence of anything, and failing a build on it would punish an
     // old snapshot rather than a changed server.
     || (opts.failUnexplainedDrift && unexplainedDrift.length > 0);
-  exitAfterFlush((opts.strict && (fail > 0 || skippedLauncher > 0 || incomplete)) || driftFails ? 1 : 0);
+  // A run where *nothing* could be attempted established nothing, and the
+  // CLI reserves 2 for that: the launcher was missing for every entry, or the
+  // sandbox was unavailable throughout. Default mode reported 0 for it — a
+  // clean smoke of no servers — and --strict reported 1, which reads as a
+  // finding about somebody's code. A real finding still outranks it.
+  const answered = newResults.filter((r) => r.status === 'pass' || r.status === 'fail').length;
+  // A genuine finding first — but `skippedLauncher` and `incomplete` are not
+  // findings about anybody's server, they are reasons this run established
+  // nothing. Counting them as `hard` made `--strict` answer 1 for a run that
+  // never started, which reads as a verdict on code nobody executed.
+  const hard = (opts.strict && fail > 0) || driftFails;
+  if (hard) return exitAfterFlush(1);
+  if (picked.length > 0 && answered === 0) {
+    process.stderr.write(
+      `mcp_eval: none of the ${picked.length} selected entr${picked.length === 1 ? 'y' : 'ies'} could be run `
+      + `(${skippedLauncher} missing a launcher, ${sandboxUnavailable} with no sandbox) — nothing was established\n`,
+    );
+    return exitAfterFlush(2);
+  }
+  // Something ran, and under --strict a partial run is still a failure to
+  // deliver what was asked for.
+  if (opts.strict && (skippedLauncher > 0 || incomplete)) return exitAfterFlush(1);
+  exitAfterFlush(0);
 }
 
 if (require.main === module) {

@@ -8,7 +8,6 @@ test('slimEntry keeps public registry fields only', () => {
   const out = g.slimEntry({
     name: 'x',
     category: 'database',
-    classification: 'Core',
     trust: 'verified',
     license: 'MIT',
     health_score: 100,
@@ -20,6 +19,7 @@ test('slimEntry keeps public registry fields only', () => {
   assert.deepEqual(Object.keys(out).sort(), [
     'category',
     'classification',
+    'tier_reason',
     'est_tools_count',
     'evidence',
     'health_score',
@@ -30,6 +30,10 @@ test('slimEntry keeps public registry fields only', () => {
     'source_url',
     'trust',
   ].sort());
+  // The tier is derived here, and an entry with no evidence cannot be Core no
+  // matter what a submitted row claims — the field is not read off the entry.
+  assert.equal(out.classification, 'Experimental');
+  assert.match(out.tier_reason, /no evidence recorded/);
   // The audit trail in `notes` stays internal.
   assert.equal(out.notes, undefined);
   // Nothing was checked for this entry, and the page says so rather than

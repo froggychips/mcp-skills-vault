@@ -14,7 +14,6 @@ const SCRIPT = path.resolve(__dirname, '../mcp-ecosystem-intelligence/scripts/ca
 const score = (over = {}) => h.calculateHealth({
   stars:           0,
   lastCommitDays:  9999,
-  inRegistry:      false,
   hasInstallCmd:   false,
   criticalIssues:  9999,
   license:         undefined,
@@ -77,11 +76,21 @@ test('recency: > 180 days → 0', () => {
   assert.equal(h.recencyBonusOf(9999), 0);
 });
 
-// ── registry / install / issues / license  (component flags) ──────────────
+// ── install / issues / license  (component flags) ─────────────────────────
 
-test('registry: in_registry=false adds 0; true adds 30', () => {
-  assert.equal(score({ inRegistry: false }).breakdown.registry, 0);
-  assert.equal(score({ inRegistry: true  }).breakdown.registry, 30);
+test('there is no registry term: being listed is measured, not assumed', () => {
+  // `+30 if in_registry` was a hand-set boolean that disagreed with the live
+  // registry for 26 of 114 entries, and at 30 points it outweighed every
+  // measured term put together. Whether an entry is listed is now established
+  // by check_identity.cjs, dated, and recorded as trust evidence.
+  const r = score({ hasInstallCmd: true });
+  assert.equal(r.breakdown.registry, undefined);
+  assert.ok(!('inRegistry' in h.calculateHealth), 'no registry input remains');
+  // And the maximum is 80, not 110.
+  const best = h.calculateHealth({
+    stars: 100000, lastCommitDays: 0, hasInstallCmd: true, criticalIssues: 0, license: 'MIT',
+  });
+  assert.equal(best.health_score, 80);
 });
 
 test('install_cmd: false adds 0; true adds 15', () => {
@@ -136,34 +145,22 @@ test('license: bare "GPL-3.0" (GitHub short SPDX) is OSI', () => {
 
 // ── classify tier mapping (boundaries) ─────────────────────────────────────
 
-test('classify: 85 → Core, 84.99 → Recommended', () => {
-  assert.equal(h.classify(85),    'Core');
-  assert.equal(h.classify(84.99), 'Recommended');
-});
-
-test('classify: 65 → Recommended, 64.99 → Experimental', () => {
-  assert.equal(h.classify(65),    'Recommended');
-  assert.equal(h.classify(64.99), 'Experimental');
-});
-
-test('classify: 40 → Experimental, 39.99 → Deprecated', () => {
-  assert.equal(h.classify(40),    'Experimental');
-  assert.equal(h.classify(39.99), 'Deprecated');
-});
-
-test('classify: edge values — 110 (max), 0, -10 (min)', () => {
-  assert.equal(h.classify(110), 'Core');
-  assert.equal(h.classify(0),   'Deprecated');
-  assert.equal(h.classify(-10), 'Deprecated');
+test('health names no tier', () => {
+  // Thresholds over this number were measured against the real DB: with the
+  // registry bonus gone, scores run 40–80 with a median of 75 and 91 of 114
+  // entries land in the top bucket, because a curated DB is popular and
+  // recent by construction. A label 80% of rows share is not a label, so the
+  // tier moved to lib/tiers.cjs and is derived from evidence.
+  assert.equal(h.classify, undefined);
+  assert.equal(score({ hasInstallCmd: true }).classification, undefined);
 });
 
 // ── integration: full end-to-end ───────────────────────────────────────────
 
-test('calculateHealth: full Core example (1200 stars / 15d / registry / install / MIT)', () => {
+test('calculateHealth: a well-kept project scores the maximum 80', () => {
   const r = h.calculateHealth({
     stars:          1200,
     lastCommitDays: 15,
-    inRegistry:     true,
     hasInstallCmd:  true,
     criticalIssues: 2,
     license:        'MIT',
@@ -171,32 +168,28 @@ test('calculateHealth: full Core example (1200 stars / 15d / registry / install 
   // popularity = min(20, 10·log10(1201)) = 20 (since log10(1201) ≈ 3.08)
   assert.equal(r.breakdown.popularity,  20);
   assert.equal(r.breakdown.recency,     40);
-  assert.equal(r.breakdown.registry,    30);
   assert.equal(r.breakdown.install_cmd, 15);
   assert.equal(r.breakdown.low_issues,  5);
   assert.equal(r.breakdown.license,     0);
-  assert.equal(r.health_score,  110);
-  assert.equal(r.classification, 'Core');
+  assert.equal(r.health_score,  80);
 });
 
-test('calculateHealth: source-available, low-star, stale → Deprecated', () => {
+test('calculateHealth: source-available, low-star, stale', () => {
   const r = h.calculateHealth({
     stars:          50,
     lastCommitDays: 200,
-    inRegistry:     false,
     hasInstallCmd:  true,
     criticalIssues: 10,
     license:        'FSL-1.1-ALv2',
   });
-  // popularity = 10·log10(51) ≈ 17.08, recency = 0 (≥180), no registry,
+  // popularity = 10·log10(51) ≈ 17.08, recency = 0 (≥180),
   // install +15, issues ≥5 → 0, license -10  →  17.08 + 15 - 10 = 22.08
   assert.ok(approx(r.health_score, 22.08));
-  assert.equal(r.classification, 'Deprecated');
 });
 
 test('calculateHealth: omitted license skips penalty (back-compat)', () => {
   const r = h.calculateHealth({
-    stars: 1200, lastCommitDays: 15, inRegistry: true,
+    stars: 1200, lastCommitDays: 15,
     hasInstallCmd: true, criticalIssues: 2,
     // license: undefined
   });
@@ -205,7 +198,7 @@ test('calculateHealth: omitted license skips penalty (back-compat)', () => {
 
 test('calculateHealth: rounds to 2 decimal places', () => {
   const r = h.calculateHealth({
-    stars: 10, lastCommitDays: 9999, inRegistry: false,
+    stars: 10, lastCommitDays: 9999,
     hasInstallCmd: false, criticalIssues: 9999,
   });
   // 10·log10(11) = 10.41392685...  →  rounds to 10.41
@@ -214,20 +207,31 @@ test('calculateHealth: rounds to 2 decimal places', () => {
 
 // ── CLI parity ─────────────────────────────────────────────────────────────
 
-test('CLI: matches programmatic output (1200/15/true/true/2 MIT)', () => {
-  const cli = spawnSync(process.execPath, [SCRIPT, '1200', '15', 'true', 'true', '2', 'MIT'], { encoding: 'utf8' });
+test('CLI: matches programmatic output (1200/15/true/2 MIT)', () => {
+  const cli = spawnSync(process.execPath, [SCRIPT, '1200', '15', 'true', '2', 'MIT'], { encoding: 'utf8' });
   assert.equal(cli.status, 0, cli.stderr);
   const parsed = JSON.parse(cli.stdout);
   const direct = h.calculateHealth({
-    stars: 1200, lastCommitDays: 15, inRegistry: true,
+    stars: 1200, lastCommitDays: 15,
     hasInstallCmd: true, criticalIssues: 2, license: 'MIT',
   });
   assert.deepEqual(parsed, direct);
 });
 
-test('CLI: missing args → exit 1 with usage', () => {
+test('CLI: the old 5-argument form is not silently reinterpreted', () => {
+  // `<stars> <days> <in_registry> <install> <issues>` used to be the shape.
+  // Called against the new arity, `true` would land on <critical_issues> and
+  // parse as NaN — the script must refuse rather than score something.
+  const cli = spawnSync(process.execPath, [SCRIPT, '1200', '15', 'true', 'true', '2'], { encoding: 'utf8' });
+  // 2, not 1: exit 1 means "answered, and there is a finding". A usage error
+  // answered nothing, and docs/COMPATIBILITY.md promises that distinction.
+  assert.equal(cli.status, 2);
+  assert.match(cli.stderr, /critical_issues/);
+});
+
+test('CLI: missing args → exit 2 with usage, never 1', () => {
   const cli = spawnSync(process.execPath, [SCRIPT, '1', '2'], { encoding: 'utf8' });
-  assert.equal(cli.status, 1);
+  assert.equal(cli.status, 2);
   assert.match(cli.stderr, /Usage:/);
 });
 

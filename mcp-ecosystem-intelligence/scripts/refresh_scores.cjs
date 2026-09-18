@@ -1,8 +1,14 @@
 #!/usr/bin/env node
 /**
  * Refresh GitHub metrics (stars, last_commit_days, open_issues) and
- * recalculate health_score + classification for all DB entries that
- * have a github.com source_url.
+ * recalculate health_score for all DB entries that have a github.com
+ * source_url.
+ *
+ * It no longer writes `classification` or `last_checked`. The tier is derived
+ * from measured evidence at read time (`lib/tiers.cjs`), and one entry-level
+ * "last checked" date cannot say *what* was checked — every dimension in
+ * `trust_evidence` carries its own `checked_at`, and the stored field had read
+ * 2026-07-31 across all 114 entries while the evidence under it was a day old.
  *
  * Requires: gh CLI able to reach the API — `gh auth login` locally, or a
  *           GITHUB_TOKEN in the environment under CI (see the preflight note
@@ -58,14 +64,14 @@ function ghApi(endpoint) {
   }
 }
 
-function calcScore(stars, days, inRegistry, hasInstall, critIssues, license) {
+function calcScore(stars, days, hasInstall, critIssues, license) {
   try {
     // argv form: `license` arrives from the GitHub API / the DB and went into a
     // shell command line unquoted — "MIT OR Apache-2.0" alone split into three
     // arguments, and anything with a `$(…)` in it would have been executed.
     const out = execFileSync(
       process.execPath,
-      [CALC, stars, days, inRegistry, hasInstall, critIssues, license || ''].map(String),
+      [CALC, stars, days, hasInstall, critIssues, license || ''].map(String),
       { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
     );
     return JSON.parse(out);
@@ -90,9 +96,8 @@ function daysSince(isoDate) {
 
 // ── main ───────────────────────────────────────────────────────────────────
 
-function main({ write, today } = {}) {
+function main({ write } = {}) {
   const WRITE = write ?? process.argv.includes('--write');
-  const TODAY = today ?? new Date().toISOString().slice(0, 10);
 
   // Verify gh is available and can actually reach the API.
   //
@@ -136,7 +141,7 @@ function main({ write, today } = {}) {
     const critIss  = Math.floor(issues / 10);
     const license  = normalizeLicense(meta.license?.spdx_id, tool.license);
 
-    const result = calcScore(stars, days, tool.in_registry, true, critIss, license);
+    const result = calcScore(stars, days, true, critIss, license);
     if (!result) {
       console.log('FAIL (score calc error)');
       skipped++;
@@ -148,22 +153,18 @@ function main({ write, today } = {}) {
       last_commit_days: tool.last_commit_days,
       open_issues:      tool.open_issues,
       health_score:     tool.health_score,
-      classification:   tool.classification,
     };
 
     tool.stars            = stars;
     tool.last_commit_days = days;
     tool.open_issues      = issues;
     tool.health_score     = result.health_score;
-    tool.classification   = result.classification;
-    tool.last_checked     = TODAY;
 
     const diff = [];
     if (prev.stars            !== stars)                   diff.push(`stars ${prev.stars}→${stars}`);
     if (prev.last_commit_days !== days)                    diff.push(`days ${prev.last_commit_days}→${days}`);
     if (prev.open_issues      !== issues)                  diff.push(`issues ${prev.open_issues}→${issues}`);
     if (prev.health_score     !== result.health_score)     diff.push(`score ${prev.health_score}→${result.health_score}`);
-    if (prev.classification   !== result.classification)   diff.push(`tier ${prev.classification}→${result.classification}`);
 
     if (diff.length > 0) {
       console.log(diff.join(', '));

@@ -95,27 +95,81 @@ function readJsonSafe(file) {
   catch { return null; }
 }
 
+/**
+ * The same read, but able to say *why* it came back with nothing.
+ *
+ * `readJsonSafe` collapses "the file is not there" and "the file is there and
+ * malformed" into one `null`, so `audit --strict` exited 0 on a config it could
+ * not parse — reporting a clean setup for servers it had never seen. A missing
+ * file is the normal case; anything else is a question left unanswered.
+ */
+function readJsonExplained(file) {
+  let raw;
+  try { raw = fs.readFileSync(file, 'utf8'); }
+  catch (e) {
+    if (e.code === 'ENOENT') return { missing: true, value: null };
+    return { error: `${e.code || 'read failed'}: ${e.message}`, value: null };
+  }
+  try { return { value: JSON.parse(raw) }; }
+  catch (e) { return { error: `parse failed: ${e.message}`, value: null }; }
+}
+
 // We deliberately ONLY pull mcpServers from ~/.claude.json. Other keys in
 // that file contain bearer tokens that have been known to leak into agent
 // transcripts; restricting our read keeps that surface dead.
-function readGlobalMcpServers(file) {
-  const data = readJsonSafe(file);
-  if (!data || typeof data !== 'object') return {};
-  return data.mcpServers && typeof data.mcpServers === 'object' ? data.mcpServers : {};
+function serversFrom(file, unreadable) {
+  const r = readJsonExplained(file);
+  if (r.error) { if (unreadable) unreadable.push({ path: file, error: r.error }); return {}; }
+  if (r.missing) return {};
+  const data = r.value;
+  // A document that is literally `null` parses and is not a config. Returning
+  // {} for it made "no servers here" indistinguishable from "this file says
+  // nothing we understand".
+  if (data === null || typeof data !== 'object' || Array.isArray(data)) {
+    if (unreadable) unreadable.push({ path: file, error: `document is ${data === null ? 'null' : (Array.isArray(data) ? 'an array' : typeof data)}, not an object` });
+    return {};
+  }
+  if (data.mcpServers === undefined) return {};
+  if (!data.mcpServers || typeof data.mcpServers !== 'object' || Array.isArray(data.mcpServers)) {
+    if (unreadable) unreadable.push({ path: file, error: '"mcpServers" is not an object' });
+    return {};
+  }
+  // Individual entries too: `audit()` skips a non-object entry with `continue`,
+  // so a server configured as a string simply vanished from the report.
+  const bad = Object.entries(data.mcpServers)
+    .filter(([, v]) => !v || typeof v !== 'object' || Array.isArray(v))
+    .map(([k]) => k);
+  if (bad.length && unreadable) {
+    unreadable.push({
+      path: file,
+      error: bad.length === 1
+        ? `server entry "${bad[0]}" is not an object`
+        : `${bad.length} server entries are not objects: ${bad.slice(0, 5).join(', ')}`,
+    });
+  }
+  return data.mcpServers;
 }
 
-function readProjectMcpServers(cwd) {
-  const data = readJsonSafe(path.join(cwd, '.mcp.json'));
-  if (!data || typeof data !== 'object') return {};
-  return data.mcpServers && typeof data.mcpServers === 'object' ? data.mcpServers : {};
+function readGlobalMcpServers(file, unreadable = null) {
+  return serversFrom(file, unreadable);
 }
 
-function readSettings(cwd) {
+function readProjectMcpServers(cwd, unreadable = null) {
+  return serversFrom(path.join(cwd, '.mcp.json'), unreadable);
+}
+
+function readSettings(cwd, unreadable = null) {
   // .claude/settings.json holds the project's enabledMcpjsonServers list
   // (whitelist of mcp.json keys Claude actually loads) and permissions.allow
   // (allowedTools-style filter that scopes which tools each server exposes).
   // Either is enough to consider a heavy server "bounded".
-  const data = readJsonSafe(path.join(cwd, '.claude', 'settings.json'));
+  const file = path.join(cwd, '.claude', 'settings.json');
+  const r = readJsonExplained(file);
+  // A malformed settings file used to fall back to "no scoping configured",
+  // which is the answer that *creates* heavy-unbounded findings — reporting
+  // on a whitelist we had failed to read.
+  if (r.error && unreadable) unreadable.push({ path: file, error: r.error });
+  const data = r.value;
   if (!data || typeof data !== 'object') return { enabled: null, allowedTools: [] };
   const enabled = Array.isArray(data.enabledMcpjsonServers) ? data.enabledMcpjsonServers : null;
   const allow   = data.permissions && Array.isArray(data.permissions.allow)
@@ -213,7 +267,16 @@ function hasArgScope(entry) {
 
 // ── findings ───────────────────────────────────────────────────────────────
 
-function audit({ project, global, settings, db }) {
+/**
+ * @param evals  optional Map<db name, eval row>. When present, a *measured*
+ *               tool count outranks the DB's estimate for the heavy check.
+ *               Without it the behaviour is unchanged — but composing this
+ *               with the eval snapshot (`status.cjs`) showed the cost of not
+ *               doing so: the same screen said "396 tools, measured" and
+ *               "tool count unknown" about one server, and a server measured
+ *               at three tools was reported as an unbounded surface.
+ */
+function audit({ project, global, settings, db, evals = null }) {
   const findings = [];
   const seen     = new Set();
 
@@ -278,8 +341,39 @@ function audit({ project, global, settings, db }) {
       }
 
       // heavy-unbounded: large surface, no scoping anywhere
-      const tools = (typeof tool.est_tools_count === 'number') ? tool.est_tools_count : null;
-      const isHeavy = tools === null || tools > HEAVY_THRESHOLD;
+      //
+      // A measurement may only *raise* the count, never lower it. `tools/list`
+      // is paginated and the eval reads one page, so a measured 10 can be the
+      // first page of 100 — using it to conclude "small enough" would delete a
+      // finding on the strength of a partial answer. The measurement therefore
+      // cannot rescue an entry whose estimate is missing either: unknown stays
+      // heavy, exactly as before.
+      const measured = evals && evals.get ? evals.get(tool.name) : null;
+      const observed = measured && measured.status === 'pass'
+        && Number.isFinite(measured.tool_count) && measured.tool_count > 0
+        ? measured.tool_count
+        : null;
+      // Tri-state, and the middle one matters: `true` means the real count is
+      // higher than `observed`, `false` means the list was complete, and
+      // `null` means the row predates the field. A null cannot raise the
+      // verdict — but it cannot lower it either, and it does not need to:
+      // the measurement is only ever used to *raise* the count, so a row with
+      // unknown completeness falls back to exactly what the DB estimate alone
+      // decided before any of this existed.
+      // Two values, deliberately: `truncated` is the *predicate* that may
+      // raise a verdict, and `truncationKnown` is the fact that gets reported.
+      // Reusing the boolean for both turned "we do not know whether that list
+      // was complete" into an assertion that it was.
+      const truncated = measured && measured.tools_truncated === true;
+      const truncationKnown = measured && measured.tools_truncated !== undefined
+        ? measured.tools_truncated
+        : null;
+      const estimated = (typeof tool.est_tools_count === 'number') ? tool.est_tools_count : null;
+      const tools = (observed !== null && estimated !== null) ? Math.max(observed, estimated)
+        : (estimated !== null ? estimated : observed);
+      // `truncated` means the real count is *more* than `observed`, so it can
+      // never support the conclusion "small enough".
+      const isHeavy = estimated === null || truncated || tools > HEAVY_THRESHOLD;
       if (isHeavy) {
         const enabledOk = settings.enabled === null || settings.enabled.includes(name);
         const argScoped = hasArgScope(entry);
@@ -292,10 +386,15 @@ function audit({ project, global, settings, db }) {
             db_name:         tool.name,
             scope,
             est_tools_count: tools,
+            tool_count_source: (observed !== null && tools === observed) ? 'measured'
+              : (estimated !== null ? 'db' : 'unknown'),
+            tool_count_truncated: observed !== null ? truncationKnown : null,
             toolsets_hint:   tool.toolsets || null,
             message:         tools === null
               ? `tool count unknown and no scoping (--toolsets/--caps/allowedTools/enabledMcpjsonServers)`
-              : `${tools} tools, no scoping (--toolsets/--caps/allowedTools/enabledMcpjsonServers)`,
+              : `${tools}${truncated && tools === observed ? '+' : ''} tools`
+                + `${observed !== null && tools === observed ? ' (measured)' : ''}`
+                + `, no scoping (--toolsets/--caps/allowedTools/enabledMcpjsonServers)`,
           });
         }
       }
@@ -404,16 +503,19 @@ function main(argv) {
     return 2;
   }
 
-  const project  = readProjectMcpServers(cwd);
-  const global_  = readGlobalMcpServers(globalCfg);
-  const settings = readSettings(cwd);
+  const unreadable = [];
+  const project  = readProjectMcpServers(cwd, unreadable);
+  const global_  = readGlobalMcpServers(globalCfg, unreadable);
+  const settings = readSettings(cwd, unreadable);
 
   const counts = { project: Object.keys(project).length, global: Object.keys(global_).length };
   const findings = audit({ project, global: global_, settings, db });
 
   if (args.json) {
     process.stdout.write(JSON.stringify({
+      schema:      'mcp-vault/audit@1',
       cwd,
+      unreadable,
       db_path:     dbPath,
       global_path: globalCfg,
       counts,
@@ -423,7 +525,16 @@ function main(argv) {
     printReport(findings, counts);
   }
 
+  // Order matters, and it is stated in docs/COMPATIBILITY.md: a finding
+  // outranks an incomplete scope. A definite version drift in a config we
+  // *could* read is more actionable than a second config that would not
+  // parse, and returning 2 for it hid the drift behind our own inability to
+  // read something else. Both are reported either way.
+  for (const u of unreadable) process.stderr.write(`audit: ${u.path}: ${u.error}\n`);
   if (args.strict && findings.some(f => STRICT_CATEGORIES.has(f.category))) return 1;
+  // A config we could not read is still not a clean config: "no findings"
+  // would be a claim about servers we never saw.
+  if (unreadable.length) return 2;
   return 0;
 }
 
@@ -433,6 +544,12 @@ if (require.main === module) {
 
 module.exports = {
   parseArgs,
+  // Exported for `status.cjs`, which composes this check with four others in
+  // one process rather than spawning five.
+  readProjectMcpServers,
+  readGlobalMcpServers,
+  readSettings,
+  STRICT_CATEGORIES,
   parseInstalledVersion,
   parseDbVersion,
   matchDbEntry,

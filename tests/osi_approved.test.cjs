@@ -30,9 +30,9 @@ function runHealth(license) {
   // driven by license alone:
   //   stars=100 → popularity 10·log10(101) ≈ 20.04 → capped at 20
   //   days=30   → recency 20 (< 90d)
-  //   inReg=true→ +30, install=true → +15, issues=1 → +5
-  //   base before license = 90, license penalty either 0 or -10.
-  const args = ['100', '30', 'true', 'true', '1'];
+  //   install=true → +15, issues=1 → +5
+  //   base before license = 60, license penalty either 0 or -10.
+  const args = ['100', '30', 'true', '1'];
   if (license !== undefined) args.push(license);
 
   const res = spawnSync(process.execPath, [SCRIPT, ...args], {
@@ -48,7 +48,7 @@ for (const lic of ['GPL-2.0', 'GPL-3.0', 'LGPL-2.1', 'LGPL-3.0', 'AGPL-3.0']) {
   test(`OSI_APPROVED: bare "${lic}" gets no license penalty`, () => {
     const out = runHealth(lic);
     assert.equal(out.breakdown.license, 0, `expected no penalty for ${lic}`);
-    assert.equal(out.health_score, 90);
+    assert.equal(out.health_score, 60);
   });
 }
 
@@ -82,7 +82,7 @@ for (const lic of ['BSL-1.1', 'SSPL-1.0', 'Elastic-2.0', 'Commons-Clause', 'Unkn
   test(`license penalty: non-OSI "${lic}" still gets -10`, () => {
     const out = runHealth(lic);
     assert.equal(out.breakdown.license, -10);
-    assert.equal(out.health_score, 80);
+    assert.equal(out.health_score, 50);
   });
 }
 
@@ -91,7 +91,7 @@ for (const lic of ['BSL-1.1', 'SSPL-1.0', 'Elastic-2.0', 'Commons-Clause', 'Unkn
 test('license: omitted argument skips the penalty entirely', () => {
   const out = runHealth(undefined);
   assert.equal(out.breakdown.license, 0);
-  assert.equal(out.health_score, 90);
+  assert.equal(out.health_score, 60);
 });
 
 // ── classifyLicense: gaps that pinned the license-drift gate red ───────────

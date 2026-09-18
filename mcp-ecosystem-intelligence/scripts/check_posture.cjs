@@ -29,7 +29,8 @@
  * Exit codes:
  *   0  no repository with a report has a failing check
  *   1  at least one does (with --strict)
- *   2  bad arguments
+ *   2  bad arguments, or deps.dev answered for no repository at all — an
+ *      unanswered check must not exit 0
  */
 
 'use strict';
@@ -132,6 +133,12 @@ function main(argv) {
     const reported = rows.filter((r) => r.posture);
     const weak     = reported.filter((r) => r.state === 'weak');
     const clean    = reported.filter((r) => r.state === 'clean');
+    // Counted here rather than inside the human-output branch, because the
+    // exit code below depends on it: "deps.dev has no report for this
+    // repository" is a successful answer, and only the *unreachable* case is
+    // an unanswered question. Declaring it in the `else` meant the JSON path
+    // threw `noReport is not defined` and its catch turned that into a 2.
+    const noReport = rows.filter((r) => r.no_report).length;
 
     if (opts.write) {
       const byName = new Map(rows.map((r) => [r.name, r]));
@@ -176,7 +183,6 @@ function main(argv) {
         for (const f of r.findings) process.stdout.write(`         ${YL}${f}${RS}\n`);
         if (r.passing && r.passing.length) process.stdout.write(`         ${DM}passing: ${r.passing.join(', ')}${RS}\n`);
       }
-      const noReport = rows.filter((r) => r.no_report).length;
       process.stdout.write(
         `\n${rows.length} checked — ${reported.length} with a Scorecard report `
         + `(${GN}${clean.length} clean${RS}, ${YL}${weak.length} with a failing check${RS}), `
@@ -185,7 +191,14 @@ function main(argv) {
       process.stdout.write(`${DM}"No report" is not a finding: Scorecard only covers repositories somebody ran it on.${RS}\n`);
     }
 
-    return opts.strict && weak.length ? 1 : 0;
+    if (opts.strict && weak.length) return 1;
+    // deps.dev answered for nothing at all. "No repository has a failing
+    // check" is a statement about reports we never received.
+    if (rows.length && !reported.length && !noReport) {
+      process.stderr.write('check_posture: deps.dev answered for no repository — nothing was established\n');
+      return 2;
+    }
+    return 0;
   });
 }
 

@@ -80,6 +80,40 @@ const today = (now = Date.now()) => new Date(now).toISOString().slice(0, 10);
 const POSITIVE_STATUSES = new Set(['verified', 'clean', 'claimed', 'bound', 'present', 'listed', 'pass', 'hooks', 'advisories-present', 'osi']);
 
 /**
+ * Which positive words belong to which dimension.
+ *
+ * `POSITIVE_STATUSES` is one flat vocabulary, and asking it "is this a good
+ * result?" without saying *for what* accepted words from the wrong check:
+ * `artifact: clean` and `advisories: verified` are not statuses either check
+ * emits, and both satisfied a requirement neither had met. Evidence arrives
+ * from pull requests, so a required dimension has to be satisfied by a word
+ * that dimension can actually produce.
+ */
+const POSITIVE_BY_DIMENSION = {
+  availability:       new Set(['present']),
+  artifact:           new Set(['verified']),
+  signature:          new Set(['verified']),
+  provenance:         new Set(['bound', 'claimed']),
+  source_binding:     new Set(['verified']),
+  registry:           new Set(['listed']),
+  advisories:         new Set(['clean', 'advisories-present']),
+  dependencies:       new Set(['clean', 'hooks', 'advisories-present']),
+  license:            new Set(['osi']),
+  smoke:              new Set(['pass']),
+  repository_posture: new Set(['clean']),
+};
+
+/** Is `status` an affirmative result *for this dimension*? */
+function isPositive(dimension, status) {
+  const set = POSITIVE_BY_DIMENSION[dimension];
+  // An unrecognised dimension falls back to the flat vocabulary rather than
+  // silently answering "no": a new check must not read as a failing one before
+  // this table learns about it. Adding a dimension without adding it here is
+  // caught by tests/evidence.test.cjs.
+  return set ? set.has(status) : POSITIVE_STATUSES.has(status);
+}
+
+/**
  * Turn one run's *typed check results* into dated evidence.
  *
  * This deliberately does not look at report prose. Deriving evidence by
@@ -259,8 +293,9 @@ function deriveTrust(evidence, { maxAgeDays = DEFAULT_MAX_AGE_DAYS, now = Date.n
   for (const name of required) {
     const dim = dims[name];
     // 'unverified' and 'absent' both mean nothing was established. So does a
-    // status the vocabulary doesn't recognise as a positive result.
-    if (!dim || !POSITIVE_STATUSES.has(dim.status)) return 'candidate';
+    // status this *dimension* cannot produce: `artifact: clean` is not an
+    // artifact verification, however positive the word sounds.
+    if (!dim || !isPositive(name, dim.status)) return 'candidate';
   }
   if (staleDimensions(evidence, maxAgeDays, now).some((s) => required.includes(s.dimension) || s.dimension === 'advisories')) {
     return 'candidate';
@@ -272,6 +307,7 @@ function deriveTrust(evidence, { maxAgeDays = DEFAULT_MAX_AGE_DAYS, now = Date.n
 }
 
 module.exports = {
-  DIMENSIONS, DEFAULT_MAX_AGE_DAYS, POSITIVE_STATUSES, REQUIRED_BY_ECOSYSTEM, requiredFor,
+  DIMENSIONS, DEFAULT_MAX_AGE_DAYS, POSITIVE_STATUSES, POSITIVE_BY_DIMENSION, isPositive,
+  REQUIRED_BY_ECOSYSTEM, requiredFor,
   buildEvidence, smokeEvidence, mergeEvidence, staleDimensions, deriveTrust,
 };

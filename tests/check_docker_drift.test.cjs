@@ -115,6 +115,13 @@ test('driftExitCode: a registry we could not read is never a pass', () => {
   // Was exit 0: `errors: 1, drifts: 0` read as "clean" to the CI step.
   assert.equal(d.driftExitCode({ drifts: 0, errors: 1, strict: false }), 1);
   assert.equal(d.driftExitCode({ drifts: 0, errors: 1, strict: true  }), 1);
+  // An error on *every* entry read nothing at all, and "could not answer" is
+  // 2: a total registry outage used to report the same code as a real drift.
+  assert.equal(d.driftExitCode({ drifts: 0, errors: 3, checked: 3, strict: false }), 2);
+  assert.equal(d.driftExitCode({ drifts: 0, errors: 1, checked: 3, strict: false }), 1,
+    'some entries were compared, so there is a finding to report');
+  assert.equal(d.driftExitCode({ drifts: 1, errors: 3, checked: 3, strict: true }), 1,
+    'a drift that was found outranks the errors beside it');
   // Drift alone stays advisory unless --strict.
   assert.equal(d.driftExitCode({ drifts: 2, errors: 0, strict: false }), 0);
   assert.equal(d.driftExitCode({ drifts: 2, errors: 0, strict: true  }), 1);

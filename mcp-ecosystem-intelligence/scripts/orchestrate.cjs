@@ -29,13 +29,14 @@ const { spawnSync } = require('child_process');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { listHosts, resolveTarget, writeServerEntry } = require('./lib/hosts.cjs');
 const { trustScore, fitScore, behaviour, recommend } = require('./lib/scores.cjs');
+const { classifyEntry } = require('./lib/tiers.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { loadPolicy } = require('./lib/policy.cjs');
 const { readInstalledServers } = require('./lib/installed.cjs');
 const { estimateServer, matchDbEntry, wouldExceed, DEFAULT_CONTEXT } = require('./lib/budget.cjs');
 // Reuse the gate's parsers so "what gets pinned" and "what gets checked" can
 // never drift apart — they were two independent regexes before.
-const { isExactVersion } = require('./lib/install_cmd.cjs');
+const { isExactVersion, pinInstallCmd } = require('./lib/install_cmd.cjs');
 const {
   npmPkgName, pypiPkgName, dockerImageRef, dockerDigestPinned,
 } = require('./verify_integrity.cjs');
@@ -398,7 +399,7 @@ function fallbackBySignal(db, signal) {
   const sig = signal.toLowerCase();
   const hits = [];
   for (const t of db.tools) {
-    if (t.classification === 'Deprecated') continue;
+    if (isDeprecated(t)) continue;
     const hay = `${t.name} ${t.notes || ''}`.toLowerCase();
     if (hay.includes(sig)) hits.push(t.name);
   }
@@ -426,7 +427,7 @@ function matchDB(db, stack, query) {
     }
   }
 
-  return db.tools.filter(t => names.has(t.name) && t.classification !== 'Deprecated');
+  return db.tools.filter(t => names.has(t.name) && !isDeprecated(t));
 }
 
 // For every stack signal, decide whether the DB actually had something
@@ -624,82 +625,6 @@ function installTool(tool, cwd, global_) {
   process.stdout.write(`Added ${tool.name} to ${result.path}\nRestart ${target.label} to pick up the new server.\n`);
 }
 
-// Pin the package token of an install command to the version the DB records —
-// and that verify_integrity actually hashed.
-//
-// Most DB entries store the command unpinned (`npx -y @scope/mcp-server`) with
-// the checked version in a separate `version` field. Copying that command into
-// .mcp.json verbatim means npx resolves `latest` every time the server starts:
-// the artifact that runs is not the artifact whose sha512 the gate compared, so
-// a compromised release published after our last refresh installs itself
-// silently. Synthesise the pin instead.
-//
-// Returns { parts, pinned, reason } — `parts` is the argv-style token list.
-//
-// "Pinned" means: the launch command names the exact version the gate verified.
-// A command that already carries *some* specifier is not automatically fine —
-// `pkg@latest`, `pkg@^1.2` and a stale `pkg@1.0.0` all launch something other
-// than the artifact whose hash was compared, so they get rewritten to the DB's
-// version rather than trusted.
-function pinInstallCmd(cmd, version) {
-  const raw    = String(cmd).trim();
-  const parts  = raw.split(/\s+/);
-  const runner = parts[0];
-
-  if (runner === 'docker') {
-    // The image is the first non-flag token; a digest sitting in some other
-    // argument (`-e REF=img@sha256:…`) is not a pin on the image that runs.
-    const ref = dockerImageRef(raw);
-    if (!ref) return { parts, pinned: false, reason: 'cannot parse the docker image reference' };
-    const ok = dockerDigestPinned(ref);
-    return { parts, pinned: ok, reason: ok ? null : `docker image ${ref} is not pinned by @sha256 digest` };
-  }
-
-  if (runner !== 'npx' && runner !== 'uvx') {
-    return { parts, pinned: false, reason: `unknown runner "${runner}" — cannot pin` };
-  }
-
-  // Resolve the package with the gate's own parser: a command shaped in a way
-  // the gate declines to check (flags before the package, --package, uvx
-  // --from/--with) must not be pinnable here either.
-  const pkg = runner === 'npx' ? npmPkgName(raw) : pypiPkgName(raw);
-  if (!pkg) {
-    return {
-      parts, pinned: false,
-      reason: runner === 'npx'
-        ? 'not a plain `npx -y <pkg>` command — the gate cannot check it either'
-        : 'not a plain `uvx <pkg>` command (--from / --with / flags) — the gate cannot check it either',
-    };
-  }
-
-  const sep = runner === 'npx' ? '@' : '==';
-  const idx = parts.findIndex((p) => p === pkg || p.startsWith(pkg + sep));
-  if (idx === -1) return { parts, pinned: false, reason: 'cannot locate the package token in install_cmd' };
-
-  const current = parts[idx] === pkg ? null : parts[idx].slice(pkg.length + sep.length);
-
-  if (!version) {
-    return {
-      parts, pinned: false,
-      reason: current
-        ? `install_cmd asks for "${current}", but the DB entry has no verified \`version\` — run verify_integrity.cjs --update`
-        : 'no `version` in the DB entry — run verify_integrity.cjs --update',
-    };
-  }
-  if (!isExactVersion(runner, version)) {
-    return {
-      parts, pinned: false,
-      reason: `DB version "${version}" is not an exact ${runner === 'npx' ? 'semver' : 'PEP 440'} version — a range is not a pin`,
-    };
-  }
-  if (current === version) return { parts, pinned: true, reason: null };
-
-  // Unpinned, or pinned to something the gate did not verify: rewrite it.
-  const pinnedParts = [...parts];
-  pinnedParts[idx] = `${pkg}${sep}${version}`;
-  return { parts: pinnedParts, pinned: true, reason: null };
-}
-
 function buildServerEntry(tool) {
   const { parts, pinned, reason } = pinInstallCmd(tool.install_cmd, tool.version);
 
@@ -742,6 +667,17 @@ function behaviourFor(name) {
   return behaviour(evalIndex().get(name) || null);
 }
 
+// The tier is derived from evidence, not read off the entry — `lib/tiers.cjs`
+// explains why it is not stored. `Deprecated` here means "do not install":
+// nothing to install, wrong bytes, or a known vulnerability at the pinned
+// version. That is the filter `matchDB` and `fallbackBySignal` apply.
+function tierFor(tool) {
+  return classifyEntry(tool, evalIndex().get(tool.name) || null);
+}
+function isDeprecated(tool) {
+  return tierFor(tool).classification === 'Deprecated';
+}
+
 // ── Report formatting ───────────────────────────────────────────────────────
 
 const HEAVY = 30;
@@ -754,6 +690,7 @@ const BEHAVIOUR_TAG = {
   'needs-credentials': () => `${YL}needs credentials${RS}`,
   'needs-network':     () => `${YL}needs network${RS}`,
   'never-started':     () => `${RD}never started${RS}`,
+  'protocol-error':    () => `${RD}protocol error${RS}`,
 };
 
 function printTool(t) {
@@ -761,7 +698,7 @@ function printTool(t) {
   const toolTag = heavy
     ? `${YL}${t.est_tools_count} tools ⚠${RS}`
     : `${DM}${t.est_tools_count} tools${RS}`;
-  const tier  = t.classification.padEnd(13);
+  const tier  = tierFor(t).classification.padEnd(13);
   const name  = t.name.padEnd(26);
   const behav = behaviourFor(t.name);
   const tag   = (BEHAVIOUR_TAG[behav.state] || (() => ''))();
@@ -816,13 +753,22 @@ function printReport(stack, matched, installed, db, unmapped) {
   // Integrity summary from DB fields
   const matchedVerified  = matched.filter(t => t.trust === 'verified').length;
   const matchedCandidate = matched.filter(t => t.trust === 'candidate').length;
-  const dates = matched.map(t => t.last_checked).filter(Boolean).sort();
+  // The oldest *measurement* under the matched entries. This used to print
+  // `last_checked`, one entry-level date that said 2026-07-31 across all 114
+  // entries while the evidence beneath it was a day old — a field nobody
+  // updated, reporting on checks that had in fact just run. Every dimension
+  // carries its own `checked_at`; the oldest of those is the honest answer.
+  const dates = matched
+    .flatMap(t => Object.values((t.trust_evidence && t.trust_evidence.dimensions) || {}))
+    .map(d => d && d.checked_at)
+    .filter(Boolean)
+    .sort();
   const oldest = dates[0] || 'unknown';
 
   process.stdout.write(`${B}── Integrity (DB snapshot) ${HR.slice(26)}${RS}\n`);
   process.stdout.write(`  Matched: ${GN}${matchedVerified} verified${RS}`);
   if (matchedCandidate) process.stdout.write(`  ${YL}${matchedCandidate} candidate${RS} (install with ⚠)`);
-  process.stdout.write(`\n  DB last refreshed: ${oldest}\n`);
+  process.stdout.write(`\n  Oldest evidence among these: ${oldest}\n`);
   process.stdout.write(`  ${DM}Full scan: node scripts/verify_integrity.cjs${RS}\n\n`);
 
   // Coverage gaps: stack signals the DB has nothing specific for. UNIVERSAL_TOOLS
@@ -891,6 +837,7 @@ if (require.main === module) {
   // -- json mode --
   if (AS_JSON) {
     process.stdout.write(JSON.stringify({
+      schema: 'mcp-vault/scan@1',
       stack: {
         langs:      [...stack.langs],
         dbs:        [...stack.dbs],
@@ -921,6 +868,7 @@ module.exports = {
   detectStack,
   slim,
   behaviourFor,
+  tierFor,
   matchDB,
   unmappedSignals,
   fallbackBySignal,
@@ -953,13 +901,13 @@ function slim(t, stack = null) {
   return {
     name:            t.name,
     category:        t.category,
-    classification:  t.classification,
+    classification:  tierFor(t).classification,
+    tier_reason:     tierFor(t).why,
     health_score:    t.health_score,
     est_tools_count: t.est_tools_count,
     toolsets:        t.toolsets,
     trust:           t.trust,
     install_cmd:     t.install_cmd,
-    last_checked:    t.last_checked,
     scores: {
       health: Number.isFinite(t.health_score) ? t.health_score : null,
       trust:  { score: trust.score, gate: trust.gate, reasons: trust.reasons.slice(0, 4) },

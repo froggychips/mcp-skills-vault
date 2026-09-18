@@ -55,7 +55,8 @@
  *   0  everything still published where we expect it
  *   1  at least one entry gone / version-gone / yanked (or, with --strict,
  *      deprecated / relocated)
- *   2  bad arguments
+ *   2  bad arguments, or no registry answered for any entry — an unanswered
+ *      check must not exit 0
  */
 
 'use strict';
@@ -415,6 +416,12 @@ function main(argv) {
 
     if (blocking.length) return 1;
     if (opts.strict && notable.length) return 1;
+    // No registry answered for any entry. "Everything is still published" is
+    // not what that means.
+    if (rows.length && unknown.length === rows.length) {
+      process.stderr.write('check_availability: no registry answered for any entry — nothing was established\n');
+      return 2;
+    }
     return 0;
   });
 }

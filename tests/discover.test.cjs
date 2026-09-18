@@ -24,7 +24,7 @@ test('ownerRepoFromUrl: parses {owner, repo}', () => {
 test('scoreHealth: stars are log10-capped at 20', () => {
   // 10·log10(1+1) ≈ 3.01; 10·log10(1e9+1) ≈ 90 — but capped at 20.
   const onlyStars = (n) => d.scoreHealth({
-    stars: n, last_commit_days: 9999, has_install_cmd: false, in_registry: false, open_issues: 999, license: 'Unknown',
+    stars: n, last_commit_days: 9999, has_install_cmd: false, open_issues: 999, license: 'Unknown',
   });
   // Just confirm the cap: 1e9 stars contributes the same as 1e6.
   assert.ok(onlyStars(1_000_000) <= onlyStars(1_000_000_000) + 0.001);
@@ -32,7 +32,7 @@ test('scoreHealth: stars are log10-capped at 20', () => {
 });
 
 test('scoreHealth: recency tiers contribute 40/20/10/0', () => {
-  const base = { stars: 0, has_install_cmd: false, in_registry: false, open_issues: 999, license: 'Unknown' };
+  const base = { stars: 0, has_install_cmd: false, open_issues: 999, license: 'Unknown' };
   const score = (days) => d.scoreHealth({ ...base, last_commit_days: days });
   // 999 open_issues blocks the +5 bonus; license Unknown applies −10. So:
   // <30  → 40 + 0 + 0 − 10 = 30
@@ -45,21 +45,25 @@ test('scoreHealth: recency tiers contribute 40/20/10/0', () => {
   assert.equal(score(400), -10);
 });
 
-test('scoreHealth: in_registry adds 30, has_install_cmd adds 15, license penalty applies', () => {
+test('scoreHealth: has_install_cmd adds 15, license penalty applies', () => {
   const s = d.scoreHealth({
-    stars: 0, last_commit_days: 10, has_install_cmd: true, in_registry: true, open_issues: 0, license: 'MIT',
+    stars: 0, last_commit_days: 10, has_install_cmd: true, open_issues: 0, license: 'MIT',
   });
-  // 0 + 40 + 30 + 15 + 5 − 0 = 90
-  assert.equal(s, 90);
+  // 0 + 40 + 15 + 5 − 0 = 60
+  assert.equal(s, 60);
 });
 
-test('classifyScore: tier boundaries', () => {
-  assert.equal(d.classifyScore(105), 'Core');
-  assert.equal(d.classifyScore(85),  'Core');
-  assert.equal(d.classifyScore(84.9), 'Recommended');
-  assert.equal(d.classifyScore(65),  'Recommended');
-  assert.equal(d.classifyScore(50),  'Experimental');
-  assert.equal(d.classifyScore(39),  'Deprecated');
+test('no registry bonus, and no tier over the score', () => {
+  // Discovery's copy of the formula gave +30 to any candidate with an npm or
+  // PyPI package — that is, to nearly every row — so the ranking this file
+  // exists to produce was mostly noise. An `in_registry` key is now ignored
+  // rather than quietly honoured.
+  const withKey = d.scoreHealth({
+    stars: 0, last_commit_days: 10, has_install_cmd: true, in_registry: true, open_issues: 0, license: 'MIT',
+  });
+  assert.equal(withKey, 60);
+  // And a candidate has no evidence, so it gets no tier at all.
+  assert.equal(d.classifyScore, undefined);
 });
 
 test('looksLikeMcpServer: curated sources pass unconditionally', () => {

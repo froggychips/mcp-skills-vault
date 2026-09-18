@@ -51,9 +51,26 @@ function versionGte(v, minMajor) {
   return Boolean(p && p[0] >= minMajor);
 }
 
-function commandVersion(cmd, args) {
-  const r = spawnSync(cmd, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+// A version probe that cannot finish must not stop the report.
+//
+// `gh --version` and friends are third-party executables on the user's PATH,
+// and one of them can be a bootstrap shim that fetches something, or a stale
+// wrapper that blocks. Without a deadline the whole command — including
+// `mcp-vault status`, which composes this — waited forever and printed
+// nothing, with no exit code to read. Five seconds is generous for a program
+// asked to print its own version.
+const PROBE_TIMEOUT_MS = 5000;
+
+function commandVersion(cmd, args, { timeout = PROBE_TIMEOUT_MS } = {}) {
+  const r = spawnSync(cmd, args, {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    timeout,
+    killSignal: "SIGKILL",
+  });
+  // A timeout arrives as an error with ETIMEDOUT, or as `signal` being set.
   if (r.error) return { ok: false, error: r.error.code || r.error.message };
+  if (r.signal) return { ok: false, error: `did not answer within ${timeout}ms (killed with ${r.signal})` };
   const out = `${r.stdout || ""}${r.stderr || ""}`.trim().split("\n")[0] || `exit ${r.status}`;
   return { ok: r.status === 0, version: out, exit_code: r.status };
 }
@@ -137,6 +154,7 @@ function runDoctor({ cwd }) {
   checks.push(status(globalLevel, "global_config", globalMessage, { path: globalConfig, mcp_server_count: serverCount }));
 
   return {
+    schema: "mcp-vault/doctor@1",
     cwd,
     checked_at: new Date().toISOString(),
     counts: {
@@ -171,8 +189,20 @@ function main() {
   if (args.json) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   else printHuman(result);
 
-  const hard = result.counts.fail > 0 || (args.strict && result.counts.warn > 0);
-  exitAfterFlush(hard ? 1 : 0);
+  // A config file that exists and does not parse is not a failing environment
+  // — it is a question left unanswered, and the CLI's contract reserves 2 for
+  // that (docs/COMPATIBILITY.md). `status` already routed these to 2 while
+  // `doctor` reported the same input as 1.
+  //
+  // But a real failure outranks it, so the unreadable checks are excluded from
+  // the `fail` count *and* considered second: scheduling the 2 first meant an
+  // unsupported Node version was reported as "could not answer".
+  const unreadable = result.checks.filter((c) => c.level === 'fail' && /parse failed|read failed/i.test(c.message));
+  const realFails  = result.counts.fail - unreadable.length;
+  const hard = realFails > 0 || (args.strict && result.counts.warn > 0);
+  if (hard) return exitAfterFlush(1);
+  if (unreadable.length) return exitAfterFlush(2);
+  exitAfterFlush(0);
 }
 
 if (require.main === module) main();

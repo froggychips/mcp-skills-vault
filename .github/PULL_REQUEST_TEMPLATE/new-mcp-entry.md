@@ -22,8 +22,10 @@ _What gap in the existing DB does this fill? Why this server vs alternatives in 
 - Last commit: … days ago
 - Open issues: …
 - License: …
-- `health_score`: … (from `calculate_health.cjs`)
-- `classification`: …
+- `health_score`: … (from `calculate_health.cjs`; max 80)
+
+The tier is not yours to set — it is derived from evidence once the checks
+below have run.
 
 ## Author checks
 

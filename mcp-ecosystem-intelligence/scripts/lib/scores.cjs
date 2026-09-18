@@ -262,6 +262,16 @@ function behaviour(evalResult) {
   if (cls === 'NEEDS_ARGS') {
     return { state: 'needs-arguments', tools, reason: 'the launch command takes an argument you have to supply', requires: 'arguments' };
   }
+  // It started, it answered, and the answer does not fit the protocol. Saying
+  // "did not complete a handshake" about a process that completed one and then
+  // replied badly sends a reader to the wrong place.
+  if (cls === 'PROTOCOL') {
+    return {
+      state:  'protocol-error',
+      tools,
+      reason: `started, but answered outside the protocol (${r.error_code || 'malformed response'})`,
+    };
+  }
   return {
     state:  'never-started',
     tools,
@@ -281,6 +291,11 @@ const capVerdict = (verdict, ceiling) =>
 // different words.
 const BEHAVIOUR_CEILING = {
   'never-started':     'not-now',
+  // It ran and answered outside the protocol. That is a defect in the server,
+  // not a gap in our environment, so it caps as hard as never starting —
+  // stated here rather than left to the `|| 'consider'` fallback, which would
+  // have been more generous to a malformed server than to a missing `uvx`.
+  'protocol-error':    'not-now',
   'needs-credentials': 'consider',
   'needs-network':     'consider',
   // A placeholder to fill in is a documented step, not a defect: it does not

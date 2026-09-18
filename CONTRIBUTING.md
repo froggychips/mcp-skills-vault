@@ -28,14 +28,21 @@ For security-sensitive changes (scripts in `mcp-ecosystem-intelligence/scripts/`
   "pkg_integrity":   "sha512-…",                       // filled by --update
   "trust":           "candidate",                      // start here; see promotion below
   "license":         "MIT",                            // SPDX identifier; "Unknown" if missing
-  "health_score":    105.0,                            // from calculate_health.cjs
-  "classification":  "Core",                           // Core / Recommended / Experimental / Deprecated
+  "health_score":    60.0,                             // from calculate_health.cjs (max 80)
   "est_tools_count": 10,                               // count from server's ListToolsRequestSchema
   "toolsets":        "--toolsets repos,issues",        // how to reduce tool count, or null
   "tracked_tag":     "latest",                         // docker only; default "latest"
   "notes":           "One-line context for the reviewer"
 }
 ```
+
+There is no `classification` field, and no `in_registry` or `last_checked`.
+The tier is derived from measured evidence when anything reads the DB
+(`scripts/lib/tiers.cjs`), so a submitted entry cannot declare itself Core: it
+becomes Core when its artifact verifies and it starts in a sandbox. The other
+two were a hand-set registry flag that was wrong for 26 entries and a "last
+checked" date that stopped tracking anything — both replaced by dated evidence
+written by the check that established it.
 
 ### Valid `category` values
 

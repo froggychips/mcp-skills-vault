@@ -1416,6 +1416,8 @@ async function main() {
     // that holds the servers nobody is checking. It used to vanish into a
     // stderr note while the run exited 0 with an empty document.
     for (const problem of installedNotes) {
+      // Also reflected in the exit code below: appearing in the document is
+      // not the same as being counted, and a reader of `$?` was told 0.
       scope.push({
         name: `${problem.host || 'host'} config (${problem.path})`,
         install_cmd: '(unreadable config)',
@@ -1744,7 +1746,7 @@ async function main() {
       process.stdout.write(JSON.stringify(report, null, 2) + '\n');
     }
     if (UPDATE && results.some((r) => r.status === 'UPD')) writeDb(DB_PATH, db);
-    return exitAfterFlush(totalFails > 0 ? 1 : 0);
+    return exitAfterFlush(totalFails > 0 ? 1 : (INSTALLED && installedNotes.length ? 2 : 0));
   }
 
   // Print results, grouped per tool.
@@ -1779,7 +1781,10 @@ async function main() {
 
   // Not process.exit(): the summary above is still buffered when stdout is a
   // pipe, and exiting drops it. See lib/exit.cjs.
-  exitAfterFlush(totalFails > 0 ? 1 : 0);
+  // A host config we could not read leaves the question unanswered, and the
+  // CLI reserves 2 for that: a hard failure still outranks it, because a real
+  // finding is more actionable than an incomplete scope.
+  exitAfterFlush(totalFails > 0 ? 1 : (INSTALLED && installedNotes.length ? 2 : 0));
 }
 
 if (require.main === module) {

@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@froggychips/mcp-vault.svg)](https://www.npmjs.com/package/@froggychips/mcp-vault)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Zero deps](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](./PHILOSOPHY.md)
-[![Tests](https://img.shields.io/badge/tests-738%20pass-brightgreen.svg)](./tests)
+[![Tests](https://img.shields.io/badge/tests-784%20pass-brightgreen.svg)](./tests)
 
 **Homepage:** [mcp.froggychips.xyz](https://mcp.froggychips.xyz) · **npm:** [`@froggychips/mcp-vault`](https://www.npmjs.com/package/@froggychips/mcp-vault)
 
@@ -63,14 +63,57 @@ $ npx -y @froggychips/mcp-vault verify --offline
 
 ## Quick start
 
-**As a CLI** — one line, no clone, no global install:
+**As a CLI** — one command, no clone, no global install:
 
 ```bash
+npx -y @froggychips/mcp-vault status
+```
+
+```text
+mcp-vault <version> · /Users/me/repos/my-project
+
+Environment     Node v22.3.0 · missing: uvx
+Installed       7 servers · 3 matched in the vault DB · 2 on another version · 2 unvetted
+                3 Recommended
+Evidence        oldest claim 2026-09-17 (stored; nothing was re-checked just now)
+Context         14,200 tokens on every request · 7.1% of a 200k window · 4 not measured
+This project    postgres, aws, Node → 3 matching servers not installed (mcp-server-neon, …)
+
+Blocking
+  ✗ mcp-atlassian: advisories: vulnerable (as of 2026-09-17)
+
+Worth knowing
+  ! 2 configured servers are not in the vault DB, so nothing here has checked them: my-own-server, internal-tools
+  ! search: the launch command resolves at start-up (npm:some-search-mcp), so what runs is not the npm:some-search-mcp@1.4.0 the vault verified
+  ! browser: the vault verified npm:some-browser-mcp@0.26.0; this host launches npm:some-browser-mcp@2.0.0
+
+Deeper:  verify --installed  re-hash what your hosts launch, live
+         explain <name>      why one entry is allowed or denied
+         scan                what to add for this stack
+         audit --strict      every drift and scope finding in full
+```
+
+Servers are matched by **artifact identity, not by the name in your config** —
+and the version is compared separately, because stored evidence about `x@1.0.0`
+is not a finding about `x@2.0.0` in either direction. Equality alone is not
+enough: both sides must also *resolve* to one artifact, so `npx -y pkg` and
+`pkg@latest` are reported as what they are rather than matched against a pin.
+A server on a version nobody verified gets no tier at all.
+
+It makes **no network calls** — every claim comes from evidence already on
+disk, and says so rather than implying it was checked just now. Exit `1` means
+something installed must not run: gone, yanked, wrong bytes, or a live advisory
+against the pinned version. `--strict` also fails on drift, unvetted servers
+and claims past their shelf life.
+
+The commands it summarises are all still there, and the footer names them:
+
+```bash
+npx -y @froggychips/mcp-vault verify --installed     # re-hash what your hosts launch, live
 npx -y @froggychips/mcp-vault scan --cwd ./my-project
 npx -y @froggychips/mcp-vault audit --strict
 npx -y @froggychips/mcp-vault verify --offline
-npx -y @froggychips/mcp-vault verify --installed     # what your hosts actually launch
-npx -y @froggychips/mcp-vault budget                 # what they cost in context
+npx -y @froggychips/mcp-vault budget
 npx -y @froggychips/mcp-vault doctor
 ```
 
@@ -339,9 +382,13 @@ mcp-vault          →  supply-chain evidence, policy, behaviour
 
 11 entries are listed today and all of them agree; a verified namespace under a
 different owner is the finding worth having. **Being unlisted is explicitly not
-a finding** — listing is opt-in and 102 entries simply are not listed. It also
-reports that `in_registry`, the hand-set boolean adding 30 points to every
-health score, disagrees with the live registry for 26 entries.
+a finding** — listing is opt-in and 102 entries simply are not listed.
+
+This check replaced a field. The DB used to carry `in_registry`, a hand-set
+boolean worth 30 points of health score that had never been compared with
+anything; it disagreed with the live registry for 26 of 114 entries. The
+boolean is gone, and whether an entry is listed is now measured here, dated,
+and worth 5 points of trust.
 
 ### How is the upstream repo run? (`posture`)
 
@@ -660,24 +707,24 @@ The generated page is static, searchable, and filterable by category, tier, and 
 
 ```bash
 mcp-vault health \
-  <stars> <last_commit_days> <in_registry> <has_install_cmd> <critical_issues> [license]
+  <stars> <last_commit_days> <has_install_cmd> <critical_issues> [license]
 ```
 
 ```
 score = min(20, 10·log10(stars+1))   # popularity, capped
       + {40|20|10|0}                  # recency: <30d / <90d / <180d / older
-      + 30 if in_registry
       + 15 if install_cmd documented
       + 5  if open_issues/10 < 5
       − 10 if license is non-OSI / source-available / Unknown
 ```
 
-| Score | Tier | Behaviour |
-|---|---|---|
-| 85+ | Core | recommend by default |
-| 65–84 | Recommended | recommend with note |
-| 40–64 | Experimental | mention only on ask |
-| < 40 | Deprecated | hide unless asked |
+It answers one question — *is this project maintained?* — and it names no tier.
+Thresholds over it were measured against the real DB and abandoned: with the
+registry bonus removed, scores run 40–80 with a median of 75 and **91 of 114
+entries land in the top bucket**, because a curated database is popular and
+recently committed by construction. A label 80% of rows share is not a label.
+The tier comes from evidence instead — see the table under [Vetted
+database](#vetted-database).
 
 ### Vetted database
 
@@ -690,7 +737,43 @@ maps      memory    meta       mobile     observability   payments
 pm        reasoning search     testing    utility         vcs       web-scraping
 ```
 
-Distribution: **20 Core / 71 Recommended / 23 Experimental**.
+Distribution: **0 Core / 101 Recommended / 4 Experimental / 9 Deprecated**.
+
+The tier is derived from the evidence below, not stored in the DB and not a
+threshold on `health_score`:
+
+| Tier | What was established |
+|---|---|
+| Core | the artifact is verified, the evidence is about this artifact, and a run of **that pinned reference** started and listed tools |
+| Recommended | the artifact is verified and current; either nothing watched it run, or what watched it cannot be tied to this artifact |
+| Experimental | too little is known — a required check never happened, a claim aged out, or the stored evidence is about a different artifact than this entry now installs |
+| Deprecated | do not install — and only for what the trust gate blocks on: nothing to install, bytes that are not the bytes we verified, or an advisory against this version |
+
+**Core is empty today, and that is the tier working.** 38 entries start and
+list tools — but no row in the eval snapshot records *which artifact it
+launched*, and a pass for `x@1` is not a statement about `x@2`.
+
+There was a second reason, and it was worse: the eval read that artifact id off
+the DB's `version` field while launching the entry's `install_cmd` — and **80
+of the 114 entries ship an unpinned command** (`npx -y pkg`; the verified
+version lives in `version`, and `install` pins it on the way out). So a run of
+`npx -y pkg` would have been recorded as a run of `pkg@1.0.0`. The eval now
+pins before launching, and an entry it cannot pin records no artifact id at
+all. The next weekly run fills the field truthfully and Core comes back on its
+own; guessing in the meantime is the one thing this repository cannot do.
+
+`Core` is deliberately narrower than "we know these bytes ran". The eval
+launches `pkg@1.2.3` and does not re-hash what the registry handed it, so a
+configured index could serve something else under that name — true of npm and
+PyPI alike. Core says the reference was pinned, verified, and seen to run;
+`artifact` is the dimension that says the bytes at that reference matched their
+hash when the gate last fetched them.
+
+Behaviour promotes but never demotes. 59 verified entries did not complete a
+handshake, and the sandbox runs with an empty environment — `@azure/mcp`,
+`@heroku/mcp-server` and their kind exit 1 because no API key was present.
+Recording that as a fact about the server would be the same mistake as reading
+a check that did not happen as a check that passed.
 
 **Verified hand-curated core** (the original 30): the seven official `modelcontextprotocol/servers` (filesystem, fetch, git, memory, sequentialthinking, time, everything) plus vendor-maintained servers (`github`, `microsoft/playwright`, `cloudflare`, `notion`, `sentry`, `stripe`, `neon`, `mongodb`, `redis`, `clickhouse`, `awslabs/mcp`, `context7`, …) and high-quality community entries (`mcp-atlassian`, `firecrawl`, `tavily`, `exa`, `brave`, `kubernetes`, `duckduckgo`, …).
 
@@ -803,7 +886,18 @@ Everything in this table is scripted and tested; the column says where it lives.
 | A decision, with the rule that made it, as an audit record | [`explain.cjs`](./mcp-ecosystem-intelligence/scripts/explain.cjs) |
 | CycloneDX SBOM | [`sbom.cjs`](./mcp-ecosystem-intelligence/scripts/sbom.cjs) |
 | Context ceiling enforced where the set changes | [`lib/budget.cjs`](./mcp-ecosystem-intelligence/scripts/lib/budget.cjs) |
+| Tier derived from evidence, not from a score | [`lib/tiers.cjs`](./mcp-ecosystem-intelligence/scripts/lib/tiers.cjs) |
+| One command instead of six | [`status.cjs`](./mcp-ecosystem-intelligence/scripts/status.cjs) |
 | The documented numbers checked against the data | [`tests/docs_numbers.test.cjs`](./tests/docs_numbers.test.cjs) |
+| What will not change without a major bump | [`docs/COMPATIBILITY.md`](./docs/COMPATIBILITY.md) |
+
+**Not shipping the next feature until three people have used this and said
+something about it.** 33 npm downloads a month, 0 stars, 0 referrers, 41 clones
+against 7 views — the honest reading is that no human has used it yet, and with
+no telemetry (by promise) the only instrument left is somebody saying so. The
+reasoning, what counts as a user, and what to ask them:
+[`docs/ADOPTION.md`](./docs/ADOPTION.md); re-measure with
+`node .github/scripts/adoption.cjs`.
 
 Still judgement, not script — deliberately: the reject heuristics (5-Minute
 Rule, Bloat, Duplication) and promoting a candidate to `trust: verified`. And

@@ -94,12 +94,27 @@ function hostConfigPaths({ cwd = process.cwd(), home = os.homedir(), platform = 
  * `.mcp.json` in the wild sometimes has neither — a config we cannot read is
  * reported as such by the caller, never silently treated as "no servers".
  */
-function parseConfig(doc, origin = {}) {
-  const table = (doc && (doc.mcpServers || doc.servers)) || null;
-  if (!table || typeof table !== 'object') return [];
+/**
+ * @param onInvalid  called with a reason when the document parses as JSON/TOML
+ *                   but is not a config this can read. Without it, a file
+ *                   saying `{"mcpServers": "broken"}` was indistinguishable
+ *                   from a file with no servers in it — syntactically valid
+ *                   and semantically unread, reported as "nothing configured".
+ */
+function parseConfig(doc, origin = {}, onInvalid = null) {
+  const bad = (reason) => { if (onInvalid) onInvalid({ ...origin, error: reason }); return []; };
+  if (doc === null || typeof doc !== 'object' || Array.isArray(doc)) return bad('not an object');
+  const raw = doc.mcpServers !== undefined ? doc.mcpServers : doc.servers;
+  // Absent is the normal case for a settings file that simply has no servers.
+  if (raw === undefined) return [];
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    return bad(`"mcpServers" is ${Array.isArray(raw) ? 'an array' : typeof raw}, not an object`);
+  }
+  const table = raw;
   const out = [];
+  const skipped = [];
   for (const [name, spec] of Object.entries(table)) {
-    if (!spec || typeof spec !== 'object') continue;
+    if (!spec || typeof spec !== 'object' || Array.isArray(spec)) { skipped.push(name); continue; }
     // A remote server (url/type: sse|http) has no local artifact to verify.
     const remote = typeof spec.url === 'string' ? spec.url : null;
     out.push({
@@ -112,6 +127,16 @@ function parseConfig(doc, origin = {}) {
       remote,
       // Env var *names* only: values are secrets and never leave this object.
       env_keys: spec.env && typeof spec.env === 'object' ? Object.keys(spec.env) : [],
+    });
+  }
+  // Entries that are present and unreadable are not entries that are absent.
+  if (skipped.length && onInvalid) {
+    onInvalid({
+      ...origin,
+      error: skipped.length === 1
+        ? `server entry "${skipped[0]}" is not an object`
+        : `${skipped.length} server entries are not objects: ${skipped.slice(0, 5).join(', ')}`,
+      partial: true,
     });
   }
   return out;
@@ -149,7 +174,14 @@ function readInstalledServers({ cwd = process.cwd(), home = os.homedir(), platfo
   for (const loc of locations) {
     let raw;
     try { raw = fs.readFileSync(loc.path, 'utf8'); }
-    catch { continue; }                       // not configured on this machine
+    catch (e) {
+      // ENOENT is the normal case: that host is not configured here. Anything
+      // else — EACCES, EISDIR, a dangling symlink — is a file we were meant to
+      // read and could not, and swallowing it made "no servers configured"
+      // indistinguishable from "we were not allowed to look".
+      if (e.code !== 'ENOENT' && onUnreadable) onUnreadable({ ...loc, error: `${e.code || 'read failed'}: ${e.message}` });
+      continue;
+    }
     let doc;
     try {
       doc = loc.path.endsWith('.toml') ? parseCodexToml(raw) : JSON.parse(raw);
@@ -157,7 +189,7 @@ function readInstalledServers({ cwd = process.cwd(), home = os.homedir(), platfo
       if (onUnreadable) onUnreadable({ ...loc, error: e.message });
       continue;
     }
-    for (const server of parseConfig(doc, loc)) {
+    for (const server of parseConfig(doc, loc, onUnreadable)) {
       servers.push({ ...server, install_cmd: toInstallCmd(server) });
     }
   }

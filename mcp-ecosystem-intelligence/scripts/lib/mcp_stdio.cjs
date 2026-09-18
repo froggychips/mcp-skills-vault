@@ -264,6 +264,12 @@ const FAILURE_CLASS = {
   // run once reported 76 CRASHes that were all this — the daemon buckling under
   // 113 consecutive container starts.
   SANDBOX:   'SANDBOX_UNAVAILABLE',
+  // The server answered, and the answer does not fit the protocol: a
+  // `tools/list` reply with no `tools` array, for instance. Kept apart from
+  // CRASH because the process is alive and talking — and apart from NO_TOOLS,
+  // which is a server that legitimately advertises none. Defaulting the
+  // missing array to `[]` had made this look like a clean zero-tool pass.
+  PROTOCOL:  'PROTOCOL',
   CRASH:     'CRASH',      // exited / protocol error for some other reason
 };
 
