@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@froggychips/mcp-vault.svg)](https://www.npmjs.com/package/@froggychips/mcp-vault)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Zero deps](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](./PHILOSOPHY.md)
-[![Tests](https://img.shields.io/badge/tests-775%20pass-brightgreen.svg)](./tests)
+[![Tests](https://img.shields.io/badge/tests-776%20pass-brightgreen.svg)](./tests)
 
 **Homepage:** [mcp.froggychips.xyz](https://mcp.froggychips.xyz) · **npm:** [`@froggychips/mcp-vault`](https://www.npmjs.com/package/@froggychips/mcp-vault)
 
@@ -751,10 +751,16 @@ threshold on `health_score`:
 
 **Core is empty today, and that is the tier working.** 38 entries start and
 list tools — but no row in the eval snapshot records *which artifact it
-launched*, and a pass for `x@1` is not a statement about `x@2`. The eval writes
-that field on every row now, so the next weekly run fills it in and Core comes
-back on its own. Guessing in the meantime is the one thing this repository
-cannot do.
+launched*, and a pass for `x@1` is not a statement about `x@2`.
+
+There was a second reason, and it was worse: the eval read that artifact id off
+the DB's `version` field while launching the entry's `install_cmd` — and **80
+of the 114 entries ship an unpinned command** (`npx -y pkg`; the verified
+version lives in `version`, and `install` pins it on the way out). So a run of
+`npx -y pkg` would have been recorded as a run of `pkg@1.0.0`. The eval now
+pins before launching, and an entry it cannot pin records no artifact id at
+all. The next weekly run fills the field truthfully and Core comes back on its
+own; guessing in the meantime is the one thing this repository cannot do.
 
 Behaviour promotes but never demotes. 59 verified entries did not complete a
 handshake, and the sandbox runs with an empty environment — `@azure/mcp`,

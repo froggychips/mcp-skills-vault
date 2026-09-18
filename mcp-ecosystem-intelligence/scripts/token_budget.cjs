@@ -91,7 +91,10 @@ function main(argv) {
   const db      = (readJson(DB_PATH, { tools: [] }).tools) || [];
   const evals   = (readJson(opts.results || EVAL_PATH, { results: [] }).results) || [];
   const evalBy  = new Map(evals.map((r) => [r.name, r]));
-  const servers = readInstalledServers({ cwd: opts.cwd });
+  // A host config we could not read is not a host with no servers in it, and
+  // a token total that quietly omits one is worse than no total.
+  const unreadable = [];
+  const servers = readInstalledServers({ cwd: opts.cwd, onUnreadable: (loc) => unreadable.push(loc) });
 
   const rows = servers.map((srv) => {
     const dbEntry = matchDbEntry(srv, db);
@@ -121,6 +124,7 @@ function main(argv) {
 
   const report = {
     schema: 'mcp-vault/token-budget@1',
+    unreadable,
     generated_at: new Date().toISOString(),
     cwd: opts.cwd,
     context_window: opts.context,
@@ -147,10 +151,15 @@ function main(argv) {
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   } else {
     if (!rows.length) {
-      process.stdout.write(`No MCP servers configured for ${opts.cwd}.\n`);
-      return 0;
+      // …unless a config could not be read, in which case "none configured"
+      // is a claim about a file nobody managed to open. Falls through to the
+      // exit-2 branch below.
+      if (!unreadable.length) {
+        process.stdout.write(`No MCP servers configured for ${opts.cwd}.\n`);
+        return 0;
+      }
     }
-    const w = Math.max(20, ...rows.map((r) => r.name.length));
+    const w = Math.max(20, ...rows.map((r) => r.name.length), 20);
     process.stdout.write(`${'server'.padEnd(w)}  ${'tools'.padStart(6)}  ${'tokens'.padStart(8)}  source\n`);
     process.stdout.write(`${'-'.repeat(w)}  ${'-'.repeat(6)}  ${'-'.repeat(8)}  ------\n`);
     for (const r of report.servers) {
@@ -177,6 +186,12 @@ function main(argv) {
   if (opts.budget !== null && pct > opts.budget) {
     process.stderr.write(`\nTool surface is ${report.totals.percent_of_context}% of the context window, over the ${opts.budget}% budget.\n`);
     return 1;
+  }
+  // A total that silently omits a config we could not read is not "under
+  // budget"; it is a total of an unknown fraction of the servers.
+  if (unreadable.length) {
+    for (const u of unreadable) process.stderr.write(`token_budget: ${u.path}: ${u.error}\n`);
+    return 2;
   }
   return 0;
 }

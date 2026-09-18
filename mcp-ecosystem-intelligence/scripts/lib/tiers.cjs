@@ -73,7 +73,7 @@
 
 const { behaviour, blocks } = require('./scores.cjs');
 const { deriveTrust, requiredFor, staleDimensions, isPositive, DEFAULT_MAX_AGE_DAYS } = require('./evidence.cjs');
-const { toTypedEntry, artifactId } = require('./entry_model.cjs');
+const { toTypedEntry, comparableArtifactId, comparableId, packageKey } = require('./entry_model.cjs');
 
 const TIERS = ['Core', 'Recommended', 'Experimental', 'Deprecated'];
 const TIER_ORDER = { Core: 0, Recommended: 1, Experimental: 2, Deprecated: 3 };
@@ -110,10 +110,33 @@ function currentArtifactId(tool) {
     const typed = toTypedEntry(tool);
     if (!typed) return null;
     if ((typed.warnings || []).some((w) => /launch command asks for|no version anywhere/.test(w))) return null;
-    return artifactId(typed.artifact);
+    // Comparable, not literal: a PyPI pin written `1.0.27.0` and one written
+    // `1.0.27` are the same release, and `a_b` and `a.b` are one distribution.
+    return comparableArtifactId(typed.artifact);
   } catch {
     return null;
   }
+}
+
+/** The package, without the version — for a finding that is about the name. */
+function currentPackageKey(tool) {
+  try {
+    const typed = toTypedEntry(tool);
+    return typed ? packageKey(typed.artifact) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The package half of a stored artifact id, comparably. */
+function packageKeyOfId(id) {
+  const c = comparableId(id);
+  if (typeof c !== 'string') return null;
+  const at = c.lastIndexOf('@');
+  // `@scope/pkg` has an `@` at position 4 in `npm:@scope/pkg`; a version's `@`
+  // is always the last one and never the first character of the remainder.
+  if (at <= c.indexOf(':')) return c;
+  return c.slice(0, at);
 }
 
 /**
@@ -127,6 +150,21 @@ function evidenceBinding(tool) {
   const recorded = tool && tool.trust_evidence && tool.trust_evidence.artifact_id;
   const current  = currentArtifactId(tool);
   if (!recorded || !current) return { state: 'unknown', recorded: recorded || null, current };
+  return { state: comparableId(recorded) === current ? 'yes' : 'no', recorded, current };
+}
+
+/**
+ * Is the stored evidence about the same *package*, whatever the version?
+ *
+ * `availability: gone` is the one finding that survives a version change — the
+ * name is unpublished, and a free name can be claimed by somebody else — but
+ * it does not survive a change of *package*. Evidence saying `x` is gone is
+ * not a finding about `y`.
+ */
+function packageBinding(tool) {
+  const recorded = packageKeyOfId(tool && tool.trust_evidence && tool.trust_evidence.artifact_id);
+  const current  = currentPackageKey(tool);
+  if (!recorded || !current) return { state: 'unknown', recorded, current };
   return { state: recorded === current ? 'yes' : 'no', recorded, current };
 }
 
@@ -135,7 +173,7 @@ function behaviourBinding(tool, evalResult) {
   const recorded = evalResult && evalResult.identity && evalResult.identity.artifact_id;
   const current  = currentArtifactId(tool);
   if (!recorded || !current) return { state: 'unknown', recorded: recorded || null, current };
-  return { state: recorded === current ? 'yes' : 'no', recorded, current };
+  return { state: comparableId(recorded) === current ? 'yes' : 'no', recorded, current };
 }
 
 /**
@@ -152,6 +190,7 @@ function classifyEntry(tool, evalResult = null, opts = {}) {
 
   const bound = {
     evidence:  evidenceBinding(tool),
+    package:   packageBinding(tool),
     behaviour: behaviourBinding(tool, evalResult),
   };
   const out = (classification, why) => ({ classification, why, bound });
@@ -160,7 +199,7 @@ function classifyEntry(tool, evalResult = null, opts = {}) {
   // Checked before the binding, and only for the name-scoped status: an
   // unpublished *name* is unpublished whatever version the entry moves to.
   const avail = dims.availability && dims.availability.status;
-  if (NAME_SCOPED.has(avail)) {
+  if (NAME_SCOPED.has(avail) && bound.package.state === 'yes') {
     return out('Deprecated', `availability: ${avail} (as of ${dims.availability.checked_at || 'unknown'})`);
   }
 
@@ -250,6 +289,7 @@ function classifyEntry(tool, evalResult = null, opts = {}) {
 }
 
 module.exports = {
-  classifyEntry, evalIndex, currentArtifactId, evidenceBinding, behaviourBinding,
-  TIERS, TIER_ORDER, NOTHING_TO_INSTALL,
+  classifyEntry, evalIndex, currentArtifactId, currentPackageKey, packageKeyOfId,
+  evidenceBinding, packageBinding, behaviourBinding,
+  TIERS, TIER_ORDER, NOTHING_TO_INSTALL, NAME_SCOPED,
 };

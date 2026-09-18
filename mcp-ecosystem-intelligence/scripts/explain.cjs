@@ -308,14 +308,18 @@ function main(argv) {
   const behav  = behaviour(evalBy.get(tool.name) || null);
 
   // Budget, if the policy has an opinion about context.
+  const unreadableConfigs = [];
   let budget = null;
   if (policy.maxContextTokens !== null || policy.maxContextPercent !== null) {
-    const rows = readInstalledServers({ cwd: opts.cwd }).map((srv) => {
+    // Unreadable host configs make the budget a total of an unknown subset;
+    // the decision record says so rather than presenting it as complete.
+    const rows = readInstalledServers({ cwd: opts.cwd, onUnreadable: (loc) => unreadableConfigs.push(loc) }).map((srv) => {
       const dbEntry = matchDbEntry(srv, db.tools || []);
       return estimateServer({ name: srv.name, dbEntry, evalEntry: evalBy.get(srv.name) || (dbEntry && evalBy.get(dbEntry.name)) });
     });
     const adding = estimateServer({ name: tool.name, dbEntry: tool, evalEntry: evalBy.get(tool.name) });
     budget = wouldExceed({ rows, adding, policy, context: DEFAULT_CONTEXT });
+    if (unreadableConfigs.length) budget = { ...budget, unreadable_configs: unreadableConfigs };
   }
 
   let gate = null;

@@ -36,8 +36,12 @@ nothing must not exit `2`.
 Three consequences that are easy to get wrong, so they are written down:
 
 - A host config that exists and cannot be parsed is `2`, not `0` and not `1` —
-  from every command that reads one. "No findings" would be a claim about
-  servers nothing ever saw.
+  from every command that reads one (`status`, `audit`, `doctor`, `budget`,
+  `lock`, `sbom`, `verify --installed`, `eval --installed`), and a test
+  asserts it for each. "No findings" would be a claim about servers nothing
+  ever saw. A real finding still outranks it: `verify` exits `1` for a hash
+  mismatch even when another config was unreadable, because a mismatch is more
+  actionable than an incomplete scope.
 - A registry that answered for **no** entry at all is `2`. "Nothing
   contradicts" is a statement about a comparison, and that comparison did not
   happen.
@@ -57,11 +61,13 @@ Every JSON document this tool writes carries a schema identifier of the form
 | `mcp-vault/audit@1` | `mcp-vault audit --json` |
 | `mcp-vault/availability@1` | `mcp-vault availability --json` |
 | `mcp-vault/capabilities@1` | `assets/capabilities.json` (the stored scan) |
+| `mcp-vault/candidates@1` | `assets/discovery/candidates.json` |
 | `mcp-vault/capability-scan@1` | `mcp-vault capabilities --json` |
 | `mcp-vault/decision@1` | `mcp-vault explain --json` |
 | `mcp-vault/docker-drift@1` | `mcp-vault docker-drift --json` |
 | `mcp-vault/doctor@1` | `mcp-vault doctor --json` |
 | `mcp-vault/entries@1` | `mcp-vault list --json` |
+| `mcp-vault/eval@1` | `mcp-vault eval --json` |
 | `mcp-vault/health@1` | `mcp-vault health` |
 | `mcp-vault/identity@1` | `mcp-vault identity --json` |
 | `mcp-vault/license-drift@1` | `mcp-vault license-drift --json` |

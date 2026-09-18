@@ -55,9 +55,19 @@ const WRITE   = argv.includes('--write');
 
 // "ghcr.io/owner/repo@sha256:abc" → { registry, repo, digest }
 // "owner/repo:latest"             → { registry: docker.io, repo: library/.. , digest: null }
-function driftExitCode({ drifts = 0, errors = 0, strict = false } = {}) {
-  if (errors > 0) return 1;
+/**
+ * `1` is "there is a finding"; `2` is "the question was not answered".
+ *
+ * Every registry error used to be a `1`, including the case where *nothing*
+ * could be read — so a total outage reported the same code as a real drift,
+ * and a reader of the exit status could not tell "your pins moved" from "we
+ * could not reach a registry".
+ */
+function driftExitCode({ drifts = 0, errors = 0, checked = null, strict = false } = {}) {
   if (strict && drifts > 0) return 1;
+  // Nothing was read at all: an unanswered question.
+  if (errors > 0 && checked !== null && drifts === 0 && errors >= checked) return 2;
+  if (errors > 0) return 1;
   return 0;
 }
 
@@ -175,9 +185,10 @@ async function main() {
   // failure — the review is the gate. Errors still fail: an unreachable
   // registry means nothing was compared.
   exitAfterFlush(driftExitCode({
-    drifts: WRITE ? 0 : drifts.length,
-    errors: errors.length,
-    strict: STRICT,
+    drifts:  WRITE ? 0 : drifts.length,
+    errors:  errors.length,
+    checked: items.length,
+    strict:  STRICT,
   }));
 }
 

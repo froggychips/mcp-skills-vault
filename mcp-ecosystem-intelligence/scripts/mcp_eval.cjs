@@ -104,7 +104,7 @@ function isExactVersion(installCmd, version) {
   if (/^npx\s/.test(String(installCmd))) return /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version);
   return /^\d+(?:\.\d+)*(?:(?:a|b|rc)\d+)?(?:\.post\d+)?(?:\.dev\d+)?(?:\+[0-9A-Za-z.]+)?$/.test(version);
 }
-const { dockerImageRef, npmPkgName, pypiPkgName } = require('./lib/install_cmd.cjs');
+const { dockerImageRef, npmPkgName, pypiPkgName , pinInstallCmd } = require('./lib/install_cmd.cjs');
 
 // Which version a launch command actually asks for; null means it resolves at
 // launch time, so no result can be attributed to a specific release.
@@ -418,14 +418,25 @@ function waitForExitOrTimeout(child, ms, isExited) {
  * a missing field is `unknown`, which is the third answer this repo insists on
  * having.
  */
-function artifactIdentity(tool, parsed) {
+function artifactIdentity(tool, parsed, { launchedPinned = null } = {}) {
   const typed = toTypedEntry(tool);
   const contract = parsed ? `${parsed.command} ${(parsed.args || []).join(' ')}`.trim() : null;
+  // `artifact_id` says *which artifact this run was about*, and a run that
+  // launched an unpinned command was about whatever the registry served at
+  // start-up. 80 of the DB's 114 entries ship an unpinned `install_cmd` — the
+  // verified version lives in the `version` field and `install` pins it on the
+  // way out — so reading the id off `toTypedEntry` recorded `npm:pkg@1.0.0`
+  // for a run of `npx -y pkg`. Consumers then attributed the result to bytes
+  // nobody had pinned. `null` is the honest answer, and the tier treats a null
+  // identity as unattributable rather than as a pass.
+  const id = typed ? artifactId(typed.artifact) : null;
   return {
-    artifact_id:        typed ? artifactId(typed.artifact) : null,
+    artifact_id:        launchedPinned === false ? null : id,
     artifact_integrity: tool.pkg_integrity || null,
     db_version:         tool.version || null,
     launch_digest:      contract ? crypto.createHash('sha256').update(contract).digest('hex').slice(0, 32) : null,
+    // What was actually launched, so a reader can see why an id is absent.
+    launch_pinned:      launchedPinned,
   };
 }
 
@@ -546,7 +557,28 @@ async function smokeEntry(tool, opts) {
     install_cmd: tool.install_cmd || null,
     db_version:  tool.version || null,
   };
-  const parsed = tool._evalSpawn || parseInstallCmd(tool.install_cmd);
+  // Pin before launching, so the run is about the artifact the gate verified
+  // rather than about whatever the registry serves this minute. An entry that
+  // cannot be pinned (a git source, a shape the gate declines to parse) is
+  // still smoked — a handshake is worth knowing — but the run carries no
+  // artifact id, because nothing can name what it launched.
+  let toLaunch = tool;
+  let launchedPinned = null;
+  if (!tool._evalSpawn && typeof tool.install_cmd === 'string') {
+    const pin = pinInstallCmd(tool.install_cmd, tool.version);
+    launchedPinned = pin.pinned;
+    if (pin.pinned) {
+      const pinnedCmd = pin.parts.join(' ');
+      if (pinnedCmd !== tool.install_cmd) {
+        toLaunch = { ...tool, install_cmd: pinnedCmd };
+        result.launched.install_cmd = pinnedCmd;
+        result.launched.pinned_from = tool.install_cmd;
+      }
+    } else {
+      result.launched.unpinned_reason = pin.reason || null;
+    }
+  }
+  const parsed = toLaunch._evalSpawn || parseInstallCmd(toLaunch.install_cmd);
   // The identity of what is about to run, as fields rather than as a string.
   //
   // Comparing `install_cmd` text answered "did the entry's prose change", which
@@ -554,7 +586,7 @@ async function smokeEntry(tool, opts) {
   // and — worse — a snapshot that had dropped the field read as *no* artifact,
   // which made every later surface change look explained by a version bump.
   // See surfaceDrift().
-  result.identity = artifactIdentity(tool, parsed);
+  result.identity = artifactIdentity(toLaunch, parsed, { launchedPinned });
   if (!parsed) {
     result.error_code = 'unrecognized install method';
     return result;
@@ -817,8 +849,10 @@ function pickTools(db, opts) {
  * spawn, and their tool surface costs context on the client's side only once
  * the client connects.
  */
-function pickInstalledTools(opts) {
-  const servers = readInstalledServers({ cwd: opts.cwd });
+function pickInstalledTools(opts, unreadable = null) {
+  // A host config we could not read is not a host with no servers in it.
+  // Collected so the caller can say so instead of quietly describing a subset.
+  const servers = readInstalledServers({ cwd: opts.cwd, onUnreadable: unreadable ? (loc) => unreadable.push(loc) : null });
   const wanted = opts.name ? servers.filter(s => s.name === opts.name || s.name.toLowerCase().includes(opts.name.toLowerCase())) : servers;
   return wanted
     .filter(s => !s.remote && s.command)
@@ -898,11 +932,18 @@ async function main() {
 
   // --no-spawn: schema-lint over the existing results file. Offline-safe.
   if (opts.noSpawn) {
+    // A results file that is not there is not a results file with nothing
+    // wrong in it. `entries: 0, malformed: 0` and exit 0 read as a clean lint.
+    if (!fs.existsSync(opts.results)) {
+      process.stderr.write(`mcp_eval: no results file at ${opts.results} — nothing to lint\n`);
+      return exitAfterFlush(2);
+    }
     const existing = readResults(opts.results);
     const recheck  = noSpawnLint(existing);
     const malformed = recheck.filter(r => r.schema_errors_recheck.length > 0);
     if (opts.json) {
       process.stdout.write(JSON.stringify({
+        schema: 'mcp-vault/eval@1',
         mode: 'no-spawn',
         results_path: opts.results,
         entries: recheck.length,
@@ -935,7 +976,14 @@ async function main() {
   // Live smoke.
   let picked;
   if (opts.installed) {
-    picked = pickInstalledTools(opts);
+    const unreadableConfigs = [];
+    picked = pickInstalledTools(opts, unreadableConfigs);
+    // Smoking an unknown subset of what runs, and reporting it as the set, is
+    // the same overstatement everywhere else in this CLI refuses to make.
+    if (unreadableConfigs.length) {
+      for (const u of unreadableConfigs) process.stderr.write(`mcp_eval: ${u.path}: ${u.error}\n`);
+      return exitAfterFlush(2);
+    }
     if (!picked.length) {
       process.stderr.write(`No local (non-remote) MCP servers configured for ${opts.cwd}\n`);
       process.exit(2);
@@ -1139,6 +1187,7 @@ async function main() {
 
   if (opts.json) {
     process.stdout.write(JSON.stringify({
+      schema: 'mcp-vault/eval@1',
       mode: 'spawn',
       results_path: opts.results,
       checked: newResults.length,

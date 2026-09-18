@@ -100,6 +100,36 @@ test('every offline --json command actually emits a listed schema', () => {
   }
 });
 
+test('every command that reads a host config answers 2 when it cannot', () => {
+  // The contract says 2 never means clean. Measured across the CLI, the same
+  // malformed `.mcp.json` produced 2 from `status`, 1 from `doctor` and **0
+  // from `audit --strict`** — the last reporting a clean setup for servers it
+  // had never seen, and `budget` totalling an unknown subset of them.
+  const { spawnSync } = require('child_process');
+  const os = require('os');
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-exit-home-'));
+
+  const broken = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-exit-'));
+  fs.writeFileSync(path.join(broken, '.mcp.json'), '{ "mcpServers": { oops');
+
+  const commands = [
+    ['status.cjs', []],
+    ['audit_setup.cjs', []],
+    ['doctor.cjs', []],
+    ['token_budget.cjs', []],
+    ['lock.cjs', ['--check']],
+    ['sbom.cjs', ['--installed']],
+    ['verify_integrity.cjs', ['--installed', '--offline']],
+  ];
+  for (const [script, extra] of commands) {
+    const r = spawnSync(process.execPath, [path.join(SCRIPTS, script), ...extra, '--cwd', broken], {
+      encoding: 'utf8',
+      env: { ...process.env, HOME: home, NO_COLOR: '1' },
+    });
+    assert.equal(r.status, 2, `${script} exited ${r.status} on a config it could not read`);
+  }
+});
+
 test('the three exit codes are the ones the scripts actually document', () => {
   // The promise makes a specific claim — 2 never means "clean" — and it is
   // only true if every script agrees on the convention. Checked against the

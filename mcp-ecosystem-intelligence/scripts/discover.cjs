@@ -584,6 +584,7 @@ async function main() {
   }));
 
   const out = {
+    schema:       'mcp-vault/candidates@1',
     generated_at: new Date().toISOString(),
     sources:      SOURCES,
     raw_count:    merged.size,

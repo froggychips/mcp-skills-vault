@@ -120,16 +120,32 @@ function readJsonExplained(file) {
 function serversFrom(file, unreadable) {
   const r = readJsonExplained(file);
   if (r.error) { if (unreadable) unreadable.push({ path: file, error: r.error }); return {}; }
+  if (r.missing) return {};
   const data = r.value;
-  if (r.missing || data === null) return {};
-  if (typeof data !== 'object' || Array.isArray(data)) {
-    if (unreadable) unreadable.push({ path: file, error: 'not an object' });
+  // A document that is literally `null` parses and is not a config. Returning
+  // {} for it made "no servers here" indistinguishable from "this file says
+  // nothing we understand".
+  if (data === null || typeof data !== 'object' || Array.isArray(data)) {
+    if (unreadable) unreadable.push({ path: file, error: `document is ${data === null ? 'null' : (Array.isArray(data) ? 'an array' : typeof data)}, not an object` });
     return {};
   }
   if (data.mcpServers === undefined) return {};
   if (!data.mcpServers || typeof data.mcpServers !== 'object' || Array.isArray(data.mcpServers)) {
     if (unreadable) unreadable.push({ path: file, error: '"mcpServers" is not an object' });
     return {};
+  }
+  // Individual entries too: `audit()` skips a non-object entry with `continue`,
+  // so a server configured as a string simply vanished from the report.
+  const bad = Object.entries(data.mcpServers)
+    .filter(([, v]) => !v || typeof v !== 'object' || Array.isArray(v))
+    .map(([k]) => k);
+  if (bad.length && unreadable) {
+    unreadable.push({
+      path: file,
+      error: bad.length === 1
+        ? `server entry "${bad[0]}" is not an object`
+        : `${bad.length} server entries are not objects: ${bad.slice(0, 5).join(', ')}`,
+    });
   }
   return data.mcpServers;
 }
@@ -142,12 +158,18 @@ function readProjectMcpServers(cwd, unreadable = null) {
   return serversFrom(path.join(cwd, '.mcp.json'), unreadable);
 }
 
-function readSettings(cwd) {
+function readSettings(cwd, unreadable = null) {
   // .claude/settings.json holds the project's enabledMcpjsonServers list
   // (whitelist of mcp.json keys Claude actually loads) and permissions.allow
   // (allowedTools-style filter that scopes which tools each server exposes).
   // Either is enough to consider a heavy server "bounded".
-  const data = readJsonSafe(path.join(cwd, '.claude', 'settings.json'));
+  const file = path.join(cwd, '.claude', 'settings.json');
+  const r = readJsonExplained(file);
+  // A malformed settings file used to fall back to "no scoping configured",
+  // which is the answer that *creates* heavy-unbounded findings — reporting
+  // on a whitelist we had failed to read.
+  if (r.error && unreadable) unreadable.push({ path: file, error: r.error });
+  const data = r.value;
   if (!data || typeof data !== 'object') return { enabled: null, allowedTools: [] };
   const enabled = Array.isArray(data.enabledMcpjsonServers) ? data.enabledMcpjsonServers : null;
   const allow   = data.permissions && Array.isArray(data.permissions.allow)
@@ -477,7 +499,7 @@ function main(argv) {
   const unreadable = [];
   const project  = readProjectMcpServers(cwd, unreadable);
   const global_  = readGlobalMcpServers(globalCfg, unreadable);
-  const settings = readSettings(cwd);
+  const settings = readSettings(cwd, unreadable);
 
   const counts = { project: Object.keys(project).length, global: Object.keys(global_).length };
   const findings = audit({ project, global: global_, settings, db });

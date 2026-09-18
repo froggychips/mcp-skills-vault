@@ -36,9 +36,10 @@ const path = require('path');
 const { exitAfterFlush }   = require('./lib/exit.cjs');
 const { readInstalledServers, toInstallCmd } = require('./lib/installed.cjs');
 const { trustScore }       = require('./lib/scores.cjs');
-const { classifyEntry, evalIndex, currentArtifactId } = require('./lib/tiers.cjs');
-const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
-const { isExactVersion } = require('./lib/install_cmd.cjs');
+const { classifyEntry, evalIndex, currentArtifactId, NAME_SCOPED } = require('./lib/tiers.cjs');
+const {
+  toTypedEntry, artifactId, comparableArtifactId, comparableId, packageKey, isExactArtifact,
+} = require('./lib/entry_model.cjs');
 const { staleDimensions, DEFAULT_MAX_AGE_DAYS } = require('./lib/evidence.cjs');
 const budget               = require('./lib/budget.cjs');
 const { runDoctor }        = require('./doctor.cjs');
@@ -105,67 +106,12 @@ function environment(cwd) {
 }
 
 /**
- * PyPI project names are compared normalised (PEP 503): lowercase, with every
- * run of `-`, `_` and `.` folded to a single `-`.
- *
- * `awslabs_core_mcp_server` and `awslabs.core-mcp-server` are the same
- * distribution, and `uvx` installs either spelling. Comparing the raw strings
- * meant a host launching the underscore form of a yanked package came out as
- * an unvetted server nothing had checked — the finding was in the DB and the
- * match never happened. npm names are not folded this way: there, `a-b` and
- * `a.b` are genuinely different packages.
+ * Identity comparison lives in `lib/entry_model.cjs`, so the tier, the audit
+ * and this command cannot disagree about what "the same artifact" means. They
+ * did: this file folded PyPI names while the tier compared raw ids, so the
+ * underscore spelling of a yanked package matched here and was then rejected
+ * there as belonging to something else.
  */
-function normalizePypiName(name) {
-  return String(name).toLowerCase().replace(/[-_.]+/g, '-');
-}
-
-/**
- * The package identity of an artifact, with the version dropped.
- *
- * This is what "is this the same package?" means. `artifactId` deliberately
- * includes the version, because evidence about 1.2.3 says nothing about 1.2.4
- * — so matching needs the coarser key, and the version comparison happens
- * separately and explicitly.
- */
-function packageKey(artifact) {
-  if (!artifact) return null;
-  switch (artifact.ecosystem) {
-    case 'npm':  return artifact.package ? `npm:${artifact.package}` : null;
-    case 'pypi': return artifact.package ? `pypi:${normalizePypiName(artifact.package)}` : null;
-    case 'oci':  return artifact.image ? `oci:${artifact.image}` : null;
-    case 'git':  return artifact.source ? `git:${artifact.source}` : null;
-    default:     return null;
-  }
-}
-
-/**
- * Does this artifact reference resolve to one set of bytes?
- *
- * Two references being *equal* only means the same bytes when each of them
- * names an exact artifact. `npx -y pkg` on both sides is equal and resolves to
- * whatever npm publishes at start-up; `pkg@latest` is equal and is a moving
- * tag. Treating either as "same" handed the DB's evidence to bytes nobody had
- * seen — the same error as matching by the config key, one level down.
- */
-function isExactReference(artifact) {
-  if (!artifact) return false;
-  switch (artifact.ecosystem) {
-    case 'npm':  return isExactVersion('npx', artifact.version || '');
-    case 'pypi': return isExactVersion('uvx', artifact.version || '');
-    case 'oci':  return Boolean(artifact.digest);
-    // A git source install has no version to be exact about.
-    case 'git':  return false;
-    default:     return false;
-  }
-}
-
-/** A comparable id that folds PyPI spellings, so two names for one distribution match. */
-function comparableArtifactId(artifact) {
-  const id = artifactId(artifact);
-  if (!id || !artifact || artifact.ecosystem !== 'pypi') return id;
-  return `pypi:${normalizePypiName(artifact.package)}${artifact.version ? `@${artifact.version}` : ''}`;
-}
-
 /**
  * What the hosts actually launch, and what the DB knows about *that*.
  *
@@ -214,12 +160,11 @@ function installed({ cwd, db, evals }) {
     const vaultTyped  = toTypedEntry(entry);
     // Equality is necessary and not sufficient: both sides must also *resolve*
     // to one artifact. `npx -y pkg` equals `npx -y pkg` and names nothing.
-    const pinned      = isExactReference(typed.artifact);
-    const vaultPinned = Boolean(vaultTyped && isExactReference(vaultTyped.artifact));
+    const pinned      = isExactArtifact(typed.artifact);
+    const vaultPinned = Boolean(vaultTyped && isExactArtifact(vaultTyped.artifact));
     const comparable  = comparableArtifactId(typed.artifact);
-    const vaultComparable = vaultTyped ? comparableArtifactId(vaultTyped.artifact) : null;
-    const version_match = (!comparable || !vaultComparable || !vaultId) ? 'unknown'
-      : (pinned && vaultPinned && comparable === vaultComparable ? 'same' : 'different');
+    const version_match = (!comparable || !vaultId) ? 'unknown'
+      : (pinned && vaultPinned && comparable === vaultId ? 'same' : 'different');
 
     const row = {
       ...base,
@@ -233,13 +178,27 @@ function installed({ cwd, db, evals }) {
     };
 
     if (version_match !== 'same') {
-      // No tier: every stored claim under this entry is about `vault_artifact`.
-      row.tier = null;
-      row.tier_reason = !pinned
-        ? `the launch command resolves at start-up (${installedId || 'unparseable'}), so what runs is not the ${vaultId || 'artifact'} the vault verified`
-        : (!vaultPinned
-          ? `the vault's own entry is not pinned to one artifact (${vaultId}), so there is nothing to compare this host's ${installedId} against`
-          : `the vault verified ${vaultId}; this host launches ${installedId}`);
+      // One finding does survive a version change: an unpublished *name*. The
+      // package is gone, and a free name can be claimed by somebody else, so
+      // it applies to whatever version this host launches.
+      const availability = (entry.trust_evidence && entry.trust_evidence.dimensions
+        && entry.trust_evidence.dimensions.availability) || null;
+      const nameGone = availability && NAME_SCOPED.has(availability.status)
+        && packageKey(typed.artifact) === packageKey(vaultTyped && vaultTyped.artifact);
+
+      // No tier: every other stored claim under this entry is about
+      // `vault_artifact`, which is not what this host runs.
+      row.tier = nameGone ? 'Deprecated' : null;
+      row.tier_reason = nameGone
+        ? `availability: ${availability.status} (as of ${availability.checked_at || 'unknown'}) — the package name itself, whatever version is launched`
+        : (version_match === 'unknown'
+          // A defect in the *vault's* entry, not drift in the user's setup:
+          // reporting it as drift blamed the reader for our bad data and, with
+          // --strict, failed their build for it.
+          ? `the vault's own entry does not name one artifact (${vaultId || 'no id'}), so this host's ${installedId || 'launch command'} cannot be compared against it`
+          : (!pinned
+            ? `the launch command resolves at start-up (${installedId || 'unparseable'}), so what runs is not the ${vaultId} the vault verified`
+            : `the vault verified ${vaultId}; this host launches ${installedId}`));
       rows.push(row);
       continue;
     }
@@ -289,9 +248,12 @@ function context(rows, db, evals) {
   const measurementFor = (r) => {
     if (!r.in_db || r.version_match !== 'same') return null;
     const row = evals.get(r.db_entry);
-    if (!row) return null;
+    // A run that failed is not a measurement of anything, however many bytes
+    // it managed to emit first: a partial `tools/list` from a crashing server
+    // was being spent as a token total.
+    if (!row || row.status !== 'pass') return null;
     const recorded = row.identity && row.identity.artifact_id;
-    if (!recorded || recorded !== r.vault_artifact) return null;
+    if (!recorded || comparableId(recorded) !== r.vault_artifact) return null;
     return row;
   };
 
@@ -307,8 +269,11 @@ function context(rows, db, evals) {
         dbEntry: (r.in_db && r.version_match === 'same' && db.tools.find((t) => t.name === r.db_entry)) || null,
         evalEntry: row,
       });
-      // A first page cannot be a total, so the number travels with the fact.
-      return { ...est, at_least: Boolean(row && row.tools_truncated) };
+      // A first page cannot be a total, so the number travels with the fact —
+      // and `null` stays `null`: a row written before the field existed has
+      // not established that its list was complete, and saying `false` would
+      // be a claim nobody made.
+      return { ...est, at_least: row ? (row.tools_truncated === undefined ? null : row.tools_truncated) : null };
     });
   const summary = budget.summarise(estimates);
   // "47% of your window" is a number; *which server* spent it is the finding.
@@ -331,13 +296,14 @@ function context(rows, db, evals) {
     .filter((r) => r.in_db && r.version_match !== 'same')
     .map((r) => {
       const row = evals.get(r.db_entry);
-      const recorded = row && row.identity && row.identity.artifact_id;
+      if (!row || row.status !== 'pass') return null;
+      const recorded = row.identity && row.identity.artifact_id;
       if (!recorded) return null;
       const e = budget.estimateServer({ name: r.name, dbEntry: null, evalEntry: row });
       if (e.tokens === null || e.source !== 'measured') return null;
       return {
         ...e,
-        at_least: Boolean(row.tools_truncated),
+        at_least: row.tools_truncated === undefined ? null : row.tools_truncated,
         measured_artifact: recorded,
         installed_artifact: r.installed_artifact,
       };
@@ -383,7 +349,7 @@ function project({ cwd, db, installedRows }) {
  * server is a gap in *our* coverage, not a finding about the server, and a
  * default that failed on it would train people to pass --no-strict forever.
  */
-function verdict({ env, installedRows, auditFindings, strict }) {
+function verdict({ env, installedRows, auditFindings, auditUnreadable = [], strict }) {
   const blocking   = [];   // something installed must not run  → 1
   const notable    = [];   // worth knowing, not a blocker      → 1 only with --strict
   const unanswered = [];   // a question we could not answer    → 2
@@ -418,11 +384,26 @@ function verdict({ env, installedRows, auditFindings, strict }) {
     // Drift is a finding about *this host*, on every host — the audit below
     // only reads Claude Code's two files, so without this a Cursor-only setup
     // running an unpinned or superseded version came out clean.
-    if (r.version_match !== 'same') { notable.push(`${r.name}: ${r.tier_reason}`); continue; }
+    if (r.version_match === 'unknown') {
+      // Our data, not theirs. Blaming a reader's setup for the vault's own
+      // malformed entry — and failing their build for it under --strict — is
+      // a finding pointed the wrong way.
+      unanswered.push(`${r.name}: ${r.tier_reason}`);
+      continue;
+    }
+    if (r.version_match !== 'same') {
+      // A name that is gone applies whatever version is launched.
+      (r.tier === 'Deprecated' ? blocking : notable).push(`${r.name}: ${r.tier_reason}`);
+      continue;
+    }
     if (r.tier === 'Deprecated') blocking.push(`${r.name}: ${r.tier_reason}`);
     else if (r.stale && r.stale.length) notable.push(`${r.name}: ${r.stale.length} claim(s) past their shelf life (${r.stale.join(', ')})`);
   }
 
+  for (const u of auditUnreadable) {
+    const line = `${u.path}: ${u.error}`;
+    if (!unanswered.includes(line)) unanswered.push(line);
+  }
   for (const f of auditFindings) {
     if (!auditSetup.STRICT_CATEGORIES.has(f.category)) continue;
     const line = `${f.server}: ${f.message}`;
@@ -476,7 +457,7 @@ function printReport(r) {
   // 4. context
   if (r.context.servers) {
     const c = r.context;
-    const lowerBound = (c.rows || []).some((e) => e.at_least && e.tokens !== null);
+    const lowerBound = (c.rows || []).some((e) => e.at_least !== false && e.tokens !== null && e.source !== 'unknown');
     out(`${label('Context')}${lowerBound ? 'at least ' : ''}${c.tokens.toLocaleString('en-US')} tokens on every request`
       + ` ${DM}·${RS} ${c.percent_of_context}% of a 200k window`
       + (c.unknown_servers ? ` ${DM}·${RS} ${YL}${c.unknown_servers} not measured${RS}` : '') + '\n');
@@ -486,7 +467,7 @@ function printReport(r) {
     }
     const big = (c.measured_on_another_version || [])[0];
     if (big) {
-      out(`${' '.repeat(16)}${DM}not counted: ${big.name} listed ${big.at_least ? 'at least ' : ''}${big.tools} tools`
+      out(`${' '.repeat(16)}${DM}not counted: ${big.name} listed ${big.at_least !== false ? 'at least ' : ''}${big.tools} tools`
         + ` (~${big.tokens.toLocaleString('en-US')}) when we measured ${big.measured_artifact},`
         + ` but this host launches ${big.installed_artifact}${RS}\n`);
     }
@@ -555,10 +536,14 @@ function main(argv) {
 
   const env           = environment(opts.cwd);
   const installedRows = installed({ cwd: opts.cwd, db, evals });
+  // The audit's own reads can fail too, and its default settings are the
+  // answer that *creates* heavy-unbounded findings, so an unreadable
+  // `.claude/settings.json` must not silently become "nothing is scoped".
+  const auditUnreadable = [];
   const auditFindings = auditSetup.audit({
-    project:  auditSetup.readProjectMcpServers(opts.cwd),
-    global:   auditSetup.readGlobalMcpServers(path.join(process.env.HOME || '', '.claude.json')),
-    settings: auditSetup.readSettings(opts.cwd),
+    project:  auditSetup.readProjectMcpServers(opts.cwd, auditUnreadable),
+    global:   auditSetup.readGlobalMcpServers(path.join(process.env.HOME || '', '.claude.json'), auditUnreadable),
+    settings: auditSetup.readSettings(opts.cwd, auditUnreadable),
     db,
     evals,
   });
@@ -577,7 +562,7 @@ function main(argv) {
     project:     project({ cwd: opts.cwd, db, installedRows }),
     audit:       auditFindings,
   };
-  report.verdict = verdict({ env, installedRows, auditFindings, strict: opts.strict });
+  report.verdict = verdict({ env, installedRows, auditFindings, auditUnreadable, strict: opts.strict });
 
   if (opts.json) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   else printReport(report);

@@ -117,14 +117,16 @@ function readJson(file, fallback) {
 }
 
 /** The servers to lock: one DB entry, or everything this project configures. */
-function subjects(opts, db) {
+function subjects(opts, db, unreadable = null) {
   if (opts.entry) {
     const tool = (db.tools || []).find((t) => t.name === opts.entry);
     return tool ? [tool] : [];
   }
   // A configured server is the subject of record: the lockfile describes what
   // this project runs, and the DB is consulted for the pin to compare against.
-  return readInstalledServers({ cwd: opts.cwd })
+  // A host config we could not read is not a host with no servers in it.
+  // Collected so the caller can say so instead of quietly describing a subset.
+  return readInstalledServers({ cwd: opts.cwd, onUnreadable: unreadable ? (loc) => unreadable.push(loc) : null })
     .filter((srv) => !srv.remote)
     .filter((srv) => opts.includeUser || srv.scope !== 'user')
     .map((srv) => {
@@ -261,7 +263,14 @@ async function main(argv) {
       .map((r) => [r.name, { ...r.surface, observed_at: (r.checked_at || '').slice(0, 10) || null }])
   );
 
-  const targets = subjects(opts, db);
+  const unreadableConfigs = [];
+  const targets = subjects(opts, db, unreadableConfigs);
+  // A lockfile that silently omits a host we could not read is a lockfile
+  // describing an unknown subset of what runs.
+  if (unreadableConfigs.length) {
+    for (const u of unreadableConfigs) process.stderr.write(`lock: ${u.path}: ${u.error}\n`);
+    return 2;
+  }
   if (!targets.length) {
     process.stderr.write(opts.entry
       ? `lock: no entry named "${opts.entry}" in the vault DB\n`

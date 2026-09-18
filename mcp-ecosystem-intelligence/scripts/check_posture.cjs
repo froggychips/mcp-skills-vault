@@ -29,7 +29,8 @@
  * Exit codes:
  *   0  no repository with a report has a failing check
  *   1  at least one does (with --strict)
- *   2  bad arguments
+ *   2  bad arguments, or deps.dev answered for no repository at all — an
+ *      unanswered check must not exit 0
  */
 
 'use strict';
@@ -185,7 +186,14 @@ function main(argv) {
       process.stdout.write(`${DM}"No report" is not a finding: Scorecard only covers repositories somebody ran it on.${RS}\n`);
     }
 
-    return opts.strict && weak.length ? 1 : 0;
+    if (opts.strict && weak.length) return 1;
+    // deps.dev answered for nothing at all. "No repository has a failing
+    // check" is a statement about reports we never received.
+    if (rows.length && !reported.length && !noReport) {
+      process.stderr.write('check_posture: deps.dev answered for no repository — nothing was established\n');
+      return 2;
+    }
+    return 0;
   });
 }
 

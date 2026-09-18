@@ -256,6 +256,7 @@ async function main(argv) {
   const evalBy = new Map(evals.map((r) => [r.name, r]));
 
   let subjects;
+  const unreadableConfigs = [];
   let subjectName;
   if (opts.entry) {
     subjects = db.filter((t) => t.name === opts.entry);
@@ -265,7 +266,9 @@ async function main(argv) {
     // The configured servers, with DB entries attached where they exist. A
     // server that is not in the vault still belongs in the SBOM — "we run this
     // and know nothing about it" is exactly what an SBOM is for.
-    subjects = readInstalledServers({ cwd: opts.cwd }).map((srv) => {
+  // A host config we could not read is not a host with no servers in it.
+  // Collected so the caller can say so instead of quietly describing a subset.
+    subjects = readInstalledServers({ cwd: opts.cwd, onUnreadable: (loc) => unreadableConfigs.push(loc) }).map((srv) => {
       const install_cmd = srv.install_cmd || toInstallCmd(srv);
       const entry = db.find((t) => t.name === srv.name)
         || db.find((t) => t.install_cmd && install_cmd && t.install_cmd === install_cmd);
@@ -278,6 +281,12 @@ async function main(argv) {
         };
     });
     subjectName = `MCP servers configured for ${opts.cwd}`;
+    // A bill of materials that silently omits a host we could not read is a
+    // bill of materials for an unknown subset of what runs.
+    if (unreadableConfigs.length) {
+      for (const u of unreadableConfigs) process.stderr.write(`sbom: ${u.path}: ${u.error}\n`);
+      return 2;
+    }
     if (!subjects.length) { process.stderr.write(`sbom: no MCP servers configured for ${opts.cwd}\n`); return 2; }
   } else {
     subjects = db;

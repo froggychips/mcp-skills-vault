@@ -53,15 +53,18 @@ test('fallbackBySignal: substring match against name+notes, skips Deprecated', (
   // vulnerability at the pinned version. A yanked package is the clearest
   // case, and no stored label can override or fake it.
   // `gone` rather than `yanked`: `gone` says nothing is published under that
-  // name at all, which needs no artifact-id binding to be true. A `yanked`
-  // recorded without an id would be evidence about bytes we cannot identify,
-  // and the tier says so instead of blocking.
-  const yanked = { dimensions: { availability: { status: 'gone', checked_at: '2026-09-17' } } };
+  // *name*, which survives a version change. It still has to be evidence about
+  // this package, though — evidence saying `x` is gone is not a finding about
+  // `y` — so the entry names an artifact and the evidence is bound to it.
+  const gone = {
+    artifact_id: 'npm:salesforce-legacy@1.0.0',
+    dimensions: { availability: { status: 'gone', checked_at: '2026-09-17' } },
+  };
   const db = {
     tools: [
-      { name: '@salesforce/mcp', notes: 'CRM server' },
-      { name: 'salesforce-legacy', notes: '', trust_evidence: yanked },
-      { name: 'irrelevant', notes: 'no match' },
+      { name: '@salesforce/mcp', notes: 'CRM server', install_cmd: 'npx -y @salesforce/mcp@1.0.0' },
+      { name: 'salesforce-legacy', notes: '', install_cmd: 'npx -y salesforce-legacy@1.0.0', trust_evidence: gone },
+      { name: 'irrelevant', notes: 'no match', install_cmd: 'npx -y irrelevant@1.0.0' },
     ],
   };
   const hits = o.fallbackBySignal(db, 'salesforce');
