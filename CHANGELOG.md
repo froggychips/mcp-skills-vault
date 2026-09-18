@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.14.1](https://github.com/froggychips/mcp-skills-vault/compare/v0.14.0...v0.14.1) (2026-09-18)
+
+
+### Bug Fixes
+
+* **explain:** a rule about a check that never ran is unknown, not a denial ([7aaf9d6](https://github.com/froggychips/mcp-skills-vault/commit/7aaf9d6dedcbff652512fd357ffb86d135560d1f))
+* **explain:** a rule about a check that never ran is unknown, not a denial ([464c99e](https://github.com/froggychips/mcp-skills-vault/commit/464c99e1262038f410fd12f44b6c960b96ba3bc4))
+
+
+### Documentation
+
+* **security:** record that 0.14.0 shipped without provenance, and why ([fa72be4](https://github.com/froggychips/mcp-skills-vault/commit/fa72be45dd4c4acf0eabd2623561f9455f5abc58))
+
 ## [0.14.0](https://github.com/froggychips/mcp-skills-vault/compare/v0.13.0...v0.14.0) (2026-09-17)
 
 
