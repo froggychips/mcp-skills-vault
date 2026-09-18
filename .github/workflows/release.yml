@@ -125,16 +125,30 @@ jobs:
       always() &&
       (needs.release-please.outputs.release_created == 'true' ||
        (github.event_name == 'workflow_dispatch' && inputs.publish_npm))
-    # self-hosted: GitHub-hosted runners do not start on this account. Publishing
-    # our own code needs no isolation from itself, so the trusted runner is fine.
-    runs-on: self-hosted
+    # github-hosted, and it has to be: npm refuses a provenance bundle built
+    # anywhere else. The exact answer when 0.15.0 tried it on the self-hosted
+    # runner:
+    #
+    #   npm error 422 Unprocessable Entity — Error verifying sigstore provenance
+    #   bundle: Unsupported GitHub Actions runner environment: "self-hosted".
+    #   Only "github-hosted" runners are supported when publishing with
+    #   provenance.
+    #
+    # The comment that used to sit here said the opposite — that because the
+    # OIDC token comes from GitHub rather than from the runner, a self-hosted
+    # runner works too. That reasoning is about where the *token* comes from,
+    # and npm's check is about where the *build* ran. It cost a release: the
+    # tag and the GitHub Release went public and npm got nothing.
+    #
+    # This is the only job in the repository that needs a hosted runner. If
+    # hosted runners will not start on this account, the job queues and nothing
+    # is published, which is the right failure: see SECURITY.md.
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
-      # npm provenance is signed against a GitHub OIDC token. The token comes
-      # from GitHub, not from the runner, so this works on a self-hosted runner
-      # too — the earlier comment claiming provenance needed a hosted runner was
-      # wrong about where the token comes from.
+      # Provenance is signed against a GitHub OIDC token, which this grants.
+      # Necessary, and — per the 422 above — not sufficient.
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
