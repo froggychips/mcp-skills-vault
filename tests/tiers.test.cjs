@@ -258,3 +258,61 @@ test('the shipped DB stores no tier, no in_registry and no last_checked', () => 
     assert.ok(r.why && r.why.length > 0, `${t.name} has a tier with no reason`);
   }
 });
+
+test('packageKeyOfId reads a stored id by ecosystem, not by the last @', () => {
+  // Splitting at the last `@` turned a missing input into a value twice:
+  // `npm:@scope/pkg` with no version became `"npm:"` — a key of nothing that
+  // then matched any other id degrading the same way — and a git URL carrying
+  // credentials became `git:git+https://user`.
+  const { packageKeyOfId } = require('../mcp-ecosystem-intelligence/scripts/lib/tiers.cjs');
+  const cases = {
+    'npm:@scope/pkg@1.0.0':          'npm:@scope/pkg',
+    'npm:@scope/pkg':                'npm:@scope/pkg',
+    'npm:pkg@1.0.0':                 'npm:pkg',
+    'npm:pkg':                       'npm:pkg',
+    'pypi:a_b@1.0':                  'pypi:a-b',
+    'pypi:a.b':                      'pypi:a-b',
+    'oci:ghcr.io/o/r@sha256:aa':     'oci:ghcr.io/o/r',
+    'oci:ghcr.io/o/r:tag':           'oci:ghcr.io/o/r',
+    'oci:host:5000/o/r:tag':         'oci:host:5000/o/r',
+    'git:git+https://user@host/x':   'git:git+https://user@host/x',
+  };
+  for (const [id, want] of Object.entries(cases)) assert.equal(packageKeyOfId(id), want, id);
+  // An id this cannot read is null, never a prefix.
+  for (const id of ['', 'npm:', 'nonsense', 'npm', null, undefined, 42]) {
+    assert.equal(packageKeyOfId(id), null, String(id));
+  }
+});
+
+test('PyPI versions compare by PEP 440, and never through Number', () => {
+  // `Number` merged `9007199254740992` and `9007199254740993` — different
+  // releases that round to the same double — so evidence could bind across
+  // them. A version string is not a number.
+  const m = require('../mcp-ecosystem-intelligence/scripts/lib/entry_model.cjs');
+  const same = [['1.0.27.0', '1.0.27'], ['1.0.0', '1'], ['01.2', '1.2'],
+    ['1.0rc01', '1.0rc1'], ['1.0+abc.01', '1.0+abc.1'],
+    ['1.0.post007', '1.0.post7'], ['1.0.dev01', '1.0.dev1']];
+  for (const [a, b] of same) {
+    assert.equal(m.normalizePypiVersion(a), m.normalizePypiVersion(b), `${a} vs ${b}`);
+  }
+  assert.notEqual(
+    m.normalizePypiVersion('9007199254740992'),
+    m.normalizePypiVersion('9007199254740993'),
+    'two releases a double cannot tell apart',
+  );
+  // npm is not folded: `1.0.0` and `1` are not the same semver, and `a-b` and
+  // `a.b` are different packages.
+  assert.equal(m.comparableArtifactId({ ecosystem: 'npm', package: 'a.b', version: '1.0.0' }), 'npm:a.b@1.0.0');
+  assert.notEqual(
+    m.comparableArtifactId({ ecosystem: 'npm', package: 'a-b', version: '1.0.0' }),
+    m.comparableArtifactId({ ecosystem: 'npm', package: 'a.b', version: '1.0.0' }),
+  );
+});
+
+test('an OCI digest has to look like one', () => {
+  const m = require('../mcp-ecosystem-intelligence/scripts/lib/entry_model.cjs');
+  assert.equal(m.isExactArtifact({ ecosystem: 'oci', image: 'x', digest: 'sha256:bad' }), false);
+  assert.equal(m.isExactArtifact({ ecosystem: 'oci', image: 'x', digest: `sha256:${'a'.repeat(64)}` }), true);
+  assert.equal(m.isExactArtifact({ ecosystem: 'oci', image: 'x', tag: 'latest' }), false);
+  assert.equal(m.isExactArtifact({ ecosystem: 'git', source: 'git+https://x' }), false);
+});

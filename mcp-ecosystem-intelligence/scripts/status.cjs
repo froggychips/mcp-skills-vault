@@ -36,7 +36,7 @@ const path = require('path');
 const { exitAfterFlush }   = require('./lib/exit.cjs');
 const { readInstalledServers, toInstallCmd } = require('./lib/installed.cjs');
 const { trustScore }       = require('./lib/scores.cjs');
-const { classifyEntry, evalIndex, currentArtifactId, NAME_SCOPED } = require('./lib/tiers.cjs');
+const { classifyEntry, evalIndex, currentArtifactId, packageKeyOfId, NAME_SCOPED } = require('./lib/tiers.cjs');
 const {
   toTypedEntry, artifactId, comparableArtifactId, comparableId, packageKey, isExactArtifact,
 } = require('./lib/entry_model.cjs');
@@ -183,8 +183,16 @@ function installed({ cwd, db, evals }) {
       // it applies to whatever version this host launches.
       const availability = (entry.trust_evidence && entry.trust_evidence.dimensions
         && entry.trust_evidence.dimensions.availability) || null;
+      // Three packages have to agree, not two: what this host launches, what
+      // the vault entry installs, and what the *evidence* was recorded
+      // against. Comparing only the first two recreated the bug the tier had
+      // just fixed — evidence saying `x` is gone produced Deprecated for an
+      // entry that now installs `y`.
+      const evidencePackage = packageKeyOfId(entry.trust_evidence && entry.trust_evidence.artifact_id);
+      const hostPackage     = packageKey(typed.artifact);
+      const vaultPackage    = packageKey(vaultTyped && vaultTyped.artifact);
       const nameGone = availability && NAME_SCOPED.has(availability.status)
-        && packageKey(typed.artifact) === packageKey(vaultTyped && vaultTyped.artifact);
+        && Boolean(hostPackage) && hostPackage === vaultPackage && hostPackage === evidencePackage;
 
       // No tier: every other stored claim under this entry is about
       // `vault_artifact`, which is not what this host runs.
@@ -412,7 +420,10 @@ function verdict({ env, installedRows, auditFindings, auditUnreadable = [], stri
     if (!notable.includes(line)) notable.push(line);
   }
 
-  const code = unanswered.length ? 2 : (blocking.length ? 1 : (strict && notable.length ? 1 : 0));
+  // A finding outranks an incomplete scope: "one of your servers must not run"
+  // is more actionable than "one of your configs would not parse", and
+  // docs/COMPATIBILITY.md says so. Both are printed either way.
+  const code = blocking.length ? 1 : (unanswered.length ? 2 : (strict && notable.length ? 1 : 0));
   return { blocking, notable, unanswered, exit_code: code };
 }
 
@@ -457,7 +468,10 @@ function printReport(r) {
   // 4. context
   if (r.context.servers) {
     const c = r.context;
-    const lowerBound = (c.rows || []).some((e) => e.at_least !== false && e.tokens !== null && e.source !== 'unknown');
+    // `null` is "we do not know whether that list was complete", and printing
+    // "at least" for it turns an unknown into an affirmative lower bound — a
+    // DB *estimate* of 100 tools became "at least 35,000 tokens".
+    const lowerBound = (c.rows || []).some((e) => e.at_least === true && e.tokens !== null);
     out(`${label('Context')}${lowerBound ? 'at least ' : ''}${c.tokens.toLocaleString('en-US')} tokens on every request`
       + ` ${DM}·${RS} ${c.percent_of_context}% of a 200k window`
       + (c.unknown_servers ? ` ${DM}·${RS} ${YL}${c.unknown_servers} not measured${RS}` : '') + '\n');
@@ -467,7 +481,7 @@ function printReport(r) {
     }
     const big = (c.measured_on_another_version || [])[0];
     if (big) {
-      out(`${' '.repeat(16)}${DM}not counted: ${big.name} listed ${big.at_least !== false ? 'at least ' : ''}${big.tools} tools`
+      out(`${' '.repeat(16)}${DM}not counted: ${big.name} listed ${big.at_least === true ? 'at least ' : ''}${big.tools} tools`
         + ` (~${big.tokens.toLocaleString('en-US')}) when we measured ${big.measured_artifact},`
         + ` but this host launches ${big.installed_artifact}${RS}\n`);
     }

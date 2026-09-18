@@ -195,14 +195,33 @@ function normalizePypiName(name) {
   return String(name).toLowerCase().replace(/[-_.]+/g, '-');
 }
 
-/** PEP 440: trailing zero segments of the release are not significant. */
+/**
+ * PEP 440 normalisation, as far as two pins need it to compare equal.
+ *
+ * Trailing zero segments of the release are not significant (`1.0.27.0` ==
+ * `1.0.27`), and neither are leading zeros anywhere a number appears —
+ * `1.0rc01` == `1.0rc1`, `1.0+abc.01` == `1.0+abc.1`.
+ *
+ * Leading zeros are stripped **textually**, never through `Number`:
+ * `9007199254740993` and `9007199254740992` are different releases and both
+ * round to the same double, so a numeric pass merged two versions that are not
+ * the same. A version string is not a number.
+ */
+function stripLeadingZeros(digits) {
+  const t = digits.replace(/^0+(?=\d)/, '');
+  return t === '' ? '0' : t;
+}
+
 function normalizePypiVersion(version) {
   const v = String(version).trim().toLowerCase();
   const m = /^(\d+(?:\.\d+)*)(.*)$/.exec(v);
   if (!m) return v;
-  const release = m[1].split('.').map((n) => String(Number(n)));
+  const release = m[1].split('.').map(stripLeadingZeros);
   while (release.length > 1 && release[release.length - 1] === '0') release.pop();
-  return release.join('.') + m[2];
+  // Every remaining run of digits — in `rc01`, `.post007`, `.dev01` and each
+  // dot-separated part of a local label — normalises the same way.
+  const rest = m[2].replace(/\d+/g, stripLeadingZeros);
+  return release.join('.') + rest;
 }
 
 function packageKey(artifact) {
@@ -257,5 +276,5 @@ function isExactArtifact(artifact) {
 module.exports = {
   toTypedEntry, renderInstallCommand, validateEntry, artifactId,
   comparableArtifactId, comparableId, packageKey, isExactArtifact,
-  normalizePypiName, normalizePypiVersion, SHA256_DIGEST,
+  normalizePypiName, normalizePypiVersion, stripLeadingZeros, SHA256_DIGEST,
 };

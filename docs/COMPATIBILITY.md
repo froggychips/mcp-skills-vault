@@ -37,11 +37,13 @@ Three consequences that are easy to get wrong, so they are written down:
 
 - A host config that exists and cannot be parsed is `2`, not `0` and not `1` —
   from every command that reads one (`status`, `audit`, `doctor`, `budget`,
-  `lock`, `sbom`, `verify --installed`, `eval --installed`), and a test
-  asserts it for each. "No findings" would be a claim about servers nothing
-  ever saw. A real finding still outranks it: `verify` exits `1` for a hash
-  mismatch even when another config was unreadable, because a mismatch is more
-  actionable than an incomplete scope.
+  `lock`, `sbom`, `verify --installed`), and a test asserts it for each.
+  `eval --installed` does the same but is not in that test, because asserting
+  it would mean spawning servers. "No findings" would be a claim about servers nothing
+  ever saw. A real finding still outranks it, everywhere: `verify` exits `1`
+  for a hash mismatch and `status` exits `1` for a server that must not run,
+  even when another config was unreadable — a finding is more actionable than
+  an incomplete scope, and both are printed either way.
 - A registry that answered for **no** entry at all is `2`. "Nothing
   contradicts" is a statement about a comparison, and that comparison did not
   happen.
@@ -54,7 +56,7 @@ yesterday exiting `1` today with the same arguments — is a major release.
 ### 3. `--json` payloads
 
 Every JSON document this tool writes carries a schema identifier of the form
-`mcp-vault/<name>@<major>`:
+`mcp-vault/<name>@<major>` — with two stated exceptions below:
 
 | Identifier | Written by |
 |---|---|
@@ -82,6 +84,18 @@ Every JSON document this tool writes carries a schema identifier of the form
 | `mcp-vault/token-budget@1` | `mcp-vault budget --json` |
 | `mcp-vault/upgrade-plan@1` | `mcp-vault upgrade --json` |
 | `mcp-vault/verify-report@1` | `mcp-vault verify --json` |
+
+Two documents are deliberately not in that list, because they answer to
+someone else's schema:
+
+- **`mcp-vault sbom`** emits [CycloneDX 1.6](https://cyclonedx.org/), whose own
+  `$schema` and `specVersion` govern it. Everything this project adds lives
+  under `properties` with a `mcp-vault:` prefix, and *those* names follow the
+  additive rule below.
+- **`assets/eval_results.json`**, the stored behavioural snapshot, carries a
+  `$schema` string that is prose, not a version. It is an evidence stream a
+  maintainer reads, the `--json` summary over it (`mcp-vault/eval@1`) is the
+  interface, and rows gain fields as checks are added.
 
 Within one schema major:
 

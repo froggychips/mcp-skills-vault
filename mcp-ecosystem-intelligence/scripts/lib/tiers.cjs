@@ -128,15 +128,44 @@ function currentPackageKey(tool) {
   }
 }
 
-/** The package half of a stored artifact id, comparably. */
+/**
+ * The package half of a stored artifact id, comparably.
+ *
+ * Splitting at the last `@` is wrong in two ways that both turn a missing
+ * input into a value: `npm:@scope/pkg` with no version produced `"npm:"` — a
+ * key of nothing, which then matched any other id that degraded the same way —
+ * and `git:git+https://user@host/x` produced `git:git+https://user`. Parsed by
+ * ecosystem instead, and an id this cannot read returns null.
+ */
 function packageKeyOfId(id) {
   const c = comparableId(id);
   if (typeof c !== 'string') return null;
-  const at = c.lastIndexOf('@');
-  // `@scope/pkg` has an `@` at position 4 in `npm:@scope/pkg`; a version's `@`
-  // is always the last one and never the first character of the remainder.
-  if (at <= c.indexOf(':')) return c;
-  return c.slice(0, at);
+  const colon = c.indexOf(':');
+  if (colon <= 0) return null;
+  const eco  = c.slice(0, colon);
+  const rest = c.slice(colon + 1);
+  if (!rest) return null;
+
+  if (eco === 'npm' || eco === 'pypi') {
+    // A scope makes the name start with `@`, so a version separator is an `@`
+    // *after* index 0. No such `@` means the id carries no version.
+    const at = rest.lastIndexOf('@');
+    const name = at > 0 ? rest.slice(0, at) : rest;
+    return name ? `${eco}:${name}` : null;
+  }
+  if (eco === 'oci') {
+    // `image@sha256:…` or `image:tag`; a `:` inside the registry host
+    // (`host:5000/x`) comes before the last `/` and is not a tag.
+    const at = rest.indexOf('@');
+    const ref = at === -1 ? rest : rest.slice(0, at);
+    const slash = ref.lastIndexOf('/');
+    const tag = ref.indexOf(':', slash + 1);
+    const image = tag === -1 ? ref : ref.slice(0, tag);
+    return image ? `oci:${image}` : null;
+  }
+  // A git source install has no version, so the whole reference is the key.
+  if (eco === 'git') return c;
+  return null;
 }
 
 /**

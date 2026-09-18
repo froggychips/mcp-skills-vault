@@ -129,7 +129,7 @@ function versionFromInstallCmd(cmd) {
 }
 const { readDb, writeDb } = require('./lib/db_io.cjs');
 const crypto = require('crypto');
-const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
+const { toTypedEntry, artifactId, comparableArtifactId, isExactArtifact } = require('./lib/entry_model.cjs');
 const { smokeEvidence, mergeEvidence } = require('./lib/evidence.cjs');
 const { fingerprintTools, diffSurface, describeDiff, isEmpty: surfaceUnchanged } = require('./lib/surface.cjs');
 const stdio         = require('./lib/mcp_stdio.cjs'); // shared framing + sandbox + classifier (vendored, zero-dep)
@@ -421,6 +421,17 @@ function waitForExitOrTimeout(child, ms, isExited) {
 function artifactIdentity(tool, parsed, { launchedPinned = null } = {}) {
   const typed = toTypedEntry(tool);
   const contract = parsed ? `${parsed.command} ${(parsed.args || []).join(' ')}`.trim() : null;
+  // Affirmative validation against the *actual* launch, rather than trust in a
+  // flag the caller passed. `launchedPinned === false` was cleared and `null`
+  // was not, so any path that skipped pinning — `_evalSpawn`, which a
+  // submitted DB row can set, and `--installed` — kept an id it had not
+  // earned. What survives is an id the launched command itself names, exactly.
+  const launched = contract ? toTypedEntry({ install_cmd: contract }) : null;
+  const launchedId = launched && isExactArtifact(launched.artifact)
+    ? comparableArtifactId(launched.artifact)
+    : null;
+  const claimedId = typed ? comparableArtifactId(typed.artifact) : null;
+  const attributable = Boolean(launchedId && claimedId && launchedId === claimedId);
   // `artifact_id` says *which artifact this run was about*, and a run that
   // launched an unpinned command was about whatever the registry served at
   // start-up. 80 of the DB's 114 entries ship an unpinned `install_cmd` — the
@@ -431,12 +442,13 @@ function artifactIdentity(tool, parsed, { launchedPinned = null } = {}) {
   // identity as unattributable rather than as a pass.
   const id = typed ? artifactId(typed.artifact) : null;
   return {
-    artifact_id:        launchedPinned === false ? null : id,
+    artifact_id:        attributable ? id : null,
     artifact_integrity: tool.pkg_integrity || null,
     db_version:         tool.version || null,
     launch_digest:      contract ? crypto.createHash('sha256').update(contract).digest('hex').slice(0, 32) : null,
     // What was actually launched, so a reader can see why an id is absent.
     launch_pinned:      launchedPinned,
+    launched_artifact:  launchedId,
   };
 }
 
@@ -867,10 +879,27 @@ function pickInstalledTools(opts, unreadable = null) {
 
 // ── Results file IO ────────────────────────────────────────────────────────
 
-function readResults(resultsPath) {
+/**
+ * @param require_  when true, a file that exists and cannot be read or parsed
+ *                  throws instead of yielding an empty snapshot. `--no-spawn`
+ *                  needs that: `entries: 0, malformed: 0` and exit 0 over an
+ *                  unreadable snapshot reads as a clean lint.
+ */
+function readResults(resultsPath, { require_ = false } = {}) {
+  let raw;
+  try { raw = fs.readFileSync(resultsPath, 'utf8'); }
+  catch (e) {
+    if (require_) throw new Error(`cannot read ${resultsPath}: ${e.code || e.message}`);
+    return { generated_at: null, generator: `mcp_eval.cjs v${VERSION}`, results: [] };
+  }
   try {
-    return JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
-  } catch {
+    const doc = JSON.parse(raw);
+    if (require_ && (!doc || typeof doc !== 'object' || !Array.isArray(doc.results))) {
+      throw new Error(`${resultsPath} has no \`results\` array`);
+    }
+    return doc;
+  } catch (e) {
+    if (require_) throw new Error(`cannot parse ${resultsPath}: ${e.message}`);
     return { generated_at: null, generator: `mcp_eval.cjs v${VERSION}`, results: [] };
   }
 }
@@ -934,11 +963,15 @@ async function main() {
   if (opts.noSpawn) {
     // A results file that is not there is not a results file with nothing
     // wrong in it. `entries: 0, malformed: 0` and exit 0 read as a clean lint.
-    if (!fs.existsSync(opts.results)) {
-      process.stderr.write(`mcp_eval: no results file at ${opts.results} — nothing to lint\n`);
+    let existing;
+    try {
+      existing = readResults(opts.results, { require_: true });
+    } catch (e) {
+      // Missing, unreadable, or not a results document: all three established
+      // nothing, and 2 is the code for that.
+      process.stderr.write(`mcp_eval: ${e.message} — nothing to lint\n`);
       return exitAfterFlush(2);
     }
-    const existing = readResults(opts.results);
     const recheck  = noSpawnLint(existing);
     const malformed = recheck.filter(r => r.schema_errors_recheck.length > 0);
     if (opts.json) {
@@ -1120,7 +1153,15 @@ async function main() {
         // otherwise file this result under a version that never started.
         const launchedCmd = (r.launched && r.launched.install_cmd) || tool.install_cmd;
         const launchedDbVersion = r.launched ? r.launched.db_version : tool.version;
-        const stillSameEntry = launchedCmd === tool.install_cmd && launchedDbVersion === tool.version;
+        // The command the *entry* asked for, which since pinning may differ
+        // from the one that ran: `npx -y pkg` is launched as `npx -y pkg@1.0.0`
+        // and `pinned_from` records the original. Comparing the launched
+        // command against `tool.install_cmd` made 78 of the shipped entries
+        // fail attribution for the sole reason that we had pinned them — so a
+        // successful run wrote `smoke_unattributed` and a stale failing smoke
+        // dimension survived it.
+        const askedFor = (r.launched && r.launched.pinned_from) || launchedCmd;
+        const stillSameEntry = askedFor === tool.install_cmd && launchedDbVersion === tool.version;
         const launched = versionFromInstallCmd(launchedCmd);
         const attributable = stillSameEntry
           && launched !== null

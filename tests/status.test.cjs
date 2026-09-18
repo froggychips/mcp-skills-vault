@@ -265,3 +265,44 @@ test('bad arguments are exit 2, not a clean report', () => {
   assert.equal(run(project(null), ['--nonsense']).status, 2);
   assert.equal(s.parseArgs(['--cwd']).error, '--cwd needs a directory');
 });
+
+test('install still runs: the integrity gate is reachable', () => {
+  // A refactor that moved `pinInstallCmd` into lib/install_cmd.cjs took
+  // `installTool` and `checkBudget` with it, and every `install` died with
+  // `ReferenceError: installTool is not defined` *before* the gate ran. No
+  // test covered the one path that writes to a user's config.
+  const os = require('os');
+  const dir  = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-install-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-install-home-'));
+  const r = spawnSync(process.execPath, [
+    path.resolve(__dirname, '../mcp-ecosystem-intelligence/scripts/orchestrate.cjs'),
+    '--install', 'mcp-server-fetch', '--offline', '--cwd', dir,
+  ], { encoding: 'utf8', env: { ...process.env, HOME: home, NO_COLOR: '1' } });
+
+  assert.equal(r.status, 0, `install exited ${r.status}: ${r.stderr}`);
+  const written = JSON.parse(fs.readFileSync(path.join(dir, '.mcp.json'), 'utf8'));
+  const args = written.mcpServers['mcp-server-fetch'].args.join(' ');
+  // And it writes the version the gate hashed, not the unpinned command the
+  // DB ships: `uvx mcp-server-fetch` would resolve at every start-up.
+  assert.match(args, /mcp-server-fetch==\d/, `wrote an unpinned command: ${args}`);
+});
+
+test('the eval records an artifact id only for a launch that names one', () => {
+  // The bug this closes was load-bearing: `artifactIdentity` read the id off
+  // the DB's `version` field while the eval launched `install_cmd`, and 80 of
+  // 114 entries ship an unpinned command. A run of `npx -y pkg` was recorded
+  // as a run of `pkg@1.0.0`, which is the field the Core tier promotes on.
+  const e = require('../mcp-ecosystem-intelligence/scripts/mcp_eval.cjs');
+  const tool = { name: 'x', install_cmd: 'npx -y pkg', version: '1.0.0', pkg_integrity: 'sha512-AAA' };
+
+  // Launched unpinned: nothing can say which bytes ran.
+  assert.equal(e.artifactIdentity(tool, { command: 'npx', args: ['-y', 'pkg'] }).artifact_id, null);
+  // Launched through the test fixture — a field a submitted DB row can set.
+  assert.equal(e.artifactIdentity(tool, { command: 'node', args: ['fake.js'] }).artifact_id, null);
+  // Launched at a different version than the entry claims.
+  assert.equal(e.artifactIdentity(tool, { command: 'npx', args: ['-y', 'pkg@2.0.0'] }).artifact_id, null);
+  // Pinned, and to the version the entry verified: attributable.
+  const ok = e.artifactIdentity({ ...tool, install_cmd: 'npx -y pkg@1.0.0' }, { command: 'npx', args: ['-y', 'pkg@1.0.0'] });
+  assert.equal(ok.artifact_id, 'npm:pkg@1.0.0');
+  assert.equal(ok.launched_artifact, 'npm:pkg@1.0.0');
+});
