@@ -48,8 +48,10 @@ publish without an npm provenance attestation unless the refusal is overridden
 explicitly (`allow_unprovenanced`). A tool that argues for provenance should
 ship with it.
 
-**0.14.0 was published with that override, and therefore has no provenance
-attestation.** The reason is worth writing down because it is not a choice:
+**0.14.0 and 0.14.1 were published with that override, and therefore have no
+provenance attestation. 0.15.0 has no npm package at all yet** — its tag and
+GitHub Release are public, the publish job refused, and nothing was pushed to
+npm. The reason is worth writing down because it is not a choice:
 
 - npm accepts a provenance bundle only from a **GitHub-hosted** runner
   (`Unsupported GitHub Actions runner environment: "self-hosted"`, HTTP 422).
@@ -59,14 +61,24 @@ attestation.** The reason is worth writing down because it is not a choice:
   the annotation *"The job was not started because your account is locked due to
   a billing issue."*
 
-So the two constraints exclude each other, and the release was published
-unprovenanced on purpose rather than silently. What is still true for 0.14.0:
-npm's **registry signature** over `name@version:integrity` is present, as it is
-for every version, and `npm audit signatures` verifies it.
+So the two constraints exclude each other, and 0.14.x was published
+unprovenanced on purpose rather than silently. What is still true for it: npm's
+**registry signature** over `name@version:integrity` is present, as it is for
+every version, and `npm audit signatures` verifies it.
 
-Provenance returns as soon as the hosted runner can start; the publish job is
-the only one that needs it, and moving that single job to `ubuntu-latest` is the
-whole fix.
+The publish job now runs on `ubuntu-latest` — the fix this section has
+prescribed all along, which the job itself had not taken, because a comment
+sitting on it argued that a self-hosted runner works since the OIDC token comes
+from GitHub. That reasoning is about where the *token* comes from and npm's
+check is about where the *build* ran. It cost 0.15.0 a publish.
+
+What that leaves: while the account is locked, the hosted job does not start,
+so the job queues and npm gets nothing. That is the intended failure — a stalled
+release rather than a quiet one — but it does mean **0.15.0 reaches npm only
+once the billing lock is cleared**, or explicitly via
+`workflow_dispatch` with `allow_unprovenanced=true`, which would give it the
+same caveat as 0.14.x. The tag, the GitHub Release and the changelog are
+already public either way.
 
 ## Static analysis (CodeQL)
 
