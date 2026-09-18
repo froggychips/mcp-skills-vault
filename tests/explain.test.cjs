@@ -132,3 +132,91 @@ test('parseArgs: one name, known flags only', () => {
   assert.match(parse(['x', '--nope']).error, /unknown flag/);
   function parse(argv) { return e.parseArgs(argv); }
 });
+
+// ── the offline path: gate-dependent rules answered from evidence ──────────
+
+const ev = (dims) => ({ artifact_id: 'npm:pkg@1.0.0', dimensions: dims });
+const dim = (status, at = '2026-09-17') => ({ status, checked_at: at, verified_at: at });
+
+test('a rule about a check that never ran is unknown, not a denial', () => {
+  // The bug this covers, found by testing the published package: with no live
+  // gate, `evaluateEntry` saw an empty findings list, read "no SIG finding" as
+  // "no signature", and denied `policy/signatures` on an entry whose stored
+  // evidence said `signature: verified`. `explain --verify` disagreed with
+  // `explain` on the same entry.
+  const policy = { ...DEFAULTS, signatures: 'require' };
+  const rules = e.policyFromEvidence(policy, tool(), ev({}));
+  const sig = rules.find((r) => r.rule === 'policy/signatures');
+  assert.equal(sig.outcome, 'unknown');
+  assert.match(sig.detail, /never been checked/);
+});
+
+test('evidence that satisfies the policy reads as allow', () => {
+  const policy = { ...DEFAULTS, signatures: 'require', provenance: 'require', unverified: 'fail' };
+  const rules = e.policyFromEvidence(policy, tool(), ev({
+    signature: dim('verified'), provenance: dim('bound'), artifact: dim('verified'),
+  }));
+  for (const rule of ['policy/signatures', 'policy/provenance', 'policy/unverified']) {
+    assert.equal(rules.find((r) => r.rule === rule).outcome, 'allow', rule);
+  }
+});
+
+test('evidence that contradicts the policy still denies', () => {
+  const policy = { ...DEFAULTS, signatures: 'require', unverified: 'fail' };
+  const rules = e.policyFromEvidence(policy, tool(), ev({
+    signature: dim('absent'), artifact: dim('unverified'),
+  }));
+  assert.equal(rules.find((r) => r.rule === 'policy/signatures').outcome, 'deny');
+  assert.equal(rules.find((r) => r.rule === 'policy/unverified').outcome, 'deny');
+});
+
+test('`provenance: bound` is demanded where the policy asks for a binding', () => {
+  const claimed = e.policyFromEvidence({ ...DEFAULTS, provenance: 'bound' }, tool(), ev({ provenance: dim('claimed') }));
+  const denials = claimed.filter((r) => r.rule === 'policy/provenance' && r.outcome === 'deny');
+  assert.equal(denials.length, 1);
+  assert.match(denials[0].detail, /only claimed/);
+
+  const bound = e.policyFromEvidence({ ...DEFAULTS, provenance: 'bound' }, tool(), ev({ provenance: dim('bound') }));
+  assert.equal(bound.filter((r) => r.rule === 'policy/provenance' && r.outcome === 'deny').length, 0);
+});
+
+test('install hooks are only visible to a gate, and say so', () => {
+  const rules = e.policyFromEvidence({ ...DEFAULTS, installHooks: 'fail' }, tool(), ev({ artifact: dim('verified') }));
+  const hooks = rules.find((r) => r.rule === 'policy/install-hooks');
+  assert.equal(hooks.outcome, 'unknown');
+  assert.match(hooks.detail, /--verify/);
+});
+
+test('a docker digest can be judged from the launch command alone', () => {
+  const pinned = e.policyFromEvidence({ ...DEFAULTS, docker: 'digest' },
+    { name: 'i', install_cmd: `docker run -i --rm ghcr.io/o/r@sha256:${'a'.repeat(64)}` }, ev({}));
+  assert.equal(pinned.find((r) => r.rule === 'policy/docker-digest').outcome, 'allow');
+
+  const tagged = e.policyFromEvidence({ ...DEFAULTS, docker: 'digest' },
+    { name: 'i', install_cmd: 'docker run -i --rm ghcr.io/o/r:latest' }, ev({}));
+  assert.equal(tagged.find((r) => r.rule === 'policy/docker-digest').outcome, 'deny');
+});
+
+test('an unknown never blocks, and is reported separately', () => {
+  const d = e.decide({
+    tool: tool(), policy: { ...DEFAULTS, signatures: 'require', installHooks: 'fail' },
+    gateEntry: null, trust: ok, behav: starts, budget: null,
+    evidence: ev({ artifact: dim('verified') }),
+  });
+  assert.equal(d.decision, 'allow');
+  assert.ok(d.unevaluated.includes('policy/signatures'));
+  assert.ok(d.unevaluated.includes('policy/install-hooks'));
+  assert.deepEqual(d.blocking, []);
+});
+
+test('with a live gate, the gate findings are what get judged', () => {
+  // Unchanged behaviour: when a scan has actually run, the absence of a SIG
+  // finding *is* evidence that there was no signature.
+  const gateEntry = { name: 'x', status: 'OK', findings: [], install_cmd: 'npx -y pkg@1.0.0' };
+  const d = e.decide({
+    tool: tool(), policy: { ...DEFAULTS, signatures: 'require' },
+    gateEntry, trust: ok, behav: starts, budget: null,
+    evidence: ev({ signature: dim('verified') }),
+  });
+  assert.ok(d.blocking.includes('policy/signatures'));
+});
