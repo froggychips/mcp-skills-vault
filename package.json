@@ -1,6 +1,6 @@
 {
   "name": "@froggychips/mcp-vault",
-  "version": "0.14.1",
+  "version": "0.15.0",
   "description": "Deterministic registry + integrity scanner for Model Context Protocol servers. Make MCP supply-chain boring.",
   "bin": {
     "mcp-vault": "bin/mcp-vault.cjs"

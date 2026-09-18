@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.15.0](https://github.com/froggychips/mcp-skills-vault/compare/v0.14.1...v0.15.0) (2026-09-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* `mcp-vault health` takes 4 positional arguments, not 5, and returns no `classification`. DB entries no longer carry `classification`, `in_registry` or `last_checked`.
+
+### Features
+
+* derive the tier from evidence, and write down what 1.0.0 promises ([886e342](https://github.com/froggychips/mcp-skills-vault/commit/886e342154abb2265461c75d628e1c9af2113f31))
+* one entry command, on one screen ([dc97416](https://github.com/froggychips/mcp-skills-vault/commit/dc974168cf0943eefa2e87e3b2119b092ddb1096))
+
+
+### Bug Fixes
+
+* a broken installer of my own making, and eight more review findings ([87c5fe1](https://github.com/froggychips/mcp-skills-vault/commit/87c5fe183e5cacdd4cde9e5813573a486c4f818f))
+* a tools/list with no tools array was a passing zero-tool measurement ([ea7b37d](https://github.com/froggychips/mcp-skills-vault/commit/ea7b37d39dde3dd3dade7604812c4ea2e32633f9))
+* fifth pass — a local version label is not a bag of numbers ([53914d2](https://github.com/froggychips/mcp-skills-vault/commit/53914d2efb801a7ebf7a5f47c78097497adb8ec5))
+* nine more from the second review pass, seven of them P1 ([27ffe41](https://github.com/froggychips/mcp-skills-vault/commit/27ffe412a6c3604c5c062ef98f787a7992dbd00e))
+* stat-then-read is a check-then-use race (CodeQL js/file-system-race) ([1290171](https://github.com/froggychips/mcp-skills-vault/commit/1290171a48fc97cc5af7d7ade77b895d04f69953))
+* ten findings from review, four of them P1 ([9657872](https://github.com/froggychips/mcp-skills-vault/commit/96578722bf315e88b487d0712c3c73889813f6a1))
+* third review pass — the eval was recording an artifact it had not launched ([d4e1a33](https://github.com/froggychips/mcp-skills-vault/commit/d4e1a33d354d294971822fb6b28c3b3ade64751e))
+
+
+### Documentation
+
+* measure adoption honestly, and stop building until three people have used it ([961c5ae](https://github.com/froggychips/mcp-skills-vault/commit/961c5ae96fa2fd772f004245dfa18a7faad214c5))
+
 ## [0.14.1](https://github.com/froggychips/mcp-skills-vault/compare/v0.14.0...v0.14.1) (2026-09-18)
 
 
