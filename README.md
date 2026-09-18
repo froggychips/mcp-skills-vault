@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@froggychips/mcp-vault.svg)](https://www.npmjs.com/package/@froggychips/mcp-vault)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Zero deps](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](./PHILOSOPHY.md)
-[![Tests](https://img.shields.io/badge/tests-738%20pass-brightgreen.svg)](./tests)
+[![Tests](https://img.shields.io/badge/tests-758%20pass-brightgreen.svg)](./tests)
 
 **Homepage:** [mcp.froggychips.xyz](https://mcp.froggychips.xyz) · **npm:** [`@froggychips/mcp-vault`](https://www.npmjs.com/package/@froggychips/mcp-vault)
 
@@ -63,14 +63,46 @@ $ npx -y @froggychips/mcp-vault verify --offline
 
 ## Quick start
 
-**As a CLI** — one line, no clone, no global install:
+**As a CLI** — one command, no clone, no global install:
 
 ```bash
+npx -y @froggychips/mcp-vault status
+```
+
+```text
+mcp-vault <version> · /Users/me/repos/my-project
+
+Environment     Node v22.3.0 · missing: uvx
+Installed       13 servers · 2 in the vault DB · 11 unvetted
+                2 Core
+Evidence        oldest claim 2026-09-17 (stored; nothing was re-checked just now)
+Context         94,336 tokens on every request · 47.2% of a 200k window
+                hostinger alone is 43.9% (396 tools, measured) — scope it with --toolsets or allowedTools
+This project    postgres, aws, Node → 3 matching servers not installed (mcp-server-neon, …)
+
+Worth knowing
+  ! 11 configured servers are not in the vault DB, so nothing here has checked them: teamcity, github, …
+
+Deeper:  verify --installed  re-hash what your hosts launch, live
+         explain <name>      why one entry is allowed or denied
+         scan                what to add for this stack
+         audit --strict      every drift and scope finding in full
+```
+
+It makes **no network calls** — every claim comes from evidence already on
+disk, and says so rather than implying it was checked just now. Exit `1` means
+something installed must not run: gone, yanked, wrong bytes, or a live advisory
+against the pinned version. `--strict` also fails on drift, unvetted servers
+and claims past their shelf life.
+
+The commands it summarises are all still there, and the footer names them:
+
+```bash
+npx -y @froggychips/mcp-vault verify --installed     # re-hash what your hosts launch, live
 npx -y @froggychips/mcp-vault scan --cwd ./my-project
 npx -y @froggychips/mcp-vault audit --strict
 npx -y @froggychips/mcp-vault verify --offline
-npx -y @froggychips/mcp-vault verify --installed     # what your hosts actually launch
-npx -y @froggychips/mcp-vault budget                 # what they cost in context
+npx -y @froggychips/mcp-vault budget
 npx -y @froggychips/mcp-vault doctor
 ```
 

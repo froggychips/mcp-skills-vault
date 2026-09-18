@@ -55,6 +55,7 @@ Every JSON document this tool writes carries a schema identifier of the form
 | `mcp-vault/lock-write@1` | `mcp-vault lock --json` |
 | `mcp-vault/policy@1` | `.mcp-vault.policy.json` (read, not written) |
 | `mcp-vault/posture@1` | `mcp-vault posture --json` |
+| `mcp-vault/status@1` | `mcp-vault status --json` |
 | `mcp-vault/token-budget@1` | `mcp-vault budget --json` |
 | `mcp-vault/upgrade-plan@1` | `mcp-vault upgrade --json` |
 | `mcp-vault/verify-report@1` | `mcp-vault verify --json` |

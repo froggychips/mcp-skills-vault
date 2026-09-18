@@ -213,7 +213,16 @@ function hasArgScope(entry) {
 
 // ── findings ───────────────────────────────────────────────────────────────
 
-function audit({ project, global, settings, db }) {
+/**
+ * @param evals  optional Map<db name, eval row>. When present, a *measured*
+ *               tool count outranks the DB's estimate for the heavy check.
+ *               Without it the behaviour is unchanged — but composing this
+ *               with the eval snapshot (`status.cjs`) showed the cost of not
+ *               doing so: the same screen said "396 tools, measured" and
+ *               "tool count unknown" about one server, and a server measured
+ *               at three tools was reported as an unbounded surface.
+ */
+function audit({ project, global, settings, db, evals = null }) {
   const findings = [];
   const seen     = new Set();
 
@@ -278,7 +287,12 @@ function audit({ project, global, settings, db }) {
       }
 
       // heavy-unbounded: large surface, no scoping anywhere
-      const tools = (typeof tool.est_tools_count === 'number') ? tool.est_tools_count : null;
+      const measured = evals && evals.get ? evals.get(tool.name) : null;
+      const observed = measured && Number.isFinite(measured.tool_count) && measured.tool_count > 0
+        ? measured.tool_count
+        : null;
+      const estimated = (typeof tool.est_tools_count === 'number') ? tool.est_tools_count : null;
+      const tools = observed !== null ? observed : estimated;
       const isHeavy = tools === null || tools > HEAVY_THRESHOLD;
       if (isHeavy) {
         const enabledOk = settings.enabled === null || settings.enabled.includes(name);
@@ -292,10 +306,11 @@ function audit({ project, global, settings, db }) {
             db_name:         tool.name,
             scope,
             est_tools_count: tools,
+            tool_count_source: observed !== null ? 'measured' : (estimated !== null ? 'db' : 'unknown'),
             toolsets_hint:   tool.toolsets || null,
             message:         tools === null
               ? `tool count unknown and no scoping (--toolsets/--caps/allowedTools/enabledMcpjsonServers)`
-              : `${tools} tools, no scoping (--toolsets/--caps/allowedTools/enabledMcpjsonServers)`,
+              : `${tools} tools${observed !== null ? ' (measured)' : ''}, no scoping (--toolsets/--caps/allowedTools/enabledMcpjsonServers)`,
           });
         }
       }
@@ -433,6 +448,12 @@ if (require.main === module) {
 
 module.exports = {
   parseArgs,
+  // Exported for `status.cjs`, which composes this check with four others in
+  // one process rather than spawning five.
+  readProjectMcpServers,
+  readGlobalMcpServers,
+  readSettings,
+  STRICT_CATEGORIES,
   parseInstalledVersion,
   parseDbVersion,
   matchDbEntry,

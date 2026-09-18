@@ -1,0 +1,363 @@
+#!/usr/bin/env node
+/**
+ * One command, one screen: what is installed, what is wrong with it, and what
+ * this project would want.
+ *
+ * The quick start used to be six commands — `scan`, `audit --strict`,
+ * `verify --offline`, `verify --installed`, `budget`, `doctor` — and a new
+ * reader had to run all six before knowing whether anything was wrong. Four of
+ * them answer questions about the same three inputs (the host configs, the DB,
+ * the stored evidence), so this composes them in one process and prints the
+ * findings rather than each check's full output.
+ *
+ * It is deliberately **offline and instant**. Every claim it makes comes from
+ * evidence already on disk, and every block prints the date that evidence was
+ * established rather than implying it was checked just now. `--live` is
+ * available where a live answer is actually different in kind, and the footer
+ * always names the command that goes deeper. A first command that takes a
+ * minute is not a first command.
+ *
+ * Usage:
+ *   node scripts/status.cjs [--cwd <dir>] [--json] [--strict]
+ *
+ * Exit codes:
+ *   0  nothing installed is blocked, and the environment can run this
+ *   1  an installed server is blocked (gone / wrong bytes / live advisory),
+ *      or a required environment check failed; with --strict, also drift,
+ *      unvetted servers and stale evidence
+ *   2  bad arguments / the DB could not be read
+ */
+
+'use strict';
+
+const fs   = require('fs');
+const path = require('path');
+
+const { exitAfterFlush }   = require('./lib/exit.cjs');
+const { readInstalledServers, toInstallCmd } = require('./lib/installed.cjs');
+const { trustScore }       = require('./lib/scores.cjs');
+const { classifyEntry, evalIndex } = require('./lib/tiers.cjs');
+const { staleDimensions, DEFAULT_MAX_AGE_DAYS } = require('./lib/evidence.cjs');
+const budget               = require('./lib/budget.cjs');
+const { runDoctor }        = require('./doctor.cjs');
+const orchestrate          = require('./orchestrate.cjs');
+const auditSetup           = require('./audit_setup.cjs');
+
+const DB_PATH   = path.resolve(__dirname, '../assets/tools_database.json');
+const EVAL_PATH = path.resolve(__dirname, '../assets/eval_results.json');
+const PKG_PATH  = path.resolve(__dirname, '../../package.json');
+
+const T  = process.stdout.isTTY && !process.env.NO_COLOR;
+const B  = T ? '\x1b[1m'  : '';
+const DM = T ? '\x1b[2m'  : '';
+const RD = T ? '\x1b[31m' : '';
+const GN = T ? '\x1b[32m' : '';
+const YL = T ? '\x1b[33m' : '';
+const RS = T ? '\x1b[0m'  : '';
+
+const HELP = `mcp-vault status — one screen: what is installed, what is wrong, what is missing
+
+  node scripts/status.cjs [--cwd <dir>] [--json] [--strict]
+
+  --cwd      project to read (default: the current directory)
+  --json     machine-readable (schema mcp-vault/status@1)
+  --strict   also exit 1 on drift, unvetted servers and stale evidence
+
+Reads only what is already on disk, so it makes no network calls. The footer
+names the commands that do.
+`;
+
+function parseArgs(argv) {
+  const opts = { cwd: process.cwd(), json: false, strict: false, help: false };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--json') opts.json = true;
+    else if (a === '--strict') opts.strict = true;
+    else if (a === '--help' || a === '-h') opts.help = true;
+    else if (a === '--cwd') { opts.cwd = argv[++i]; if (!opts.cwd) return { error: '--cwd needs a directory' }; }
+    else return { error: `unknown argument: ${a}` };
+  }
+  return opts;
+}
+
+function readJson(file) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
+}
+
+// ── the five questions ──────────────────────────────────────────────────────
+
+/** Can this machine run any of it? Only the things that are not fine. */
+function environment(cwd) {
+  const doc = runDoctor({ cwd });
+  const problems = doc.checks.filter((c) => c.level !== 'ok');
+  return {
+    node: process.version,
+    counts: doc.counts,
+    // A `fail` is a blocker; a `warn` is an optional tool that is absent, and
+    // an absent optional tool is not a finding about this project.
+    failed:  problems.filter((c) => c.level === 'fail').map((c) => ({ check: c.name, detail: c.message })),
+    // Optional tools that are absent. Not a finding about this project — but
+    // worth one word, because a missing `uvx` silently limits what installs.
+    missing: problems.filter((c) => c.level === 'warn' && c.optional).map((c) => c.name),
+  };
+}
+
+/**
+ * What the hosts actually launch, and what the DB knows about each.
+ *
+ * `tier` and `trust` come from stored evidence with its dates. A server the DB
+ * has never heard of is reported as exactly that — not as a problem, and not
+ * as fine either.
+ */
+function installed({ cwd, db, evals }) {
+  const unreadable = [];
+  const servers = readInstalledServers({ cwd, onUnreadable: (loc) => unreadable.push(loc) });
+  const rows = [];
+  for (const server of servers) {
+    const withCmd = { ...server, install_cmd: server.install_cmd || toInstallCmd(server) };
+    const entry   = budget.matchDbEntry(withCmd, db.tools);
+    if (!entry) {
+      rows.push({ name: server.name, host: server.host, scope: server.scope || null, in_db: false });
+      continue;
+    }
+    const tier  = classifyEntry(entry, evals.get(entry.name) || null);
+    const trust = trustScore(entry.trust_evidence || null);
+    const dims  = (entry.trust_evidence && entry.trust_evidence.dimensions) || {};
+    const dates = Object.values(dims).map((d) => d.checked_at).filter(Boolean).sort();
+    rows.push({
+      name: server.name,
+      host: server.host,
+      scope: server.scope || null,
+      in_db: true,
+      db_entry: entry.name,
+      tier: tier.classification,
+      tier_reason: tier.why,
+      trust_gate: trust.gate,
+      blocking: trust.blocking.map((b) => `${b.dimension}: ${b.status}`),
+      oldest_evidence: dates[0] || null,
+      stale: staleDimensions(entry.trust_evidence || null).map((s) => s.dimension),
+    });
+  }
+  // A host config that could not be parsed is not a host with no servers.
+  for (const loc of unreadable) {
+    rows.push({ name: `(${loc.host || loc.path})`, host: loc.host || null, in_db: false, unreadable: loc.error || 'unparseable' });
+  }
+  return rows;
+}
+
+/** What they cost on every request. */
+const HEAVY_SHARE = 20;   // percent of the window one server may take quietly
+
+function context(rows, db, evals) {
+  const estimates = rows
+    .filter((r) => r.in_db)
+    .map((r) => budget.estimateServer({
+      name: r.name,
+      dbEntry: db.tools.find((t) => t.name === r.db_entry) || null,
+      evalEntry: evals.get(r.db_entry) || null,
+    }));
+  const summary = budget.summarise(estimates);
+  // "47% of your window" is a number; *which server* spent it is the finding.
+  const heaviest = estimates
+    .filter((e) => e.tokens !== null)
+    .sort((a, b) => b.tokens - a.tokens)[0] || null;
+  const share = heaviest ? Number(((heaviest.tokens / 200000) * 100).toFixed(1)) : null;
+  return {
+    ...summary,
+    rows: estimates,
+    heaviest: heaviest ? { ...heaviest, percent_of_context: share } : null,
+    heavy: Boolean(share !== null && share >= HEAVY_SHARE),
+  };
+}
+
+/** What this project's stack suggests that is not already installed. */
+function project({ cwd, db, installedRows }) {
+  const stack   = orchestrate.detectStack(cwd);
+  const matched = orchestrate.matchDB(db, stack, null);
+  const have    = new Set(installedRows.filter((r) => r.in_db).map((r) => r.db_entry));
+  const missing = matched.filter((t) => !have.has(t.name));
+  // `matchDB` always adds the universal three, so "no signals detected → 3
+  // suggested" was a sentence that contradicted itself. They are worth
+  // offering and they are not a statement about this project's stack.
+  const universal = missing.filter((t) => orchestrate.UNIVERSAL_TOOLS.has(t.name)).map((t) => t.name);
+  const forStack  = missing.filter((t) => !orchestrate.UNIVERSAL_TOOLS.has(t.name)).map((t) => t.name);
+  return {
+    signals: [...new Set([...stack.dbs, ...stack.infra, ...stack.langs])],
+    suggested: matched.length,
+    not_installed: missing.map((t) => t.name),
+    not_installed_for_stack: forStack,
+    not_installed_universal: universal,
+  };
+}
+
+// ── verdict ─────────────────────────────────────────────────────────────────
+
+/**
+ * What in this picture should stop a pipeline.
+ *
+ * Blocking and merely-worth-knowing are kept apart on purpose: an unvetted
+ * server is a gap in *our* coverage, not a finding about the server, and a
+ * default that failed on it would train people to pass --no-strict forever.
+ */
+function verdict({ env, installedRows, auditFindings, strict }) {
+  const blocking = [];
+  const notable  = [];
+
+  for (const c of env.failed) blocking.push(`environment: ${c.check} — ${c.detail}`);
+
+  // One line for all of them, not one line each: eleven near-identical rows
+  // push the things that matter off the screen this command exists to fit.
+  const unvetted = installedRows.filter((r) => !r.in_db && !r.unreadable).map((r) => r.name);
+  if (unvetted.length) {
+    notable.push(`${unvetted.length} configured server${unvetted.length === 1 ? ' is' : 's are'} not in the vault DB, `
+      + `so nothing here has checked ${unvetted.length === 1 ? 'it' : 'them'}: ${unvetted.slice(0, 8).join(', ')}`
+      + (unvetted.length > 8 ? `, +${unvetted.length - 8}` : ''));
+  }
+  for (const r of installedRows) {
+    // A config we could not parse is not a config with nothing in it.
+    if (r.unreadable) { blocking.push(`${r.name}: host config could not be read — ${r.unreadable}`); continue; }
+    if (!r.in_db) continue;
+    if (r.tier === 'Deprecated') blocking.push(`${r.name}: ${r.tier_reason}`);
+    else if (r.stale.length) notable.push(`${r.name}: ${r.stale.length} claim(s) past their shelf life (${r.stale.join(', ')})`);
+  }
+
+  for (const f of auditFindings) {
+    const line = `${f.server}: ${f.message}`;
+    if (auditSetup.STRICT_CATEGORIES.has(f.category)) notable.push(line);
+  }
+
+  const code = blocking.length ? 1 : (strict && notable.length ? 1 : 0);
+  return { blocking, notable, exit_code: code };
+}
+
+// ── report ──────────────────────────────────────────────────────────────────
+
+const label = (s) => `${B}${String(s).padEnd(16)}${RS}`;
+
+function printReport(r) {
+  const out = (s) => process.stdout.write(s);
+  out(`\n${B}mcp-vault ${r.version}${RS} ${DM}· ${r.cwd}${RS}\n\n`);
+
+  // 1. environment
+  const envBits = [`Node ${r.environment.node}`];
+  if (r.environment.missing.length) envBits.push(`${YL}missing: ${r.environment.missing.join(', ')}${RS}`);
+  out(`${label('Environment')}${envBits.join(' · ')}\n`);
+  for (const f of r.environment.failed) out(`${' '.repeat(16)}${RD}✗ ${f.check}${RS} ${f.detail}\n`);
+
+  // 2. installed
+  const inDb   = r.installed.filter((x) => x.in_db);
+  const unknown = r.installed.length - inDb.length;
+  if (!r.installed.length) {
+    out(`${label('Installed')}${DM}no MCP servers configured in any host this can read${RS}\n`);
+  } else {
+    out(`${label('Installed')}${r.installed.length} server${r.installed.length === 1 ? '' : 's'}`
+      + ` ${DM}·${RS} ${inDb.length} in the vault DB`
+      + (unknown ? ` ${DM}·${RS} ${YL}${unknown} unvetted${RS}` : '') + '\n');
+    const tiers = {};
+    for (const x of inDb) tiers[x.tier] = (tiers[x.tier] || 0) + 1;
+    const tierLine = Object.entries(tiers).map(([t, n]) => `${n} ${t}`).join(' · ');
+    if (tierLine) out(`${' '.repeat(16)}${DM}${tierLine}${RS}\n`);
+  }
+
+  // 3. evidence — with its date, never implying it was checked just now
+  const dates = r.installed.map((x) => x.oldest_evidence).filter(Boolean).sort();
+  if (dates.length) {
+    out(`${label('Evidence')}oldest claim ${dates[0]} ${DM}(stored; nothing was re-checked just now)${RS}\n`);
+  }
+
+  // 4. context
+  if (r.context.servers) {
+    const c = r.context;
+    out(`${label('Context')}${c.tokens.toLocaleString('en-US')} tokens on every request`
+      + ` ${DM}·${RS} ${c.percent_of_context}% of a 200k window`
+      + (c.unknown_servers ? ` ${DM}·${RS} ${YL}${c.unknown_servers} not measured${RS}` : '') + '\n');
+    if (c.heavy) {
+      out(`${' '.repeat(16)}${YL}${c.heaviest.name}${RS} alone is ${c.heaviest.percent_of_context}%`
+        + ` ${DM}(${c.heaviest.tools} tools, ${c.heaviest.source}) — scope it with --toolsets or allowedTools${RS}\n`);
+    }
+  }
+
+  // 5. this project
+  const p = r.project;
+  const suggestion = p.not_installed_for_stack.length
+    ? ` ${DM}→${RS} ${p.not_installed_for_stack.length} matching server${p.not_installed_for_stack.length === 1 ? '' : 's'} not installed`
+      + ` ${DM}(${p.not_installed_for_stack.slice(0, 3).join(', ')}${p.not_installed_for_stack.length > 3 ? ', …' : ''})${RS}`
+    : (p.not_installed_universal.length ? ` ${DM}→ nothing stack-specific; ${p.not_installed_universal.length} universally useful not installed${RS}` : '');
+  out(`${label('This project')}`
+    + (p.signals.length ? `${p.signals.slice(0, 6).join(', ')}${p.signals.length > 6 ? `, +${p.signals.length - 6}` : ''}` : `${DM}no stack signals detected${RS}`)
+    + suggestion + '\n');
+
+  // findings
+  if (r.verdict.blocking.length) {
+    out(`\n${RD}${B}Blocking${RS}\n`);
+    for (const line of r.verdict.blocking) out(`  ${RD}✗${RS} ${line}\n`);
+  }
+  if (r.verdict.notable.length) {
+    out(`\n${YL}${B}Worth knowing${RS}\n`);
+    for (const line of r.verdict.notable.slice(0, 6)) out(`  ${YL}!${RS} ${line}\n`);
+    if (r.verdict.notable.length > 6) out(`  ${DM}…and ${r.verdict.notable.length - 6} more (mcp-vault audit)${RS}\n`);
+  }
+  if (!r.verdict.blocking.length && !r.verdict.notable.length) {
+    out(`\n${GN}Nothing blocked, nothing drifted.${RS}\n`);
+  }
+
+  // where to go deeper — the commands this one replaced, named so they stay
+  // discoverable rather than hidden behind a summary.
+  out(`\n${DM}Deeper:  verify --installed  re-hash what your hosts launch, live`);
+  out(`\n         explain <name>      why one entry is allowed or denied`);
+  out(`\n         scan                what to add for this stack`);
+  out(`\n         audit --strict      every drift and scope finding in full${RS}\n\n`);
+}
+
+// ── main ────────────────────────────────────────────────────────────────────
+
+function main(argv) {
+  const opts = parseArgs(argv);
+  if (opts.error) { process.stderr.write(`status: ${opts.error}\n\n${HELP}`); return 2; }
+  if (opts.help)  { process.stdout.write(HELP); return 0; }
+
+  const db = readJson(DB_PATH);
+  if (!db || !Array.isArray(db.tools)) {
+    process.stderr.write(`status: DB not found or malformed: ${DB_PATH}\n`);
+    return 2;
+  }
+  const evals = evalIndex((readJson(EVAL_PATH) || {}).results);
+  const pkg   = readJson(PKG_PATH) || {};
+
+  const env           = environment(opts.cwd);
+  const installedRows = installed({ cwd: opts.cwd, db, evals });
+  const auditFindings = auditSetup.audit({
+    project:  auditSetup.readProjectMcpServers(opts.cwd),
+    global:   auditSetup.readGlobalMcpServers(path.join(process.env.HOME || '', '.claude.json')),
+    settings: auditSetup.readSettings(opts.cwd),
+    db,
+    evals,
+  });
+
+  const report = {
+    schema:  'mcp-vault/status@1',
+    version: pkg.version || 'unknown',
+    cwd:     opts.cwd,
+    generated_at: new Date().toISOString(),
+    // Said once, out loud: nothing below was measured during this run.
+    evidence_source: 'stored',
+    max_age_days: DEFAULT_MAX_AGE_DAYS,
+    environment: env,
+    installed:   installedRows,
+    context:     context(installedRows, db, evals),
+    project:     project({ cwd: opts.cwd, db, installedRows }),
+    audit:       auditFindings,
+  };
+  report.verdict = verdict({ env, installedRows, auditFindings, strict: opts.strict });
+
+  if (opts.json) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  else printReport(report);
+
+  return report.verdict.exit_code;
+}
+
+if (require.main === module) {
+  exitAfterFlush(main(process.argv.slice(2)));
+}
+
+module.exports = { parseArgs, environment, installed, context, project, verdict, main };

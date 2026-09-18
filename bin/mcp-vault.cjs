@@ -27,6 +27,7 @@ function dbEntryCount() {
 }
 
 const COMMANDS = {
+  status:          "status.cjs",
   audit:           "audit_setup.cjs",
   verify:          "verify_integrity.cjs",
   scan:            "orchestrate.cjs",
@@ -59,6 +60,7 @@ USAGE
   mcp-vault <command> [options]
 
 COMMANDS
+  status            One screen: what is installed, what is wrong, what is missing
   scan              Detect project stack and recommend MCP servers
   list (ls)         Show every server in the vault DB (filters: --category, --tier, --query)
   doctor            Check local Node / gh / Docker / uvx / Claude MCP config readiness
