@@ -21,10 +21,14 @@ const SCRIPTS = path.join(ROOT, 'mcp-ecosystem-intelligence/scripts');
 function emittedSchemas() {
   const found = new Set();
   const walk = (dir) => {
-    for (const name of fs.readdirSync(dir)) {
-      const full = path.join(dir, name);
-      if (fs.statSync(full).isDirectory()) { walk(full); continue; }
-      if (!name.endsWith('.cjs')) continue;
+    // `withFileTypes` rather than a `statSync` per entry: stat-then-read is a
+    // check-then-use race (CodeQL `js/file-system-race`), the directory entry
+    // already says what the thing is, and a dirent does not follow a symlink
+    // the way `statSync` would.
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) { walk(full); continue; }
+      if (!entry.isFile() || !entry.name.endsWith('.cjs')) continue;
       for (const m of fs.readFileSync(full, 'utf8').matchAll(/mcp-vault\/[a-z-]+@\d+/g)) found.add(m[0]);
     }
   };
