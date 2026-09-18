@@ -71,8 +71,8 @@
  *   TIERS, TIER_ORDER
  */
 
-const { behaviour } = require('./scores.cjs');
-const { deriveTrust, requiredFor, staleDimensions, DEFAULT_MAX_AGE_DAYS } = require('./evidence.cjs');
+const { behaviour, blocks } = require('./scores.cjs');
+const { deriveTrust, requiredFor, staleDimensions, isPositive, DEFAULT_MAX_AGE_DAYS } = require('./evidence.cjs');
 const { toTypedEntry, artifactId } = require('./entry_model.cjs');
 
 const TIERS = ['Core', 'Recommended', 'Experimental', 'Deprecated'];
@@ -81,16 +81,36 @@ const TIER_ORDER = { Core: 0, Recommended: 1, Experimental: 2, Deprecated: 3 };
 // There is no artifact to install under any of these.
 const NOTHING_TO_INSTALL = new Set(['gone', 'version-gone', 'yanked']);
 
+// `gone` means the *name* is not published at all, which is true whatever
+// version an entry moves to — and worse than unpublished, because a free name
+// can be claimed by somebody else. `version-gone` and `yanked` are statements
+// about one version and do not survive a version change.
+const NAME_SCOPED = new Set(['gone']);
+
 /** Index an `eval_results.json` `results` array by entry name. */
 function evalIndex(results) {
   return new Map((Array.isArray(results) ? results : []).map((r) => [r.name, r]));
 }
 
-/** The artifact this entry installs *now*, as an id, or null if unparseable. */
+/**
+ * The artifact this entry installs *now*, as an id, or null when that cannot be
+ * established.
+ *
+ * `toTypedEntry` resolves the version from the DB's `version` field in
+ * preference to the one written in `install_cmd`, and records a warning when
+ * they disagree. Reading the winner and ignoring the warning meant an entry
+ * whose command says `x@2.0.0` while its `version` field says `1.0.0` reported
+ * its identity as `x@1.0.0` — so evidence for 1.0.0 bound cleanly to an entry
+ * that installs 2.0.0, which is the exact comparison this function exists to
+ * make safe. A disagreement is not a version; it is two, and the honest answer
+ * is that we do not know which runs.
+ */
 function currentArtifactId(tool) {
   try {
     const typed = toTypedEntry(tool);
-    return typed ? artifactId(typed.artifact) : null;
+    if (!typed) return null;
+    if ((typed.warnings || []).some((w) => /launch command asks for|no version anywhere/.test(w))) return null;
+    return artifactId(typed.artifact);
   } catch {
     return null;
   }
@@ -136,28 +156,45 @@ function classifyEntry(tool, evalResult = null, opts = {}) {
   };
   const out = (classification, why) => ({ classification, why, bound });
 
-  // ── 1. nothing to install ──
+  // ── 1. the package name itself is gone ──
+  // Checked before the binding, and only for the name-scoped status: an
+  // unpublished *name* is unpublished whatever version the entry moves to.
   const avail = dims.availability && dims.availability.status;
-  if (NOTHING_TO_INSTALL.has(avail)) {
+  if (NAME_SCOPED.has(avail)) {
     return out('Deprecated', `availability: ${avail} (as of ${dims.availability.checked_at || 'unknown'})`);
   }
 
-  // ── 2. the evidence has to be about these bytes ──
+  // ── 2. everything below is a statement about bytes, so the evidence has to
+  //       be about *these* bytes. A precondition, not a fallback: the first
+  //       version only asked this when the trust verdict was already weak, so
+  //       complete evidence with no recorded identity — or a `yanked` recorded
+  //       against the version before this one — sailed past it in both
+  //       directions.
   if (bound.evidence.state === 'no') {
     return out('Experimental',
       `the recorded evidence is about ${bound.evidence.recorded}, and this entry now installs ${bound.evidence.current}`);
   }
+  if (bound.evidence.state === 'unknown' && Object.keys(dims).length) {
+    return out('Experimental', bound.evidence.current
+      ? 'the stored evidence is not tied to a named artifact, so it cannot be read as being about this one'
+      : "this entry does not name one artifact: the launch command and the verified version disagree, or neither states a version");
+  }
+
+  // ── 3. a finding that means "do not run this" ──
+  //
+  // The set is `scores.cjs`'s `BLOCKING`, deliberately, so the tier and the
+  // trust gate cannot disagree about what blocks. The first version used
+  // `deriveTrust(...) === 'unverified'`, which is a wider net: it includes
+  // `smoke: fail` — turning "our sandbox could not start it" into "must not
+  // run", flatly contradicting the rule that behaviour never demotes — and
+  // `source_binding: mismatch`, which `BLOCKING` excludes on purpose, because
+  // a metadata disagreement is something to read rather than a refusal.
+  const blocking = Object.entries(dims).find(([name, v]) => blocks(name, v.status));
+  if (blocking) {
+    return out('Deprecated', `${blocking[0]}: ${blocking[1].status} (as of ${blocking[1].checked_at || 'unknown'})`);
+  }
 
   const trust = deriveTrust(evidence, { now, maxAgeDays, require: requiredFor(ecosystem) });
-
-  // ── 3. something failed ──
-  if (trust === 'unverified') {
-    const failed = Object.entries(dims)
-      .find(([, v]) => ['mismatch', 'vulnerable', 'fail', 'gone', 'version-gone', 'yanked'].includes(v.status));
-    return out('Deprecated', failed
-      ? `${failed[0]}: ${failed[1].status} (as of ${failed[1].checked_at || 'unknown'})`
-      : 'a check failed');
-  }
 
   // ── 4. not enough was established, or it has aged out ──
   //
@@ -169,18 +206,30 @@ function classifyEntry(tool, evalResult = null, opts = {}) {
     if (!Object.keys(dims).length) {
       return out('Experimental', 'no evidence recorded for this entry');
     }
-    const missing = requiredFor(ecosystem).filter((name) => !dims[name]);
+    const required = requiredFor(ecosystem);
+    const missing = required.filter((name) => !dims[name]);
     if (missing.length) {
       return out('Experimental', `never checked for this entry: ${missing.join(', ')}`);
     }
-    if (bound.evidence.state === 'unknown') {
-      return out('Experimental', bound.current
-        ? 'the stored evidence is not tied to a named artifact, so it cannot be read as being about this one'
-        : "this entry's install command does not name an artifact anything could be checked against");
+    // Present but not affirmative — including a status the dimension cannot
+    // produce, which is how `artifact: clean` used to satisfy a requirement
+    // the artifact check had never met.
+    const inconclusive = required.filter((name) => dims[name] && !isPositive(name, dims[name].status));
+    if (inconclusive.length) {
+      return out('Experimental',
+        inconclusive.map((n) => `${n}: ${dims[n].status}`).join(', ') + ' — not an affirmative result');
     }
     const stale = staleDimensions(evidence, maxAgeDays, now).map((s) => s.dimension);
     if (stale.length) {
       return out('Experimental', `past its shelf life: ${stale.join(', ')}`);
+    }
+    // Everything required checked out and nothing is stale, so what is left is
+    // a dimension that failed without blocking — `smoke: fail`, a
+    // `source_binding: mismatch`, a withdrawn registry record.
+    const failed = Object.entries(dims)
+      .find(([, v]) => ['mismatch', 'vulnerable', 'fail', 'contradicted', 'withdrawn'].includes(v.status));
+    if (failed) {
+      return out('Experimental', `${failed[0]}: ${failed[1].status} (as of ${failed[1].checked_at || 'unknown'})`);
     }
     return out('Experimental', ecosystem === 'git'
       ? 'a git-source install has nothing a registry can verify'

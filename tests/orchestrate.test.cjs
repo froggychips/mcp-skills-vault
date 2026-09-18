@@ -52,7 +52,11 @@ test('fallbackBySignal: substring match against name+notes, skips Deprecated', (
   // means "do not install" — nothing to install, wrong bytes, or a known
   // vulnerability at the pinned version. A yanked package is the clearest
   // case, and no stored label can override or fake it.
-  const yanked = { dimensions: { availability: { status: 'yanked', checked_at: '2026-09-17' } } };
+  // `gone` rather than `yanked`: `gone` says nothing is published under that
+  // name at all, which needs no artifact-id binding to be true. A `yanked`
+  // recorded without an id would be evidence about bytes we cannot identify,
+  // and the tier says so instead of blocking.
+  const yanked = { dimensions: { availability: { status: 'gone', checked_at: '2026-09-17' } } };
   const db = {
     tools: [
       { name: '@salesforce/mcp', notes: 'CRM server' },

@@ -68,6 +68,64 @@ test('behaviour promotes, never demotes', () => {
   }
 });
 
+test('what blocks is the trust gate\'s list, not a wider one', () => {
+  // The first version asked `deriveTrust(...) === 'unverified'`, which also
+  // catches `smoke: fail` — turning "our sandbox could not start it" into
+  // "must not run", flatly against the rule that behaviour never demotes.
+  const smokeFailed = classifyEntry(entry(verified({ smoke: dim('fail') })), pass, at);
+  assert.equal(smokeFailed.classification, 'Experimental');
+  assert.match(smokeFailed.why, /smoke: fail/);
+});
+
+test('an unpublished *name* survives a version change; a yanked version does not', () => {
+  // `gone` means nothing is published under that name at all — worse than
+  // unpublished, because a free name can be claimed by somebody else — and it
+  // is true whatever version the entry moves to. `yanked` is a statement about
+  // one version, so evidence for 0.9.0 is not a finding about 1.0.0.
+  const staleGone = { ...verified({ availability: dim('gone') }), artifact_id: 'npm:pkg@0.9.0' };
+  assert.equal(classifyEntry(entry(staleGone), pass, at).classification, 'Deprecated');
+
+  const staleYank = { ...verified({ availability: dim('yanked') }), artifact_id: 'npm:pkg@0.9.0' };
+  const r = classifyEntry(entry(staleYank), pass, at);
+  assert.equal(r.classification, 'Experimental');
+  assert.match(r.why, /recorded evidence is about npm:pkg@0\.9\.0/);
+});
+
+test('complete evidence with no recorded identity cannot reach Core', () => {
+  // The binding used to be checked only when the trust verdict was already
+  // weak, so evidence that looked complete and named no artifact sailed past
+  // it — with a bound passing eval, straight to Core.
+  const anonymous = { dimensions: verified().dimensions };   // no artifact_id
+  const r = classifyEntry(entry(anonymous), pass, at);
+  assert.equal(r.classification, 'Experimental');
+  assert.equal(r.bound.evidence.state, 'unknown');
+  assert.match(r.why, /not tied to a named artifact/);
+});
+
+test('an entry whose own version fields disagree names no artifact', () => {
+  // `toTypedEntry` prefers the DB's `version` over the one in the launch
+  // command and records a warning when they differ. Reading the winner and
+  // ignoring the warning bound evidence for 1.0.0 to an entry that installs
+  // 2.0.0 — the very comparison this is supposed to make safe.
+  const conflicted = entry(verified(), { version: '2.0.0' });
+  const r = classifyEntry(conflicted, pass, at);
+  assert.equal(r.classification, 'Experimental');
+  assert.match(r.why, /does not name one artifact/);
+});
+
+test('a required dimension needs a status that dimension can produce', () => {
+  // `POSITIVE_STATUSES` is one flat vocabulary, so `artifact: clean` and
+  // `advisories: verified` — words neither check emits — satisfied
+  // requirements neither had met. Evidence arrives through pull requests.
+  const wrongWords = entry({
+    artifact_id: AID,
+    dimensions: { availability: dim('present'), artifact: dim('clean'), advisories: dim('verified') },
+  });
+  const r = classifyEntry(wrongWords, pass, at);
+  assert.equal(r.classification, 'Experimental');
+  assert.match(r.why, /not an affirmative result/);
+});
+
 test('Deprecated means "do not install", and each way of getting there is named', () => {
   for (const status of ['gone', 'version-gone', 'yanked']) {
     const r = classifyEntry(entry(verified({ availability: dim(status) })), pass, at);
@@ -100,10 +158,14 @@ test('an omitted check cannot make an entry look stronger', () => {
   assert.equal(r.classification, 'Experimental');
   assert.match(r.why, /never checked for this entry: advisories/);
 
-  // And enough positive points must not outweigh a contradiction.
+  // And enough positive points must not outweigh a contradiction. It lands in
+  // Experimental rather than Deprecated deliberately: `scores.cjs` excludes
+  // source_binding from the blocking set, because a metadata disagreement
+  // between a package's repository field and ours is something to read, not a
+  // refusal to install. The tier uses that same set so the two cannot drift.
   const contradicted = entry(verified({ source_binding: dim('mismatch') }));
   const c = classifyEntry(contradicted, pass, at);
-  assert.equal(c.classification, 'Deprecated');
+  assert.equal(c.classification, 'Experimental');
   assert.match(c.why, /source_binding: mismatch/);
 
   assert.equal(classifyEntry(entry(null), pass, at).classification, 'Experimental');

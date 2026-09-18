@@ -77,8 +77,17 @@ test('every offline --json command actually emits a listed schema', () => {
   const cwd  = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-compat-'));
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-compat-home-'));
 
-  for (const script of ['list_entries.cjs', 'doctor.cjs', 'audit_setup.cjs', 'status.cjs']) {
-    const r = spawnSync(process.execPath, [path.join(SCRIPTS, script), '--json', '--cwd', cwd], {
+  const cases = [
+    ['list_entries.cjs',     ['--json', '--cwd', cwd]],
+    ['doctor.cjs',           ['--json', '--cwd', cwd]],
+    ['audit_setup.cjs',      ['--json', '--cwd', cwd]],
+    ['status.cjs',           ['--json', '--cwd', cwd]],
+    ['orchestrate.cjs',      ['--json', '--cwd', cwd]],
+    // `health` has no --json: its only output is the document.
+    ['calculate_health.cjs', ['100', '30', 'true', '1', 'MIT']],
+  ];
+  for (const [script, argv] of cases) {
+    const r = spawnSync(process.execPath, [path.join(SCRIPTS, script), ...argv], {
       encoding: 'utf8',
       env: { ...process.env, HOME: home, NO_COLOR: '1' },
     });

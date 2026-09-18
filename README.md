@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@froggychips/mcp-vault.svg)](https://www.npmjs.com/package/@froggychips/mcp-vault)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Zero deps](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](./PHILOSOPHY.md)
-[![Tests](https://img.shields.io/badge/tests-766%20pass-brightgreen.svg)](./tests)
+[![Tests](https://img.shields.io/badge/tests-775%20pass-brightgreen.svg)](./tests)
 
 **Homepage:** [mcp.froggychips.xyz](https://mcp.froggychips.xyz) · **npm:** [`@froggychips/mcp-vault`](https://www.npmjs.com/package/@froggychips/mcp-vault)
 
@@ -73,18 +73,19 @@ npx -y @froggychips/mcp-vault status
 mcp-vault <version> · /Users/me/repos/my-project
 
 Environment     Node v22.3.0 · missing: uvx
-Installed       13 servers · 1 matched in the vault DB · 2 on another version · 10 unvetted
-                1 Recommended
+Installed       7 servers · 3 matched in the vault DB · 2 on another version · 2 unvetted
+                3 Recommended
 Evidence        oldest claim 2026-09-17 (stored; nothing was re-checked just now)
-Context         6,505 tokens on every request · 3.3% of a 200k window · 12 not measured
-                not counted: hostinger listed 396 tools (~87,831) when we measured
-                npm:hostinger-api-mcp@0.1.43, but this host launches npm:hostinger-api-mcp
+Context         14,200 tokens on every request · 7.1% of a 200k window · 4 not measured
 This project    postgres, aws, Node → 3 matching servers not installed (mcp-server-neon, …)
 
+Blocking
+  ✗ mcp-atlassian: advisories: vulnerable (as of 2026-09-17)
+
 Worth knowing
-  ! 10 configured servers are not in the vault DB, so nothing here has checked them: teamcity, github, …
-  ! hostinger: the launch command is unpinned, so what starts is not the npm:hostinger-api-mcp@0.1.43 the vault verified
-  ! chrome-devtools: the vault verified npm:chrome-devtools-mcp@0.26.0; this host launches npm:chrome-devtools-mcp@latest
+  ! 2 configured servers are not in the vault DB, so nothing here has checked them: my-own-server, internal-tools
+  ! search: the launch command resolves at start-up (npm:some-search-mcp), so what runs is not the npm:some-search-mcp@1.4.0 the vault verified
+  ! browser: the vault verified npm:some-browser-mcp@0.26.0; this host launches npm:some-browser-mcp@2.0.0
 
 Deeper:  verify --installed  re-hash what your hosts launch, live
          explain <name>      why one entry is allowed or denied
@@ -94,9 +95,10 @@ Deeper:  verify --installed  re-hash what your hosts launch, live
 
 Servers are matched by **artifact identity, not by the name in your config** —
 and the version is compared separately, because stored evidence about `x@1.0.0`
-is not a finding about `x@2.0.0` in either direction. A server on a version
-nobody verified gets no tier at all, and an unpinned `npx -y pkg` is reported
-as what it is: whatever is published at start-up.
+is not a finding about `x@2.0.0` in either direction. Equality alone is not
+enough: both sides must also *resolve* to one artifact, so `npx -y pkg` and
+`pkg@latest` are reported as what they are rather than matched against a pin.
+A server on a version nobody verified gets no tier at all.
 
 It makes **no network calls** — every claim comes from evidence already on
 disk, and says so rather than implying it was checked just now. Exit `1` means
@@ -735,7 +737,7 @@ maps      memory    meta       mobile     observability   payments
 pm        reasoning search     testing    utility         vcs       web-scraping
 ```
 
-Distribution: **0 Core / 101 Recommended / 1 Experimental / 12 Deprecated**.
+Distribution: **0 Core / 101 Recommended / 4 Experimental / 9 Deprecated**.
 
 The tier is derived from the evidence below, not stored in the DB and not a
 threshold on `health_score`:
@@ -745,7 +747,7 @@ threshold on `health_score`:
 | Core | the artifact is verified, the evidence is about *these* bytes, and a run **bound to these bytes** started and listed tools |
 | Recommended | the artifact is verified and current; either nothing watched it run, or what watched it cannot be tied to this artifact |
 | Experimental | too little is known — a required check never happened, a claim aged out, or the stored evidence is about a different artifact than this entry now installs |
-| Deprecated | do not install: nothing to install, or something failed (wrong bytes, a live advisory, a repository that disagrees) |
+| Deprecated | do not install — and only for what the trust gate blocks on: nothing to install, bytes that are not the bytes we verified, or an advisory against this version |
 
 **Core is empty today, and that is the tier working.** 38 entries start and
 list tools — but no row in the eval snapshot records *which artifact it

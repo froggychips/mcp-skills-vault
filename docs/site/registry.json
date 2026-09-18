@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-18T04:38:58.149Z",
+  "generated_at": "2026-09-18T04:52:21.253Z",
   "count": 114,
   "entries": [
     {
@@ -2208,7 +2208,7 @@
     {
       "name": "@mondaydotcomorg/monday-api-mcp",
       "category": "pm",
-      "classification": "Deprecated",
+      "classification": "Experimental",
       "tier_reason": "source_binding: mismatch (as of 2026-09-17)",
       "trust": "unverified",
       "license": "MIT",
@@ -2396,7 +2396,7 @@
     {
       "name": "linear-mcp-server",
       "category": "pm",
-      "classification": "Deprecated",
+      "classification": "Experimental",
       "tier_reason": "source_binding: mismatch (as of 2026-09-17)",
       "trust": "unverified",
       "license": "MIT",
@@ -4957,8 +4957,8 @@
     {
       "name": "@yoda.digital/gitlab-mcp-server",
       "category": "vcs",
-      "classification": "Deprecated",
-      "tier_reason": "advisories: vulnerable (as of 2026-09-17)",
+      "classification": "Experimental",
+      "tier_reason": "this entry does not name one artifact: the launch command and the verified version disagree, or neither states a version",
       "trust": "unverified",
       "license": "MIT",
       "health_score": 77.92,

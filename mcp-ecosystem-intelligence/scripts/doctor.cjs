@@ -189,6 +189,12 @@ function main() {
   if (args.json) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   else printHuman(result);
 
+  // A config file that exists and does not parse is not a failing environment
+  // — it is a question left unanswered, and the CLI's contract reserves 2 for
+  // that (docs/COMPATIBILITY.md). `status` already routed these to 2 while
+  // `doctor` reported the same input as 1.
+  const unreadable = result.checks.filter((c) => c.level === 'fail' && /parse failed|read failed/i.test(c.message));
+  if (unreadable.length) exitAfterFlush(2);
   const hard = result.counts.fail > 0 || (args.strict && result.counts.warn > 0);
   exitAfterFlush(hard ? 1 : 0);
 }

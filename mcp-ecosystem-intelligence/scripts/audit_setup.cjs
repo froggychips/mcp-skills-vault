@@ -95,19 +95,51 @@ function readJsonSafe(file) {
   catch { return null; }
 }
 
+/**
+ * The same read, but able to say *why* it came back with nothing.
+ *
+ * `readJsonSafe` collapses "the file is not there" and "the file is there and
+ * malformed" into one `null`, so `audit --strict` exited 0 on a config it could
+ * not parse — reporting a clean setup for servers it had never seen. A missing
+ * file is the normal case; anything else is a question left unanswered.
+ */
+function readJsonExplained(file) {
+  let raw;
+  try { raw = fs.readFileSync(file, 'utf8'); }
+  catch (e) {
+    if (e.code === 'ENOENT') return { missing: true, value: null };
+    return { error: `${e.code || 'read failed'}: ${e.message}`, value: null };
+  }
+  try { return { value: JSON.parse(raw) }; }
+  catch (e) { return { error: `parse failed: ${e.message}`, value: null }; }
+}
+
 // We deliberately ONLY pull mcpServers from ~/.claude.json. Other keys in
 // that file contain bearer tokens that have been known to leak into agent
 // transcripts; restricting our read keeps that surface dead.
-function readGlobalMcpServers(file) {
-  const data = readJsonSafe(file);
-  if (!data || typeof data !== 'object') return {};
-  return data.mcpServers && typeof data.mcpServers === 'object' ? data.mcpServers : {};
+function serversFrom(file, unreadable) {
+  const r = readJsonExplained(file);
+  if (r.error) { if (unreadable) unreadable.push({ path: file, error: r.error }); return {}; }
+  const data = r.value;
+  if (r.missing || data === null) return {};
+  if (typeof data !== 'object' || Array.isArray(data)) {
+    if (unreadable) unreadable.push({ path: file, error: 'not an object' });
+    return {};
+  }
+  if (data.mcpServers === undefined) return {};
+  if (!data.mcpServers || typeof data.mcpServers !== 'object' || Array.isArray(data.mcpServers)) {
+    if (unreadable) unreadable.push({ path: file, error: '"mcpServers" is not an object' });
+    return {};
+  }
+  return data.mcpServers;
 }
 
-function readProjectMcpServers(cwd) {
-  const data = readJsonSafe(path.join(cwd, '.mcp.json'));
-  if (!data || typeof data !== 'object') return {};
-  return data.mcpServers && typeof data.mcpServers === 'object' ? data.mcpServers : {};
+function readGlobalMcpServers(file, unreadable = null) {
+  return serversFrom(file, unreadable);
+}
+
+function readProjectMcpServers(cwd, unreadable = null) {
+  return serversFrom(path.join(cwd, '.mcp.json'), unreadable);
 }
 
 function readSettings(cwd) {
@@ -299,7 +331,14 @@ function audit({ project, global, settings, db, evals = null }) {
         && Number.isFinite(measured.tool_count) && measured.tool_count > 0
         ? measured.tool_count
         : null;
-      const truncated = Boolean(measured && measured.tools_truncated);
+      // Tri-state, and the middle one matters: `true` means the real count is
+      // higher than `observed`, `false` means the list was complete, and
+      // `null` means the row predates the field. A null cannot raise the
+      // verdict — but it cannot lower it either, and it does not need to:
+      // the measurement is only ever used to *raise* the count, so a row with
+      // unknown completeness falls back to exactly what the DB estimate alone
+      // decided before any of this existed.
+      const truncated = measured && measured.tools_truncated === true;
       const estimated = (typeof tool.est_tools_count === 'number') ? tool.est_tools_count : null;
       const tools = (observed !== null && estimated !== null) ? Math.max(observed, estimated)
         : (estimated !== null ? estimated : observed);
@@ -435,8 +474,9 @@ function main(argv) {
     return 2;
   }
 
-  const project  = readProjectMcpServers(cwd);
-  const global_  = readGlobalMcpServers(globalCfg);
+  const unreadable = [];
+  const project  = readProjectMcpServers(cwd, unreadable);
+  const global_  = readGlobalMcpServers(globalCfg, unreadable);
   const settings = readSettings(cwd);
 
   const counts = { project: Object.keys(project).length, global: Object.keys(global_).length };
@@ -446,6 +486,7 @@ function main(argv) {
     process.stdout.write(JSON.stringify({
       schema:      'mcp-vault/audit@1',
       cwd,
+      unreadable,
       db_path:     dbPath,
       global_path: globalCfg,
       counts,
@@ -455,6 +496,13 @@ function main(argv) {
     printReport(findings, counts);
   }
 
+  // A config we could not read is not a clean config. 2, because "no findings"
+  // would be a claim about servers we never saw — the same rule `status` and
+  // `doctor` follow.
+  if (unreadable.length) {
+    for (const u of unreadable) process.stderr.write(`audit: ${u.path}: ${u.error}\n`);
+    return 2;
+  }
   if (args.strict && findings.some(f => STRICT_CATEGORIES.has(f.category))) return 1;
   return 0;
 }

@@ -97,6 +97,46 @@ test('every claim is marked as stored, never as freshly checked', () => {
   assert.equal(human.status, 0);
 });
 
+test('equal references are not the same bytes unless each names one artifact', () => {
+  // `npx -y pkg` on both sides is equal and resolves to whatever npm publishes
+  // at start-up; `pkg@latest` is equal and is a moving tag. Both used to read
+  // as "same", which handed the DB's evidence to bytes nobody had seen.
+  for (const args of [['-y', 'chrome-devtools-mcp'], ['-y', 'chrome-devtools-mcp@latest']]) {
+    const r = run(project({ 'chrome-devtools': { command: 'npx', args } }), ['--json']);
+    const row = r.json.installed[0];
+    assert.equal(row.version_match, 'different', args.join(' '));
+    assert.equal(row.tier, null, args.join(' '));
+    assert.equal(row.pinned, false, args.join(' '));
+  }
+  // The pinned form does match, and then the evidence applies.
+  const exact = run(project({ 'chrome-devtools': { command: 'npx', args: ['-y', 'chrome-devtools-mcp@0.26.0'] } }), ['--json']);
+  assert.equal(exact.json.installed[0].version_match, 'same');
+  assert.ok(exact.json.installed[0].tier);
+});
+
+test('two spellings of one PyPI distribution are one package', () => {
+  // PEP 503: names fold on case and on runs of `-`, `_` and `.`, and `uvx`
+  // installs either spelling. Comparing raw strings meant a host launching the
+  // underscore form of a yanked package came out unvetted, with the finding
+  // sitting in the DB unmatched.
+  const r = run(project({ ok: { command: 'uvx', args: ['awslabs_core_mcp_server==1.0.27'] } }), ['--json']);
+  assert.equal(r.json.installed[0].in_db, true);
+  assert.equal(r.json.installed[0].db_entry, 'mcp-server-aws');
+  assert.equal(r.json.installed[0].tier, 'Deprecated');
+  assert.equal(r.status, 1);
+});
+
+test('a measurement is only spent on the artifact it was taken against', () => {
+  // The eval is indexed by name, so a measurement against an older version was
+  // being spent on the current one, and the "not counted" line labelled that
+  // measurement with the *DB's* artifact — inventing its provenance.
+  const r = run(project({ 'mcp-server-fetch': { command: 'uvx', args: ['mcp-server-fetch==2025.4.7'] } }), ['--json']);
+  const est = r.json.context.rows[0];
+  // No shipped eval row records an identity, so nothing can be attributed.
+  assert.equal(est.source, 'db', 'an unattributable measurement must not be used as one');
+  assert.deepEqual(r.json.context.measured_on_another_version, []);
+});
+
 test('a server on a different version than the vault verified gets no tier', () => {
   // The finding that made this rule: matching by the config key and then
   // applying the DB entry's evidence presented a claim about one version as a
@@ -105,7 +145,7 @@ test('a server on a different version than the vault verified gets no tier', () 
   assert.equal(unpinned.json.installed[0].version_match, 'different');
   assert.equal(unpinned.json.installed[0].tier, null, 'no tier may be claimed for bytes nobody checked');
   assert.equal(unpinned.json.installed[0].pinned, false);
-  assert.match(unpinned.stdout, /unpinned, so what starts is not the pypi:mcp-server-fetch@2025\.4\.7/);
+  assert.match(unpinned.stdout, /resolves at start-up .*so what runs is not the pypi:mcp-server-fetch@2025\.4\.7/);
 
   const other = run(project({ 'mcp-server-fetch': { command: 'uvx', args: ['mcp-server-fetch==1.0.0'] } }), ['--json']);
   assert.equal(other.json.installed[0].version_match, 'different');

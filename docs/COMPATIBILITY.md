@@ -33,6 +33,16 @@ the one this project cares most about getting right: **`2` never means "clean"**
 A check that could not run must not exit `0`, and a check that ran and found
 nothing must not exit `2`.
 
+Three consequences that are easy to get wrong, so they are written down:
+
+- A host config that exists and cannot be parsed is `2`, not `0` and not `1` —
+  from every command that reads one. "No findings" would be a claim about
+  servers nothing ever saw.
+- A registry that answered for **no** entry at all is `2`. "Nothing
+  contradicts" is a statement about a comparison, and that comparison did not
+  happen.
+- A usage error is `2`, including from `health`, which used to exit `1`.
+
 Which *conditions* produce a `1` can become stricter only behind a flag
 (`--strict`, `--fail-*`). Making a default stricter — something that exited `0`
 yesterday exiting `1` today with the same arguments — is a major release.
@@ -49,15 +59,19 @@ Every JSON document this tool writes carries a schema identifier of the form
 | `mcp-vault/capabilities@1` | `assets/capabilities.json` (the stored scan) |
 | `mcp-vault/capability-scan@1` | `mcp-vault capabilities --json` |
 | `mcp-vault/decision@1` | `mcp-vault explain --json` |
+| `mcp-vault/docker-drift@1` | `mcp-vault docker-drift --json` |
 | `mcp-vault/doctor@1` | `mcp-vault doctor --json` |
 | `mcp-vault/entries@1` | `mcp-vault list --json` |
+| `mcp-vault/health@1` | `mcp-vault health` |
 | `mcp-vault/identity@1` | `mcp-vault identity --json` |
+| `mcp-vault/license-drift@1` | `mcp-vault license-drift --json` |
 | `mcp-vault/lock@1` | `mcp.lock.json` |
 | `mcp-vault/lock-check@1` | `mcp-vault lock --check --json` |
 | `mcp-vault/lock-vendor@1` | `mcp-vault lock --vendor --json` |
 | `mcp-vault/lock-write@1` | `mcp-vault lock --json` |
 | `mcp-vault/policy@1` | `.mcp-vault.policy.json` (read, not written) |
 | `mcp-vault/posture@1` | `mcp-vault posture --json` |
+| `mcp-vault/scan@1` | `mcp-vault scan --json` |
 | `mcp-vault/status@1` | `mcp-vault status --json` |
 | `mcp-vault/token-budget@1` | `mcp-vault budget --json` |
 | `mcp-vault/upgrade-plan@1` | `mcp-vault upgrade --json` |

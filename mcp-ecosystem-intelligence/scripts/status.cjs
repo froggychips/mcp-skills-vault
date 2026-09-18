@@ -38,6 +38,7 @@ const { readInstalledServers, toInstallCmd } = require('./lib/installed.cjs');
 const { trustScore }       = require('./lib/scores.cjs');
 const { classifyEntry, evalIndex, currentArtifactId } = require('./lib/tiers.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
+const { isExactVersion } = require('./lib/install_cmd.cjs');
 const { staleDimensions, DEFAULT_MAX_AGE_DAYS } = require('./lib/evidence.cjs');
 const budget               = require('./lib/budget.cjs');
 const { runDoctor }        = require('./doctor.cjs');
@@ -104,6 +105,21 @@ function environment(cwd) {
 }
 
 /**
+ * PyPI project names are compared normalised (PEP 503): lowercase, with every
+ * run of `-`, `_` and `.` folded to a single `-`.
+ *
+ * `awslabs_core_mcp_server` and `awslabs.core-mcp-server` are the same
+ * distribution, and `uvx` installs either spelling. Comparing the raw strings
+ * meant a host launching the underscore form of a yanked package came out as
+ * an unvetted server nothing had checked — the finding was in the DB and the
+ * match never happened. npm names are not folded this way: there, `a-b` and
+ * `a.b` are genuinely different packages.
+ */
+function normalizePypiName(name) {
+  return String(name).toLowerCase().replace(/[-_.]+/g, '-');
+}
+
+/**
  * The package identity of an artifact, with the version dropped.
  *
  * This is what "is this the same package?" means. `artifactId` deliberately
@@ -114,12 +130,40 @@ function environment(cwd) {
 function packageKey(artifact) {
   if (!artifact) return null;
   switch (artifact.ecosystem) {
-    case 'npm':
-    case 'pypi': return artifact.package ? `${artifact.ecosystem}:${artifact.package}` : null;
+    case 'npm':  return artifact.package ? `npm:${artifact.package}` : null;
+    case 'pypi': return artifact.package ? `pypi:${normalizePypiName(artifact.package)}` : null;
     case 'oci':  return artifact.image ? `oci:${artifact.image}` : null;
     case 'git':  return artifact.source ? `git:${artifact.source}` : null;
     default:     return null;
   }
+}
+
+/**
+ * Does this artifact reference resolve to one set of bytes?
+ *
+ * Two references being *equal* only means the same bytes when each of them
+ * names an exact artifact. `npx -y pkg` on both sides is equal and resolves to
+ * whatever npm publishes at start-up; `pkg@latest` is equal and is a moving
+ * tag. Treating either as "same" handed the DB's evidence to bytes nobody had
+ * seen — the same error as matching by the config key, one level down.
+ */
+function isExactReference(artifact) {
+  if (!artifact) return false;
+  switch (artifact.ecosystem) {
+    case 'npm':  return isExactVersion('npx', artifact.version || '');
+    case 'pypi': return isExactVersion('uvx', artifact.version || '');
+    case 'oci':  return Boolean(artifact.digest);
+    // A git source install has no version to be exact about.
+    case 'git':  return false;
+    default:     return false;
+  }
+}
+
+/** A comparable id that folds PyPI spellings, so two names for one distribution match. */
+function comparableArtifactId(artifact) {
+  const id = artifactId(artifact);
+  if (!id || !artifact || artifact.ecosystem !== 'pypi') return id;
+  return `pypi:${normalizePypiName(artifact.package)}${artifact.version ? `@${artifact.version}` : ''}`;
 }
 
 /**
@@ -167,12 +211,15 @@ function installed({ cwd, db, evals }) {
 
     const installedId = artifactId(typed.artifact);
     const vaultId     = currentArtifactId(entry);
-    // An id with no version in it is an unpinned launch: `npx -y pkg` resolves
-    // whatever is published at start-up, which is by definition not the
-    // artifact anybody verified.
-    const pinned = Boolean(installedId && /@[^@/]+$/.test(installedId.replace(/^oci:[^@]*/, 'oci:')));
-    const version_match = !installedId || !vaultId ? 'unknown'
-      : (installedId === vaultId ? 'same' : 'different');
+    const vaultTyped  = toTypedEntry(entry);
+    // Equality is necessary and not sufficient: both sides must also *resolve*
+    // to one artifact. `npx -y pkg` equals `npx -y pkg` and names nothing.
+    const pinned      = isExactReference(typed.artifact);
+    const vaultPinned = Boolean(vaultTyped && isExactReference(vaultTyped.artifact));
+    const comparable  = comparableArtifactId(typed.artifact);
+    const vaultComparable = vaultTyped ? comparableArtifactId(vaultTyped.artifact) : null;
+    const version_match = (!comparable || !vaultComparable || !vaultId) ? 'unknown'
+      : (pinned && vaultPinned && comparable === vaultComparable ? 'same' : 'different');
 
     const row = {
       ...base,
@@ -188,9 +235,11 @@ function installed({ cwd, db, evals }) {
     if (version_match !== 'same') {
       // No tier: every stored claim under this entry is about `vault_artifact`.
       row.tier = null;
-      row.tier_reason = pinned
-        ? `the vault verified ${vaultId}; this host launches ${installedId}`
-        : `the launch command is unpinned, so what starts is not the ${vaultId} the vault verified`;
+      row.tier_reason = !pinned
+        ? `the launch command resolves at start-up (${installedId || 'unparseable'}), so what runs is not the ${vaultId || 'artifact'} the vault verified`
+        : (!vaultPinned
+          ? `the vault's own entry is not pinned to one artifact (${vaultId}), so there is nothing to compare this host's ${installedId} against`
+          : `the vault verified ${vaultId}; this host launches ${installedId}`);
       rows.push(row);
       continue;
     }
@@ -233,16 +282,34 @@ function context(rows, db, evals) {
   // the one thing this command must not do. `estimateServer` already returns
   // `source: 'unknown'` with a null token count for an entry it cannot
   // measure, and `summarise` already counts those separately.
+  // Which eval row, if any, is a measurement *of this artifact*. Checking the
+  // host against the DB was not enough: the eval is indexed by name, so a
+  // measurement taken against an older version was being spent on the current
+  // one. And a truncated `tools/list` is a lower bound, not a total.
+  const measurementFor = (r) => {
+    if (!r.in_db || r.version_match !== 'same') return null;
+    const row = evals.get(r.db_entry);
+    if (!row) return null;
+    const recorded = row.identity && row.identity.artifact_id;
+    if (!recorded || recorded !== r.vault_artifact) return null;
+    return row;
+  };
+
   const estimates = rows
     .filter((r) => !r.unreadable)
-    .map((r) => budget.estimateServer({
-      name: r.name,
-      // A server whose launched version differs from the DB's is not measured
-      // by the DB's entry either: its tool surface is whatever that version
-      // ships. Only an exact artifact match contributes a number.
-      dbEntry: (r.in_db && r.version_match === 'same' && db.tools.find((t) => t.name === r.db_entry)) || null,
-      evalEntry: (r.in_db && r.version_match === 'same' && evals.get(r.db_entry)) || null,
-    }));
+    .map((r) => {
+      const row = measurementFor(r);
+      const est = budget.estimateServer({
+        name: r.name,
+        // A server whose launched version differs from the DB's is not measured
+        // by the DB's entry either: its tool surface is whatever that version
+        // ships. Only an exact artifact match contributes a number.
+        dbEntry: (r.in_db && r.version_match === 'same' && db.tools.find((t) => t.name === r.db_entry)) || null,
+        evalEntry: row,
+      });
+      // A first page cannot be a total, so the number travels with the fact.
+      return { ...est, at_least: Boolean(row && row.tools_truncated) };
+    });
   const summary = budget.summarise(estimates);
   // "47% of your window" is a number; *which server* spent it is the finding.
   const heaviest = estimates
@@ -255,15 +322,25 @@ function context(rows, db, evals) {
   // ("your hostinger server listed 396 tools") to protect against a small
   // one (it was a different version). So it is reported, as what it is: a
   // measurement of another artifact, named.
+  //
+  // Only real measurements appear here, labelled with the artifact the *eval*
+  // recorded — not with the DB's current one. Labelling it with the DB artifact
+  // invented the measurement's provenance, and including DB estimates made the
+  // line claim a server "listed" tools when nothing had ever asked it.
   const elsewhere = rows
     .filter((r) => r.in_db && r.version_match !== 'same')
     .map((r) => {
-      const e = budget.estimateServer({
-        name: r.name,
-        dbEntry: db.tools.find((t) => t.name === r.db_entry) || null,
-        evalEntry: evals.get(r.db_entry) || null,
-      });
-      return e.tokens === null ? null : { ...e, measured_artifact: r.vault_artifact, installed_artifact: r.installed_artifact };
+      const row = evals.get(r.db_entry);
+      const recorded = row && row.identity && row.identity.artifact_id;
+      if (!recorded) return null;
+      const e = budget.estimateServer({ name: r.name, dbEntry: null, evalEntry: row });
+      if (e.tokens === null || e.source !== 'measured') return null;
+      return {
+        ...e,
+        at_least: Boolean(row.tools_truncated),
+        measured_artifact: recorded,
+        installed_artifact: r.installed_artifact,
+      };
     })
     .filter(Boolean)
     .sort((a, b) => b.tokens - a.tokens);
@@ -399,7 +476,8 @@ function printReport(r) {
   // 4. context
   if (r.context.servers) {
     const c = r.context;
-    out(`${label('Context')}${c.tokens.toLocaleString('en-US')} tokens on every request`
+    const lowerBound = (c.rows || []).some((e) => e.at_least && e.tokens !== null);
+    out(`${label('Context')}${lowerBound ? 'at least ' : ''}${c.tokens.toLocaleString('en-US')} tokens on every request`
       + ` ${DM}·${RS} ${c.percent_of_context}% of a 200k window`
       + (c.unknown_servers ? ` ${DM}·${RS} ${YL}${c.unknown_servers} not measured${RS}` : '') + '\n');
     if (c.heavy) {
@@ -408,8 +486,9 @@ function printReport(r) {
     }
     const big = (c.measured_on_another_version || [])[0];
     if (big) {
-      out(`${' '.repeat(16)}${DM}not counted: ${big.name} listed ${big.tools} tools (~${big.tokens.toLocaleString('en-US')})`
-        + ` when we measured ${big.measured_artifact}, but this host launches ${big.installed_artifact}${RS}\n`);
+      out(`${' '.repeat(16)}${DM}not counted: ${big.name} listed ${big.at_least ? 'at least ' : ''}${big.tools} tools`
+        + ` (~${big.tokens.toLocaleString('en-US')}) when we measured ${big.measured_artifact},`
+        + ` but this host launches ${big.installed_artifact}${RS}\n`);
     }
   }
 

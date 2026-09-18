@@ -142,6 +142,7 @@ async function main() {
 
   if (AS_JSON) {
     process.stdout.write(JSON.stringify({
+      schema: 'mcp-vault/docker-drift@1',
       checked: items.length, drifts: drifts.length, errors: errors.length,
       updated,
       items: items.map(({ _tool, ...rest }) => rest),

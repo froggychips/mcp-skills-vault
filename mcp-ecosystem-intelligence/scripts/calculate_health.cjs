@@ -195,6 +195,7 @@ function calculateHealth({ stars, lastCommitDays, hasInstallCmd, criticalIssues,
   const healthScore = Math.round(score * 100) / 100;
 
   return {
+    schema: 'mcp-vault/health@1',
     health_score: healthScore,
     breakdown: {
       popularity: Math.round(popularityScore * 100) / 100,

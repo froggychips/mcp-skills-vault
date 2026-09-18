@@ -403,6 +403,7 @@ async function main() {
   if (opts.json) {
     // Match the documented output shape.
     process.stdout.write(JSON.stringify({
+      schema: 'mcp-vault/license-drift@1',
       checked: report.checked,
       drifts:  report.drifts,
       errors:  report.errors,

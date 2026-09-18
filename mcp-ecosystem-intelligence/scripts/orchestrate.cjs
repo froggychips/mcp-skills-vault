@@ -912,6 +912,7 @@ if (require.main === module) {
   // -- json mode --
   if (AS_JSON) {
     process.stdout.write(JSON.stringify({
+      schema: 'mcp-vault/scan@1',
       stack: {
         langs:      [...stack.langs],
         dbs:        [...stack.dbs],

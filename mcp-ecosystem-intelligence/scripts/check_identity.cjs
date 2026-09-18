@@ -37,7 +37,8 @@
  * Exit codes:
  *   0  nothing contradicts
  *   1  at least one contradiction / withdrawal
- *   2  bad arguments
+ *   2  bad arguments, or the registry answered for no entry at all — a
+ *      comparison that never happened must not exit 0
  */
 
 'use strict';
@@ -201,6 +202,13 @@ function main(argv) {
     }
 
     if (findings.length) return 1;
+    // Nothing was checkable: the registry did not answer for a single entry.
+    // Exiting 0 there reads as "nothing contradicts", which is a statement
+    // about a comparison that never happened. 2 is "could not answer".
+    if (rows.length && byState('unknown').length === rows.length) {
+      process.stderr.write('check_identity: the registry answered for none of the entries — nothing was established\n');
+      return 2;
+    }
     return 0;
   });
 }

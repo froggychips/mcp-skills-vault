@@ -228,3 +228,31 @@ test('mergeEvidence: inheriting requires a positive identity match', () => {
   );
   assert.equal(bothUnnamed.dimensions.smoke.status, 'pass');
 });
+
+test('every dimension has its own vocabulary of positive statuses', () => {
+  // `POSITIVE_STATUSES` is one flat set, and asking it "is this good?" without
+  // saying *for what* accepted words from the wrong check: `artifact: clean`
+  // and `advisories: verified` are statuses neither check emits, and both
+  // satisfied a requirement neither had met. Evidence arrives through pull
+  // requests, so the vocabulary is per dimension — and a new dimension added
+  // without an entry here would silently fall back to the flat set.
+  const e = require('../mcp-ecosystem-intelligence/scripts/lib/evidence.cjs');
+  const missing = e.DIMENSIONS.filter((d) => !e.POSITIVE_BY_DIMENSION[d]);
+  assert.deepEqual(missing, [], `dimensions with no positive vocabulary: ${missing.join(', ')}`);
+
+  // Every per-dimension word must be a word the flat set also recognises:
+  // two lists disagreeing is how this drifts back apart.
+  for (const [dimension, set] of Object.entries(e.POSITIVE_BY_DIMENSION)) {
+    for (const status of set) {
+      assert.ok(e.POSITIVE_STATUSES.has(status), `${dimension}: ${status} is not in POSITIVE_STATUSES`);
+    }
+  }
+
+  assert.equal(e.isPositive('artifact', 'verified'), true);
+  assert.equal(e.isPositive('artifact', 'clean'), false, 'a word from the advisory check');
+  assert.equal(e.isPositive('advisories', 'verified'), false, 'a word from the artifact check');
+  assert.equal(e.isPositive('advisories', 'clean'), true);
+  // An unknown dimension falls back rather than answering "no": a new check
+  // must not read as a failing one before this table learns about it.
+  assert.equal(e.isPositive('something-new', 'verified'), true);
+});
