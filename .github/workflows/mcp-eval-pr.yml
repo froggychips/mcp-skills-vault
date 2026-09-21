@@ -1,0 +1,88 @@
+name: mcp-eval-pr
+
+# Behavioural smoke of the DB entries a pull request touches — in a file of its
+# own, and that is the point.
+#
+# It used to be a job in security-scan.yml, guarded by
+# `if: github.event_name == 'pull_request'`. That guard is real, but it is
+# invisible to anything reading the workflow's triggers: security-scan.yml also
+# runs on `schedule` and `workflow_dispatch`, which are default-branch contexts,
+# and this job checks out `github.event.pull_request.head.sha`. CodeQL read the
+# combination the only way it can — untrusted checkout reachable from a
+# privileged context — and raised two `actions/cache-poisoning/poisonable-step`
+# findings plus an `actions/untrusted-checkout` one, naming `(schedule)` and
+# `(workflow_dispatch)` explicitly.
+#
+# Dismissing those would have been accurate and useless: the next person to add
+# a trigger to security-scan.yml would have made them true, and the dismissal
+# would have kept them quiet. A file that can only ever start from
+# `pull_request` says the same thing structurally, so the analyser and the
+# reader agree without anyone having to remember an `if:`.
+#
+# What was lost in the move: `needs: unit-tests`. A separate workflow cannot
+# depend on another one's job, and the alternatives are worse — `workflow_run`
+# would hand this a privileged context, which is the thing being avoided, and
+# copying the suite here would run it twice on a one-machine runner. The job is
+# `continue-on-error` and never gated a merge, so what this costs is a container
+# smoke of changed DB entries on a PR whose tests are red. The isolation
+# argument below does not depend on it.
+
+on:
+  pull_request:
+    paths:
+      # Only the DB: this job evaluates entries, and `smoke-changed-entries`
+      # diffs that one file against the base commit. A PR touching scripts
+      # alone has nothing here to measure.
+      - 'mcp-ecosystem-intelligence/assets/tools_database.json'
+      - '.github/workflows/mcp-eval-pr.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  mcp-eval-pr:
+    name: MCP eval (sandboxed, changed entries)
+    # Behavioural smoke for the DB entries touched by THIS PR. Each changed
+    # server runs in a jailed container (mcp_eval --sandbox: --cap-drop ALL,
+    # read-only rootfs, non-root, mem/pid caps).
+    #
+    # Trusted code, untrusted data. The scripts are checked out from the PR's
+    # BASE commit — i.e. code that is already reviewed — and only
+    # tools_database.json comes from the PR head. Otherwise a PR could edit
+    # mcp_eval.cjs itself and the sandbox would be whatever that edit said it
+    # was. With the code fixed, `--sandbox` rebuilds every docker launch from
+    # its pinned digest, so a hostile `install_cmd` has nothing to work with.
+    runs-on: self-hosted
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}   # reviewed code only
+          fetch-depth: 0                                    # need history to diff the DB
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v7.0.0
+        with:
+          node-version: '20'
+      # Bring in the one file this job is about, and nothing else from the PR.
+      - name: Take the DB from the PR head
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "+$HEAD_SHA:refs/mcp-vault/pr-head"
+          git checkout refs/mcp-vault/pr-head -- mcp-ecosystem-intelligence/assets/tools_database.json
+          git --no-pager diff --stat -- mcp-ecosystem-intelligence/assets/tools_database.json
+      # Note the consequence of checking out the base commit above: the actions
+      # this job uses come from base too, so a change to them takes effect after
+      # merge, not in the PR that makes it. That is the intended direction — the
+      # PR must not be able to redefine the machinery that contains it — but it
+      # does mean this step fails in the PR that first adds the action.
+      - name: Docker preflight
+        uses: ./.github/actions/docker-preflight
+        with:
+          required: 'true'
+      - name: Smoke changed entries
+        uses: ./.github/actions/smoke-changed-entries
+        with:
+          base: ${{ github.event.pull_request.base.sha }}
+          gate: 'true'   # job is continue-on-error, so this reports without blocking merge
