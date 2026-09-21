@@ -1404,7 +1404,7 @@
     {
       "name": "github-mcp-server",
       "category": "vcs",
-      "install_cmd": "docker run -i --rm --cap-drop ALL --security-opt no-new-privileges -e GITHUB_PERSONAL_ACCESS_TOKEN ghcr.io/github/github-mcp-server@sha256:2ac27ef03461ef2b877031b838a7d1fd7f12b12d4ace7796d8cad91446d55959",
+      "install_cmd": "docker run -i --rm --cap-drop ALL --security-opt no-new-privileges -e GITHUB_PERSONAL_ACCESS_TOKEN ghcr.io/github/github-mcp-server@sha256:508a0857ec762b1ab1cece29193345b501fab1dd9d1228a7b617062954cecac6",
       "source_url": "https://github.com/github/github-mcp-server",
       "stars": 31864,
       "last_commit_days": 0,
@@ -1413,7 +1413,7 @@
       "est_tools_count": 100,
       "toolsets": "--toolsets repos,issues  # 19 presets; combine e.g. repos,pull_requests,code_security",
       "version": "latest@2026-05-09",
-      "pkg_integrity": "sha256-2ac27ef03461ef2b877031b838a7d1fd7f12b12d4ace7796d8cad91446d55959",
+      "pkg_integrity": "sha256-508a0857ec762b1ab1cece29193345b501fab1dd9d1228a7b617062954cecac6",
       "trust": "verified",
       "notes": "Docker image pinned by digest. Refresh with: docker manifest inspect ghcr.io/github/github-mcp-server.",
       "license": "MIT",
@@ -6303,7 +6303,7 @@
     {
       "name": "terraform-mcp-server",
       "category": "infra",
-      "install_cmd": "docker run -i --rm --cap-drop ALL --security-opt no-new-privileges hashicorp/terraform-mcp-server@sha256:67b4d3d39aa2c32c5ee280b21d67fb6513dab463af6c93c2ae0cdd4af09d4603",
+      "install_cmd": "docker run -i --rm --cap-drop ALL --security-opt no-new-privileges hashicorp/terraform-mcp-server@sha256:423a6b8e2ee06affcf090892f40c86469caba45fd2448ffa8ca5d717a174f7d5",
       "source_url": "https://github.com/hashicorp/terraform-mcp-server",
       "version": "latest",
       "pkg_integrity": "sha256:67b4d3d39aa2c32c5ee280b21d67fb6513dab463af6c93c2ae0cdd4af09d4603",
