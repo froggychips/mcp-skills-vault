@@ -75,6 +75,16 @@ test('githubOwnerRepo: returns null for non-github URLs and empty input', () => 
   assert.equal(r.githubOwnerRepo(undefined), null);
 });
 
+test('githubOwnerRepo is anchored: github.com inside someone else\'s URL is not a match', () => {
+  // A `url.includes('github.com')` pre-check used to guard this function, and
+  // it accepted exactly the URLs the anchored matcher rejects — so the guard
+  // decided nothing and read as if it did. The anchored pattern in
+  // lib/repo_url.cjs is the only thing deciding now.
+  assert.equal(r.githubOwnerRepo('https://evil.example/github.com/acme/server'), null);
+  assert.equal(r.githubOwnerRepo('https://github.com.evil.example/acme/server'), null);
+  assert.equal(r.githubOwnerRepo('https://github.com/acme/server'), 'acme/server');
+});
+
 // ── daysSince ──────────────────────────────────────────────────────────────
 
 test('daysSince: 0 for today (with small skew tolerance)', () => {

@@ -35,6 +35,8 @@ const path   = require('path');
 const crypto = require('crypto');
 const { execFile } = require('child_process');
 
+const { cacheRoot } = require('./cache_dir.cjs');
+
 const DEFAULT_TIMEOUT_MS = 120000;
 // Resolution is the slow part — tens of seconds per package, because npm has to
 // walk the whole graph. But a pinned root does NOT pin its tree: `server@1.0.0`
@@ -184,9 +186,8 @@ function pypiDirectDependencies(meta) {
 // ── cache ──────────────────────────────────────────────────────────────────
 
 function treeCacheDir() {
-  const base = process.env.MCP_VAULT_CACHE_DIR
-    || path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir() || os.tmpdir(), '.cache'), 'mcp-vault');
-  return path.join(base, 'deps');
+  const root = cacheRoot();
+  return root ? path.join(root, 'deps') : null;   // null: this process gets no cache
 }
 
 function treeCacheKey(pkg, version) {
@@ -201,7 +202,10 @@ function treeCacheKey(pkg, version) {
 async function resolveNpmTreeCached(pkg, version, opts = {}) {
   const { cacheTtlMs = DEFAULT_CACHE_TTL_MS, ...rest } = opts;
   const cacheable = typeof version === 'string' && EXACT_VERSION.test(version) && cacheTtlMs > 0;
-  const file = cacheable ? path.join(treeCacheDir(), `${treeCacheKey(pkg, version)}.json`) : null;
+  // This line sits outside both `try` blocks below, so nothing it calls may
+  // throw: an unusable cache has to read as "no cache", not as a failed resolve.
+  const dir  = cacheable ? treeCacheDir() : null;
+  const file = dir ? path.join(dir, `${treeCacheKey(pkg, version)}.json`) : null;
 
   if (file) {
     try {
@@ -218,9 +222,10 @@ async function resolveNpmTreeCached(pkg, version, opts = {}) {
   const result = await resolveNpmTree(pkg, version, rest);
   if (file && result.ok) {
     try {
-      fs.mkdirSync(treeCacheDir(), { recursive: true });
-      const tmp = `${file}.${process.pid}.tmp`;
-      fs.writeFileSync(tmp, JSON.stringify({ stored_at: Date.now(), packages: result.packages, lockfileVersion: result.lockfileVersion }));
+      fs.mkdirSync(dir, { recursive: true });
+      // Random name, exclusive write: see the same pattern in lib/http.cjs.
+      const tmp = `${file}.${process.pid}.${crypto.randomBytes(6).toString('hex')}.tmp`;
+      fs.writeFileSync(tmp, JSON.stringify({ stored_at: Date.now(), packages: result.packages, lockfileVersion: result.lockfileVersion }), { mode: 0o600, flag: 'wx' });
       fs.renameSync(tmp, file);
     } catch { /* a cache that can't be written is not worth failing over */ }
   }

@@ -549,7 +549,12 @@ function installTool(tool, cwd, global_) {
     process.stderr.write(`\n${RD}ABORT: integrity gate did not clear ${tool.name} (verify exit ${res.status}). Do not install.${RS}\n`);
     process.exit(1);
   }
-  if (/^(WARN|HOOK)\b|\[(WARN|HOOK)\]/m.test(out)) {
+  // Two shapes, kept apart so the anchor is unambiguous: verify's own lines
+  // start with the word, and a nested tool's output carries it bracketed
+  // anywhere in the line.
+  const LINE_START = /^(?:WARN|HOOK)\b/m;
+  const BRACKETED  = /\[(?:WARN|HOOK)\]/;
+  if (LINE_START.test(out) || BRACKETED.test(out)) {
     process.stderr.write(`\n${YL}WARN: review the issue above before proceeding.${RS}\n`);
   }
 
