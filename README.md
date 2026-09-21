@@ -841,7 +841,11 @@ per step, so a later edit cannot quietly add an unjailed one. See
   that it was benign), paced so 100+ container starts don't take the daemon
   down, and opens a PR refreshing the shipped `eval_results.json`.
 - **mcp-eval-pr** — on PRs touching the DB. Behavioural smoke of just the
-  changed entries, advisory (never blocks merge).
+  changed entries, advisory (never blocks merge). In
+  [its own workflow](./.github/workflows/mcp-eval-pr.yml) rather than in
+  `security-scan.yml`: it checks out the PR head, and a file that cannot start
+  from `schedule` or `workflow_dispatch` says so without depending on an `if:`
+  that a later trigger could outlive.
 - **codeql** — pushes to master, PRs touching code or workflows, and a weekly
   cron. `javascript-typescript` and `actions`, `security-extended`. Advanced
   setup on the self-hosted runner: the default setup is hard-wired to

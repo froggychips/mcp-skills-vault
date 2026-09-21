@@ -253,13 +253,21 @@ test('a pull_request build refuses to fall back to the host when it cannot isola
 
   // Every job that shells out to docker needs its own: GITHUB_ENV does not
   // cross job boundaries, so one job finding the socket says nothing about
-  // the next one.
+  // the next one. Searched across every manifest, not just security-scan.yml —
+  // `mcp-eval-pr` moved to a file of its own and this assertion followed it by
+  // failing, which is the right way round, but the next move should not need a
+  // test edit to stay checked.
   const jobsNeedingDocker = ['unit-tests', 'smoke', 'mcp-eval-pr', 'mcp-eval-smoke'];
-  const jobBlocks = src.split(/\n  (?=[a-z0-9_-]+:\n)/i).slice(1);
+  const allJobBlocks = [];
+  for (const [file, text] of sources) {
+    for (const block of text.split(/\n  (?=[a-z0-9_-]+:\n)/i).slice(1)) {
+      allJobBlocks.push([file, block]);
+    }
+  }
   for (const job of jobsNeedingDocker) {
-    const block = jobBlocks.find((b) => b.startsWith(`${job}:`));
-    assert.ok(block, `job ${job} not found`);
-    assert.match(block, /docker-preflight/, `${job} uses docker without a preflight`);
+    const found = allJobBlocks.filter(([, b]) => b.startsWith(`${job}:`));
+    assert.equal(found.length, 1, `job ${job}: expected exactly one definition, found ${found.length}`);
+    assert.match(found[0][1], /docker-preflight/, `${job} uses docker without a preflight`);
   }
   // The guarded steps still take the host path only when this is not a PR.
   const hostFallbacks = src.split('\n').filter((l) => /^\s+node (--test|mcp-ecosystem)/.test(l));
