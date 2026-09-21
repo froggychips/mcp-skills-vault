@@ -82,12 +82,13 @@ function calcScore(stars, days, hasInstall, critIssues, license) {
 
 // Extract owner/repo from a github.com URL, stripping /tree/... paths.
 function githubOwnerRepo(url) {
-  if (!url || !url.includes('github.com')) return null;
   // Anchored via lib/repo_url.cjs: an unanchored match read
   // `https://evil.example/github.com/acme/server` as `acme/server`, and this
-  // slug decides which repository gets asked about.
-  const slug = githubSlug(url);
-  return slug;
+  // slug decides which repository gets asked about. The substring pre-check
+  // that used to guard this line was the same bug in miniature — it accepted
+  // exactly the hostile URL the anchored pattern then rejected — so the
+  // anchored matcher is the only thing deciding.
+  return githubSlug(url);
 }
 
 function daysSince(isoDate) {

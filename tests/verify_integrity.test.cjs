@@ -387,6 +387,9 @@ test('npmManifestUrl: scoped names keep their slash encoded', () => {
   // A version with a plus or a pre-release tag must survive intact enough to
   // address the document.
   assert.equal(v.npmManifestUrl('pkg', '1.0.0-rc.1', 'https://r'), 'https://r/pkg/1.0.0-rc.1');
+  // The lower-casing replace is global: nothing shaped like a scope leaves a
+  // stray %2F behind for the registry to read differently.
+  assert.ok(!v.npmManifestUrl('@a/b/c', '1.0.0', 'https://r').includes('%2F'));
 });
 
 test('versionFromInstallCmd: what a launch command actually asks for', () => {

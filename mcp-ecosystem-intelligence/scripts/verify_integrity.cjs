@@ -504,7 +504,7 @@ function newChecks() {
 // A scoped name keeps its slash encoded: /@scope%2fpkg/1.2.3
 function npmManifestUrl(pkg, version, registry = NPM_REGISTRY) {
   const name = pkg.startsWith('@')
-    ? `@${encodeURIComponent(pkg.slice(1)).replace(/%2F/i, '%2f')}`
+    ? `@${encodeURIComponent(pkg.slice(1)).replace(/%2F/g, '%2f')}`
     : encodeURIComponent(pkg);
   return `${registry}/${name}/${encodeURIComponent(version || 'latest')}`;
 }

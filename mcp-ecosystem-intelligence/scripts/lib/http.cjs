@@ -33,9 +33,10 @@
 
 const https  = require('https');
 const fs     = require('fs');
-const os     = require('os');
 const path   = require('path');
 const crypto = require('crypto');
+
+const { cacheRoot } = require('./cache_dir.cjs');
 
 const DEFAULT_TIMEOUT_MS = 10000;
 const DEFAULT_RETRIES    = 3;
@@ -83,9 +84,7 @@ function cacheKey(method, url, headers = {}) {
 }
 
 function cacheDir() {
-  const base = process.env.MCP_VAULT_CACHE_DIR
-    || path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir() || os.tmpdir(), '.cache'), 'mcp-vault');
-  return path.join(base, 'http');
+  return path.join(cacheRoot(), 'http');
 }
 
 function readCache(key) {
@@ -105,8 +104,10 @@ function writeCache(key, record) {
     fs.mkdirSync(dir, { recursive: true });
     // Write-then-rename so a killed process can't leave a half-written file
     // that later parses as valid JSON.
-    const tmp = path.join(dir, `${key}.${process.pid}.tmp`);
-    fs.writeFileSync(tmp, JSON.stringify(record));
+    // The scratch name is random and the write is exclusive: a name another
+    // process could predict is a file it could have put a symlink at first.
+    const tmp = path.join(dir, `${key}.${process.pid}.${crypto.randomBytes(6).toString('hex')}.tmp`);
+    fs.writeFileSync(tmp, JSON.stringify(record), { mode: 0o600, flag: 'wx' });
     fs.renameSync(tmp, path.join(dir, `${key}.json`));
   } catch {
     /* a cache that can't be written is not an error worth failing a scan for */

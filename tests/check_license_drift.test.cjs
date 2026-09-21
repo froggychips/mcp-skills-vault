@@ -128,6 +128,16 @@ test('githubOwnerRepo: strips trailing path', () => {
   assert.equal(drift.githubOwnerRepo(null),                                       null);
 });
 
+test('githubOwnerRepo is anchored: github.com inside someone else\'s URL is not a match', () => {
+  // A `url.includes('github.com')` pre-check used to guard this function, and
+  // it accepted exactly the URLs the anchored matcher rejects — so the guard
+  // decided nothing and read as if it did. The anchored pattern in
+  // lib/repo_url.cjs is the only thing deciding now.
+  assert.equal(drift.githubOwnerRepo('https://evil.example/github.com/acme/server'), null);
+  assert.equal(drift.githubOwnerRepo('https://github.com.evil.example/acme/server'), null);
+  assert.equal(drift.githubOwnerRepo('https://github.com/acme/server'), 'acme/server');
+});
+
 // ── PyPI license extraction ───────────────────────────────────────────────
 
 test('pypiLicenseFromMeta: prefers info.license when set', () => {

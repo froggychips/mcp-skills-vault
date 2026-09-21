@@ -23,11 +23,12 @@ const DB_PATH = path.resolve(
   '../mcp-ecosystem-intelligence/assets/tools_database.json'
 );
 
+// One private directory for the whole file, rather than a name built inside
+// the shared temp dir: the name was unique but the directory was everyone's.
+const SCRATCH = fs.mkdtempSync(path.join(os.tmpdir(), 'db_io.test.'));
+
 function tmpFile(label) {
-  return path.join(
-    os.tmpdir(),
-    `db_io.test.${label}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.json`
-  );
+  return path.join(SCRATCH, `${label}.json`);
 }
 
 test('round-trips the live tools_database.json byte-for-byte', () => {
