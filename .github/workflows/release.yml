@@ -143,7 +143,13 @@ jobs:
     # This is the only job in the repository that needs a hosted runner. If
     # hosted runners will not start on this account, the job queues and nothing
     # is published, which is the right failure: see SECURITY.md.
-    runs-on: ubuntu-latest
+    #
+    # The exception is an explicit `allow_unprovenanced` dispatch. That dispatch
+    # says "publish without provenance", so the reason for the hosted runner is
+    # gone with it — and pinning it to a hosted runner anyway would have made
+    # the one documented way out of a billing lock the one thing a billing lock
+    # blocks. It goes to the self-hosted runner, where it can actually run.
+    runs-on: ${{ (github.event_name == 'workflow_dispatch' && inputs.allow_unprovenanced) && 'self-hosted' || 'ubuntu-latest' }}
     timeout-minutes: 20
     permissions:
       contents: read
@@ -201,6 +207,10 @@ jobs:
           ALLOW_UNPROVENANCED: ${{ inputs.allow_unprovenanced }}
         run: |
           set -uo pipefail
+          # Still attempted first even on the self-hosted runner: npm's refusal
+          # is the authority on whether provenance is possible, and it is the
+          # 422 below that routes into the override rather than an assumption
+          # made here about the runner.
           if npm publish --access public --provenance 2>&1 | tee /tmp/npm-publish.log; then
             echo "published with provenance"
             exit 0

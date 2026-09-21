@@ -75,10 +75,16 @@ check is about where the *build* ran. It cost 0.15.0 a publish.
 What that leaves: while the account is locked, the hosted job does not start,
 so the job queues and npm gets nothing. That is the intended failure — a stalled
 release rather than a quiet one — but it does mean **0.15.0 reaches npm only
-once the billing lock is cleared**, or explicitly via
-`workflow_dispatch` with `allow_unprovenanced=true`, which would give it the
-same caveat as 0.14.x. The tag, the GitHub Release and the changelog are
-already public either way.
+once the billing lock is cleared**, or explicitly via `workflow_dispatch` with
+`allow_unprovenanced=true`, which would give it the same caveat as 0.14.x. The
+tag, the GitHub Release and the changelog are already public either way.
+
+That override runs on the **self-hosted** runner, and has to: a dispatch saying
+"publish without provenance" has given up the only thing the hosted runner was
+for, and routing it to a hosted runner would mean the documented way out of a
+billing lock is the one thing a billing lock stops. The refusal itself is still
+npm's to make — the job attempts `--provenance` first either way and falls back
+only on npm's own 422.
 
 ## Static analysis (CodeQL)
 
