@@ -75,14 +75,20 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
+      # These are commit SHAs. The two below used to hold 4bd7200, which is
+      # 40 hex characters and passes every check we have — and is the SHA of
+      # the *annotated tag object* v4.38.0, not of any commit. Actions resolves
+      # it, so nothing broke; Dependabot could not read a version out of it and
+      # proposed bumps with no version in the title, which is how it went
+      # unnoticed. `git rev-parse v4.38.1^{commit}` is what belongs here.
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@4bd7200e1f146b1c937cae12d258b50f41a53cf8   # v4.38.0
+        uses: github/codeql-action/init@1c5b675653bb5c22dbe9b12b556ec555138e09fd   # v4.38.1
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-extended
 
       - name: Analyze
-        uses: github/codeql-action/analyze@4bd7200e1f146b1c937cae12d258b50f41a53cf8   # v4.38.0
+        uses: github/codeql-action/analyze@1c5b675653bb5c22dbe9b12b556ec555138e09fd   # v4.38.1
         with:
           category: /language:${{ matrix.language }}
