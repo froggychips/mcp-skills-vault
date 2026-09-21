@@ -70,3 +70,34 @@ test('no home directory: a private mkdtemp directory, not a guessable path in th
     os.homedir = realHomedir;
   }
 });
+
+test('no home directory and no writable temp dir: null, not a throw', () => {
+  // The expression this module replaced was pure path arithmetic and could not
+  // fail. `resolveNpmTreeCached` builds its cache path outside both of its
+  // `try` blocks and relies on that, so a throw here would end `verify --deps`
+  // over an unusable cache. No cache is a state, not an error.
+  const modPath = require.resolve('../mcp-ecosystem-intelligence/scripts/lib/cache_dir.cjs');
+  const realHomedir  = os.homedir;
+  const realMkdtemp  = fs.mkdtempSync;
+  let attempts = 0;
+  delete require.cache[modPath];
+  os.homedir = () => '';
+  fs.mkdtempSync = () => {
+    attempts += 1;
+    throw Object.assign(new Error('read-only file system'), { code: 'EROFS' });
+  };
+  try {
+    const fresh = require(modPath);
+    withEnv({}, () => {
+      assert.equal(fresh.cacheRoot(), null);
+      assert.equal(fresh.cacheDir('http'), null);
+      assert.equal(fresh.cacheDir('deps'), null);
+      // Tried once, not once per lookup.
+      assert.equal(attempts, 1);
+    });
+  } finally {
+    os.homedir = realHomedir;
+    fs.mkdtempSync = realMkdtemp;
+    delete require.cache[modPath];
+  }
+});

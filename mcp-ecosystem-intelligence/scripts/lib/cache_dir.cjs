@@ -19,26 +19,42 @@
  *   XDG_CACHE_HOME        — $XDG_CACHE_HOME/mcp-vault
  *   $HOME                 — $HOME/.cache/mcp-vault
  *   (none of the above)   — a fresh mkdtemp directory
+ *
+ * `null` when even that fails — no home directory *and* no writable temp dir.
+ * The expression this replaces did no I/O and so could not fail, and callers
+ * were written against that: `resolveNpmTreeCached` builds its cache path
+ * outside either `try`, so a throw here would abort `verify --deps` over a
+ * cache. A cache that cannot be created is not an error worth failing a scan
+ * for — it is no cache. Callers treat `null` as "skip the cache".
  */
 
 const fs   = require('fs');
 const os   = require('os');
 const path = require('path');
 
-let scratch = null;   // the mkdtemp fallback, made at most once per process
+// undefined = not attempted, string = the directory, null = attempted and failed
+let scratch;
 
+/** The cache root, or `null` if this process cannot have one. */
 function cacheRoot() {
   if (process.env.MCP_VAULT_CACHE_DIR) return process.env.MCP_VAULT_CACHE_DIR;
   if (process.env.XDG_CACHE_HOME) return path.join(process.env.XDG_CACHE_HOME, 'mcp-vault');
   const home = os.homedir();
   if (home) return path.join(home, '.cache', 'mcp-vault');
-  if (!scratch) scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-vault-cache-'));
+  if (scratch === undefined) {
+    // Tried once: a temp dir that is missing or read-only will not become
+    // writable later in the run, and retrying per call would turn one failure
+    // into a syscall on every cache lookup.
+    try { scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-vault-cache-')); }
+    catch { scratch = null; }
+  }
   return scratch;
 }
 
-/** A named subtree of the cache: `cacheRoot()/<name>`. */
+/** A named subtree of the cache: `cacheRoot()/<name>`, or `null` for no cache. */
 function cacheDir(name) {
-  return path.join(cacheRoot(), name);
+  const root = cacheRoot();
+  return root ? path.join(root, name) : null;
 }
 
 module.exports = { cacheRoot, cacheDir };

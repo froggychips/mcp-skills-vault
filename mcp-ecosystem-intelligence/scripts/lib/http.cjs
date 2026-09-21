@@ -84,12 +84,15 @@ function cacheKey(method, url, headers = {}) {
 }
 
 function cacheDir() {
-  return path.join(cacheRoot(), 'http');
+  const root = cacheRoot();
+  return root ? path.join(root, 'http') : null;   // null: this process gets no cache
 }
 
 function readCache(key) {
+  const dir = cacheDir();
+  if (!dir) return null;
   try {
-    const raw = fs.readFileSync(path.join(cacheDir(), `${key}.json`), 'utf8');
+    const raw = fs.readFileSync(path.join(dir, `${key}.json`), 'utf8');
     const rec = JSON.parse(raw);
     if (!rec || typeof rec !== 'object') return null;
     return rec;   // { stored_at, etag, status, data }
@@ -99,8 +102,9 @@ function readCache(key) {
 }
 
 function writeCache(key, record) {
+  const dir = cacheDir();
+  if (!dir) return;
   try {
-    const dir = cacheDir();
     fs.mkdirSync(dir, { recursive: true });
     // Write-then-rename so a killed process can't leave a half-written file
     // that later parses as valid JSON.
