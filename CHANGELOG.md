@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.15.2](https://github.com/froggychips/mcp-skills-vault/compare/v0.15.1...v0.15.2) (2026-09-24)
+
+
+### Bug Fixes
+
+* **license-drift:** a name that is gone has no licence to fail on ([1145d87](https://github.com/froggychips/mcp-skills-vault/commit/1145d8733985f034054a8b3fd628d66087cfd0d0))
+* **license-drift:** a recorded gone expires, because the name does not stay free ([77ba157](https://github.com/froggychips/mcp-skills-vault/commit/77ba157c4e46687641bbe063fca8858f1e17dfd3))
+
+
+### Documentation
+
+* **security:** 0.15.1 shipped unprovenanced, and what sigstore holds about it ([4985bd7](https://github.com/froggychips/mcp-skills-vault/commit/4985bd721c8ebc3683b834cf261a356ffdccca3c))
+
 ## [0.15.1](https://github.com/froggychips/mcp-skills-vault/compare/v0.15.0...v0.15.1) (2026-09-21)
 
 
