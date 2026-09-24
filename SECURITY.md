@@ -48,11 +48,21 @@ publish without an npm provenance attestation unless the refusal is overridden
 explicitly (`allow_unprovenanced`). A tool that argues for provenance should
 ship with it.
 
-**0.14.0, 0.14.1 and 0.15.1 were published with that override, and therefore
-have no provenance attestation. 0.15.0 was never published at all** — its tag
-and GitHub Release are public, the publish job refused, and the next release
-went out instead, so the registry goes 0.14.1 → 0.15.1 with nothing between
-them. The reason is worth writing down because it is not a choice:
+**Every version published since that refusal existed — 0.14.0, 0.14.1, 0.15.1
+and 0.15.2 — went out with the override, and therefore has no provenance
+attestation. 0.15.0 was never published at all** — its tag and GitHub Release
+are public, the publish job refused, and the next release went out instead, so
+the registry goes 0.14.1 → 0.15.1 with nothing between them.
+
+The scope of that sentence is the gate, not the lock, and the two do not line
+up. The billing lock is older: npm publishing moved to the self-hosted runner
+on 2026-06-20 (`8be08dd`) because hosted runners would not start. The gate
+that demands provenance, and the `allow_unprovenanced` escape from it, arrived
+on 2026-09-17 (`927ffd7`). Versions published in between — 0.12.0 on
+2026-06-20, by hand — have no attestation either, but not because anyone
+overrode anything: nothing was asking for one yet.
+
+Why the override keeps being needed, which is not a choice:
 
 - npm accepts a provenance bundle only from a **GitHub-hosted** runner
   (`Unsupported GitHub Actions runner environment: "self-hosted"`, HTTP 422).
@@ -95,11 +105,19 @@ recording exactly, because it is the same one that cost 0.15.0 its publish:
 3. The fallback publishes the same tarball without provenance.
 
 So there is a public, signed statement about a tarball that is on the registry
-without a provenance attestation attached to it. The equivalent statement for
-0.15.0 ([logIndex 2883447939](https://search.sigstore.dev/?logIndex=2883447939))
-describes a tarball that is not on the registry at all. Neither is a
-vulnerability; both are the kind of loose end that is worse when it is
-discovered than when it is written down.
+without a provenance attestation attached to it. 0.15.2 followed the same three
+steps later the same day. The statements, and what each one describes:
+
+| version | sigstore | the tarball it describes |
+|---|---|---|
+| 0.15.0 | [logIndex 2883447939](https://search.sigstore.dev/?logIndex=2883447939) | never published — not on the registry at all |
+| 0.15.1 | [logIndex 2931732566](https://search.sigstore.dev/?logIndex=2931732566) | on the registry, no attestation attached |
+| 0.15.2 | [logIndex 2932476094](https://search.sigstore.dev/?logIndex=2932476094) | on the registry, no attestation attached |
+
+None of these is a vulnerability; all three are the kind of loose end that is
+worse when it is discovered than when it is written down. Expect one more row
+per release for as long as the lock holds — which is the argument for clearing
+it rather than for a longer table.
 
 Provenance returns when the billing lock is cleared: the publish job needs no
 change, only a hosted runner that starts.
