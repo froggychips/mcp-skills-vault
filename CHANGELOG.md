@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.15.1](https://github.com/froggychips/mcp-skills-vault/compare/v0.15.0...v0.15.1) (2026-09-21)
+
+
+### Bug Fixes
+
+* **cache:** an unusable cache is no cache, not a failed scan ([5cebf86](https://github.com/froggychips/mcp-skills-vault/commit/5cebf864d47d976d7e692483d6e6b4939437fcd9))
+* **ci:** npm refuses provenance from a self-hosted runner ([c0fedd2](https://github.com/froggychips/mcp-skills-vault/commit/c0fedd253222aa5076beb19eb861260a1c516174))
+* **ci:** the documented way out of a billing lock cannot need a hosted runner ([f1e731c](https://github.com/froggychips/mcp-skills-vault/commit/f1e731c78c6cff484411d8a8c6d35f390c798a71))
+* the cache's last resort was a path every user on the machine could guess ([6eb35ad](https://github.com/froggychips/mcp-skills-vault/commit/6eb35ad7714ea4e7d2ee34c4827e81f5c80e877a))
+
 ## [0.15.0](https://github.com/froggychips/mcp-skills-vault/compare/v0.14.1...v0.15.0) (2026-09-18)
 
 
