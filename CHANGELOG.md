@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.15.3](https://github.com/froggychips/mcp-skills-vault/compare/v0.15.2...v0.15.3) (2026-09-24)
+
+
+### Documentation
+
+* **security:** 0.15.2, and the sigstore statements as a table ([247ddec](https://github.com/froggychips/mcp-skills-vault/commit/247ddecc937fe403306706d21bbe7518af0f0017))
+* **security:** the gate and the lock are different dates ([3f94e89](https://github.com/froggychips/mcp-skills-vault/commit/3f94e896e88ef553166e00e5930c87b65e10be55))
+
 ## [0.15.2](https://github.com/froggychips/mcp-skills-vault/compare/v0.15.1...v0.15.2) (2026-09-24)
 
 
