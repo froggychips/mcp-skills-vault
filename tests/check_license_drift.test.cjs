@@ -273,6 +273,10 @@ test('licenseExitCode: --strict fails on fetch errors, not just on drift', () =>
 
 // ── a name that is gone ─────────────────────────────────────────────────────
 
+// Dates in these fixtures are relative: `availability` is seven-day evidence,
+// so a literal date would start failing this file a week after it was written.
+const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+
 test('an entry recorded as availability:gone is reported, not fetched, and does not fail --strict', async () => {
   // @diskd-ai/email-mcp went 404 on npm. check_availability recorded it as
   // `gone` on 2026-09-17; the weekly licence gate then failed every run after
@@ -288,7 +292,7 @@ test('an entry recorded as availability:gone is reported, not fetched, and does 
         install_cmd: 'npx -y vanished@0.3.8',
         license: 'LGPL-3.0',
         trust_evidence: {
-          dimensions: { availability: { status: 'gone', checked_at: '2026-09-17' } },
+          dimensions: { availability: { status: 'gone', checked_at: daysAgo(2) } },
         },
       },
       { name: 'still-there', install_cmd: 'npx -y ok@1', license: 'MIT' },
@@ -310,7 +314,7 @@ test('an entry recorded as availability:gone is reported, not fetched, and does 
   const goneItem = report.items.find((i) => i.name === 'vanished');
   assert.ok(goneItem, 'the entry is still an item');
   assert.equal(goneItem.skipped, true);
-  assert.equal(goneItem.gone.recorded_at, '2026-09-17');
+  assert.equal(goneItem.gone.recorded_at, daysAgo(2));
 });
 
 test('a package that disappears before it is recorded still fails --strict', async () => {
@@ -323,4 +327,54 @@ test('a package that disappears before it is recorded still fails --strict', asy
 
   assert.equal(report.errors.length, 1);
   assert.equal(drift.licenseExitCode(report, true), 1, 'an unrecorded disappearance is still a failure');
+});
+
+test('a stale gone is re-fetched: an unpublished name is claimable, so the record expires', async () => {
+  // Codex, P2 on #109: trusting a recorded `gone` forever would mean the
+  // licence gate stays green for a name somebody else has since registered and
+  // published under. `availability` is seven-day evidence in this repo, and the
+  // comment on that limit gives this exact reason.
+  const asked = [];
+  const db = {
+    tools: [{
+      name: 'gone-a-while-ago',
+      install_cmd: 'npx -y vanished@0.3.8',
+      license: 'LGPL-3.0',
+      trust_evidence: {
+        dimensions: { availability: { status: 'gone', checked_at: daysAgo(30) } },
+      },
+    }],
+  };
+  const fetcher = async (tool) => {
+    asked.push(tool.name);
+    return { source: 'npm', error: 'Command failed: npm view vanished@0.3.8 license --json' };
+  };
+
+  const report = await drift.runDriftCheck(db, { fetcher, noFetch: false });
+
+  assert.deepEqual(asked, ['gone-a-while-ago'], 'a stale record is not a reason to skip the fetch');
+  assert.equal(report.errors.length, 1, 'still 404 → the error comes back');
+  assert.equal(drift.licenseExitCode(report, true), 1, 'and --strict says the availability evidence needs re-running');
+});
+
+test('a stale gone whose name was re-published reads the new licence', async () => {
+  // The case the freshness limit exists for: the name was claimed by someone
+  // else and now resolves. A permanent skip would never have looked.
+  const db = {
+    tools: [{
+      name: 'reclaimed',
+      install_cmd: 'npx -y reclaimed@1.0.0',
+      license: 'MIT',
+      trust_evidence: {
+        dimensions: { availability: { status: 'gone', checked_at: daysAgo(30) } },
+      },
+    }],
+  };
+  const fetcher = async () => ({ source: 'npm', license: 'BSL-1.1' });
+
+  const report = await drift.runDriftCheck(db, { fetcher, noFetch: false });
+
+  assert.equal(report.drifts.length, 1);
+  assert.equal(report.drifts[0].classification, 'drift-osi-to-restrictive');
+  assert.equal(drift.licenseExitCode(report, true), 1, 'a re-published name relicensed to BSL must fail the gate');
 });

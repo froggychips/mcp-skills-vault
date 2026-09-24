@@ -46,8 +46,10 @@
  *
  * An entry the DB already records as `availability: gone` is reported as GONE
  * and not fetched: there is no licence to read, and the 404 it would return is
- * a settled fact rather than a failed measurement. A package that disappears
- * before that is recorded still errors, and still fails --strict.
+ * a settled fact rather than a failed measurement. Two limits on that: the
+ * record must be fresh (availability is seven-day evidence, because a name that
+ * is unpublished today is claimable tomorrow), and a package that disappears
+ * before anyone records it still errors and still fails --strict.
  *
  * To wire into CI: add a job that runs this script with --strict. Failure
  * (relicensing detected) is the signal — don't auto-open a PR.
@@ -64,6 +66,8 @@ const fs           = require('fs');
 const https        = require('https');
 const path         = require('path');
 const { githubSlug } = require('./lib/repo_url.cjs');
+// Freshness is decided in one place; `availability` is seven-day evidence.
+const { staleDimensions } = require('./lib/evidence.cjs');
 
 const { classifyLicense } = require('./calculate_health.cjs');
 
@@ -327,14 +331,23 @@ async function runDriftCheck(db, { fetcher, noFetch }) {
     // A package that is no longer published has no licence to read, and the DB
     // already says so: check_availability recorded `availability: gone` with
     // the date it established that. Letting the 404 come back as a fetch error
-    // made --strict red every week for a fact settled once and unable to
-    // change — and a gate that is permanently red is a gate nobody reads.
+    // made --strict red every week for a fact settled once — and a gate that is
+    // permanently red is a gate nobody reads.
     //
-    // This keys off the *recorded* state, not off the 404. A package that
-    // vanishes and has not been recorded yet still fails the run, which is the
-    // week that finding matters.
-    const recordedAvailability = tool?.trust_evidence?.dimensions?.availability?.status;
-    if (recordedAvailability === 'gone') {
+    // Two things keep that from becoming a blind spot:
+    //
+    //   - It keys off the *recorded* state, never off the 404. A package that
+    //     vanishes before anyone records it still errors, which is the week
+    //     that finding matters.
+    //   - The record has to be fresh. `availability` is seven-day evidence in
+    //     this repo for exactly this reason — the comment on the limit says it:
+    //     an unpublished name is claimable by someone else. A stale `gone` is
+    //     not a fact about today, so the entry goes back to being fetched, and
+    //     if the name is still 404 the error returns and says the availability
+    //     evidence needs re-running.
+    const availabilityDim = tool?.trust_evidence?.dimensions?.availability;
+    if (availabilityDim?.status === 'gone'
+        && !staleDimensions(tool.trust_evidence).some((d) => d.dimension === 'availability')) {
       items.push({
         name: tool.name,
         old: tool.license || null,
@@ -342,7 +355,7 @@ async function runDriftCheck(db, { fetcher, noFetch }) {
         classification: 'match',
         source: 'availability:gone',
         skipped: true,
-        gone: { recorded_at: tool.trust_evidence.dimensions.availability.checked_at || null },
+        gone: { recorded_at: availabilityDim.checked_at || null },
       });
       continue;
     }
