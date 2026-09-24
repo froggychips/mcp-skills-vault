@@ -270,3 +270,57 @@ test('licenseExitCode: --strict fails on fetch errors, not just on drift', () =>
   assert.equal(drift.licenseExitCode(errored, false), 0);
   assert.equal(drift.licenseExitCode(drifted, false), 0);
 });
+
+// ── a name that is gone ─────────────────────────────────────────────────────
+
+test('an entry recorded as availability:gone is reported, not fetched, and does not fail --strict', async () => {
+  // @diskd-ai/email-mcp went 404 on npm. check_availability recorded it as
+  // `gone` on 2026-09-17; the weekly licence gate then failed every run after
+  // that, because a 404 arrived as a fetch error and --strict fails on those.
+  // The rule is sound — a run that read no licences is not a run that found no
+  // drift — but this is not a failed measurement. There is nothing to measure,
+  // and the DB knew it.
+  const asked = [];
+  const db = {
+    tools: [
+      {
+        name: 'vanished',
+        install_cmd: 'npx -y vanished@0.3.8',
+        license: 'LGPL-3.0',
+        trust_evidence: {
+          dimensions: { availability: { status: 'gone', checked_at: '2026-09-17' } },
+        },
+      },
+      { name: 'still-there', install_cmd: 'npx -y ok@1', license: 'MIT' },
+    ],
+  };
+  const fetcher = async (tool) => {
+    asked.push(tool.name);
+    return { source: 'npm', license: 'MIT' };
+  };
+
+  const report = await drift.runDriftCheck(db, { fetcher, noFetch: false });
+
+  assert.deepEqual(asked, ['still-there'], 'the gone entry must not be fetched at all');
+  assert.equal(report.errors.length, 0,    'a recorded gone is not a fetch error');
+  assert.equal(report.drifts.length, 0,    'and not a drift either — no licence was read');
+  assert.equal(drift.licenseExitCode(report, true), 0, '--strict stays green');
+
+  // Visible, not silent: an entry nobody watches any more should be countable.
+  const goneItem = report.items.find((i) => i.name === 'vanished');
+  assert.ok(goneItem, 'the entry is still an item');
+  assert.equal(goneItem.skipped, true);
+  assert.equal(goneItem.gone.recorded_at, '2026-09-17');
+});
+
+test('a package that disappears before it is recorded still fails --strict', async () => {
+  // The other half of the rule. Skipping on the *recorded* state rather than
+  // on the 404 is what keeps the first week loud.
+  const db = { tools: [{ name: 'just-vanished', install_cmd: 'npx -y x@1', license: 'MIT' }] };
+  const fetcher = async () => ({ source: 'npm', error: 'Command failed: npm view x@1 license --json' });
+
+  const report = await drift.runDriftCheck(db, { fetcher, noFetch: false });
+
+  assert.equal(report.errors.length, 1);
+  assert.equal(drift.licenseExitCode(report, true), 1, 'an unrecorded disappearance is still a failure');
+});

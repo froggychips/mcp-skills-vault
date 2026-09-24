@@ -41,8 +41,13 @@
  *
  * Exit codes:
  *   0  no restrictive drift (or --strict not set)
- *   1  --strict + at least one drift-osi-to-restrictive
+ *   1  --strict + at least one drift-osi-to-restrictive, or a fetch error
  *   2  bad arguments / DB not readable
+ *
+ * An entry the DB already records as `availability: gone` is reported as GONE
+ * and not fetched: there is no licence to read, and the 404 it would return is
+ * a settled fact rather than a failed measurement. A package that disappears
+ * before that is recorded still errors, and still fails --strict.
  *
  * To wire into CI: add a job that runs this script with --strict. Failure
  * (relicensing detected) is the signal — don't auto-open a PR.
@@ -319,6 +324,29 @@ async function runDriftCheck(db, { fetcher, noFetch }) {
       continue;
     }
 
+    // A package that is no longer published has no licence to read, and the DB
+    // already says so: check_availability recorded `availability: gone` with
+    // the date it established that. Letting the 404 come back as a fetch error
+    // made --strict red every week for a fact settled once and unable to
+    // change — and a gate that is permanently red is a gate nobody reads.
+    //
+    // This keys off the *recorded* state, not off the 404. A package that
+    // vanishes and has not been recorded yet still fails the run, which is the
+    // week that finding matters.
+    const recordedAvailability = tool?.trust_evidence?.dimensions?.availability?.status;
+    if (recordedAvailability === 'gone') {
+      items.push({
+        name: tool.name,
+        old: tool.license || null,
+        new: tool.license || null,
+        classification: 'match',
+        source: 'availability:gone',
+        skipped: true,
+        gone: { recorded_at: tool.trust_evidence.dimensions.availability.checked_at || null },
+      });
+      continue;
+    }
+
     let res;
     try {
       res = await fetcher(tool);
@@ -408,6 +436,7 @@ async function main() {
       checked: report.checked,
       drifts:  report.drifts,
       errors:  report.errors,
+      gone:    (report.items || []).filter((i) => i.gone).map((i) => ({ name: i.name, recorded_at: i.gone.recorded_at })),
     }, null, 2) + '\n');
   } else {
     for (const d of report.drifts) {
@@ -416,7 +445,14 @@ async function main() {
     for (const e of report.errors) {
       console.log(`ERROR  ${e.name.padEnd(30)} (${e.source}) ${e.error}`);
     }
-    console.log(`\n${report.checked} entries checked — ${report.drifts.length} drift(s), ${report.errors.length} error(s)`);
+    // Not silence: a skipped entry is one nobody is watching any more, and the
+    // count belongs in the summary so it cannot grow unnoticed.
+    const gone = (report.items || []).filter((i) => i.gone);
+    for (const g of gone) {
+      console.log(`GONE   ${g.name.padEnd(30)} no longer published — licence not read (recorded ${g.gone.recorded_at || 'date unknown'})`);
+    }
+    const goneNote = gone.length ? `, ${gone.length} gone (not read)` : '';
+    console.log(`\n${report.checked} entries checked — ${report.drifts.length} drift(s), ${report.errors.length} error(s)${goneNote}`);
   }
 
   exitAfterFlush(licenseExitCode(report, opts.strict));
