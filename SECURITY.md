@@ -48,10 +48,11 @@ publish without an npm provenance attestation unless the refusal is overridden
 explicitly (`allow_unprovenanced`). A tool that argues for provenance should
 ship with it.
 
-**0.14.0 and 0.14.1 were published with that override, and therefore have no
-provenance attestation. 0.15.0 has no npm package at all yet** — its tag and
-GitHub Release are public, the publish job refused, and nothing was pushed to
-npm. The reason is worth writing down because it is not a choice:
+**0.14.0, 0.14.1 and 0.15.1 were published with that override, and therefore
+have no provenance attestation. 0.15.0 was never published at all** — its tag
+and GitHub Release are public, the publish job refused, and the next release
+went out instead, so the registry goes 0.14.1 → 0.15.1 with nothing between
+them. The reason is worth writing down because it is not a choice:
 
 - npm accepts a provenance bundle only from a **GitHub-hosted** runner
   (`Unsupported GitHub Actions runner environment: "self-hosted"`, HTTP 422).
@@ -61,10 +62,12 @@ npm. The reason is worth writing down because it is not a choice:
   the annotation *"The job was not started because your account is locked due to
   a billing issue."*
 
-So the two constraints exclude each other, and 0.14.x was published
-unprovenanced on purpose rather than silently. What is still true for it: npm's
-**registry signature** over `name@version:integrity` is present, as it is for
-every version, and `npm audit signatures` verifies it.
+So the two constraints exclude each other, and each of those versions was
+published unprovenanced on purpose rather than silently. What is still true for
+them: npm's **registry signature** over `name@version:integrity` is present, as
+it is for every version, and `npm audit signatures` verifies it. What is absent
+is `dist.attestations`, and the registry metadata says so plainly — there is no
+version of this package where it is present, and nothing here claims otherwise.
 
 The publish job now runs on `ubuntu-latest` — the fix this section has
 prescribed all along, which the job itself had not taken, because a comment
@@ -74,10 +77,32 @@ check is about where the *build* ran. It cost 0.15.0 a publish.
 
 What that leaves: while the account is locked, the hosted job does not start,
 so the job queues and npm gets nothing. That is the intended failure — a stalled
-release rather than a quiet one — but it does mean **0.15.0 reaches npm only
-once the billing lock is cleared**, or explicitly via `workflow_dispatch` with
-`allow_unprovenanced=true`, which would give it the same caveat as 0.14.x. The
-tag, the GitHub Release and the changelog are already public either way.
+release rather than a quiet one.
+
+**2026-09-24 is what that looks like in practice.** Merging the 0.15.1 release
+PR created the tag and the GitHub Release, and the publish job died in three
+seconds with no steps at all, carrying the annotation *"The job was not started
+because your account is locked due to a billing issue."* 0.15.1 then went out
+through the override — `workflow_dispatch` with `allow_unprovenanced=true`,
+which routes to the self-hosted runner — and the sequence there is worth
+recording exactly, because it is the same one that cost 0.15.0 its publish:
+
+1. `npm publish --provenance` builds the bundle and **signs it first**. The
+   statement reaches the sigstore transparency log before npm ever looks at it:
+   [logIndex 2931732566](https://search.sigstore.dev/?logIndex=2931732566).
+2. npm then rejects the bundle — HTTP 422, *"Unsupported GitHub Actions runner
+   environment: self-hosted"*.
+3. The fallback publishes the same tarball without provenance.
+
+So there is a public, signed statement about a tarball that is on the registry
+without a provenance attestation attached to it. The equivalent statement for
+0.15.0 ([logIndex 2883447939](https://search.sigstore.dev/?logIndex=2883447939))
+describes a tarball that is not on the registry at all. Neither is a
+vulnerability; both are the kind of loose end that is worse when it is
+discovered than when it is written down.
+
+Provenance returns when the billing lock is cleared: the publish job needs no
+change, only a hosted runner that starts.
 
 That override runs on the **self-hosted** runner, and has to: a dispatch saying
 "publish without provenance" has given up the only thing the hosted runner was
