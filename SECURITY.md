@@ -48,11 +48,21 @@ publish without an npm provenance attestation unless the refusal is overridden
 explicitly (`allow_unprovenanced`). A tool that argues for provenance should
 ship with it.
 
-**Every version published since the billing lock — 0.14.0, 0.14.1, 0.15.1 and
-0.15.2 — went out with that override, and therefore has no provenance
+**Every version published since that refusal existed — 0.14.0, 0.14.1, 0.15.1
+and 0.15.2 — went out with the override, and therefore has no provenance
 attestation. 0.15.0 was never published at all** — its tag and GitHub Release
 are public, the publish job refused, and the next release went out instead, so
-the registry goes 0.14.1 → 0.15.1 with nothing between them. The reason is worth writing down because it is not a choice:
+the registry goes 0.14.1 → 0.15.1 with nothing between them.
+
+The scope of that sentence is the gate, not the lock, and the two do not line
+up. The billing lock is older: npm publishing moved to the self-hosted runner
+on 2026-06-20 (`8be08dd`) because hosted runners would not start. The gate
+that demands provenance, and the `allow_unprovenanced` escape from it, arrived
+on 2026-09-17 (`927ffd7`). Versions published in between — 0.12.0 on
+2026-06-20, by hand — have no attestation either, but not because anyone
+overrode anything: nothing was asking for one yet.
+
+Why the override keeps being needed, which is not a choice:
 
 - npm accepts a provenance bundle only from a **GitHub-hosted** runner
   (`Unsupported GitHub Actions runner environment: "self-hosted"`, HTTP 422).
