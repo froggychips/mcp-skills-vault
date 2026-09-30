@@ -67,7 +67,8 @@
  *   roleOf(row, mode)                    -> 'gate' | 'context'
  *   effectivePolicy(base, flags, opts)   -> frozen, normalised policy
  *   loadEffectivePolicy(startDir, opts)  -> { ok, policy, path, found, errors, sources }  (opts.file: a named policy)
- *   flagsFromArgv(argv)                  -> { strict, failUnverified, … }
+ *   flagsFromArgv(argv)                  -> { strict, failUnverified, failFamilies, failFamiliesError, … }
+ *   parseFailFamilies(argv)              -> { families, error }  (FINDING_FAMILIES: what it accepts)
  *   entryRuleOutcomes(ctx)               -> legacy evaluateEntry outcomes
  */
 
@@ -821,18 +822,64 @@ function deepFreeze(o) {
  * The CLI switches that raise the bar, read once. They are policy, not
  * command logic: each one is an input to `effectivePolicy`.
  */
+// The rule families a finding or an outcome can belong to: the first segment
+// of every row id here, and of every finding rule the producers emit
+// (lib/legacy_tags.cjs, lib/findings_from.cjs and the commands). What
+// `--fail-families` may name — a name outside it matches nothing, and a
+// security gate whose filter matches nothing passes everything (#134).
+// tests/decision_consistency.test.cjs checks that no producer emits a family
+// missing here.
+const FINDING_FAMILIES = Object.freeze([
+  'advisories', 'artifact', 'audits', 'db', 'dependencies', 'evidence', 'flows', 'install', 'integrity',
+  'license', 'lock', 'lookalike', 'metadata', 'oci', 'org', 'pin', 'provenance', 'registry', 'scope',
+  'secrets', 'shadowing', 'signature', 'tool-scan', 'verify',
+]);
+const familiesKnown = () => new Set([...FINDING_FAMILIES, ...RULES.map((r) => r.id.split('/')[0])]);
+
+/**
+ * `--fail-families a,b` / `--fail-families=a,b` -> { families, error }.
+ * Absent: { families: null } (every family may fail the run). A missing
+ * value, a value that is another switch, an empty list or a family nobody
+ * emits is an error: each would otherwise narrow the question to nothing and
+ * exit 0 on a decision that denies.
+ */
+function parseFailFamilies(argv = []) {
+  let raw = null;
+  let error = null;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = String(argv[i]);
+    if (arg === '--fail-families') {
+      const next = argv[i + 1];
+      if (next === undefined || String(next).startsWith('-')) {
+        error = '--fail-families needs a comma-separated list of rule families (e.g. integrity,pin)';
+        raw = '';
+        continue;
+      }
+      raw = String(next);
+      i++;
+    } else if (arg.startsWith('--fail-families=')) raw = arg.slice('--fail-families='.length);
+  }
+  if (raw === null) return { families: null, error: null };
+  const families = raw.split(',').map((x) => x.trim().replace(/\/\*?$/, '')).filter(Boolean);
+  if (error) return { families: [], error };
+  if (!families.length) return { families: [], error: `--fail-families names no family (got ${JSON.stringify(raw)})` };
+  const known = familiesKnown();
+  const unknown = families.filter((f) => !known.has(f.split('/')[0]));
+  if (unknown.length) {
+    return { families, error: `--fail-families: unknown rule famil${unknown.length === 1 ? 'y' : 'ies'} ${unknown.map((f) => JSON.stringify(f)).join(', ')} (known: ${[...known].sort().join(', ')})` };
+  }
+  return { families, error: null };
+}
+
 function flagsFromArgv(argv = []) {
   const a = new Set(argv);
   // --fail-families a,b (or =a,b): the rule families whose outcomes may fail
-  // the run. Absent, every family may.
-  let families = null;
-  for (let i = 0; i < argv.length; i++) {
-    const arg = String(argv[i]);
-    if (arg === '--fail-families') families = String(argv[i + 1] || '');
-    else if (arg.startsWith('--fail-families=')) families = arg.slice('--fail-families='.length);
-  }
+  // the run. Absent, every family may. A malformed one is `failFamiliesError`,
+  // which the command refuses with exit 2 — never a filter that matches nothing.
+  const ff = parseFailFamilies(argv);
   return {
-    failFamilies:             families === null ? null : families.split(',').map((x) => x.trim().replace(/\/\*?$/, '')).filter(Boolean),
+    failFamilies:             ff.families,
+    failFamiliesError:        ff.error,
     strict:                   a.has('--strict'),
     failUnverified:           a.has('--fail-unverified'),
     requireSignatures:        a.has('--require-signatures'),
@@ -958,5 +1005,5 @@ function evidenceRuleOutcomes(ctx) {
 module.exports = {
   EFFECTS, RANK, RULES, RULE_BY_ID, ORDER,
   rulesFor, rowFor, roleOf, stricter, deepFreeze,
-  flagsFromArgv, effectivePolicy, loadEffectivePolicy, entryRuleOutcomes, evidenceRuleOutcomes,
+  flagsFromArgv, parseFailFamilies, FINDING_FAMILIES, effectivePolicy, loadEffectivePolicy, entryRuleOutcomes, evidenceRuleOutcomes,
 };

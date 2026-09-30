@@ -1459,6 +1459,11 @@ async function main() {
     console.error(`--fail-on must be ${RANK.fail_on.join(', ').replace(/, (\w+)$/, ' or $1')} (got ${JSON.stringify(FAIL_ON_ARG)}).`);
     process.exit(2);
   }
+  // A family filter that matches nothing would pass a denied entry (#134).
+  if (RUN_FLAGS.failFamiliesError) {
+    console.error(RUN_FLAGS.failFamiliesError);
+    process.exit(2);
+  }
   if (POLICY_FILE && NO_POLICY) {
     console.error('--policy and --no-policy contradict each other.');
     process.exit(2);

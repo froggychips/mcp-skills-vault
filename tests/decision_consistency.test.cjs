@@ -387,6 +387,33 @@ test('roles: what explain shows beside the gate is context in its modes, and the
   assert.deepEqual(d.rules.map((o) => [o.rule, o.effect, o.role]), [['behaviour/never-started', 'warn', 'context'], ['budget/over', 'warn', 'context']]);
 });
 
+test('--fail-families: a missing, empty or unknown value is a usage error, never a filter that matches nothing', (t) => {
+  const runIn = fixtureTree(t);
+  const base = ['--offline', '--entry', 'fx-advisory-fresh', '--cwd', DIRS.none, '--as-of', FIX_AS_OF];
+  for (const [args, why] of [
+    [['--fail-families'], /needs a comma-separated list/],
+    [['--fail-families', '--strict'], /needs a comma-separated list/],
+    [['--fail-families='], /names no family/],
+    [['--fail-families', ',,'], /names no family/],
+    [['--fail-families', 'trust,intgrity'], /unknown rule family "intgrity"/],
+    [['--fail-families=advisory'], /unknown rule family "advisory"/],
+  ]) {
+    const r = runIn('verify_integrity.cjs', [...base, ...args]);
+    assert.equal(r.status, 2, `${args.join(' ')}: exit ${r.status} (${r.stderr})`);
+    assert.match(r.stderr, why, args.join(' '));
+  }
+  assert.deepEqual(PR.parseFailFamilies(['--fail-families', 'trust/*,integrity']), { families: ['trust', 'integrity'], error: null });
+  assert.deepEqual(PR.parseFailFamilies(['--strict']), { families: null, error: null });
+  // Every family a producer emits is one --fail-families accepts.
+  const known = new Set([...PR.FINDING_FAMILIES, ...PR.RULES.map((r) => r.id.split('/')[0])]);
+  const src = [path.join(S, 'lib'), S].flatMap((d) => fs.readdirSync(d).filter((f) => f.endsWith('.cjs')).map((f) => path.join(d, f)));
+  for (const file of src) {
+    for (const m of fs.readFileSync(file, 'utf8').matchAll(/rule:\s*['`]([a-z0-9-]+)\//g)) {
+      assert.ok(known.has(m[1]), `${path.relative(ROOT, file)} emits family "${m[1]}", which --fail-families rejects`);
+    }
+  }
+});
+
 test('outcomeFails: the family filter, by the outcome\'s rule or a finding it rests on', () => {
   const ruleOf = new Map([['f:1', 'integrity/docker-pin-mismatch'], ['f:2', 'evidence/advisories']]);
   const deny = (rule, findings) => ({ rule, effect: 'deny', findings, thresholded: true });
