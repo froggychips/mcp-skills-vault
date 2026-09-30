@@ -129,6 +129,75 @@ billing lock is the one thing a billing lock stops. The refusal itself is still
 npm's to make — the job attempts `--provenance` first either way and falls back
 only on npm's own 422.
 
+## Signed DB
+
+`tools_database.json` is the trust anchor (see *Sensitive Attack Surfaces*),
+and until now the client trusted it for arriving in the npm tarball. The CLI
+now checks an Ed25519 signature before any command that reads it
+(`bin/mcp-vault.cjs` → `lib/db_signature.cjs`), offline, with Node's own
+`crypto`:
+
+- **What is signed**: the DB's canonical JSON (sorted keys, no whitespace,
+  UTF-8 — `lib/signing.cjs`), so line endings or re-indentation neither break
+  a signature nor hide a change. `tools_database.json.sig` carries the key id,
+  the algorithm, the sha256 of those canonical bytes and the signing date, all
+  inside the signed message.
+- **Who may sign**: the keys in `assets/trusted_keys.json`, shipped in the
+  package. Rotation: add the new key with `valid_from`, give the old one
+  `valid_until`; a signature must fall inside its key's window. `revoked: true`
+  verifies nothing whatever date is claimed — a window stops a retired key used
+  by mistake, not a stolen one backdating.
+- **Fail closed**: no `.sig`, a malformed one, an unknown or revoked key, or
+  changed content → the command does not run and says which. A DB passed with
+  `--db <file>` is held to the same bar.
+- **Development / forks**: `--allow-unsigned-db` or
+  `MCP_VAULT_ALLOW_UNSIGNED_DB=1`, with a warning on every run. A clone has no
+  `.sig` (signing happens at release), so `bin/` from a clone needs it;
+  `npm test` does not — the tests generate keys on the fly.
+- **Until a key exists**: while `trusted_keys.json` is empty the check reports
+  `not-configured` (never `verified`) and lets commands run, as every earlier
+  version did. That is a property of the build, not something a tampered DB can
+  cause: once the package ships a key, removing the `.sig` is a refusal.
+
+What it does not cover: the keyring ships inside the same tarball as the code,
+so an attacker who can rewrite the package can rewrite the keyring too. The
+signature protects the DB wherever it travels without that code — a mirror, a
+copy handed over with `--db`, a vendored file — and ties it to a key the
+maintainer holds rather than to whoever controls the transport. Scripts run
+directly (`node mcp-ecosystem-intelligence/scripts/…`) are the development path
+and do not check it.
+
+### Setting up the release key (maintainer, once)
+
+```bash
+node mcp-ecosystem-intelligence/scripts/sign_db.cjs --keygen ~/mcp-vault-release.pem
+#   (equivalent: openssl genpkey -algorithm ed25519 -out ~/mcp-vault-release.pem)
+node mcp-ecosystem-intelligence/scripts/sign_db.cjs --public-entry --key-file ~/mcp-vault-release.pem
+gh secret set MCP_VAULT_SIGNING_KEY < ~/mcp-vault-release.pem
+```
+
+Paste the printed entry into `assets/trusted_keys.json` and merge that PR. From
+then on `release.yml` runs `sign_db.cjs --release`, which refuses to publish
+without the secret, or with a secret whose key the keyring does not list, and
+verifies the result the way a client will before `npm publish`. Keep an
+offline copy of the private key; never commit it.
+
+Optional, as a second and independent statement: `cosign sign-blob
+tools_database.json` (keyless, recorded in Rekor) can be run by hand or added
+as a step later. It is not a dependency, and the client does not read it.
+
+### Imported audits
+
+`mcp-vault audits` exchanges audits in the cargo-vet model, signed with the
+same Ed25519 envelope. Sources are listed in `.mcp-vault.imports.json` with
+their public key and the criteria accepted from them, fetched only by
+`audits fetch`, and re-verified from `.mcp-vault.imports.lock.json` on every
+read against the key in the *config* — so an edited lock contributes nothing.
+Imports are not transitive: an export carries its author's own audits only, and
+a bundle carrying anything else is refused. An audit is shown in `explain` with
+its source and is not an evidence dimension, so it cannot raise `trust`:
+someone else having looked at a package is not a hash match.
+
 ## Static analysis (CodeQL)
 
 CodeQL runs as **advanced setup** on the self-hosted runner
