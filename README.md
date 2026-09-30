@@ -464,6 +464,38 @@ the package's own files — a capability arriving through a dependency is
 `verify --deps`' job, and PyPI needs a zip reader it does not have yet (those
 13 entries report `unsupported`, not "nothing found").
 
+### What do the tools tell the model? (`tool-scan`)
+
+A tool description is an instruction the model follows on every request, and
+nothing that checks the artifact reads it. `eval` already has the text in hand
+when `tools/list` answers, so it runs a fixed rule table over every name,
+description, parameter description and enum value: hidden Unicode (Tags
+characters and variation-selector runs are *decoded*), bidi and zero-width
+controls, ANSI/OSC escapes, "ignore previous instructions", "do not tell the
+user", `<IMPORTANT>`, credential and MCP-config paths, references to other
+tools, encoded blobs, and schemas with a catch-all `sidenote`/`notes`/`context`
+parameter the description never mentions.
+
+```bash
+mcp-vault tool-scan tools.json          # a captured tools/list, offline
+mcp-vault tool-scan                     # what eval stored (rule, tool, location — no text)
+mcp-vault eval --installed --sandbox    # scan the servers your hosts launch
+mcp-vault tool-scan --rules             # the table: id, severity, why
+```
+
+Each match is a finding `tool-scan/<rule>` on the tool it was found in, and
+the verdict is the `tool-scan/*` row of the one policy table: high denies —
+in `tool-scan`, in `explain` and in `eval --fail-tool-scan` alike — medium
+warns, low is listed with `--show-low`. Recorded with `eval --record-evidence`
+it also blocks trust through a `tool_descriptions` evidence dimension.
+"Nothing was read" is never "clean": a row listed before the scan existed is
+`not-run`, a `tools/list` with an unfetched next page or an empty one is
+`no-data`, a scan older than 30 days is `stale` — each decides to `unknown`
+(which `--strict` / `--fail-unverified` fail). `--json` is
+`mcp-vault/findings@1`, `--sarif` its SARIF, `--as-of` replays a date. No
+rule firing is not a clean bill either: plain polite English matches nothing
+here.
+
 ### So what do I install instead? (`upgrade`)
 
 "Affected by GHSA-2h44-8472-frjj" is correct and not actionable. OSV carries a
@@ -1028,6 +1060,7 @@ Everything in this table is scripted and tested; the column says where it lives.
 | Upstream repository posture (OpenSSF Scorecard) | [`lib/scorecard.cjs`](./mcp-ecosystem-intelligence/scripts/lib/scorecard.cjs) |
 | Capability presence with evidence, and the version-to-version delta | [`lib/capabilities.cjs`](./mcp-ecosystem-intelligence/scripts/lib/capabilities.cjs), [`lib/tarball.cjs`](./mcp-ecosystem-intelligence/scripts/lib/tarball.cjs) |
 | Tool-surface fingerprint, for the rug-pull case | [`lib/surface.cjs`](./mcp-ecosystem-intelligence/scripts/lib/surface.cjs) |
+| Tool poisoning in descriptions and schemas, by rule | [`lib/tool_scan.cjs`](./mcp-ecosystem-intelligence/scripts/lib/tool_scan.cjs), [`check_tool_descriptions.cjs`](./mcp-ecosystem-intelligence/scripts/check_tool_descriptions.cjs) |
 | Lockfile + vendored tree, so nothing re-resolves at launch | [`lib/lockfile.cjs`](./mcp-ecosystem-intelligence/scripts/lib/lockfile.cjs), [`lock.cjs`](./mcp-ecosystem-intelligence/scripts/lock.cjs) |
 | Org allowlist / denylist, inherited and only tightened; tools approved one by one | [`lib/org_policy.cjs`](./mcp-ecosystem-intelligence/scripts/lib/org_policy.cjs), [`approve.cjs`](./mcp-ecosystem-intelligence/scripts/approve.cjs) |
 | Shortest safe upgrade for anything with an advisory | [`suggest_upgrade.cjs`](./mcp-ecosystem-intelligence/scripts/suggest_upgrade.cjs), [`lib/versions.cjs`](./mcp-ecosystem-intelligence/scripts/lib/versions.cjs) |

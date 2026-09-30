@@ -65,6 +65,11 @@ const TRUST_WEIGHTS = {
   advisories:     { clean: 15, 'advisories-present': 5, unverified: 0, vulnerable: -100 },
   dependencies:   { clean: 5, hooks: 2, 'advisories-present': 0 },
   smoke:          { pass: 0, fail: -5, skipped: 0 },   // behavioural, not a trust claim
+  // Worth nothing when quiet — "no rule fired" is not a trust claim — and a
+  // veto when a high-severity rule fired: hidden text, terminal escapes or an
+  // injected instruction in what the model is handed is not a defect to weigh,
+  // it is the attack.
+  tool_descriptions: { clean: 0, suspicious: 0, 'high-risk': -100 },
 };
 
 // A negative weight is a finding, not a deduction: it blocks — but only for the
@@ -80,6 +85,7 @@ const BLOCKING = {
   artifact:     new Set(['mismatch']),        // the bytes are not what we verified
   advisories:   new Set(['vulnerable']),      // a known CVE applies to this version
   availability: new Set(['gone', 'version-gone', 'yanked']),   // there is nothing to install
+  tool_descriptions: new Set(['high-risk']),  // the tool list carries an injection pattern
   // Deliberately absent: source_binding, provenance and registry. Each can
   // disagree for innocent reasons — a fork, a monorepo move, an org rename —
   // and each is reported as a finding by the gate. A metadata disagreement is

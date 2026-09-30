@@ -578,6 +578,48 @@ const setupRules = [
 ];
 const SETUP_ORDER = ['flows/lethal-trifecta', 'flows/untrusted-destructive', 'shadowing/*', 'flows/no-data'];
 
+// ── tool-scan (#124) ───────────────────────────────────────────────────────
+//
+// What a server's tool list tells the model (lib/tool_scan.cjs). The findings
+// are on `tool` subjects; explain, deciding about the artifact, reads them from
+// `facts.tool_scan` (this server's scan, as findings) instead. One row either
+// way, so `tool-scan` and `explain` cannot read the same scan differently.
+
+const toolScanRules = [
+  {
+    id: 'tool-scan/*', status: 'active', thresholded: true, views: ['explain'],
+    doc: 'Tool descriptions: an observed high finding refuses, medium warns, low is listed only; a scan that did not run, did not cover the list or aged out is unknown.',
+    evaluate(ctx) {
+      const held = ctx.facts && ctx.facts.tool_scan;
+      const fs = [...ctx.findings, ...((held && held.findings) || [])].filter((f) => f.rule.startsWith('tool-scan/'));
+      if (!fs.length && !(held && held.scanned)) return [];
+      const { RULE_BY_ID: TS } = require('./tool_scan.cjs');
+      const byRule = new Map();
+      for (const f of fs) { if (!byRule.has(f.rule)) byRule.set(f.rule, []); byRule.get(f.rule).push(f); }
+      const res = [];
+      let fired = false;
+      for (const [rule, group] of byRule) {
+        const pending = group.filter((f) => f.state !== 'observed');
+        if (pending.length) res.push(out('unknown', pending[0].message, pending.map((f) => f.id), rule));
+        const seen = group.filter((f) => f.state === 'observed' && f.severity !== 'low' && f.severity !== 'info');
+        if (!seen.length) continue;
+        fired = true;
+        const where = seen.map((f) => f.subject.id);
+        const row = TS.get(rule.slice('tool-scan/'.length));
+        const detail = `${row ? row.summary : rule} — ${where.slice(0, 3).join('; ')}${where.length > 3 ? `; +${where.length - 3} more` : ''}`;
+        const severe = seen.some((f) => f.severity === 'critical' || f.severity === 'high');
+        res.push(out(severe ? 'deny' : 'warn', detail, seen.map((f) => f.id), rule));
+      }
+      // Only where the whole scan is in view (explain's fact); in `tool-scan`
+      // a quiet server is a subject with no findings, and allows as such.
+      if (held && held.scanned && Array.isArray(held.findings) && !fired) {
+        res.push(out('allow', `no high or medium rule fired over ${held.tools} tools (rules v${held.rules_version}); absence of a match is not proof of intent`, [], 'tool-scan/quiet'));
+      }
+      return res;
+    },
+  },
+];
+
 // ── reserved for the open feature PRs ──────────────────────────────────────
 //
 // Claimed here so that each lands as a row in this table — with this id in
@@ -585,7 +627,6 @@ const SETUP_ORDER = ['flows/lethal-trifecta', 'flows/untrusted-destructive', 'sh
 
 const reserved = (id, owner, doc) => ({ id, status: 'reserved', owner, doc, thresholded: false, views: [], evaluate: () => [] });
 const reservedRules = [
-  reserved('tool-scan/*', '#124', 'poisoning patterns in tool descriptions and schemas'),
   reserved('lookalike/*', '#125', 'a name one edit away from a vault entry'),
 ];
 
@@ -638,7 +679,7 @@ const signatureRules = [
   },
 ];
 
-const RULES = Object.freeze([...explainRules, ...policyRules, ...secretRules, ...findingRules, ...orgRules, ...setupRules, ...reservedRules, ...signatureRules].map((r) => Object.freeze(r)));
+const RULES = Object.freeze([...explainRules, ...policyRules, ...secretRules, ...findingRules, ...toolScanRules, ...orgRules, ...setupRules, ...reservedRules, ...signatureRules].map((r) => Object.freeze(r)));
 const RULE_BY_ID = new Map(RULES.map((r) => [r.id, r]));
 
 // Evaluation order, per mode. It is the order the legacy views have always
@@ -652,7 +693,7 @@ const ORDER = Object.freeze({
     'policy/install-hooks', 'policy/dependency-hooks', 'policy/dependency-advisories',
     'policy/signatures', 'policy/provenance', 'policy/docker-digest', 'policy/unverified',
     'policy/license', 'policy/health', 'policy/trust',
-    'gate/fail', 'gate/unverified', 'behaviour/*', 'budget/over', ...SETUP_ORDER,
+    'gate/fail', 'gate/unverified', 'tool-scan/*', 'behaviour/*', 'budget/over', ...SETUP_ORDER,
     'secrets/*',
     'gate/require-provenance', 'gate/fail-dep-advisories', 'finding/severity', 'finding/incomplete',
     'audits/recorded',
@@ -664,7 +705,7 @@ const ORDER = Object.freeze({
     'policy/signatures', 'policy/provenance', 'policy/dependency-hooks', 'policy/dependency-advisories',
     'policy/unverified', 'policy/install-hooks', 'policy/docker-digest',
     'policy/license', 'policy/health', 'policy/trust',
-    'gate/fail', 'gate/unverified', 'behaviour/*', 'budget/over', ...SETUP_ORDER,
+    'gate/fail', 'gate/unverified', 'tool-scan/*', 'behaviour/*', 'budget/over', ...SETUP_ORDER,
     'secrets/*',
     'gate/require-provenance', 'gate/fail-dep-advisories', 'finding/severity', 'finding/incomplete',
     'audits/recorded',

@@ -50,6 +50,7 @@ const COMMANDS = {
   explain:         "explain.cjs",
   upgrade:         "suggest_upgrade.cjs",
   capabilities:    "check_capabilities.cjs",
+  "tool-scan":     "check_tool_descriptions.cjs",
   "license-drift": "check_license_drift.cjs",
   health:          "calculate_health.cjs",
   refresh:         "refresh_scores.cjs",
@@ -91,6 +92,8 @@ COMMANDS
   explain <name>    Why this entry is allowed or denied, with the evidence and the rule
   upgrade           Shortest version that clears the advisories against a pin
   capabilities      What a package can do, and what it gained since the last scan
+  tool-scan [file]  Tool poisoning in descriptions/schemas: hidden Unicode, ANSI,
+                    injected instructions (--sarif; --rules for the rule table)
   docker-drift      Detect upstream Docker @sha256 drift
   license-drift     Detect MIT → BSL / SSPL relicensing
   health <args>     Score a candidate by stars / recency / license / registry
@@ -108,7 +111,7 @@ COMMANDS
 
 COMMON OPTIONS
   --json            Machine-readable output
-  --sarif           SARIF 2.1.0 for code scanning (verify)
+  --sarif           SARIF 2.1.0 for code scanning (verify, tool-scan)
   --strict          Treat warnings as failures (exit 1)
   --no-audit        Skip advisory APIs; verify still checks live registries
   --offline         True offline verify mode: stored DB pins and stored evidence

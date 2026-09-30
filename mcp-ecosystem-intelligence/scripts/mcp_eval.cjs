@@ -38,6 +38,8 @@
  *   mcp_eval.cjs --fail-unexplained-surface-drift
  *                                       exit 1 only when a surface changed and the
  *                                       artifact demonstrably did not
+ *   mcp_eval.cjs --fail-tool-scan       exit 1 if a tool description or schema has a
+ *                                       high-severity finding (lib/tool_scan.cjs)
  *   mcp_eval.cjs --timeout <ms>         per-entry deadline (default 30s on the host,
  *                                       90s under --sandbox: a container starts cold)
  *   mcp_eval.cjs --sandbox              run each server in a locked-down container (needs docker)
@@ -72,7 +74,7 @@ const path          = require('path');
 const { spawn }     = require('child_process');
 const { performance } = require('perf_hooks');
 const { exitAfterFlush } = require('./lib/exit.cjs');
-const { readWallClock } = require('./lib/clock.cjs');
+const { readWallClock, requireAsOf } = require('./lib/clock.cjs');
 const { readInstalledServers } = require('./lib/installed.cjs');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -133,6 +135,9 @@ const crypto = require('crypto');
 const { toTypedEntry, artifactId, comparableArtifactId, isExactArtifact } = require('./lib/entry_model.cjs');
 const { smokeEvidence, mergeEvidence } = require('./lib/evidence.cjs');
 const { fingerprintTools, diffSurface, describeDiff, isEmpty: surfaceUnchanged } = require('./lib/surface.cjs');
+const toolScan      = require('./lib/tool_scan.cjs');
+const { decide }    = require('./lib/finding.cjs');
+const { loadEffectivePolicy } = require('./lib/policy_rules.cjs');
 const stdio         = require('./lib/mcp_stdio.cjs'); // shared framing + sandbox + classifier (vendored, zero-dep)
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -183,6 +188,7 @@ function parseArgs(argv) {
     // the code did the first.
     failSurfaceDrift: false,
     failUnexplainedDrift: false,
+    failToolScan: false,
     help:     false,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -205,6 +211,7 @@ function parseArgs(argv) {
       case '--strict':  opts.strict  = true; break;
       case '--fail-surface-drift': opts.failSurfaceDrift = true; break;
       case '--fail-unexplained-surface-drift': opts.failUnexplainedDrift = true; break;
+      case '--fail-tool-scan': opts.failToolScan = true; break;
       case '-h':
       case '--help':    opts.help    = true; break;
       default:
@@ -516,6 +523,25 @@ function artifactChangedBetween(prior, fresh) {
   return unknown ? null : false;
 }
 
+/**
+ * The `tool_descriptions` evidence dimension from one eval result, or null
+ * when the run never listed tools — a server that did not start has said
+ * nothing, and "clean" for it would be a measurement nobody made.
+ */
+function toolDescriptionEvidence(evalResult, { now } = {}) {
+  requireAsOf(now, 'toolDescriptionEvidence');
+  const s = evalResult && evalResult.tool_scan;
+  if (!s || !Array.isArray(s.findings)) return null;
+  return {
+    status:        s.status || toolScan.evidenceStatus(s),
+    checked_at:    (evalResult.checked_at || new Date(now).toISOString()).slice(0, 10),
+    rules_version: s.rules_version,
+    high:          s.high,
+    medium:        s.medium,
+    rules:         [...new Set(s.findings.map((f) => f.rule))].sort(),
+  };
+}
+
 function surfaceDrift(prior, fresh) {
   if (!fresh.surface || !prior || !prior.surface) return null;
   const diff = diffSurface(prior.surface, fresh.surface);
@@ -554,6 +580,9 @@ async function smokeEntry(tool, opts) {
     // { sha256, count, tools: { name: { description, schema } } } — hashes.
     surface:          null,
     surface_drift:    null,
+    // What the descriptions and schemas say, by rule (lib/tool_scan.cjs):
+    // rule, tool and location — never the text, for the reason above.
+    tool_scan:        null,
     // What ran, as comparable fields; the baseline a later run diffs against.
     identity:         null,
     tools_truncated:  null,      // unknown until a tools/list actually answers
@@ -788,6 +817,14 @@ async function smokeEntry(tool, opts) {
     // reaches the model. Hashes only: a tool description is attacker-controlled
     // text and does not belong committed in this repository.
     result.surface = fingerprintTools(tools);
+    // Read what the surface says, while the text is still in memory: this is
+    // the only point in the pipeline that has it. The stored form drops the
+    // excerpts and decoded hidden text; the full scan rides along on a
+    // non-enumerable property so the live report can show it and
+    // JSON.stringify cannot write it to disk.
+    const scan = toolScan.scanTools(tools);
+    result.tool_scan = toolScan.toStored(scan, { surface_sha256: result.surface.sha256, truncated: result.tools_truncated });
+    Object.defineProperty(result, 'tool_scan_live', { value: scan, enumerable: false });
     if (typeof result.tool_count_db === 'number') {
       result.tool_count_drift = result.tool_count !== result.tool_count_db;
     }
@@ -1134,6 +1171,13 @@ async function main() {
         ? ` — ${r.error_code || 'unknown error'}`
         : (r.status === 'skip' ? ` — ${r.error_code || ''}` : ` — ${r.tool_count} tools, boot ${r.boot_ms}ms${drift}`);
       process.stderr.write(`  ${tag} ${tool.name}${detail}\n`);
+      if (r.tool_scan && (r.tool_scan.high || r.tool_scan.medium)) {
+        process.stderr.write(`       tool scan: ${r.tool_scan.high} high, ${r.tool_scan.medium} medium\n`);
+        // Escaped by describeScan: this is server text, printed to a terminal.
+        for (const line of toolScan.describeScan(r.tool_scan_live || r.tool_scan, { limit: 10 })) {
+          process.stderr.write(`         ${line}\n`);
+        }
+      }
       if (r.surface_drift) {
         const how = r.surface_drift.artifact_changed === null
           ? 'the previous snapshot recorded no identity, so the artifact cannot be compared'
@@ -1197,9 +1241,12 @@ async function main() {
           && (!tool.version || launched === tool.version || launched === `sha256:${String(tool.pkg_integrity || '').replace(/^sha256-/, '')}`);
 
         if (attributable && typed) {
+          // The tool-description scan is evidence about the same artifact, and
+          // only exists when the run listed tools.
+          const described = toolDescriptionEvidence(r, { now: readWallClock() });
           tool.trust_evidence = mergeEvidence(tool.trust_evidence, {
             artifact_id: artifactId(typed.artifact),
-            dimensions: { smoke: dim },
+            dimensions: described ? { smoke: dim, tool_descriptions: described } : { smoke: dim },
           });
         } else {
           // Unattributed: kept beside the evidence rather than merged into it.
@@ -1244,6 +1291,16 @@ async function main() {
   // were never attempted at all.
   const sandboxUnavailable = newResults.filter(r => r.failure_class === 'SANDBOX_UNAVAILABLE').length;
   const surfaceDrifted = newResults.filter(r => r.surface_drift);
+  const toolScanHigh = newResults.filter(r => r.tool_scan && r.tool_scan.high > 0);
+  // --fail-tool-scan is decide()'s answer (docs/adr/0001), from the same
+  // `tool-scan/*` row explain and `mcp-vault tool-scan` use — not a counter.
+  const toolScanFails = opts.failToolScan && (() => {
+    const at = readWallClock();
+    const m = toolScan.evalRowsModel(newResults, { asOf: at });
+    const { policy } = loadEffectivePolicy(process.cwd(), { noPolicy: true });
+    return decide(m.findings, policy, at, { subjects: m.subjects, facts: m.facts }).some(d => d.fails);
+  })();
+  const toolScanMedium = newResults.filter(r => r.tool_scan && !r.tool_scan.high && r.tool_scan.medium > 0);
   // Split on the one distinction that matters: an upgrade changing its surface
   // is expected, the same artifact changing its surface is not.
   // Strictly false, not falsy: `null` means the previous snapshot carried no
@@ -1266,6 +1323,8 @@ async function main() {
       surface_drift: surfaceDrifted.length,
       surface_drift_unexplained: unexplainedDrift.length,
       surface_drift_uncomparable: uncomparableDrift.length,
+      tool_scan_high: toolScanHigh.length,
+      tool_scan_medium: toolScanMedium.length,
       aborted: runAborted,
       planned: picked.length,
       not_attempted: notAttempted,
@@ -1290,6 +1349,13 @@ async function main() {
     process.stderr.write(
       `\nUNEXPLAINED: ${unexplainedDrift.map(r => r.name).join(', ')} presented a different tool surface ` +
       `from the same artifact identity. Worth a look: an unvendored tree, a feature flag, or a changed server.\n`
+    );
+  }
+  if (toolScanHigh.length) {
+    process.stderr.write(
+      `\nTOOL SCAN: ${toolScanHigh.map(r => toolScan.printable(r.name)).join(', ')} ` +
+      `ha${toolScanHigh.length === 1 ? 's' : 've'} high-severity findings in tool descriptions or schemas ` +
+      `(hidden text, terminal escapes or injected instructions). \`mcp-vault tool-scan\` lists them.\n`
     );
   }
   if (uncomparableDrift.length) {
@@ -1324,7 +1390,8 @@ async function main() {
     // Strictly the unexplained ones: a drift we could not attribute (`null`)
     // is not evidence of anything, and failing a build on it would punish an
     // old snapshot rather than a changed server.
-    || (opts.failUnexplainedDrift && unexplainedDrift.length > 0);
+    || (opts.failUnexplainedDrift && unexplainedDrift.length > 0)
+    || toolScanFails;
   // A run where *nothing* could be attempted established nothing, and the
   // CLI reserves 2 for that: the launcher was missing for every entry, or the
   // sandbox was unavailable throughout. Default mode reported 0 for it — a
@@ -1362,6 +1429,7 @@ module.exports = {
   relevantIdentityFields,
   artifactChangedBetween,
   surfaceDrift,
+  toolDescriptionEvidence,
   parseInstallCmd,
   lintSchema,
   pickTools,
