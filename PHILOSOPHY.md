@@ -32,11 +32,21 @@ this project's output — Claude reads what `orchestrate.cjs` prints, doesn't
 replace it.
 
 One qualification, added because the code now depends on it: evidence is dated,
-and dates age. `verify --offline` against a fixed DB still returns the same exit
-code every run, but a stored verification has a shelf life — a hash match holds
-for 90 days, "no advisories" for 7 — and past it the entry reports `UNVERIFIED`.
+and dates age. A stored verification has a shelf life — a hash match holds for
+90 days, "no advisories" for 7 — and past it the entry reports `UNVERIFIED`.
 That is time-dependence on purpose: the alternative is a verdict that keeps
 claiming to be current long after anyone checked.
+
+So time is an input, named like the others:
+
+    result = f(db, evidence, policy, asOf, rules_version)
+
+The clock is read once, at the command's entry point, or given with
+`--as-of`; nothing below it reads the clock on its own, and every `--json`
+document says which instant it was judged at. The same DB, policy and
+`--as-of` at the same version print the same bytes. Without `--as-of` the
+instant is now, as it always was. See
+[docs/adr/0001](docs/adr/0001-findings-and-time.md).
 
 ## 5. Boring
 
