@@ -127,6 +127,9 @@ COMMON OPTIONS
   --allow-unpinned  Allow install to write a launch command with no version pin
   --allow-over-budget   Install even when the config would exceed the policy's
                         context ceiling (maxContextTokens / maxContextPercent)
+  --allow-lookalike <name>  A configured server shaped like a vault entry that
+                        you know is yours: still reported, no longer fails
+                        --strict (audit, verify --installed)
   --cwd <path>      Target project directory (scan / audit)
   --as-of <date>    Judge stored evidence as of YYYY-MM-DD or an ISO-8601 instant
                     instead of now (verify / status / explain / audit / list / scan);

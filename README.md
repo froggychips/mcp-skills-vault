@@ -858,6 +858,32 @@ documents none (Claude Desktop, `~/.claude.json`). `audit` reports the same
 findings for Claude Code's two files (`--strict` fails on them); `status` shows
 one line and fails on it only with `--strict`.
 
+### Lookalike names (typosquatting)
+
+A typosquat passes every registry check — it is a real, signed package — it is
+just not the one you meant. [`lib/lookalike.cjs`](./mcp-ecosystem-intelligence/scripts/lib/lookalike.cjs)
+compares a name that is *not* in the DB against every entry's name, npm/PyPI
+package and image, offline and deterministically: Damerau-Levenshtein with a
+length-dependent threshold, homoglyphs (Cyrillic, `0/o`, `1/l`, `rn/m`), `-`/`_`/`.`,
+PEP 503, a dropped, added, misspelled or foreign npm scope, a swapped registry,
+and added affixes (`-mcp`, `-server`, `-official`, `-js`). A DB entry never flags
+another; a test checks the whole DB, and with each entry left out in turn.
+
+```text
+$ mcp-vault install mcp-server-memmory
+REFUSED: npm package mcp-server-memmory is not in the vault but looks like mcp-server-memory
+(npm @modelcontextprotocol/server-memory) — a doubled letter. Likely an impersonation of mcp-server-memory.
+```
+
+Each hit is a `lookalike/<technique>` finding on the *name*
+([`mcp-vault/findings@1`](./docs/adr/0001-findings-and-time.md)), and one row,
+`lookalike/*` in [`lib/policy_rules.cjs`](./mcp-ecosystem-intelligence/scripts/lib/policy_rules.cjs),
+decides it: a name you *ask for* (`install`, `explain`) is refused — `install`
+exits `2` as for any unknown name, `--json` prints the findings document; a name a
+host config *launches* (`audit`, `verify --installed`, including a config key that
+is a vault name but launches another package) warns, which fails under `--strict`.
+`--allow-lookalike <name>` is an input to that row: still reported, allowed.
+
 ### Public registry page
 
 [`scripts/generate_registry_page.cjs`](./mcp-ecosystem-intelligence/scripts/generate_registry_page.cjs) renders the DB into `docs/site/registry.html` plus `docs/site/registry.json`:
@@ -1048,6 +1074,7 @@ Everything in this table is scripted and tested; the column says where it lives.
 | Policy file instead of a garland of flags | [`lib/policy.cjs`](./mcp-ecosystem-intelligence/scripts/lib/policy.cjs) |
 | Install into any host's config | [`lib/hosts.cjs`](./mcp-ecosystem-intelligence/scripts/lib/hosts.cjs) |
 | Verify what the hosts actually launch (`--installed`) | [`lib/installed.cjs`](./mcp-ecosystem-intelligence/scripts/lib/installed.cjs) |
+| Typosquat / lookalike names refused at install, flagged in audit | [`lib/lookalike.cjs`](./mcp-ecosystem-intelligence/scripts/lib/lookalike.cjs) |
 | Token budget for a real config | [`token_budget.cjs`](./mcp-ecosystem-intelligence/scripts/token_budget.cjs) |
 | Machine-readable report + SARIF | [`lib/report.cjs`](./mcp-ecosystem-intelligence/scripts/lib/report.cjs) |
 | Behavioural smoke in a rebuilt jail | [`mcp_eval.cjs`](./mcp-ecosystem-intelligence/scripts/mcp_eval.cjs), [`lib/mcp_stdio.cjs`](./mcp-ecosystem-intelligence/scripts/lib/mcp_stdio.cjs) |

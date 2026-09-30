@@ -18,7 +18,9 @@
  * Exit codes:
  *   0  success / all clear
  *   1  install aborted (FAIL or CVE in integrity scan)
- *   2  bad arguments / tool not found in DB
+ *   2  bad arguments / tool not found in DB — including a name shaped like a
+ *      DB entry's, which is refused with the entry it resembles
+ *      (`--json`: the mcp-vault/findings@1 document it was refused on)
  */
 
 'use strict';
@@ -39,6 +41,9 @@ const { estimateServer, matchDbEntry, wouldExceed, DEFAULT_CONTEXT } = require('
 // Reuse the gate's parsers so "what gets pinned" and "what gets checked" can
 // never drift apart — they were two independent regexes before.
 const { isExactVersion, pinInstallCmd } = require('./lib/install_cmd.cjs');
+const lookalike = require('./lib/lookalike.cjs');
+const { loadEffectivePolicy } = require('./lib/policy_rules.cjs');
+const { decide, findingsDocument, toJson } = require('./lib/finding.cjs');
 const {
   npmPkgName, pypiPkgName, dockerImageRef, dockerDigestPinned,
 } = require('./verify_integrity.cjs');
@@ -855,6 +860,46 @@ if (require.main === module) {
   if (INSTALL) {
     const tool = db.tools.find(t => t.name === INSTALL);
     if (!tool) {
+      // "Not found" used to be the whole answer, and for a typosquat it is the
+      // wrong one: the next thing a person does with "not found" is run the
+      // package by hand. A name shaped like a vault entry gets said out loud,
+      // with the entry it is shaped like. Still exit 2 — nothing was installed
+      // either way, and the code for "not in the DB" does not change.
+      // Typed by a person, so exact identity is judged like a server key (any
+      // of the entry's names), and resemblance like a package (every technique).
+      const index = lookalike.buildIndex(db.tools);
+      const asName = lookalike.checkName(INSTALL, 'name', index);
+      if (asName.known) {
+        process.stderr.write(`${YL}"${INSTALL}" is a package of vault entry ${asName.known}.${RS}\n`
+          + `Install it by its vault name: mcp-vault install ${asName.known}\n`);
+        process.exit(2);
+      }
+      const hit = lookalike.checkName(INSTALL, INSTALL.includes('/') && !INSTALL.startsWith('@') ? 'oci' : 'npm', index);
+      const f = lookalike.toFinding(hit, { scope: 'database' });
+      if (f) {
+        // Decided like everything else (docs/adr/0001): a person asking for
+        // this name by name is `requested`, which the `lookalike/*` row
+        // refuses. The refusal is rendered from the Decision.
+        const policy = loadEffectivePolicy(CWD).policy;
+        const facts = { [f.subject.id]: lookalike.factsFor(hit, { intent: 'requested' }) };
+        const [d] = decide([f], policy, asOf, { subjects: [f.subject], facts });
+        if (AS_JSON) {
+          process.stdout.write(JSON.stringify(toJson(findingsDocument({
+            asOf, findings: [f], decisions: [d], scope: 'database', policy, facts,
+          })), null, 2) + '\n');
+          return exitAfterFlush(2);
+        }
+        if (d.fails) {
+          process.stderr.write(`${RD}REFUSED: ${f.message}${RS}\n`);
+          process.stderr.write(`  ${DM}decided by ${d.decided_by} as of ${d.as_of}${RS}\n`);
+          for (const m of hit.matches) {
+            process.stderr.write(`  ${m.confidence.padEnd(6)} ${m.technique.padEnd(18)} ${m.db_name}${m.package ? `  ${DM}${m.package}${RS}` : ''}\n`);
+          }
+          process.stderr.write(`\nDo not run "${INSTALL}" by hand. If you meant the vetted server:\n`
+            + `  mcp-vault install ${hit.matches[0].db_name}\n`);
+          process.exit(2);
+        }
+      }
       process.stderr.write(`${RD}Tool not found in DB: "${INSTALL}"${RS}\n`);
       process.stderr.write(`Known names: ${db.tools.map(t => t.name).join(', ')}\n`);
       process.exit(2);

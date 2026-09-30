@@ -36,8 +36,9 @@ const { exitAfterFlush } = require('./lib/exit.cjs');
 const { asOfFromArgv } = require('./lib/clock.cjs');
 const { scanHostConfigs } = require('./lib/secrets.cjs');
 const flows = require('./lib/flows.cjs');
-const { loadEffectivePolicy } = require('./lib/policy_rules.cjs');
-const { findingsDocument, toJson } = require('./lib/finding.cjs');
+const lookalike = require('./lib/lookalike.cjs');
+const { loadEffectivePolicy, flagsFromArgv } = require('./lib/policy_rules.cjs');
+const { decide, exitCode, findingsDocument, toJson } = require('./lib/finding.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { toInstallCmd } = require('./lib/installed.cjs');
 
@@ -68,6 +69,7 @@ function parseArgs(argv) {
     else if (a === '--global-config') out.globalConfig = argv[++i];
     else if (a === '--as-of')         i++;
     else if (a.startsWith('--as-of=')) { /* read below */ }
+    else if (a === '--allow-lookalike') (out.allowLookalike ||= []).push(...String(argv[++i] || '').split(',').filter(Boolean));
     else return { error: `unknown argument: ${a}` };
   }
   // Nothing the audit decides ages today, but the instant is still an input
@@ -84,6 +86,7 @@ const HELP = `audit_setup.cjs — diff installed MCP servers against the vetted 
 Usage:
   node scripts/audit_setup.cjs [--cwd <path>] [--db <path>] [--global-config <path>]
                                [--json] [--strict] [--as-of <date>]
+                               [--allow-lookalike <name>]
 
 Reads:
   <cwd>/.mcp.json                          project-scoped servers
@@ -93,6 +96,9 @@ Reads:
   assets/tools_database.json               vetted DB
 
 Finding categories:
+  lookalike          not in DB, but its package or name is shaped like a DB
+                     entry's (typo, homoglyph, scope swap, affix) — likely an
+                     impersonation; also a DB name launching another package
   drift              installed version differs from DB-pinned version
   untrusted          DB trust=candidate but actively installed
   heavy-unbounded    est_tools_count > 15 (or unknown) with no scoping
@@ -113,7 +119,9 @@ Finding categories:
 
 Flags:
   --json             emit findings array as JSON
-  --strict           exit 1 on any drift/untrusted/heavy-unbounded/secret
+  --strict           exit 1 on any lookalike/drift/untrusted/heavy-unbounded/secret
+  --allow-lookalike  a server (key or package) you know is yours; still
+                     reported, no longer fails --strict. Repeatable, or a,b
   --cwd <path>       project root override (default: process.cwd())
   --db <path>        DB path override
   --global-config    ~/.claude.json path override (testability)
@@ -311,6 +319,29 @@ function hasArgScope(entry) {
 function audit({ project, global, settings, db, evals = null }) {
   const findings = [];
   const seen     = new Set();
+  const index    = lookalike.buildIndex(db.tools);
+
+  // A server that is not in the DB used to be one finding, `unknown
+  // (informational)`, whether it was the user's own tool or a package one
+  // letter away from a vetted one. Those are not the same thing.
+  const lookalikeFinding = (name, entry, scope, dbName) => {
+    const hit = lookalike.checkServer({ name, install_cmd: toInstallCmd(entry) }, index, { dbName });
+    if (!hit) return null;
+    const top = hit.matches[0];
+    // Whether it counts is decided in lookalikeDecisions(), not here.
+    return {
+      category:   'lookalike',
+      server:     name,
+      scope,
+      candidate:  hit.candidate,
+      kind:       hit.kind,
+      db_name:    top.db_name,
+      technique:  top.technique,
+      confidence: top.confidence,
+      matches:    hit.matches,
+      message:    lookalike.describe(hit),
+    };
+  };
 
   // Walk project servers first so a server present in both surfaces as project
   // (more specific). Global-only servers get the scope-misplacement check.
@@ -328,6 +359,8 @@ function audit({ project, global, settings, db, evals = null }) {
       const installedVer = parseInstalledVersion(entry);
 
       if (!tool) {
+        const look = lookalikeFinding(name, entry, scope, null);
+        if (look) { findings.push(look); continue; }
         findings.push({
           category: 'unknown',
           server:   name,
@@ -335,6 +368,17 @@ function audit({ project, global, settings, db, evals = null }) {
           message:  `not in DB (custom or unvetted server; informational)`,
         });
         continue;
+      }
+
+      // Matched — but is it launching the entry's package? Two ways it may
+      // not be: the key is the vault's name and the command runs something
+      // else, or the match came from matchDbEntry's substring rule, which
+      // reads `@evil/mongodb-mcp-server@1.0` as containing `mongodb-mcp-server@`.
+      // Either way the server is not that entry, so its other findings (drift,
+      // trust) would describe the wrong thing and are not reported.
+      {
+        const look = lookalikeFinding(name, entry, scope, tool.name === name ? tool.name : null);
+        if (look) { findings.push(look); continue; }
       }
 
       // drift: DB pins a version, user is on a different one
@@ -513,9 +557,12 @@ const GN = T ? '\x1b[32m' : '';
 const RS = T ? '\x1b[0m'  : '';
 
 const CATEGORY_ORDER = [
-  'secret', 'drift', 'untrusted', 'heavy-unbounded', 'toxic-flow', 'tool-shadowing', 'scope', 'unknown', 'version-unknown',
+  'lookalike', 'secret', 'drift', 'untrusted', 'heavy-unbounded', 'toxic-flow', 'tool-shadowing', 'scope', 'unknown',
+  'lookalike-allowed', 'version-unknown',
 ];
 const CATEGORY_COLOR = {
+  'lookalike':       RD,
+  'lookalike-allowed': DM,
   'secret':          RD,
   'drift':           RD,
   'untrusted':       YL,
@@ -526,7 +573,10 @@ const CATEGORY_COLOR = {
   'unknown':         DM,
   'version-unknown': DM,
 };
-const STRICT_CATEGORIES = new Set(['drift', 'untrusted', 'heavy-unbounded', 'secret']);
+const STRICT_CATEGORIES = new Set(['lookalike', 'drift', 'untrusted', 'heavy-unbounded', 'secret']);
+// Categories whose exit is decide()'s (lookalikeDecisions). `status` still
+// reads STRICT_CATEGORIES as the legacy decider it is.
+const MODEL_CATEGORIES = new Set(['lookalike', 'lookalike-allowed']);
 
 function printReport(findings, counts) {
   const total = findings.length;
@@ -555,6 +605,9 @@ function printReport(findings, counts) {
       }
       if ((cat === 'toxic-flow' || cat === 'tool-shadowing') && f.advice && (f.effect === 'deny' || f.effect === 'warn')) {
         process.stdout.write(`    ${DM}→ ${f.advice}${RS}\n`);
+      }
+      if (cat === 'lookalike') {
+        process.stdout.write(`    ${DM}→ if you meant the vetted server: mcp-vault install ${f.db_name}${RS}\n`);
       }
       if (cat === 'untrusted' && f.notes) {
         process.stdout.write(`    ${DM}${truncate(f.notes, 110)}${RS}\n`);
@@ -614,6 +667,39 @@ function secretFindings(cwd, globalCfg, { git = true } = {}) {
   }));
 }
 
+/**
+ * The lookalike findings of an audit, decided (docs/adr/0001): each one a
+ * `lookalike/*` finding on the name, `--allow-lookalike` an input to the
+ * row, `--strict` the policy's `fail_on`. The rest of the categories are
+ * still judged by STRICT_CATEGORIES below until they move (migration step 3).
+ * Returns the findings@1 document and, per legacy finding, its decision.
+ */
+function lookalikeDecisions(findings, { policy, asOf, allow = [] }) {
+  const model = [];
+  const facts = {};
+  const byEntry = new Map();
+  for (const x of findings) {
+    if (x.category !== 'lookalike') continue;
+    const hit = { candidate: x.candidate, kind: x.kind, server: x.server, lookalike: true, matches: x.matches };
+    const f = lookalike.toFinding(hit, { scope: x.scope });
+    if (!model.some((m) => m.id === f.id)) model.push(f);
+    const fx = lookalike.factsFor(hit, { intent: 'configured', allow });
+    const prev = facts[f.subject.id];
+    if (prev) fx.lookalike.names = [...new Set([...prev.lookalike.names, ...fx.lookalike.names])].sort();
+    facts[f.subject.id] = fx;
+    byEntry.set(x, f);
+  }
+  const decisions = decide(model, policy, asOf, { subjects: model.map((f) => f.subject), facts });
+  const bySubject = new Map(decisions.map((d) => [d.subject.id, d]));
+  const outcomeOf = (x) => {
+    const f = byEntry.get(x);
+    const d = f && bySubject.get(f.subject.id);
+    return d ? { decision: d, outcome: d.rules.find((o) => o.findings.includes(f.id)) || null } : null;
+  };
+  const document = toJson(findingsDocument({ asOf, findings: model, decisions, scope: 'setup', policy, facts }));
+  return { document, decisions, outcomeOf };
+}
+
 // ── main ───────────────────────────────────────────────────────────────────
 
 function main(argv) {
@@ -652,7 +738,9 @@ function main(argv) {
   // --strict as fail_on). A policy with errors is said out loud and counts
   // under --strict; it does not change the default exit, because this command
   // did not read the policy before (docs/COMPATIBILITY.md).
-  const loaded = loadEffectivePolicy(cwd, { flags: { strict: args.strict } });
+  // The one policy loader; --strict is its `fail_on`, not a branch here.
+  const loaded = loadEffectivePolicy(cwd, { flags: flagsFromArgv(argv) });
+  const policy = loaded.policy;
   const policyErrors = loaded.errors.map((e) => ({ path: loaded.path || '.mcp-vault.policy.json', error: e }));
   const evalRows = (readJsonSafe(EVAL_PATH) || {}).results;
   const evals = new Map((Array.isArray(evalRows) ? evalRows : []).map((r) => [r.name, r]));
@@ -661,6 +749,14 @@ function main(argv) {
     capabilities: readJsonSafe(CAPS_PATH), policy: loaded.policy, asOf: args.asOf,
   });
   findings.push(...setup.findings);
+
+  const looks = lookalikeDecisions(findings, { policy, asOf: args.asOf, allow: args.allowLookalike || [] });
+  // Rendering: a lookalike the user vouched for is listed apart, with the
+  // row's own wording.
+  for (const x of findings) {
+    const o = looks.outcomeOf(x);
+    if (o && o.outcome && o.outcome.effect === 'allow') { x.category = 'lookalike-allowed'; x.message = o.outcome.detail; }
+  }
 
   if (args.json) {
     process.stdout.write(JSON.stringify({
@@ -681,6 +777,10 @@ function main(argv) {
         scope: 'setup', policy: loaded.policy, facts: setup.judged.facts,
       })),
       policy_errors: policyErrors,
+      // Additive (mcp-vault/findings@1): the categories already on the
+      // findings model — lookalike names — with the policy and facts they
+      // were decided on. `findings` above is the audit@1 view.
+      model: looks.document,
     }, null, 2) + '\n');
   } else {
     printReport(findings, counts);
@@ -696,7 +796,8 @@ function main(argv) {
   // The cross-server part fails when its Decision does: `toxicFlows: fail`
   // without --strict, `warn` with it (fail_on) — decide() said which.
   if (setup.judged.decisions.some((d) => d.fails)) return 1;
-  if (args.strict && (policyErrors.length || findings.some(f => STRICT_CATEGORIES.has(f.category)))) return 1;
+  if (exitCode(looks.decisions) === 1) return 1;
+  if (args.strict && (policyErrors.length || findings.some(f => STRICT_CATEGORIES.has(f.category) && !MODEL_CATEGORIES.has(f.category)))) return 1;
   // A config we could not read is still not a clean config: "no findings"
   // would be a claim about servers we never saw.
   if (unreadable.length) return 2;
@@ -723,6 +824,7 @@ module.exports = {
   audit,
   secretFindings,
   flowFindings,
+  lookalikeDecisions,
   main,
   PROJECT_SCOPED_CATEGORIES,
   HEAVY_THRESHOLD,
