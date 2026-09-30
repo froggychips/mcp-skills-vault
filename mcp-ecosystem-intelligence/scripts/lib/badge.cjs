@@ -8,15 +8,27 @@
  * years. A badge that keeps saying "Core" after anyone last looked is the
  * `last_checked` field again, in a place more people see.
  *
- * So the badge is three facts and no adjectives:
+ * So the badge is three facts and no adjectives, and none of them is decided
+ * here (docs/adr/0001-findings-and-time.md):
  *
  *   the tier      derived by `classifyEntry`, never stored
- *   the date      of the newest evidence behind it, on the badge itself, so a
- *                 reader can see how old the claim is without clicking
- *   staleness     if any dimension the tier *requires* is past its shelf life,
- *                 the badge says `stale` in grey instead of the tier's colour.
- *                 Deprecated (shown as `blocked`) outranks stale: a failed
- *                 check stays news however old it is.
+ *   the date      of the newest observation behind it, on the badge itself, so
+ *                 a reader can see how old the claim is without clicking
+ *   the state     a view of the entry's Decision and its observations:
+ *                   blocked     the Decision is `deny` — an observed, blocking
+ *                               finding. Outranks stale: a failed check stays
+ *                               news however old it is.
+ *                   stale       an observation of a dimension the tier
+ *                               *requires* is stale at asOf (observationState)
+ *                   unverified  nothing was observed about *this* artifact
+ *                   otherwise   the tier, in its colour
+ *
+ * The Decision is `decide()` over `fromEvidence` findings (the producer
+ * `explain` uses) with the gate's own rules and no project policy: a badge on
+ * somebody's README is the vault's claim, not any one project's bar. Evidence
+ * counts only for the artifact it was collected on (a name-scoped `gone`
+ * holds across versions), so the badge and the tier cannot disagree about
+ * what blocks.
  *
  * Rendered here, by code, as a flat shields-style SVG — no request to
  * shields.io or anywhere else at generation time, and the same input produces
@@ -29,8 +41,13 @@
  * badges served by shields; it carries the same label, message and colour.
  *
  * API:
- *   badgeState(tool, evalResult, opts)  -> { name, slug, tier, why, state, stale, stale_dimensions,
- *                                            latest_evidence, label, message, color, color_name }
+ *   badgeModel(tool, { asOf, maxAgeDays }) -> { subject, observations, findings, decision, facts, policy }
+ *   badgeState(tool, evalResult, { asOf, maxAgeDays, model })
+ *                                       -> { name, slug, tier, why, state, effect, decided_by, stale,
+ *                                            stale_dimensions, latest_evidence, label, message, color,
+ *                                            color_name, model }
+ *   evidenceAboutArtifact(tool)         -> the stored evidence that is about the current artifact, or null
+ *   BADGE_POLICY                        -> the frozen effective policy badges are decided under
  *   renderSvg({ label, message, color, title }) -> string
  *   endpointJson(state)                 -> shields endpoint object
  *   slugFor(name)                       -> file-safe slug
@@ -40,9 +57,16 @@
  *   escXml(s)                           -> string
  */
 
-const { classifyEntry } = require('./tiers.cjs');
-const { staleDimensions, requiredFor, DEFAULT_MAX_AGE_DAYS } = require('./evidence.cjs');
+const { classifyEntry, evidenceBinding, packageBinding, NAME_SCOPED } = require('./tiers.cjs');
+const { requiredFor, DEFAULT_MAX_AGE_DAYS } = require('./evidence.cjs');
 const { toTypedEntry } = require('./entry_model.cjs');
+const { decide, observationState } = require('./finding.cjs');
+const { subjectForTool, fromEvidence } = require('./findings_from.cjs');
+const { effectivePolicy } = require('./policy_rules.cjs');
+const { requireAsOf } = require('./clock.cjs');
+
+// The gate's own rules, no policy file: `--no-policy`, frozen once.
+const BADGE_POLICY = effectivePolicy(null, {}, { policyRules: false });
 
 const SITE = 'https://mcp.froggychips.xyz';
 const LABEL = 'mcp-vault';
@@ -122,31 +146,88 @@ function newestDate(values) {
     .pop() || null;
 }
 
+function ecosystemOf(tool) {
+  try { const t = toTypedEntry(tool); return t ? t.artifact.ecosystem : null; } catch { return null; }
+}
+
 /**
- * Everything a badge says about one entry, and why.
+ * The stored evidence that is about the artifact this entry installs today.
+ * Evidence recorded against another version, or not tied to a named artifact
+ * at all, says nothing about these bytes — except a name-scoped status
+ * (`gone`), which is about the package name and holds for every version. The
+ * same preconditions `classifyEntry` applies before it reads a blocking
+ * finding, so the tier and the badge cannot disagree about what blocks.
+ */
+function evidenceAboutArtifact(tool) {
+  const ev = tool && tool.trust_evidence;
+  if (!ev || !ev.dimensions || !Object.keys(ev.dimensions).length) return null;
+  if (evidenceBinding(tool).state === 'yes') return ev;
+  const av = ev.dimensions.availability;
+  if (av && NAME_SCOPED.has(av.status) && packageBinding(tool).state === 'yes') {
+    return { artifact_id: ev.artifact_id || null, dimensions: { availability: av } };
+  }
+  return null;
+}
+
+/**
+ * Observations, findings and the one Decision for an entry's badge. Nothing
+ * here computes an effect: `decide()` does, over the table in
+ * lib/policy_rules.cjs.
+ */
+function badgeModel(tool, { asOf, maxAgeDays = DEFAULT_MAX_AGE_DAYS } = {}) {
+  const at = requireAsOf(asOf, 'badgeModel');
+  const s = subjectForTool(tool);
+  const evidence = evidenceAboutArtifact(tool);
+  // Required dimensions never checked are `no-data` findings: no evidence is
+  // `unknown`, never a clean badge.
+  const ev = fromEvidence(evidence, { subject: s, asOf: at, maxAgeDays, required: requiredFor(ecosystemOf(tool)) });
+  const facts = {
+    [s.id]: {
+      mode: 'evidence',
+      entry: {
+        install_cmd:  (tool && tool.install_cmd) || '',
+        license:      (tool && tool.license) ?? null,
+        health_score: (tool && tool.health_score) ?? null,
+        trust:        (tool && tool.trust) ?? null,
+      },
+      evidence: evidence || null,
+    },
+  };
+  const [decision] = decide(ev.findings, BADGE_POLICY, at, { subjects: [s], facts });
+  return { subject: s, observations: ev.observations, findings: ev.findings, decision, facts, policy: BADGE_POLICY };
+}
+
+/**
+ * Everything a badge says about one entry, and why — read off the entry's
+ * Decision and observations (`badgeModel`), plus the tier's name.
  *
  * `stale` is judged on the dimensions the tier *requires* for this ecosystem
  * (artifact + advisories for npm and PyPI, artifact for OCI): those are the
  * ones whose age makes the tier untrue. An old Scorecard read does not.
  */
 function badgeState(tool, evalResult = null, opts = {}) {
-  const { now = Date.now(), maxAgeDays = DEFAULT_MAX_AGE_DAYS } = opts;
-  const tier = classifyEntry(tool, evalResult, { now, maxAgeDays });
-  const evidence = (tool && tool.trust_evidence) || null;
-  const dims = (evidence && evidence.dimensions) || {};
-  let ecosystem = null;
-  try { const t = toTypedEntry(tool); ecosystem = t ? t.artifact.ecosystem : null; } catch { /* unparsable */ }
-  const required = new Set(requiredFor(ecosystem));
-  const staleRequired = staleDimensions(evidence, maxAgeDays, now)
-    .filter((s) => required.has(s.dimension))
-    .map((s) => s.dimension)
+  const { asOf, maxAgeDays = DEFAULT_MAX_AGE_DAYS } = opts;
+  const at = requireAsOf(asOf, 'badgeState');
+  const model = opts.model || badgeModel(tool, { asOf: at, maxAgeDays });
+  const tier = classifyEntry(tool, evalResult, { now: at, maxAgeDays });
+  const required = new Set(requiredFor(ecosystemOf(tool)));
+  const staleRequired = model.observations
+    .filter((o) => required.has(o.dimension) && observationState(o, at) === 'stale')
+    .map((o) => o.dimension)
     .sort();
 
-  const latest = newestDate(Object.values(dims).map((v) => v && v.checked_at));
+  // An observation with no recorded date is dated 1970-01-01 by the model; it
+  // is not a date to print on somebody's README.
+  const latest = newestDate(model.observations.map((o) => o.observed_at).filter((d) => d !== '1970-01-01'));
+  const d = model.decision;
   let state;
-  if (!Object.keys(dims).length) state = 'unverified';
-  else if (tier.classification === 'Deprecated') state = 'Deprecated';
+  if (!model.observations.length) state = 'unverified';
+  else if (d.effect === 'deny') state = 'Deprecated';
   else if (staleRequired.length) state = 'stale';
+  // A tier that says Deprecated without a denying Decision cannot happen
+  // (tests/badge.test.cjs checks the shipped DB); if it ever did, the badge
+  // must not be red on the tier's word alone.
+  else if (tier.classification === 'Deprecated') state = 'unverified';
   else state = tier.classification;
 
   // The Deprecated tier means "do not install: a check failed". On an author's
@@ -161,6 +242,8 @@ function badgeState(tool, evalResult = null, opts = {}) {
     tier: tier.classification,
     why: tier.why,
     state,
+    effect: d.effect,
+    decided_by: d.decided_by,
     stale: staleRequired.length > 0,
     stale_dimensions: staleRequired,
     latest_evidence: latest,
@@ -168,6 +251,7 @@ function badgeState(tool, evalResult = null, opts = {}) {
     message,
     color: color.hex,
     color_name: color.name,
+    model,
   };
 }
 
@@ -232,6 +316,6 @@ function snippet(name, base = SITE) {
 }
 
 module.exports = {
-  badgeState, renderSvg, endpointJson, slugFor, badgeUrls, snippet, textWidth, escXml,
+  badgeModel, badgeState, evidenceAboutArtifact, BADGE_POLICY, renderSvg, endpointJson, slugFor, badgeUrls, snippet, textWidth, escXml,
   COLORS, LABEL, SITE,
 };

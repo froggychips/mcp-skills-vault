@@ -6,7 +6,9 @@
  * committed and diffed), a required check past its shelf life turns the badge
  * grey and says `stale` rather than keeping the tier's colour, a failed check
  * outranks staleness, and an entry name — pull-request text — cannot break out
- * of the XML it is written into.
+ * of the XML it is written into. And that none of it is decided here: blocked is
+ * the entry's Decision being `deny` (decide(), docs/adr/0001), stale is an
+ * observation's state at asOf.
  */
 
 const test   = require('node:test');
@@ -32,7 +34,7 @@ const tool = (over = {}, dims = {}) => ({
 });
 
 test('fresh evidence: the tier, in its colour, with the newest date', () => {
-  const s = b.badgeState(tool(), null, { now: day('2026-09-20') });
+  const s = b.badgeState(tool(), null, { asOf: day('2026-09-20') });
   assert.equal(s.state, 'Recommended');
   assert.equal(s.stale, false);
   assert.equal(s.message, 'recommended · 2026-09-17');
@@ -42,7 +44,7 @@ test('fresh evidence: the tier, in its colour, with the newest date', () => {
 
 test('a required check past its shelf life turns the badge grey and says stale', () => {
   // advisories keeps 7 days; 13 days later the tier is not a current claim.
-  const s = b.badgeState(tool(), null, { now: day('2026-09-30') });
+  const s = b.badgeState(tool(), null, { asOf: day('2026-09-30') });
   assert.equal(s.state, 'stale');
   assert.equal(s.stale, true);
   assert.deepEqual(s.stale_dimensions, ['advisories']);
@@ -56,7 +58,7 @@ test('staleness is judged on the dimensions the tier requires, not on every one'
   // A 60-day-old Scorecard read does not make an npm tier untrue.
   const s = b.badgeState(tool({}, {
     repository_posture: { status: 'clean', checked_at: '2026-06-01' },
-  }), null, { now: day('2026-09-20') });
+  }), null, { asOf: day('2026-09-20') });
   assert.equal(s.stale, false);
   assert.equal(s.state, 'Recommended');
 });
@@ -65,7 +67,7 @@ test('the newest date is shown, but one stale required check is enough to grey i
   const s = b.badgeState(tool({}, {
     artifact:   { status: 'verified', checked_at: '2026-09-29', verified_at: '2026-09-29' },
     advisories: { status: 'clean',    checked_at: '2026-09-01', verified_at: '2026-09-01' },
-  }), null, { now: day('2026-09-30') });
+  }), null, { asOf: day('2026-09-30') });
   assert.equal(s.latest_evidence, '2026-09-29');
   assert.equal(s.state, 'stale');
 });
@@ -73,7 +75,7 @@ test('the newest date is shown, but one stale required check is enough to grey i
 test('a failed check outranks staleness: blocked, red, however old', () => {
   const s = b.badgeState(tool({}, {
     advisories: { status: 'vulnerable', checked_at: '2026-08-01' },
-  }), null, { now: day('2026-09-30') });
+  }), null, { asOf: day('2026-09-30') });
   assert.equal(s.tier, 'Deprecated');
   assert.equal(s.state, 'Deprecated');
   assert.equal(s.message, 'blocked · 2026-09-17');
@@ -81,15 +83,15 @@ test('a failed check outranks staleness: blocked, red, however old', () => {
 });
 
 test('no evidence at all: unverified, grey, no date', () => {
-  const s = b.badgeState({ name: 'x', install_cmd: 'npx -y x@1.0.0', version: '1.0.0' }, null, { now: day('2026-09-20') });
+  const s = b.badgeState({ name: 'x', install_cmd: 'npx -y x@1.0.0', version: '1.0.0' }, null, { asOf: day('2026-09-20') });
   assert.equal(s.state, 'unverified');
   assert.equal(s.message, 'unverified');
   assert.equal(s.latest_evidence, null);
 });
 
 test('the SVG is deterministic: same input, same bytes', () => {
-  const s1 = b.badgeState(tool(), null, { now: day('2026-09-20') });
-  const s2 = b.badgeState(tool(), null, { now: day('2026-09-20') });
+  const s1 = b.badgeState(tool(), null, { asOf: day('2026-09-20') });
+  const s2 = b.badgeState(tool(), null, { asOf: day('2026-09-20') });
   const a = b.renderSvg({ message: s1.message, color: s1.color });
   const c = b.renderSvg({ message: s2.message, color: s2.color });
   assert.equal(a, c);
@@ -102,8 +104,8 @@ test('the SVG is deterministic: same input, same bytes', () => {
 
 test('the whole site build is deterministic, and sorted independently of locale', () => {
   const tools = [tool({ name: 'zeta' }), tool({ name: '@scope/alpha' }), tool({ name: 'Beta' })];
-  const one = cli.buildAll(tools, new Map(), { now: day('2026-09-20') });
-  const two = cli.buildAll([...tools].reverse(), new Map(), { now: day('2026-09-20') });
+  const one = cli.buildAll(tools, new Map(), { asOf: day('2026-09-20') });
+  const two = cli.buildAll([...tools].reverse(), new Map(), { asOf: day('2026-09-20') });
   assert.deepEqual([...one.files.entries()], [...two.files.entries()]);
   assert.deepEqual(one.index.map((e) => e.name), ['@scope/alpha', 'Beta', 'zeta']);
   assert.ok(one.files.has('badges/scope__alpha.svg'));
@@ -115,7 +117,7 @@ test('the whole site build is deterministic, and sorted independently of locale'
 });
 
 test('two entries that would share a badge file are refused, not overwritten', () => {
-  assert.throws(() => cli.buildAll([tool({ name: '@a/b' }), tool({ name: 'a__b' })], new Map(), { now: day('2026-09-20') }),
+  assert.throws(() => cli.buildAll([tool({ name: '@a/b' }), tool({ name: 'a__b' })], new Map(), { asOf: day('2026-09-20') }),
     /would share the badge file/);
 });
 
@@ -131,7 +133,7 @@ test('XML is escaped in names: a hostile name cannot inject markup', () => {
   // A colour that is not a hex colour is not written into an attribute.
   assert.equal(b.renderSvg({ message: 'm', color: '"/><script>' }).includes('<script>'), false);
 
-  const built = cli.buildAll([tool({ name, source_url: 'javascript:alert(1)"' })], new Map(), { now: day('2026-09-20') });
+  const built = cli.buildAll([tool({ name, source_url: 'javascript:alert(1)"' })], new Map(), { asOf: day('2026-09-20') });
   const page = [...built.files.entries()].find(([k]) => k.startsWith('entry/'))[1];
   assert.equal(page.includes('<script>'), false);
   assert.equal(page.includes('alert(1)"'), false);
@@ -154,7 +156,7 @@ test('the snippet links the badge to the entry\'s evidence page', () => {
 });
 
 test('endpoint JSON is shields schemaVersion 1', () => {
-  const j = b.endpointJson(b.badgeState(tool(), null, { now: day('2026-09-20') }));
+  const j = b.endpointJson(b.badgeState(tool(), null, { asOf: day('2026-09-20') }));
   assert.deepEqual(Object.keys(j).sort(), ['cacheSeconds', 'color', 'label', 'message', 'schemaVersion']);
   assert.equal(j.schemaVersion, 1);
   assert.equal(j.label, 'mcp-vault');
@@ -163,7 +165,9 @@ test('endpoint JSON is shields schemaVersion 1', () => {
 test('CLI arguments: a name or --write, never both', () => {
   assert.match(cli.parseArgs([]).error, /which entry/);
   assert.match(cli.parseArgs(['x', '--write']).error, /drop the name/);
-  assert.match(cli.parseArgs(['--now', '2026-13-45']).error, /YYYY-MM-DD/);
+  assert.match(cli.parseArgs(['x', '--as-of', '2026-13-45']).error, /--as-of/);
+  assert.equal(cli.parseArgs(['x', '--as-of', '2026-09-20']).asOf, day('2026-09-20'));
+  assert.match(cli.parseArgs(['x', '--now', '2026-09-20']).error, /unknown flag --now/);
   assert.equal(cli.parseArgs(['x', '--json']).json, true);
 });
 
@@ -197,7 +201,70 @@ test('site-registry writes the page and the badges under --out, linked from --ba
     assert.ok(fs.existsSync(path.join(out, 'badges', `${e.slug}.json`)));
     assert.equal(e.page, `https://example.test/entry/${e.slug}.html`);
     const page = fs.readFileSync(path.join(out, 'entry', `${e.slug}.html`), 'utf8');
-    assert.match(page, new RegExp(`https://example\\.test/badges/${e.slug.replace(/[.]/g, '\\.')}\\.svg`));
+    assert.ok(page.includes(`https://example.test/badges/${e.slug}.svg`), 'the page links its badge from --base-url');
     assert.equal(page.includes('docs/site'), false);
   } finally { fs.rmSync(out, { recursive: true, force: true }); }
+});
+
+// ── the badge is a view of the Decision ─────────────────────────────────────
+
+const F  = require('../mcp-ecosystem-intelligence/scripts/lib/finding.cjs');
+const PR = require('../mcp-ecosystem-intelligence/scripts/lib/policy_rules.cjs');
+
+test('no asOf, no badge: the instant is an argument, not the wall clock', () => {
+  assert.throws(() => b.badgeState(tool(), null, {}), /asOf is required/);
+  assert.throws(() => b.badgeModel(tool(), {}), /asOf is required/);
+});
+
+test('blocked is the Decision saying deny, decided by a row of the policy table', () => {
+  const s = b.badgeState(tool({}, { advisories: { status: 'vulnerable', checked_at: '2026-09-17' } }), null, { asOf: day('2026-09-20') });
+  assert.equal(s.effect, 'deny');
+  assert.equal(s.decided_by, 'finding/severity');
+  assert.ok(PR.RULE_BY_ID.has(s.decided_by));
+  const [f] = s.model.findings.filter((x) => s.model.decision.findings.includes(x.id));
+  assert.equal(f.rule, 'evidence/advisories');
+  assert.equal(f.state, 'observed');
+  // No effect on the finding itself.
+  assert.equal('effect' in f, false);
+});
+
+test('stale is an observation state, and the Decision is unknown — never allow — for it', () => {
+  const s = b.badgeState(tool(), null, { asOf: day('2026-09-30') });
+  assert.equal(s.state, 'stale');
+  assert.equal(s.effect, 'unknown');
+  const adv = s.model.observations.find((o) => o.dimension === 'advisories');
+  assert.equal(F.observationState(adv, day('2026-09-30')), 'stale');
+  // The boundary is expires_at: the day before it the claim is current.
+  assert.equal(b.badgeState(tool(), null, { asOf: Date.parse(adv.expires_at) - 1 }).state, 'Recommended');
+  assert.equal(b.badgeState(tool(), null, { asOf: Date.parse(adv.expires_at) }).state, 'stale');
+});
+
+test('evidence about another version is not about these bytes: unverified, not a tier', () => {
+  const t = tool({ version: '2.0.0', install_cmd: 'npx -y pkg@2.0.0' }, { advisories: { status: 'vulnerable', checked_at: '2026-09-17' } });
+  const s = b.badgeState(t, null, { asOf: day('2026-09-20') });
+  assert.equal(s.state, 'unverified');
+  assert.equal(s.effect, 'unknown');
+  assert.equal(s.model.observations.length, 0);
+  // …except a name that is gone, which is gone for every version.
+  const gone = tool({ version: '2.0.0', install_cmd: 'npx -y pkg@2.0.0' }, { availability: { status: 'gone', checked_at: '2026-09-17' } });
+  const g = b.badgeState(gone, null, { asOf: day('2026-09-20') });
+  assert.equal(g.tier, 'Deprecated');
+  assert.equal(g.state, 'Deprecated');
+  assert.equal(g.effect, 'deny');
+});
+
+test('shipped DB: blocked iff the tier is Deprecated iff decide() says deny, and --json carries the decision', () => {
+  const { dbAsOf } = require('../mcp-ecosystem-intelligence/scripts/lib/evidence.cjs');
+  const at = day('2026-09-24');
+  const db = dbAsOf(require('../mcp-ecosystem-intelligence/assets/tools_database.json'), at);
+  const built = cli.buildAll(db.tools, new Map(), { asOf: at });
+  for (const st of built.states) {
+    assert.equal(st.state === 'Deprecated', st.effect === 'deny', `${st.name}: state ${st.state} vs effect ${st.effect}`);
+    assert.equal(st.tier === 'Deprecated', st.effect === 'deny', `${st.name}: tier ${st.tier} vs effect ${st.effect}`);
+  }
+  const doc = cli.badgesDocument(built.states, at);
+  assert.equal(doc.schema, 'mcp-vault/findings@1');
+  const again = F.toJson(F.decide(doc.findings, PR.deepFreeze(JSON.parse(JSON.stringify(doc.policy))), Date.parse(doc.as_of),
+    { subjects: F.documentSubjects(doc), facts: doc.facts }));
+  assert.deepEqual(again, doc.decisions);
 });

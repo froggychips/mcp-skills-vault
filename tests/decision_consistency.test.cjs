@@ -170,6 +170,23 @@ test('explain: its decision, blocking list and exit code are views of decide()',
   }
 });
 
+test('badge: its state is a view of decide() over the document\'s own inputs', () => {
+  for (const name of SAMPLE) {
+    const r = run('badge.cjs', [name, '--json', '--as-of', AS_OF]);
+    assert.equal(r.status, 0, `${name}: ${r.stderr}`);
+    const rec = JSON.parse(r.stdout);
+    const doc = rec.findings;
+    assert.equal(doc.schema, 'mcp-vault/findings@1');
+    assert.equal(doc.as_of, AS_OF);
+    assert.deepEqual(recompute(doc), doc.decisions, `${name}: the badge's decision is not decide()'s`);
+    const [d] = doc.decisions;
+    assert.equal(rec.effect, d.effect, name);
+    assert.equal(rec.decided_by, d.decided_by, name);
+    // blocked is deny, and nothing else is.
+    assert.equal(rec.state === 'Deprecated', d.effect === 'deny', `${name}: state ${rec.state} vs effect ${d.effect}`);
+  }
+});
+
 test('one subject, one answer: the same inputs decide the same way whichever command asks', () => {
   // verify's findings for an entry, handed to explain's model as a live gate
   // result: the gate-derived part of explain's decision is exactly verify's.
@@ -621,6 +638,9 @@ const DECIDES_VIA_MODEL = {
   audits:    'audits.cjs',
   secrets: 'check_secrets.cjs',
   'tool-scan': 'check_tool_descriptions.cjs',
+  // A badge's state is a view of the entry's Decision (#119); its exit code
+  // is 0 or a usage error, never the verdict.
+  badge:   'badge.cjs',
 };
 // Commands that still map their own findings to an exit code. Each moves by
 // emitting findings@1 and exiting via decide() — then its line goes.

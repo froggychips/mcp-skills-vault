@@ -899,10 +899,10 @@ The generated page is static, searchable, and filterable by category, tier, and 
 
 ### Badges
 
-The same run renders a badge per entry into `badges/` under the site root — a flat SVG drawn by [`lib/badge.cjs`](./mcp-ecosystem-intelligence/scripts/lib/badge.cjs), no external service, plus a shields.io endpoint JSON — and an evidence page per entry under `entry/` that the badge links to. It carries the derived tier and the date of the newest evidence; once a check the tier rests on is past its shelf life it says `stale` in grey, and a failed check says `blocked` in red.
+The same run renders a badge per entry into `badges/` under the site root — a flat SVG drawn by [`lib/badge.cjs`](./mcp-ecosystem-intelligence/scripts/lib/badge.cjs), no external service, plus a shields.io endpoint JSON — and an evidence page per entry under `entry/` that the badge links to. It carries the derived tier and the date of the newest evidence; once a check the tier rests on is past its shelf life it says `stale` in grey, and a failed check says `blocked` in red. None of that is decided by the badge: `blocked` is the entry's Decision from `decide()` being `deny`, `stale` is an observation's state at `--as-of`, and `badge --json` carries the `findings@1` document it was read off.
 
 ```bash
-mcp-vault badge <name>          # README snippet (Markdown / HTML / shields), --json
+mcp-vault badge <name>          # README snippet (Markdown / HTML / shields), --json, --as-of
 mcp-vault site-registry --out <site root> --base-url https://mcp.froggychips.xyz
 ```
 

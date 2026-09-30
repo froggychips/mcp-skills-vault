@@ -95,8 +95,8 @@ Every JSON document this tool writes carries a schema identifier of the form
 | `mcp-vault/keygen@1` | `mcp-vault audits keygen --json`, `sign_db.cjs --keygen / --public-entry --json` |
 | `mcp-vault/sign@1` | `sign_db.cjs --json` |
 | `mcp-vault/availability@1` | `mcp-vault availability --json` |
-| `mcp-vault/badge@1` | `mcp-vault badge <name> --json` |
-| `mcp-vault/badges@1` | `badges/index.json` under the site root, `mcp-vault badge --write --json` |
+| `mcp-vault/badge@1` | `mcp-vault badge <name> --json` — the badge (label, message, colour, links); what it is a view of is `findings@1` under `findings` |
+| `mcp-vault/badges@1` | `badges/index.json` under the site root (the manifest: entry → slug, state, date, links), `mcp-vault badge --write --json` (with `findings@1` under `findings`) |
 | `mcp-vault/capabilities@1` | `assets/capabilities.json` (the stored scan) |
 | `mcp-vault/candidates@1` | `assets/discovery/candidates.json` |
 | `mcp-vault/capability-scan@1` | `mcp-vault capabilities --json` |

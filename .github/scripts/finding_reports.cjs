@@ -28,6 +28,16 @@
  *                        or the name / version unpublished
  *   surface-unexplained  the tool surface changed while the artifact did not
  *
+ * Each one is a lib/finding.cjs Finding (docs/adr/0001) on the entry's
+ * artifact subject, resting on an Observation of the stored evidence — and
+ * only evidence about the artifact the entry installs today: a record for the
+ * previous version is not news about this one (lib/badge.cjs
+ * `evidenceAboutArtifact`, the rule the tier and the badge use). A finding
+ * whose observation is past its shelf life has `state: stale`. index.json
+ * carries them as an `mcp-vault/findings@1` document under `findings`; the
+ * drafts are renderings of it. Nothing here decides anything — a draft is
+ * not a verdict, so there is no Decision.
+ *
  * An entry with none of these is not in the output at all. A clean entry is
  * not news, and an issue saying "we checked and it is fine" is noise in
  * someone else's tracker.
@@ -44,10 +54,12 @@
  *
  * Usage:
  *   node .github/scripts/finding_reports.cjs [--out <dir>] [--upgrade <upgrade.json>]
- *                                            [--now YYYY-MM-DD] [--json]
+ *                                            [--as-of <date>] [--json]
  *
  * Writes <dir>/<slug>.md per entry and <dir>/index.json. Default dir:
- * ./finding-reports. The same DB, upgrade file and date produce the same bytes.
+ * ./finding-reports. The same DB, upgrade file and day produce the same bytes:
+ * the instant is taken to the start of its UTC day, the only granularity at
+ * which an observation goes stale.
  *
  * Exit codes:
  *   0  written (including "no findings")
@@ -62,10 +74,15 @@ const path = require('path');
 const SCRIPTS = path.resolve(__dirname, '..', '..', 'mcp-ecosystem-intelligence', 'scripts');
 const { readDb } = require(path.join(SCRIPTS, 'lib', 'db_io.cjs'));
 const { evalIndex } = require(path.join(SCRIPTS, 'lib', 'tiers.cjs'));
-const { DEFAULT_MAX_AGE_DAYS } = require(path.join(SCRIPTS, 'lib', 'evidence.cjs'));
+const { DEFAULT_MAX_AGE_DAYS, isPositive } = require(path.join(SCRIPTS, 'lib', 'evidence.cjs'));
 const { toTypedEntry } = require(path.join(SCRIPTS, 'lib', 'entry_model.cjs'));
 const { githubSlug } = require(path.join(SCRIPTS, 'lib', 'repo_url.cjs'));
-const { slugFor } = require(path.join(SCRIPTS, 'lib', 'badge.cjs'));
+const { slugFor, evidenceAboutArtifact } = require(path.join(SCRIPTS, 'lib', 'badge.cjs'));
+const {
+  observation, observationsFromEvidence, observationState, finding, findingsDocument, toJson,
+} = require(path.join(SCRIPTS, 'lib', 'finding.cjs'));
+const { subjectForTool } = require(path.join(SCRIPTS, 'lib', 'findings_from.cjs'));
+const { asOfFromArgv, parseAsOf, isoDay, requireAsOf } = require(path.join(SCRIPTS, 'lib', 'clock.cjs'));
 
 const DB_PATH   = path.join(SCRIPTS, '..', 'assets', 'tools_database.json');
 const EVAL_PATH = path.join(SCRIPTS, '..', 'assets', 'eval_results.json');
@@ -80,51 +97,36 @@ const HELP = `finding_reports — draft issue texts for authors of entries with 
 
 USAGE
   node .github/scripts/finding_reports.cjs [--out <dir>] [--upgrade <upgrade.json>]
-                                           [--now YYYY-MM-DD] [--json]
+                                           [--as-of <date>] [--json]
 
   --out       where to write <slug>.md + index.json (default ./finding-reports)
   --upgrade   output of \`mcp-vault upgrade --json\`: advisory IDs and safe versions
-  --now       the date staleness is judged against (default: today)
+  --as-of     the day staleness is judged at: YYYY-MM-DD or ISO-8601 with a
+              zone, taken to the start of its UTC day (default: today)
   --json      print the index instead of a summary
 
 Writes files only. Nothing is opened, posted or sent anywhere.
 `;
 
 function parseArgs(argv) {
-  const opts = { out: path.resolve('finding-reports'), upgrade: null, now: null, json: false, help: false };
+  const opts = { out: path.resolve('finding-reports'), upgrade: null, json: false, help: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--json') opts.json = true;
     else if (a === '-h' || a === '--help') opts.help = true;
     else if (a === '--out') { const v = argv[++i]; if (!v) return { ...opts, error: '--out needs a directory' }; opts.out = path.resolve(v); }
     else if (a === '--upgrade') { const v = argv[++i]; if (!v) return { ...opts, error: '--upgrade needs a file' }; opts.upgrade = path.resolve(v); }
-    else if (a === '--now') {
-      const v = argv[++i];
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(v || '') || Number.isNaN(Date.parse(`${v}T00:00:00Z`))) {
-        return { ...opts, error: '--now takes a date, YYYY-MM-DD' };
-      }
-      opts.now = Date.parse(`${v}T00:00:00Z`);
-    }
+    else if (a === '--as-of') i++;              // read by asOfFromArgv
+    else if (a.startsWith('--as-of=')) continue;
     else return { ...opts, error: `unknown argument ${a}` };
   }
-  return opts;
+  const clock = asOfFromArgv(argv);
+  if (clock.error) return { ...opts, error: clock.error };
+  return { ...opts, asOf: dayOf(clock.asOf) };
 }
 
-const DAY = 86400000;
-const dayOf = (ms) => Date.parse(`${new Date(ms).toISOString().slice(0, 10)}T00:00:00Z`);
-
-function ageDays(date, now) {
-  const t = Date.parse(`${String(date || '').slice(0, 10)}T00:00:00Z`);
-  return Number.isNaN(t) ? null : Math.floor((now - t) / DAY);
-}
-
-/** Past its shelf life, or of unknown age — both mean "check again first". */
-function isStale(dimension, date, now) {
-  const limit = DEFAULT_MAX_AGE_DAYS[dimension];
-  const age = ageDays(date, now);
-  if (age === null) return true;
-  return Number.isFinite(limit) ? age > limit : false;
-}
+/** The start of asOf's UTC day. */
+const dayOf = (asOf) => parseAsOf(isoDay(requireAsOf(asOf, 'finding_reports')));
 
 /** `pkg@version`, the way the author would write it. */
 function artifactLabel(tool) {
@@ -141,17 +143,88 @@ function ecosystemOf(tool) {
   try { return toTypedEntry(tool).artifact.ecosystem; } catch { return null; }
 }
 
+// What each author-facing (dimension, status) concludes: the Finding's rule
+// and severity, and the draft type it is rendered as. Rule ids reuse the
+// gate's where the fact is the same one (lib/legacy_tags.cjs: CVE, DEPHOOK).
+const RULES = {
+  'advisories:vulnerable':         { rule: 'advisories/known-vulnerability', severity: 'high',   type: 'advisory' },
+  'advisories:advisories-present': { rule: 'advisories/known-advisory',      severity: 'low',    type: 'advisory' },
+  'source_binding:mismatch':       { rule: 'identity/source-mismatch',       severity: 'medium', type: 'identity' },
+  'registry:contradicted':         { rule: 'identity/registry-contradicted', severity: 'medium', type: 'identity' },
+  'registry:withdrawn':            { rule: 'identity/registry-withdrawn',    severity: 'medium', type: 'identity' },
+  'dependencies:hooks':            { rule: 'dependencies/install-hook',      severity: 'low',    type: 'dependency-hooks' },
+  'availability:gone':             { rule: 'availability/gone',              severity: 'high',   type: 'availability' },
+  'availability:version-gone':     { rule: 'availability/version-gone',      severity: 'high',   type: 'availability' },
+  'availability:yanked':           { rule: 'availability/yanked',            severity: 'high',   type: 'availability' },
+  'availability:deprecated':       { rule: 'availability/deprecated',        severity: 'medium', type: 'availability' },
+  'smoke:drift':                   { rule: 'surface/unexplained-change',     severity: 'medium', type: 'surface-unexplained' },
+};
+
+// No dates in the message: a Finding's id is what was concluded about what,
+// not when (lib/finding.cjs). The date is on the Observation it refs.
+const MESSAGES = {
+  advisory: (v) => (v.status === 'vulnerable' ? 'advisories of high or critical severity apply to this version' : 'advisories of low or moderate severity apply to this version'),
+  identity: (v) => `${v.dimension}: ${v.status}`,
+  'dependency-hooks': () => 'a package in the dependency tree runs install-time scripts',
+  availability: (v) => `availability: ${v.status}`,
+  'surface-unexplained': () => 'the advertised tool list changed while the artifact did not',
+};
+
 /**
- * The findings for one entry, from stored data only. Empty array: nothing to
- * tell the author.
+ * The model for one entry: Observations of the stored evidence about the
+ * current artifact (and of the eval's surface drift), and one Finding per
+ * author-facing fact. `state` is `stale` when the observation is past its
+ * shelf life at asOf, `observed` otherwise.
  */
-function findingsFor(tool, evalResult = null, upgradeRow = null, { now = Date.now() } = {}) {
-  const dims = (tool && tool.trust_evidence && tool.trust_evidence.dimensions) || {};
+function modelFor(tool, evalResult = null, { asOf } = {}) {
+  const at = requireAsOf(asOf, 'modelFor');
+  const s = subjectForTool(tool);
+  const evidence = s.type === 'artifact' ? evidenceAboutArtifact(tool) : null;
+  const observations = evidence
+    ? observationsFromEvidence(evidence, { subject: s, source: 'stored', maxAgeDays: DEFAULT_MAX_AGE_DAYS, positive: isPositive })
+    : [];
+  const drift = evalResult && evalResult.surface_drift;
+  if (s.type === 'artifact' && drift && drift.artifact_changed === false) {
+    observations.push(observation({
+      subject: s, dimension: 'smoke', status: 'drift',
+      observed_at: String(evalResult.checked_at || '').slice(0, 10) || '1970-01-01',
+      ttl_days: DEFAULT_MAX_AGE_DAYS.smoke, source: 'eval',
+    }));
+  }
+  const findings = [];
+  for (const o of observations) {
+    const r = RULES[`${o.dimension}:${o.status}`];
+    if (!r) continue;
+    findings.push({
+      o, r,
+      f: finding({
+        rule: r.rule, subject: s, scope: 'database', severity: r.severity,
+        state: observationState(o, at) === 'stale' ? 'stale' : 'observed',
+        refs: [o.id], message: MESSAGES[r.type](o),
+      }),
+    });
+  }
+  return { subject: s, observations, findings };
+}
+
+/**
+ * The findings for one entry, as the drafts render them: each one a view of
+ * a model Finding (`finding`), with the extra detail its text needs. Empty
+ * array: nothing to tell the author.
+ */
+function findingsFor(tool, evalResult = null, upgradeRow = null, { asOf } = {}) {
+  const model = modelFor(tool, evalResult, { asOf });
+  const dims = (evidenceAboutArtifact(tool) || {}).dimensions || {};
+  const byDim = new Map(model.findings.map((x) => [x.o.dimension, x]));
   const out = [];
-  const add = (type, dimension, v, extra = {}) => out.push({
-    type, dimension, status: v.status, checked_at: v.checked_at || null,
-    stale: isStale(dimension, v.checked_at, now), ...extra,
-  });
+  const add = (type, dimension, v, extra = {}) => {
+    const m = byDim.get(dimension);
+    if (!m) return;
+    out.push({
+      type, dimension, status: v.status, checked_at: v.checked_at || null,
+      stale: m.f.state === 'stale', rule: m.f.rule, finding: m.f, ...extra,
+    });
+  };
 
   const adv = dims.advisories;
   if (adv && (adv.status === 'vulnerable' || adv.status === 'advisories-present')) {
@@ -188,9 +261,8 @@ function findingsFor(tool, evalResult = null, upgradeRow = null, { now = Date.no
   const drift = evalResult && evalResult.surface_drift;
   if (drift && drift.artifact_changed === false) {
     const date = String(evalResult.checked_at || '').slice(0, 10) || null;
-    out.push({
-      type: 'surface-unexplained', dimension: 'smoke', status: 'drift', checked_at: date,
-      stale: isStale('smoke', date, now), since: drift.since ? String(drift.since).slice(0, 10) : null,
+    add('surface-unexplained', 'smoke', { status: 'drift', checked_at: date }, {
+      since: drift.since ? String(drift.since).slice(0, 10) : null,
       lines: Array.isArray(drift.lines) ? drift.lines.slice(0, 10) : [],
     });
   }
@@ -334,15 +406,20 @@ function loadUpgrade(file) {
  * Everything to write, as data. Deterministic: sorted by entry name, dates
  * only, no timestamps of the run itself beyond the `as_of` day.
  */
-function buildReports(tools, evals = new Map(), upgrades = new Map(), { now = Date.now() } = {}) {
-  const day = dayOf(now);
+function buildReports(tools, evals = new Map(), upgrades = new Map(), { asOf } = {}) {
+  const day = dayOf(asOf);
   const files = new Map();
   const entries = [];
+  const modelFindings = [];
+  const modelObservations = [];
   const sorted = [...tools].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   const seen = new Map();
   for (const tool of sorted) {
-    const findings = findingsFor(tool, evals.get(tool.name) || null, upgrades.get(tool.name) || null, { now: day });
+    const findings = findingsFor(tool, evals.get(tool.name) || null, upgrades.get(tool.name) || null, { asOf: day });
     if (!findings.length) continue;
+    modelFindings.push(...findings.map((f) => f.finding));
+    const refs = new Set(findings.flatMap((f) => f.finding.refs));
+    modelObservations.push(...modelFor(tool, evals.get(tool.name) || null, { asOf: day }).observations.filter((o) => refs.has(o.id)));
     const slug = slugFor(tool.name);
     if (seen.has(slug)) throw new Error(`"${seen.get(slug)}" and "${tool.name}" would share ${slug}.md`);
     seen.set(slug, tool.name);
@@ -371,7 +448,8 @@ function buildReports(tools, evals = new Map(), upgrades = new Map(), { now = Da
       file,
       title: issue.title,
       types: [...new Set(findings.map((f) => f.type))],
-      findings: findings.map((f) => ({ type: f.type, dimension: f.dimension, status: f.status, checked_at: f.checked_at, stale: f.stale })),
+      // The Findings themselves are in `findings` (findings@1) at the top.
+      finding_ids: findings.map((f) => f.finding.id).sort(),
       evidence_date: findings.map((f) => f.checked_at).filter(Boolean).sort()[0] || null,
       stale,
       ready: needs.length === 0,
@@ -382,12 +460,13 @@ function buildReports(tools, evals = new Map(), upgrades = new Map(), { now = Da
   const by_type = Object.fromEntries(TYPES.map((t) => [t, entries.filter((e) => e.types.includes(t)).length]));
   const index = {
     schema: 'mcp-vault/finding-reports@1',
-    as_of: new Date(day).toISOString().slice(0, 10),
+    as_of: isoDay(day),
     note: 'Drafts only. Nothing was opened or sent; each issue is filed by hand, one repository at a time.',
     checked: tools.length,
     count: entries.length,
     by_type,
     entries,
+    findings: toJson(findingsDocument({ asOf: day, scope: 'database', observations: modelObservations, findings: modelFindings })),
   };
   files.set('index.json', `${JSON.stringify(index, null, 2)}\n`);
   return { files, index };
@@ -430,7 +509,7 @@ function main(argv) {
 
   let built;
   try {
-    built = buildReports(db.tools || [], evals, upgrades, { now: opts.now ?? Date.now() });
+    built = buildReports(db.tools || [], evals, upgrades, { asOf: opts.asOf });
     writeReports(opts.out, built.files);
   } catch (e) {
     process.stderr.write(`finding_reports: ${e.message}\n`);
@@ -454,4 +533,4 @@ if (require.main === module) {
   process.exitCode = code;
 }
 
-module.exports = { parseArgs, findingsFor, renderIssue, buildReports, writeReports, isStale, TYPES, STALE_NOTE };
+module.exports = { parseArgs, modelFor, findingsFor, renderIssue, buildReports, writeReports, TYPES, RULES, STALE_NOTE };
