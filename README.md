@@ -746,7 +746,7 @@ maps      memory    meta       mobile     observability   payments
 pm        reasoning search     testing    utility         vcs       web-scraping
 ```
 
-Distribution as of 2026-09-17 (the date of the newest evidence in the DB): **0 Core / 101 Recommended / 4 Experimental / 9 Deprecated**.
+Distribution as of 2026-09-17 (the date of the newest evidence in the DB): **0 Core / 99 Recommended / 6 Experimental / 9 Deprecated**.
 That is a snapshot, not today's split: evidence has a shelf life, so an entry
 whose claims have aged out reads as Experimental on a later day even though no
 commit touched it. `mcp-vault list` (whole DB) and `mcp-vault status` (what you
