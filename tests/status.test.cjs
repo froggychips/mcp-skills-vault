@@ -28,9 +28,9 @@ function project(servers) {
 }
 
 /** Run the CLI with HOME pointed at an empty dir, so only the project counts. */
-function run(dir, args = []) {
+function run(dir, args = [], script = SCRIPT) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-home-'));
-  const r = spawnSync(process.execPath, [SCRIPT, '--cwd', dir, ...args], {
+  const r = spawnSync(process.execPath, [script, '--cwd', dir, ...args], {
     encoding: 'utf8',
     env: { ...process.env, HOME: home, NO_COLOR: '1' },
   });
@@ -46,13 +46,40 @@ test('a clean project is exit 0 and says so in one screen', () => {
   assert.ok(lines <= 24, `status printed ${lines} lines:\n${r.stdout}`);
 });
 
+/**
+ * A throwaway copy of the skill in which one entry's `dimension` reads
+ * `status`, dated today — for a test that needs a finding the committed DB
+ * does not carry, or no longer carries fresh. Same approach as the install
+ * test below: the code under test is the real one, only the data is staged.
+ */
+function skillWith(entryName, dimension, status) {
+  const skill = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'vault-status-skill-')), 'mcp-ecosystem-intelligence');
+  fs.cpSync(path.resolve(__dirname, '../mcp-ecosystem-intelligence'), skill, { recursive: true });
+  const dbPath = path.join(skill, 'assets/tools_database.json');
+  const dbJson = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+  const entry  = dbJson.tools.find((t) => t.name === entryName);
+  assert.ok(entry && entry.trust_evidence, `${entryName} is no longer in the DB with evidence; pick another entry`);
+  const today = new Date().toISOString().slice(0, 10);
+  entry.trust_evidence.dimensions[dimension] = { status, checked_at: today };
+  fs.writeFileSync(dbPath, JSON.stringify(dbJson, null, 2));
+  return path.join(skill, 'scripts/status.cjs');
+}
+
 test('an installed server that must not run is blocking, and exit 1', () => {
   // mcp-atlassian has an advisory against its pinned version; mcp-server-aws
   // is yanked. Both are Deprecated in the derived tier — "do not install".
+  //
+  // The advisory is staged: the committed DB moved mcp-atlassian to 0.22.0,
+  // which clears every advisory, and this test would otherwise depend on some
+  // entry in the real DB being vulnerable *and* its evidence being under a
+  // week old. The yanked one is read from the committed DB as before.
+  const script = skillWith('mcp-atlassian', 'advisories', 'vulnerable');
+  const db = JSON.parse(fs.readFileSync(path.join(path.dirname(script), '../assets/tools_database.json'), 'utf8'));
+  const pinned = db.tools.find((t) => t.name === 'mcp-atlassian').version;
   const r = run(project({
-    'mcp-atlassian':  { command: 'uvx', args: ['mcp-atlassian==0.21.1'] },
+    'mcp-atlassian':  { command: 'uvx', args: [`mcp-atlassian==${pinned}`] },
     'mcp-server-aws': { command: 'uvx', args: ['awslabs.core-mcp-server==1.0.27'] },
-  }));
+  }), [], script);
   assert.equal(r.status, 1);
   assert.match(r.stdout, /Blocking/);
   assert.match(r.stdout, /mcp-atlassian: advisories: vulnerable/);
@@ -211,8 +238,12 @@ test('a --cwd that is not there is exit 2, not a project with no signals', () =>
 
 test('the heaviest server is named, not just the total', () => {
   // "47% of your window" is a number; which server spent it is the finding.
+  // The vault's own pin: the tool count is a claim about that artifact, and a
+  // host launching another version gets no count (and so no heaviest).
+  const pinned = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../mcp-ecosystem-intelligence/assets/tools_database.json'), 'utf8'))
+    .tools.find((t) => t.name === 'mcp-atlassian').version;
   const r = run(project({
-    'mcp-atlassian': { command: 'uvx', args: ['mcp-atlassian==0.21.1'] },
+    'mcp-atlassian': { command: 'uvx', args: [`mcp-atlassian==${pinned}`] },
   }), ['--json']);
   assert.ok(r.json.context.heaviest, 'the heaviest server travels with the totals');
   assert.equal(r.json.context.heaviest.name, 'mcp-atlassian');
