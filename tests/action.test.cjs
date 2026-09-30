@@ -50,6 +50,11 @@ const INPUT_DEFAULTS = {
   VAULT_FAIL_ON: 'unverified',
   VAULT_SARIF: 'false',
   VAULT_OFFLINE: 'true',
+  VAULT_MODE: 'checkout',
+  VAULT_ACTION_REF: '',
+  // The test runner's own environment must not decide the signature cases.
+  MCP_VAULT_ALLOW_UNSIGNED_DB: '',
+  MCP_VAULT_REQUIRE_SIGNED_DB: '',
 };
 
 function readOutputs(file) {
@@ -222,6 +227,56 @@ test('action: a version that is not exact is refused before anything is fetched'
   const own = runStep('cli', { cwd: REPO, env: { VAULT_VERSION: '', VAULT_INTEGRITY: '' } });
   assert.equal(own.status, 0);
   assert.equal(own.outputs.cli, path.join(REPO, 'bin', 'mcp-vault.cjs'));
+});
+
+/**
+ * The action as GitHub unpacks `uses: owner/repo@<sha>`: the commit's files,
+ * no .git, and no DB signature (that is made at release and is not in git).
+ */
+function unpackedAction() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-vault-uses-'));
+  for (const p of ['action.yml', 'package.json', 'bin', 'mcp-ecosystem-intelligence']) {
+    fs.cpSync(path.join(REPO, p), path.join(dir, p), { recursive: true, filter: (src) => !src.endsWith('.sig') });
+  }
+  return dir;
+}
+
+test('action: its own checkout without .git (uses: @sha) runs, integrity pinned by the SHA', { skip: !HAS_BASH && 'no bash' }, () => {
+  const dir = unpackedAction();
+  const sha = 'a'.repeat(40);
+  const r = runStep('verify', {
+    cwd: path.join(FIXTURES, 'clean'),
+    env: { GITHUB_ACTION_PATH: dir, VAULT_CLI: path.join(dir, 'bin', 'mcp-vault.cjs'), VAULT_MODE: 'checkout', VAULT_ACTION_REF: sha },
+  });
+  assert.equal(r.outputs['exit-code'], '0', r.stdout + r.stderr);
+  assert.match(r.summary, /\*\*OK\*\*/);
+  assert.ok(r.summary.includes(`DB integrity: pinned by action SHA ${sha}`), r.summary);
+  // The allowance is this step's alone, and only for a missing signature: a
+  // .sig that is present still has to verify.
+  fs.writeFileSync(path.join(dir, 'mcp-ecosystem-intelligence', 'assets', 'tools_database.json.sig'), '{"not":"a signature"}');
+  const tampered = runStep('verify', {
+    cwd: path.join(FIXTURES, 'clean'),
+    env: { GITHUB_ACTION_PATH: dir, VAULT_CLI: path.join(dir, 'bin', 'mcp-vault.cjs'), VAULT_MODE: 'checkout', VAULT_ACTION_REF: sha },
+  });
+  assert.equal(tampered.outputs['exit-code'], '1', tampered.stdout + tampered.stderr);
+  assert.match(tampered.stderr, /refusing to use the DB/);
+});
+
+test('action: the npm package (version:) without a .sig is refused — the tarball must carry one', { skip: !HAS_BASH && 'no bash' }, () => {
+  const pkg = unpackedAction();
+  const r = runStep('verify', {
+    cwd: path.join(FIXTURES, 'clean'),
+    // An allowance in the caller's env does not reach the package mode.
+    env: { VAULT_CLI: path.join(pkg, 'bin', 'mcp-vault.cjs'), VAULT_MODE: 'package', MCP_VAULT_ALLOW_UNSIGNED_DB: '1' },
+  });
+  assert.equal(r.outputs['exit-code'], '1', r.stdout + r.stderr);
+  assert.match(r.stderr, /refusing to use the DB/);
+  assert.match(r.summary, /DB integrity: Ed25519 signature, checked by the CLI/);
+});
+
+test('action: the resolve step says which mode it picked', { skip: !HAS_BASH && 'no bash' }, () => {
+  const own = runStep('cli', { cwd: REPO, env: { VAULT_VERSION: '', VAULT_INTEGRITY: '' } });
+  assert.equal(own.outputs.mode, 'checkout');
 });
 
 // ── pre-commit hook ────────────────────────────────────────────────────────
