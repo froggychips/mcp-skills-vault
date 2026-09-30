@@ -648,12 +648,12 @@
       "name": "mcp-redis",
       "category": "database",
       "classification": "Experimental",
-      "tier_reason": "a git-source install has nothing a registry can verify",
+      "tier_reason": "the recorded evidence is about git:git+https://github.com/redis/mcp-redis, and this entry now installs pypi:redis-mcp-server@0.5.1",
       "trust": "candidate",
       "license": "MIT",
       "health_score": 80,
       "est_tools_count": 10,
-      "install_cmd": "uvx --from git+https://github.com/redis/mcp-redis mcp-redis",
+      "install_cmd": "uvx redis-mcp-server==0.5.1",
       "source_url": "https://github.com/redis/mcp-redis",
       "evidence": {
         "artifact": {
@@ -4958,12 +4958,12 @@
       "name": "@yoda.digital/gitlab-mcp-server",
       "category": "vcs",
       "classification": "Experimental",
-      "tier_reason": "this entry does not name one artifact: the launch command and the verified version disagree, or neither states a version",
+      "tier_reason": "the recorded evidence is about npm:@yoda.digital/gitlab-mcp-server, and this entry now installs npm:@yoda.digital/gitlab-mcp-server@0.9.1",
       "trust": "unverified",
       "license": "MIT",
       "health_score": 77.92,
       "est_tools_count": null,
-      "install_cmd": "npx -y @yoda.digital/gitlab-mcp-server",
+      "install_cmd": "npx -y @yoda.digital/gitlab-mcp-server@0.9.1",
       "source_url": "https://github.com/yoda-digital/mcp-gitlab-server",
       "evidence": {
         "availability": {

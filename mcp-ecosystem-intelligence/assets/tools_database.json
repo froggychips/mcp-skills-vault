@@ -62,7 +62,7 @@
     {
       "name": "mcp-redis",
       "category": "database",
-      "install_cmd": "uvx --from git+https://github.com/redis/mcp-redis mcp-redis",
+      "install_cmd": "uvx redis-mcp-server==0.5.1",
       "source_url": "https://github.com/redis/mcp-redis",
       "stars": 555,
       "last_commit_days": 3,
@@ -70,11 +70,11 @@
       "health_score": 80,
       "est_tools_count": 10,
       "toolsets": null,
-      "version": null,
-      "pkg_integrity": null,
+      "version": "0.5.1",
+      "pkg_integrity": "sha256-c6c88b91f5c0e6c5c1e9bb5aff2edcb77bd136b7db5b9c409e90136a4e19376a",
       "trust": "candidate",
       "license": "MIT",
-      "notes": "Installed via uvx --from git+... \u2014 pkg_integrity cannot be verified through PyPI; git commit SHA is not pinned. Downgraded to candidate until a PyPI release or pinned commit is available.\n\n[HOLD 2026-05-22] Still installed via uvx --from git+... (no PyPI release / no pinned commit SHA). pkg_integrity unverifiable \u2014 pre-existing hold continues.",
+      "notes": "[2026-09-30] Moved off `uvx --from git+...` to the official PyPI package redis-mcp-server 0.5.1 (publisher Redis <oss@redis.com>; project_urls point to github.com/redis/mcp-redis; the upstream README recommends the PyPI package). Console script: `redis-mcp-server`. version + pkg_integrity (sha256 of the sdist) filled by `verify --update`; `--deep` hash matches.\n\n[HISTORY] Installed via uvx --from git+... \u2014 pkg_integrity cannot be verified through PyPI; git commit SHA is not pinned. Downgraded to candidate until a PyPI release or pinned commit is available.\n\n[HOLD 2026-05-22] Still installed via uvx --from git+... (no PyPI release / no pinned commit SHA). pkg_integrity unverifiable \u2014 pre-existing hold continues.",
       "trust_evidence": {
         "artifact_id": "git:git+https://github.com/redis/mcp-redis",
         "dimensions": {
@@ -4481,10 +4481,10 @@
     {
       "name": "@yoda.digital/gitlab-mcp-server",
       "category": "vcs",
-      "install_cmd": "npx -y @yoda.digital/gitlab-mcp-server",
+      "install_cmd": "npx -y @yoda.digital/gitlab-mcp-server@0.9.1",
       "source_url": "https://github.com/yoda-digital/mcp-gitlab-server",
-      "version": null,
-      "pkg_integrity": null,
+      "version": "0.9.1",
+      "pkg_integrity": "sha512-bqniLIN+mXz7j1t/qi52yxTdmiE1jhFpqS8qLoAYrR0biPcxLpkcbXJqpaLr6KsRx2COh/YJ6pIvSMRW/2fgYg==",
       "trust": "unverified",
       "license": "MIT",
       "health_score": 77.92,
