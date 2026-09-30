@@ -414,6 +414,22 @@ test('--fail-families: a missing, empty or unknown value is a usage error, never
   }
 });
 
+test('--fail-families trust: a failing trust outcome counts against its entry, and the report explains the exit', (t) => {
+  const runIn = fixtureTree(t);
+  const r = runIn('verify_integrity.cjs', ['--offline', '--json', '--entry', 'fx-advisory-fresh', '--cwd', DIRS.none, '--as-of', FIX_AS_OF, '--fail-families', 'trust']);
+  assert.equal(r.status, 1, r.stderr);
+  assert.doesNotMatch(r.stderr, /internal:/, 'the decision and the counters must agree');
+  const report = JSON.parse(r.stdout);
+  const [d] = report.findings.decisions;
+  assert.deepEqual([d.effect, d.decided_by, d.fails], ['deny', 'trust/advisories', true]);
+  const e = report.entries.find((x) => x.name === 'fx-advisory-fresh');
+  assert.equal(e.status, 'FAIL');
+  assert.ok(e.failures > 0, `failures ${e.failures}`);
+  assert.ok(e.findings.some((f) => f.tag === 'FAIL' && /^trust\/advisories: /.test(f.message)), 'the failing outcome is named');
+  const { judgeRun } = require(path.join(S, 'verify_summary.cjs'));
+  assert.deepEqual(judgeRun(report, r.status), { ok: true, reason: null });
+});
+
 test('outcomeFails: the family filter, by the outcome\'s rule or a finding it rests on', () => {
   const ruleOf = new Map([['f:1', 'integrity/docker-pin-mismatch'], ['f:2', 'evidence/advisories']]);
   const deny = (rule, findings) => ({ rule, effect: 'deny', findings, thresholded: true });

@@ -2040,6 +2040,26 @@ async function main() {
     }
   }
 
+  // The entry's failure count is its Decision's (#134). An outcome can fail
+  // the run without resting on any finding rendered above — `trust/<dimension>`
+  // under `--fail-families trust`: the stored advisory's own line is decided
+  // by `finding/severity`, outside the question — so an entry whose decision
+  // fails and that nothing above counted is counted here, with the outcomes
+  // that failed it named. Otherwise the report says 0 failures for an exit 1.
+  for (let i = 0; i < results.length; i++) {
+    const s = model.subjects[i];
+    const d = s && decisionOf.get(s.id);
+    if (!d || !d.fails || results[i].failures > 0) continue;
+    const ruleOf = new Map(model.findings.filter((f) => f.subject.id === s.id).map((f) => [f.id, f.rule]));
+    const failing = d.rules.filter((o) => outcomeFails(o, {
+      threshold: d.fail_on, families: EP.fail_families, ruleOf, thresholded: Boolean((rowFor(o.rule) || {}).thresholded),
+    }));
+    results[i].lines = results[i].lines || [];
+    for (const o of failing) results[i].lines.push(['FAIL', `${o.rule}: ${o.detail || o.rule}`, { decided_by: o.rule }]);
+    results[i].failures = Math.max(1, failing.length);
+    results[i].status = 'FAIL';
+  }
+
   // The exit code is the decisions'. The per-entry `failures` counters are the
   // frozen verify-report@1 view and are still kept by the processors; until
   // they are retired (docs/adr/0001, migration step 2) the two are compared,
