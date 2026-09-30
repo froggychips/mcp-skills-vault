@@ -40,7 +40,7 @@ const { classifyEntry, evalIndex, currentArtifactId, packageKeyOfId, NAME_SCOPED
 const {
   toTypedEntry, artifactId, comparableArtifactId, comparableId, packageKey, isExactArtifact,
 } = require('./lib/entry_model.cjs');
-const { staleDimensions, DEFAULT_MAX_AGE_DAYS } = require('./lib/evidence.cjs');
+const { staleDimensions, DEFAULT_MAX_AGE_DAYS, dbAsOf, evalResultsAsOf } = require('./lib/evidence.cjs');
 const { asOfFromArgv, requireAsOf } = require('./lib/clock.cjs');
 const budget               = require('./lib/budget.cjs');
 const { runDoctor }        = require('./doctor.cjs');
@@ -554,12 +554,14 @@ function main(argv) {
     return 2;
   }
 
-  const db = readJson(DB_PATH);
-  if (!db || !Array.isArray(db.tools)) {
+  const rawDb = readJson(DB_PATH);
+  if (!rawDb || !Array.isArray(rawDb.tools)) {
     process.stderr.write(`status: DB not found or malformed: ${DB_PATH}\n`);
     return 2;
   }
-  const evals = evalIndex((readJson(EVAL_PATH) || {}).results);
+  // The record as it stood at asOf: a look dated later did not exist then.
+  const db = dbAsOf(rawDb, opts.asOf);
+  const evals = evalIndex(evalResultsAsOf((readJson(EVAL_PATH) || {}).results, opts.asOf));
   const pkg   = readJson(PKG_PATH) || {};
 
   const env           = environment(opts.cwd);

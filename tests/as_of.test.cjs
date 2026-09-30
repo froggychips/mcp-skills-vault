@@ -118,3 +118,57 @@ test('a replayed instant never dates an observation or approves an install', () 
   assert.match(inst.stderr, /an install is decided against the current time/);
   assert.equal(fs.existsSync(path.join(TMP, '.mcp.json')), false, 'the install went ahead');
 });
+
+test('a replay never presents a live look as a past one', () => {
+  // verify and license-drift observe the registries today unless told not to;
+  // explain --verify runs that live gate. None of them may date it at --as-of.
+  const cases = [
+    ['verify_integrity.cjs', ['--entry', ENTRY.name, '--json'], /needs --offline/],
+    ['explain.cjs', [ENTRY.name, '--verify', '--json', '--cwd', TMP], /cannot be combined with --verify/],
+    ['check_license_drift.cjs', ['--json'], /needs --no-fetch/],
+  ];
+  for (const [script, args, why] of cases) {
+    const r = run(script, [...args, '--as-of', FRESH]);
+    assert.equal(r.status, 2, `${script} ran a live check at a replayed instant`);
+    assert.match(r.stderr, why);
+  }
+});
+
+test('before a look was taken, a replay reads it as never taken', () => {
+  // The DB keeps only the latest look at each dimension. Replayed at an
+  // instant before any of them, the stored evidence did not exist yet: it
+  // must not read as fresh (its age would be negative), in any view.
+  const BEFORE = '2020-01-01';
+  const list = JSON.parse(run('list_entries.cjs', ['--json', '--as-of', BEFORE]).stdout);
+  const row = list.entries.find((e) => e.name === ENTRY.name);
+  assert.equal(row.classification, 'Experimental');
+  assert.match(row.tier_reason, /no evidence recorded/);
+  assert.ok(list.entries.every((e) => !['Core', 'Recommended'].includes(e.classification)),
+    'an entry was promoted on evidence recorded after the instant it was judged at');
+
+  const ex = JSON.parse(run('explain.cjs', [ENTRY.name, '--json', '--cwd', TMP, '--as-of', BEFORE]).stdout);
+  assert.deepEqual(ex.evidence.dimensions, []);
+  assert.ok(ex.evidence.missing.includes('advisories'));
+
+  const v = JSON.parse(run('verify_integrity.cjs', ['--offline', '--entry', ENTRY.name, '--json', '--as-of', BEFORE]).stdout);
+  assert.ok(!v.findings.observations.some((o) => o.observed_at > BEFORE), 'an observation from after the instant was used');
+});
+
+test('evidenceAsOf: drops looks after the day, keeps the day itself, and is the identity otherwise', () => {
+  const { evidenceAsOf, dbAsOf, evalResultsAsOf } = require(path.join(S, 'lib', 'evidence.cjs'));
+  const ev = { artifact_id: 'npm:x@1.0.0', dimensions: {
+    artifact:   { status: 'verified', checked_at: '2026-09-10' },
+    advisories: { status: 'clean',    checked_at: '2026-09-17' },
+  } };
+  assert.equal(evidenceAsOf(ev, Date.parse('2026-09-30T00:00:00Z')), ev);
+  assert.deepEqual(Object.keys(evidenceAsOf(ev, Date.parse('2026-09-17T00:00:00Z')).dimensions), ['artifact', 'advisories']);
+  assert.deepEqual(Object.keys(evidenceAsOf(ev, Date.parse('2026-09-16T23:59:59Z')).dimensions), ['artifact']);
+  const db = { tools: [{ name: 'x', trust_evidence: ev }, { name: 'y' }] };
+  assert.equal(dbAsOf(db, Date.parse('2026-09-30T00:00:00Z')), db);
+  assert.deepEqual(dbAsOf(db, Date.parse('2026-09-01T00:00:00Z')).tools[0].trust_evidence.dimensions, {});
+  assert.equal(ev.dimensions.advisories.status, 'clean', 'the stored record was mutated');
+  const rows = [{ name: 'x', checked_at: '2026-09-10T00:00:00.000Z' }];
+  assert.equal(evalResultsAsOf(rows, Date.parse('2026-09-10T00:00:00Z')), rows);
+  assert.deepEqual(evalResultsAsOf(rows, Date.parse('2026-09-09T00:00:00Z')), []);
+  assert.throws(() => evidenceAsOf(ev), /asOf is required/);
+});

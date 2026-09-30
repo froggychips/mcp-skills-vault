@@ -67,7 +67,7 @@ const https        = require('https');
 const path         = require('path');
 const { githubSlug } = require('./lib/repo_url.cjs');
 // Freshness is decided in one place; `availability` is seven-day evidence.
-const { staleDimensions, DEFAULT_MAX_AGE_DAYS } = require('./lib/evidence.cjs');
+const { staleDimensions, DEFAULT_MAX_AGE_DAYS, dbAsOf } = require('./lib/evidence.cjs');
 const { asOfFromArgv, requireAsOf } = require('./lib/clock.cjs');
 
 const { classifyLicense } = require('./calculate_health.cjs');
@@ -410,6 +410,7 @@ function parseArgs(argv) {
   if (clock.error) { console.error(clock.error); process.exit(2); }
   out.asOf = clock.asOf;
   out.asOfIso = clock.iso;
+  out.asOfSource = clock.source;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if      (a === '--strict')                            out.strict = true;
@@ -443,9 +444,17 @@ async function main() {
 
   let db;
   try {
-    db = JSON.parse(fs.readFileSync(opts.dbPath, 'utf8'));
+    // The record as it stood at asOf: a look dated later did not exist then.
+    db = dbAsOf(JSON.parse(fs.readFileSync(opts.dbPath, 'utf8')), opts.asOf);
   } catch (e) {
     console.error(`Cannot read DB at ${opts.dbPath}: ${e.message}`);
+    process.exit(2);
+  }
+
+  // A fetch reads the registries today; --as-of replays only what the DB
+  // already holds, or today's licences would be reported as another day's.
+  if (opts.asOfSource === 'as-of' && !opts.noFetch) {
+    console.error('--as-of replays stored evidence and needs --no-fetch: a fetch observes today, and its results cannot be dated in the past.');
     process.exit(2);
   }
 

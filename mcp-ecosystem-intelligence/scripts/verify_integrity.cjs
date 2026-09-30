@@ -70,7 +70,7 @@ const { decide, exitCode, findingsDocument, toJson } = require('./lib/finding.cj
 const { fromVerifyResults } = require('./lib/findings_from.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const {
-  buildEvidence, mergeEvidence, staleDimensions, deriveTrust, requiredFor, DEFAULT_MAX_AGE_DAYS,
+  buildEvidence, mergeEvidence, staleDimensions, deriveTrust, requiredFor, DEFAULT_MAX_AGE_DAYS, dbAsOf,
 } = require('./lib/evidence.cjs');
 const https       = require('https');
 const fs          = require('fs');
@@ -1370,6 +1370,13 @@ async function main() {
     console.error('--as-of cannot be combined with --record-evidence: evidence is dated when it is observed.');
     process.exit(2);
   }
+  // Replay is over stored evidence. A live run asks the registries and the
+  // advisory feeds today; judging that at another instant would present
+  // today's answers as a past day's audit record.
+  if (CLOCK.source === 'as-of' && !OFFLINE) {
+    console.error('--as-of replays stored evidence and needs --offline: a live run observes today, and its results cannot be dated in the past.');
+    process.exit(2);
+  }
   // A policy that doesn't parse is not a policy: refuse rather than run a bar
   // nobody set.
   if (POLICY.found && !POLICY.ok) {
@@ -1400,7 +1407,11 @@ async function main() {
     process.exit(2);
   }
 
-  const db        = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+  // A replay reads the record as it stood at --as-of: a look dated later did
+  // not exist then. Only on replay, which never writes the DB (--as-of refuses
+  // --record-evidence and needs --offline), so the copy is never persisted.
+  const rawDb     = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+  const db        = CLOCK.source === 'as-of' ? dbAsOf(rawDb, AS_OF) : rawDb;
   const results   = [];
   let totalFails  = 0;
   let updated     = 0;

@@ -30,6 +30,7 @@ const { exitAfterFlush } = require('./lib/exit.cjs');
 const { listHosts, resolveTarget, writeServerEntry } = require('./lib/hosts.cjs');
 const { trustScore, fitScore, behaviour, recommend } = require('./lib/scores.cjs');
 const { classifyEntry } = require('./lib/tiers.cjs');
+const { dbAsOf, entryAsOf, evalResultsAsOf } = require('./lib/evidence.cjs');
 const { asOfFromArgv, requireAsOf } = require('./lib/clock.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { loadPolicy } = require('./lib/policy.cjs');
@@ -672,8 +673,10 @@ function evalIndex() {
   return _evalIndex;
 }
 
-function behaviourFor(name) {
-  return behaviour(evalIndex().get(name) || null);
+function behaviourFor(name, asOf) {
+  // A result recorded after asOf did not exist then (lib/evidence.cjs).
+  const [row] = evalResultsAsOf([evalIndex().get(name) || null], requireAsOf(asOf, 'behaviourFor'));
+  return behaviour(row || null);
 }
 
 // The tier is derived from evidence, not read off the entry — `lib/tiers.cjs`
@@ -681,7 +684,8 @@ function behaviourFor(name) {
 // nothing to install, wrong bytes, or a known vulnerability at the pinned
 // version. That is the filter `matchDB` and `fallbackBySignal` apply.
 function tierFor(tool, asOf) {
-  return classifyEntry(tool, evalIndex().get(tool.name) || null, { now: asOf });
+  const [row] = evalResultsAsOf([evalIndex().get(tool.name) || null], asOf);
+  return classifyEntry(entryAsOf(tool, asOf), row || null, { now: asOf });
 }
 function isDeprecated(tool, asOf) {
   return tierFor(tool, asOf).classification === 'Deprecated';
@@ -709,7 +713,7 @@ function printTool(t, asOf) {
     : `${DM}${t.est_tools_count} tools${RS}`;
   const tier  = tierFor(t, asOf).classification.padEnd(13);
   const name  = t.name.padEnd(26);
-  const behav = behaviourFor(t.name);
+  const behav = behaviourFor(t.name, asOf);
   const tag   = (BEHAVIOUR_TAG[behav.state] || (() => ''))();
   process.stdout.write(`  ${B}${tier}${RS} ${name} ${toolTag}  ${DM}score ${t.health_score}${RS}${tag ? `  ${tag}` : ''}\n`);
   process.stdout.write(`  ${' '.repeat(13)}  ${DM}${t.install_cmd}${RS}\n`);
@@ -840,7 +844,8 @@ if (require.main === module) {
   }
   const asOf = clock.asOf;
 
-  const db        = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+  // The record as it stood at asOf: a look dated later did not exist then.
+  const db        = dbAsOf(JSON.parse(fs.readFileSync(DB_PATH, 'utf8')), asOf);
   const stack     = detectStack(CWD);
   const matched   = matchDB(db, stack, QUERY, asOf);
   const unmapped  = unmappedSignals(db, stack, asOf);
@@ -924,7 +929,7 @@ function slim(t, stack = null, asOf) {
     trust.reasons.unshift(`stored evidence describes ${t.trust_evidence.artifact_id}, not ${currentId} — ignored`);
   }
   const fit   = stack ? fitScore(t, stack, { signalToTools: SIGNAL_TO_TOOLS, universal: UNIVERSAL_TOOLS }) : null;
-  const behav = behaviourFor(t.name);
+  const behav = behaviourFor(t.name, asOf);
   return {
     name:            t.name,
     category:        t.category,

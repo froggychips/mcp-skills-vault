@@ -92,7 +92,14 @@ migration step, and a new command that is not classified fails that test.
   replayable. When a check *looked* is not: observers (`availability`,
   `identity`, `eval`, `lock`, …) stamp with `readWallClock()`, and
   `--record-evidence` / `install` refuse `--as-of`, because a replayed instant
-  must never date a real observation or approve a real install. Durations
+  must never date a real observation or approve a real install. For the same
+  reason a replay is over stored evidence only: `verify --as-of` needs
+  `--offline`, `license-drift --as-of` needs `--no-fetch`, and
+  `explain --verify` refuses `--as-of`. And the DB keeps only the latest look
+  at each dimension, so a look dated after `asOf` did not exist then: every
+  entry point reads the record through `dbAsOf` / `evalResultsAsOf`
+  (`lib/evidence.cjs`), which drop it — "never checked", not "fresh" with a
+  negative age. At the wall clock both are the identity. Durations
   (`performance.now()`), cache TTLs, timeouts and backup filenames are
   measurements and stay on the clock, each allowlisted with its reason in
   `tests/no_wall_clock.test.cjs`, which fails on any new read.

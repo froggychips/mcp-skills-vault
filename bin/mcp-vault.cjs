@@ -105,7 +105,8 @@ COMMON OPTIONS
                         context ceiling (maxContextTokens / maxContextPercent)
   --cwd <path>      Target project directory (scan / audit)
   --as-of <date>    Judge stored evidence as of YYYY-MM-DD or an ISO-8601 instant
-                    instead of now (verify / status / explain / audit / list / scan)
+                    instead of now (verify / status / explain / audit / list / scan);
+                    stored evidence only, so verify needs --offline
   --host <id>       Which host config to write (install; --list-hosts to see them)
   --scope <s>       project or user (install; --global means --scope user)
 

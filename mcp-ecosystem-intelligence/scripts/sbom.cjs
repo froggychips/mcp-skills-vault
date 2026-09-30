@@ -53,7 +53,7 @@ const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { resolveNpmTreeCached, summarizeTree } = require('./lib/deps.cjs');
 const { purlFor } = require('./lib/npm_signatures.cjs');
 const { behaviour } = require('./lib/scores.cjs');
-const { staleDimensions, DEFAULT_MAX_AGE_DAYS } = require('./lib/evidence.cjs');
+const { staleDimensions, DEFAULT_MAX_AGE_DAYS, dbAsOf, evalResultsAsOf } = require('./lib/evidence.cjs');
 const { asOfFromArgv, requireAsOf } = require('./lib/clock.cjs');
 const { OSI_APPROVED } = require('./calculate_health.cjs');
 
@@ -261,8 +261,9 @@ async function main(argv) {
   if (opts.error) { process.stderr.write(`sbom: ${opts.error}\n\n${HELP}`); return 2; }
   if (opts.help)  { process.stdout.write(HELP); return 0; }
 
-  const db    = readJson(DB_PATH, { tools: [] }).tools || [];
-  const evals = readJson(EVAL_PATH, { results: [] }).results || [];
+  // The record as it stood at asOf: a look dated later did not exist then.
+  const db    = dbAsOf(readJson(DB_PATH, { tools: [] }).tools || [], opts.asOf);
+  const evals = evalResultsAsOf(readJson(EVAL_PATH, { results: [] }).results || [], opts.asOf);
   const pkg   = readJson(PKG_PATH, { name: '@froggychips/mcp-vault', version: '0.0.0' });
   const evalBy = new Map(evals.map((r) => [r.name, r]));
 

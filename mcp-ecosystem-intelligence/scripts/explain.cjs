@@ -47,7 +47,7 @@ const { decide: decideFindings, findingsDocument, toJson, explainTrace, renderTr
 const { subjectForTool, fromEvidence, fromReportEntry } = require('./lib/findings_from.cjs');
 const { trustScore, fitScore, behaviour, recommend } = require('./lib/scores.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
-const { staleDimensions, DIMENSIONS, DEFAULT_MAX_AGE_DAYS, POSITIVE_STATUSES, requiredFor } = require('./lib/evidence.cjs');
+const { staleDimensions, DIMENSIONS, DEFAULT_MAX_AGE_DAYS, POSITIVE_STATUSES, requiredFor, dbAsOf, evalResultsAsOf } = require('./lib/evidence.cjs');
 const { estimateServer, matchDbEntry, wouldExceed, DEFAULT_CONTEXT } = require('./lib/budget.cjs');
 const { readInstalledServers } = require('./lib/installed.cjs');
 const { asOfFromArgv } = require('./lib/clock.cjs');
@@ -83,6 +83,9 @@ function parseArgs(argv) {
   // The one clock read for this run; see lib/clock.cjs.
   const clock = asOfFromArgv(argv);
   if (clock.error) return { ...opts, error: clock.error };
+  // --verify runs the live gate, which observes today; a replayed instant
+  // would date those answers in the past (verify refuses the same pair).
+  if (opts.verify && clock.source === 'as-of') return { ...opts, error: '--as-of replays stored evidence and cannot be combined with --verify (a live gate run observes today)' };
   return { ...opts, asOf: clock.asOf, asOfIso: clock.iso, asOfSource: clock.source };
 }
 
@@ -221,7 +224,8 @@ function main(argv) {
   if (opts.error) { process.stderr.write(`explain: ${opts.error}\n\n${HELP}`); return 2; }
   if (opts.help)  { process.stdout.write(HELP); return 0; }
 
-  const { db } = readDb(DB_PATH);
+  // The record as it stood at asOf: a look dated later did not exist then.
+  const db = dbAsOf(readDb(DB_PATH).db, opts.asOf);
   const tool = (db.tools || []).find((t) => t.name === opts.name)
     || (db.tools || []).find((t) => t.name.toLowerCase().includes(opts.name.toLowerCase()));
   if (!tool) {
@@ -248,7 +252,7 @@ function main(argv) {
   const trust  = trustScore(evidence, { maxAgeDays: maxAge, now: opts.asOf });
   const stale  = new Map(staleDimensions(evidence, maxAge, opts.asOf).map((s) => [s.dimension, s]));
 
-  const evals  = readJson(EVAL_PATH, { results: [] }).results || [];
+  const evals  = evalResultsAsOf(readJson(EVAL_PATH, { results: [] }).results || [], opts.asOf);
   const evalBy = new Map(evals.map((r) => [r.name, r]));
   const behav  = behaviour(evalBy.get(tool.name) || null);
 

@@ -7,6 +7,7 @@ const fs = require("fs");
 const path = require("path");
 const { classifyEntry } = require("./lib/tiers.cjs");
 const { asOfFromArgv, requireAsOf } = require("./lib/clock.cjs");
+const { dbAsOf, evalResultsAsOf } = require("./lib/evidence.cjs");
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const DB_PATH = path.join(ROOT, "mcp-ecosystem-intelligence", "assets", "tools_database.json");
@@ -150,8 +151,9 @@ function renderHtml(entries) {
 // that forgets the instant must fail, not quietly judge at the wall clock.
 function buildEntries(db, evals, asOf) {
   requireAsOf(asOf, 'buildEntries');
-  const smokeByName = new Map(((evals && evals.results) || []).map((r) => [r.name, r]));
-  return db.tools
+  // The record as it stood at asOf: a look dated later did not exist then.
+  const smokeByName = new Map((evalResultsAsOf((evals && evals.results) || [], asOf)).map((r) => [r.name, r]));
+  return dbAsOf(db, asOf).tools
     .map((t) => slimEntry(t, t.trust_evidence || null, smokeByName.get(t.name) || null, asOf))
     .sort((a, b) =>
     (a.category || "").localeCompare(b.category || "") ||

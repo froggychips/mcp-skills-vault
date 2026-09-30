@@ -21,6 +21,7 @@ const path = require("path");
 const { exitAfterFlush } = require("./lib/exit.cjs");
 const { classifyEntry, evalIndex, TIER_ORDER } = require("./lib/tiers.cjs");
 const { asOfFromArgv } = require("./lib/clock.cjs");
+const { dbAsOf, evalResultsAsOf } = require("./lib/evidence.cjs");
 
 const DB_PATH = path.join(
   __dirname, "..", "assets", "tools_database.json"
@@ -73,7 +74,8 @@ if (CLOCK.error) {
 
 let db;
 try {
-  db = JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
+  // The record as it stood at asOf: a look dated later did not exist then.
+  db = dbAsOf(JSON.parse(fs.readFileSync(DB_PATH, "utf8")), CLOCK.asOf);
 } catch (e) {
   process.stderr.write(`list: cannot read DB at ${DB_PATH}: ${e.message}\n`);
   process.exit(2);
@@ -83,7 +85,7 @@ try {
 // "not observed", never "observed to fail".
 let evals = new Map();
 try {
-  evals = evalIndex(JSON.parse(fs.readFileSync(EVAL_PATH, "utf8")).results);
+  evals = evalIndex(evalResultsAsOf(JSON.parse(fs.readFileSync(EVAL_PATH, "utf8")).results, CLOCK.asOf));
 } catch { /* no results shipped */ }
 
 // The tier is derived from evidence, not stored: see lib/tiers.cjs.
