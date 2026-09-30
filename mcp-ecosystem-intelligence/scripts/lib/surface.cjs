@@ -38,6 +38,21 @@
  *   diffSurface(before, after)       -> { added, removed, changed, unchanged }
  *   describeDiff(diff)               -> [string]        (human lines)
  *   isEmpty(diff)                    -> boolean
+ *   mentionHashes(text)              -> [hex16]         (see below)
+ *   tokenHash(token)                 -> hex16
+ *
+ * Two facts ride along per tool without entering any hash, so an older
+ * fingerprint and a newer one of the same surface still compare equal:
+ *
+ *   annotations  the MCP behaviour hints (readOnlyHint, destructiveHint,
+ *                idempotentHint, openWorldHint) the server declared, as
+ *                booleans. Only present ones are kept. A hint is the server's
+ *                own claim, and lib/flows.cjs only ever lets one *add* a risk.
+ *   mentions     hashed identifier-shaped tokens of the description
+ *                (`read_file`, `mcp__github__create_issue`, `server-slack`),
+ *                so the cross-server check can ask "does this description
+ *                name a tool of another server" by hashing the other name and
+ *                looking it up — without the text being stored.
  */
 
 const crypto = require('crypto');
@@ -56,6 +71,44 @@ function canonical(value) {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   const keys = Object.keys(value).sort();
   return `{${keys.map((k) => `${JSON.stringify(k)}:${canonical(value[k])}`).join(',')}}`;
+}
+
+const HINTS = ['readOnlyHint', 'destructiveHint', 'idempotentHint', 'openWorldHint'];
+
+/** The declared behaviour hints, booleans only — never the free-text title. */
+function annotationsOf(tool) {
+  const a = tool && tool.annotations;
+  if (!a || typeof a !== 'object') return null;
+  const out = {};
+  for (const k of HINTS) if (typeof a[k] === 'boolean') out[k] = a[k];
+  return Object.keys(out).length ? out : null;
+}
+
+/**
+ * 64 bits of sha256 over a lower-cased token. Enough for membership in one
+ * description's handful of tokens; short enough that a thousand tools do not
+ * double the size of the eval snapshot.
+ */
+const tokenHash = (token) => sha256(String(token).toLowerCase()).slice(0, 16);
+
+// Identifier-shaped: two or more alphanumeric runs joined by `_ - . /` or a
+// double underscore, or a camelCase word. Plain words are deliberately not
+// kept — "search" or "github" as prose would make every description mention
+// everything, and storing every word would be storing the text.
+const IDENT = /[A-Za-z][A-Za-z0-9]*(?:(?:__|[_\-./])[A-Za-z0-9]+)+|\b[a-z]+[A-Z][A-Za-z0-9]*/g;
+const MAX_MENTIONS = 64;
+
+function mentionHashes(text) {
+  if (typeof text !== 'string' || !text) return [];
+  const tokens = new Set();
+  for (const m of text.match(IDENT) || []) {
+    tokens.add(m);
+    // `mcp__github__create_issue` names a server and a tool; `@scope/server-x`
+    // names a package whose last segment is what people call it.
+    if (m.includes('__')) for (const part of m.split('__')) if (part) tokens.add(part);
+    if (m.includes('/')) tokens.add(m.slice(m.lastIndexOf('/') + 1));
+  }
+  return [...new Set([...tokens].map(tokenHash))].sort().slice(0, MAX_MENTIONS);
 }
 
 /**
@@ -79,6 +132,10 @@ function fingerprintTools(tools) {
       description: t.description === undefined ? null : sha256(String(t.description)),
       schema:      t.inputSchema === undefined ? null : sha256(canonical(t.inputSchema)),
     };
+    const hints = annotationsOf(t);
+    if (hints) out[name].annotations = hints;
+    const mentions = mentionHashes(t.description);
+    if (mentions.length) out[name].mentions = mentions;
   }
   const names = Object.keys(out).sort();
   return {
@@ -130,4 +187,4 @@ function describeDiff(diff, { limit = 8 } = {}) {
   return lines;
 }
 
-module.exports = { fingerprintTools, diffSurface, describeDiff, isEmpty, canonical, sha256 };
+module.exports = { fingerprintTools, diffSurface, describeDiff, isEmpty, canonical, sha256, mentionHashes, tokenHash };

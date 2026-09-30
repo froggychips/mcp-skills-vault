@@ -71,6 +71,8 @@ const RANK = {
   // Organisation keys (#127, lib/org_policy.cjs): an allow list implies deny.
   default:              ['allow', 'deny'],
   toolApproval:         ['off', 'require'],
+  toxicFlows:           ['allow', 'warn', 'fail'],
+  toolShadowing:        ['allow', 'warn', 'fail'],
   // The exit threshold: which effects fail the run. `deny` always does.
   fail_on:              ['deny', 'unknown', 'warn'],
 };
@@ -88,9 +90,16 @@ const entryOf = (ctx) => (ctx.facts && ctx.facts.entry) || {};
 const isNpx = (ctx) => String(entryOf(ctx).install_cmd || '').startsWith('npx');
 const isDocker = (ctx) => /^docker\s+run/.test(entryOf(ctx).install_cmd || '');
 const out = (effect, detail, findings = [], rule = undefined) => ({ rule, effect, detail, findings });
-// A finding family whose own row decides it (#121: `db/signature-*`,
-// `audits/import-*`). Read at call time: RULES is defined below.
-const claimed = (f) => RULES.some((r) => r.claims && r.status === 'active' && f.rule.startsWith(r.claims));
+// A finding family whose own row decides it is judged by that row alone, not
+// by the generic finding/* rows: a row that `claims` a rule prefix (#121:
+// `db/signature-*`, `audits/import-*`), or one that `owns_findings` of the
+// rules it matches (#123: flows/*, shadowing/*: the policy key it reads, not
+// the severity bar). Read at call time: RULES is defined below.
+const claimed = (f) => {
+  if (RULES.some((r) => r.claims && r.status === 'active' && f.rule.startsWith(r.claims))) return true;
+  const row = rowFor(f.rule);
+  return Boolean(row && row.owns_findings);
+};
 
 // ── plain-text secrets in host configs (#122) ───────────────────────────────
 
@@ -524,6 +533,51 @@ const orgRules = [
   },
 ];
 
+// ── what the configured set does together (#123, lib/flows.cjs) ────────────
+//
+// Findings on a `setup` subject (a host's session) or a `tool` subject (a
+// colliding tool), or — in explain — on the entry that would close the flow.
+// The level is the policy's: `toxicFlows` / `toolShadowing` = fail | warn |
+// allow, default warn, and `warn` fails the run only under --strict (these
+// rows are thresholded, so `fail_on: warn` reaches them). A low-confidence
+// conclusion — a flow that needs a code capability to close, a near-miss
+// name — is reported and never enforced: it is `allow`, said so in the trace.
+
+const SET_EFFECT = { fail: 'deny', warn: 'warn', allow: 'allow' };
+const setJudged = (ctx, match, key) => ctx.findings
+  .filter((f) => match(f.rule) && f.state === 'observed')
+  .map((f) => {
+    if (f.confidence === 'low') return out('allow', `${f.message} (low confidence: reported, not enforced)`, [f.id], f.rule);
+    const level = SET_EFFECT[ctx.policy[key]] ? ctx.policy[key] : 'warn';
+    return out(SET_EFFECT[level], level === 'allow' ? `${f.message} (${key}: allow)` : f.message, [f.id], f.rule);
+  });
+const setupRules = [
+  {
+    id: 'flows/lethal-trifecta', status: 'active', thresholded: true, owns_findings: true, views: ['explain'],
+    doc: 'private data + untrusted content + an outward sink in one session; the level is policy.toxicFlows',
+    evaluate: (ctx) => setJudged(ctx, (r) => r === 'flows/lethal-trifecta', 'toxicFlows'),
+  },
+  {
+    id: 'flows/untrusted-destructive', status: 'active', thresholded: true, owns_findings: true, views: ['explain'],
+    doc: 'untrusted content next to a destructive tool; the level is policy.toxicFlows',
+    evaluate: (ctx) => setJudged(ctx, (r) => r === 'flows/untrusted-destructive', 'toxicFlows'),
+  },
+  {
+    id: 'shadowing/*', status: 'active', thresholded: true, owns_findings: true, views: ['explain'],
+    doc: 'tool names that shadow one another across servers; the level is policy.toolShadowing',
+    evaluate: (ctx) => setJudged(ctx, (r) => r.startsWith('shadowing/'), 'toolShadowing'),
+  },
+  {
+    id: 'flows/no-data', status: 'active', thresholded: false, owns_findings: true, views: [],
+    doc: 'a server nobody could see into: unknown, never clean — and, as before, never a failing exit',
+    evaluate(ctx) {
+      return ctx.findings.filter((f) => (f.rule.startsWith('flows/') || f.rule.startsWith('shadowing/')) && f.state !== 'observed')
+        .map((f) => out('unknown', f.message, [f.id], 'flows/no-data'));
+    },
+  },
+];
+const SETUP_ORDER = ['flows/lethal-trifecta', 'flows/untrusted-destructive', 'shadowing/*', 'flows/no-data'];
+
 // ── reserved for the open feature PRs ──────────────────────────────────────
 //
 // Claimed here so that each lands as a row in this table — with this id in
@@ -531,9 +585,6 @@ const orgRules = [
 
 const reserved = (id, owner, doc) => ({ id, status: 'reserved', owner, doc, thresholded: false, views: [], evaluate: () => [] });
 const reservedRules = [
-  reserved('flows/lethal-trifecta', '#123', 'private data + untrusted content + exfiltration in one session'),
-  reserved('flows/untrusted-destructive', '#123', 'untrusted content next to a destructive tool'),
-  reserved('shadowing/*', '#123', 'tool names that shadow one another across servers'),
   reserved('tool-scan/*', '#124', 'poisoning patterns in tool descriptions and schemas'),
   reserved('lookalike/*', '#125', 'a name one edit away from a vault entry'),
 ];
@@ -587,7 +638,7 @@ const signatureRules = [
   },
 ];
 
-const RULES = Object.freeze([...explainRules, ...policyRules, ...secretRules, ...findingRules, ...orgRules, ...reservedRules, ...signatureRules].map((r) => Object.freeze(r)));
+const RULES = Object.freeze([...explainRules, ...policyRules, ...secretRules, ...findingRules, ...orgRules, ...setupRules, ...reservedRules, ...signatureRules].map((r) => Object.freeze(r)));
 const RULE_BY_ID = new Map(RULES.map((r) => [r.id, r]));
 
 // Evaluation order, per mode. It is the order the legacy views have always
@@ -601,7 +652,7 @@ const ORDER = Object.freeze({
     'policy/install-hooks', 'policy/dependency-hooks', 'policy/dependency-advisories',
     'policy/signatures', 'policy/provenance', 'policy/docker-digest', 'policy/unverified',
     'policy/license', 'policy/health', 'policy/trust',
-    'gate/fail', 'gate/unverified', 'behaviour/*', 'budget/over',
+    'gate/fail', 'gate/unverified', 'behaviour/*', 'budget/over', ...SETUP_ORDER,
     'secrets/*',
     'gate/require-provenance', 'gate/fail-dep-advisories', 'finding/severity', 'finding/incomplete',
     'audits/recorded',
@@ -613,7 +664,7 @@ const ORDER = Object.freeze({
     'policy/signatures', 'policy/provenance', 'policy/dependency-hooks', 'policy/dependency-advisories',
     'policy/unverified', 'policy/install-hooks', 'policy/docker-digest',
     'policy/license', 'policy/health', 'policy/trust',
-    'gate/fail', 'gate/unverified', 'behaviour/*', 'budget/over',
+    'gate/fail', 'gate/unverified', 'behaviour/*', 'budget/over', ...SETUP_ORDER,
     'secrets/*',
     'gate/require-provenance', 'gate/fail-dep-advisories', 'finding/severity', 'finding/incomplete',
     'audits/recorded',
@@ -623,6 +674,8 @@ const ORDER = Object.freeze({
   // what this server offers, and is it what was locked — so only these rows
   // answer it; the entry-quality rows need facts those commands do not have.
   approval: Object.freeze(['org/tool-approval', 'finding/severity', 'finding/incomplete']),
+  // status / audit over a host's session: only what the set does together.
+  setup: Object.freeze([...SETUP_ORDER]),
 });
 
 function rulesFor(mode) {

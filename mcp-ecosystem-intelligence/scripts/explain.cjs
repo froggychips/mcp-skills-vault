@@ -56,9 +56,12 @@ const { estimateServer, matchDbEntry, wouldExceed, DEFAULT_CONTEXT } = require('
 const { readInstalledServers } = require('./lib/installed.cjs');
 const { asOfFromArgv } = require('./lib/clock.cjs');
 const { readLocalAudits, loadImportedAudits, auditsFor, auditObservations } = require('./lib/audits.cjs');
+const flows = require('./lib/flows.cjs');
+const { finding } = require('./lib/finding.cjs');
 
 const DB_PATH    = path.resolve(__dirname, '../assets/tools_database.json');
 const EVAL_PATH  = path.resolve(__dirname, '../assets/eval_results.json');
+const CAPS_PATH  = path.resolve(__dirname, '../assets/capabilities.json');
 const VERIFY_CJS = path.resolve(__dirname, 'verify_integrity.cjs');
 
 const T  = process.stdout.isTTY;
@@ -168,11 +171,71 @@ function asEffective(policy) {
 }
 
 /**
+ * What this entry would take part in beside what is already configured —
+ * lib/flows.cjs, per host — as findings about *this entry* (subject: the
+ * entry; scope: the host, or `alone` when nothing is configured, which is
+ * still the GitHub case: one server can hold every leg).
+ *
+ * A flow the host already had without this entry is not a finding about it:
+ * it goes in `already_present`, for the record, and not to decide(). One this
+ * entry closes by itself is always about it. Configured servers are matched to
+ * the vault by what they launch, never by their config key.
+ *
+ * Returns { findings, meta, already_present } — `meta` maps a finding id to
+ * the host, servers and advice a rendering shows beside it.
+ */
+function setupFindings({ tool, subject: s, db, evalBy, capabilities, installed }) {
+  let typed = null;
+  try { typed = toTypedEntry(tool); } catch { typed = null; }
+  const self = flows.memberFrom({
+    name: tool.name, dbEntry: tool, evalEntry: evalBy.get(tool.name) || null, capabilities,
+    artifactIds: [typed ? artifactId(typed.artifact) : null], launch: tool.install_cmd,
+  });
+  const byHost = new Map();
+  for (const srv of installed) {
+    const dbEntry = flows.dbEntryForLaunch(db.tools || [], srv.install_cmd);
+    // Already configured: the entry being explained takes its place.
+    if (dbEntry && dbEntry.name === tool.name) continue;
+    const host = srv.host || 'unknown';
+    if (!byHost.has(host)) byHost.set(host, []);
+    let t = null;
+    try { t = dbEntry ? toTypedEntry(dbEntry) : null; } catch { t = null; }
+    byHost.get(host).push(flows.memberFrom({
+      name: srv.name, dbEntry, evalEntry: dbEntry ? evalBy.get(dbEntry.name) || null : null, capabilities,
+      artifactIds: [t ? artifactId(t.artifact) : null], launch: srv.install_cmd,
+    }));
+  }
+  if (!byHost.size) byHost.set(null, []);
+  const findings = [];
+  const meta = {};
+  const alreadyPresent = [];
+  for (const [host, members] of byHost) {
+    const before = new Set(flows.conclusions(flows.analyseSet(members))
+      .filter((c) => c.confidence === 'high').map((c) => c.rule));
+    for (const c of flows.grouped(flows.conclusions(flows.analyseSet([...members, self])))) {
+      if (!c.servers.includes(tool.name)) continue;
+      const alone = c.servers.length === 1;
+      if (c.rule.startsWith('flows/') && !alone && before.has(c.rule)) {
+        alreadyPresent.push({ host, rule: c.rule, servers: c.servers, message: c.message });
+        continue;
+      }
+      const f = finding({
+        rule: c.rule, subject: s, scope: host || 'alone', severity: c.severity, confidence: c.confidence,
+        message: `${host ? `${host}: ` : ''}${c.message}`,
+      });
+      findings.push(f);
+      meta[f.id] = { host, rule: c.rule, servers: c.servers, advice: c.advice };
+    }
+  }
+  return { findings, meta, already_present: alreadyPresent };
+}
+
+/**
  * The model for one entry: observations from the stored evidence, findings
  * from the evidence and — with `--verify` — from the live gate, and the one
  * Decision `decide()` makes over them. explain renders it; it decides nothing.
  */
-function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, behav, budget, evidence = null, asOf, maxAgeDays = DEFAULT_MAX_AGE_DAYS, org = null, audits = [] }) {
+function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, behav, budget, evidence = null, asOf, maxAgeDays = DEFAULT_MAX_AGE_DAYS, org = null, audits = [], setup = [] }) {
   const ep = asEffective(policy);
   const s = subjectForTool(tool);
   // The stored part of the decision, from the one producer verify --offline
@@ -192,7 +255,8 @@ function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, b
   // `audits/recorded` findings the table can only ever allow — visible in the
   // trace, never a lift (#121).
   const aud = auditObservations(audits, s);
-  const findings = [...ev.findings, ...gateFindings, ...(orgPart ? orgPart.findings : []), ...aud.findings];
+  // What the configured set would do with it (rows flows/*, shadowing/*).
+  const findings = [...ev.findings, ...gateFindings, ...(orgPart ? orgPart.findings : []), ...aud.findings, ...setup];
   const facts = {
     [s.id]: {
       mode: gateEntry ? 'gate' : 'evidence',
@@ -225,8 +289,8 @@ function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, b
  * words explain has always used, because the useful part of a denial is
  * which rule denied it.
  */
-function decide({ tool, policy, gateEntry, gateDoc = null, trust, behav, budget, evidence = null, asOf, maxAgeDays, org = null, audits = [] }) {
-  const m = explainModel({ tool, policy, gateEntry, gateDoc, trust, behav, budget, evidence, asOf, maxAgeDays, org, audits });
+function decide({ tool, policy, gateEntry, gateDoc = null, trust, behav, budget, evidence = null, asOf, maxAgeDays, org = null, audits = [], setup = [] }) {
+  const m = explainModel({ tool, policy, gateEntry, gateDoc, trust, behav, budget, evidence, asOf, maxAgeDays, org, audits, setup });
   const rules = m.decision.rules
     .filter((r) => { const row = rowFor(r.rule); return row && row.views.includes('explain'); })
     .map((r) => ({ rule: r.rule, outcome: r.effect, detail: r.detail }));
@@ -319,9 +383,15 @@ function main(argv) {
     ...importedAudits.errors,
   ];
 
+  const setupUnreadable = [];
+  const setup = setupFindings({
+    tool, subject: subjectForTool(tool), db, evalBy,
+    capabilities: readJson(CAPS_PATH, { packages: {} }),
+    installed: readInstalledServers({ cwd: opts.cwd, onUnreadable: (loc) => setupUnreadable.push(loc) }),
+  });
   const verdict = decide({
     tool, policy: loaded.policy, gateEntry, gateDoc: gate && gate.ok ? gate.report.findings : null,
-    trust, behav, budget, evidence, asOf: opts.asOf, maxAgeDays: maxAge, org, audits,
+    trust, behav, budget, evidence, asOf: opts.asOf, maxAgeDays: maxAge, org, audits, setup: setup.findings,
   });
   const m = verdict.model;
   const trace = toJson(findingsDocument({
@@ -388,6 +458,15 @@ function main(argv) {
       recommendation: recommend({ trust, health: tool.health_score, fit, behaviour: behav }),
     },
     budget,
+    // The cross-server context of the flows/* and shadowing/* rules above:
+    // which host and servers each finding is about, what to do, the flows a
+    // host already had without this entry, and whether the set is complete.
+    // The findings themselves are in `findings` (findings@1).
+    setup: {
+      context: setup.findings.map((f) => ({ finding: f.id, ...setup.meta[f.id] })),
+      already_present: setup.already_present,
+      unreadable_configs: setupUnreadable.map((u) => ({ path: u.path, error: u.error })),
+    },
     live_gate: gate && gate.ok
       ? { ran: true, exit: gate.exit, status: gateEntry ? gateEntry.status : null, findings: gateEntry ? gateEntry.findings : [] }
       : { ran: false, reason: opts.verify ? (gate && gate.error) || 'unavailable' : 'not requested (--verify runs it)' },
@@ -477,4 +556,4 @@ if (require.main === module) {
   exitAfterFlush(main(process.argv.slice(2)));
 }
 
-module.exports = { parseArgs, decide, explainModel, runGate, policyFromEvidence };
+module.exports = { parseArgs, decide, explainModel, runGate, policyFromEvidence, setupFindings };

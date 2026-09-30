@@ -454,6 +454,62 @@ test('secrets: every decision is decide() of the document\'s own inputs, and the
   }
 });
 
+// ── the configured set: flows/* and shadowing/* (#123) ─────────────────────
+//
+// status and audit are still legacy deciders for everything else, but their
+// cross-server part is decide()'s: each prints a findings@1 document of it,
+// and the lines they show for it are views of those Decisions.
+
+test('status / audit: the cross-server decisions are decide()\'s, and their lines and exit codes are views of them', () => {
+  const servers = {
+    exa:    { command: 'npx', args: ['-y', 'exa-mcp-server@3.2.1'] },
+    memory: { command: 'npx', args: ['-y', '@modelcontextprotocol/server-memory@2026.1.26'] },
+    homegrown: { command: 'node', args: ['server.js'] },
+  };
+  for (const pol of [null, { toxicFlows: 'fail' }, { toxicFlows: 'allow', toolShadowing: 'fail' }]) {
+    const dir = fs.mkdtempSync(path.join(TMP, 'setup-'));
+    fs.writeFileSync(path.join(dir, '.mcp.json'), JSON.stringify({ mcpServers: servers }));
+    if (pol) fs.writeFileSync(path.join(dir, '.mcp-vault.policy.json'), JSON.stringify(pol));
+    for (const flags of [[], ['--strict']]) {
+      const label = `${JSON.stringify(pol)} ${flags.join(' ') || '(no flags)'}`;
+
+      const st = run('status.cjs', ['--json', '--cwd', dir, '--as-of', AS_OF, ...flags]);
+      const sr = JSON.parse(st.stdout);
+      const sdoc = sr.findings;
+      assert.equal(sdoc.schema, 'mcp-vault/findings@1', label);
+      assert.ok(sdoc.findings.some((f) => f.rule.startsWith('flows/')), `${label}: the fixture has no flow`);
+      assert.deepEqual(recompute(sdoc), sdoc.decisions, `status ${label}: the printed decisions are not decide()'s`);
+      const outcomes = sdoc.decisions.flatMap((d) => d.rules);
+      const lines = sr.setup.hosts.flatMap((h) => h.lines);
+      for (const l of lines) {
+        for (const id of l.findings) {
+          assert.ok(outcomes.some((o) => o.rule === l.rule && o.effect === l.effect && o.findings.includes(id)), `status ${label}: ${l.rule} ${l.effect} is not the decision's`);
+        }
+        const text = (x) => x.startsWith(`${l.host}: ${l.message}`);
+        if (l.effect === 'deny') assert.ok(sr.verdict.blocking.some(text), `status ${label}: a deny is not blocking`);
+        if (l.effect === 'warn') assert.ok(sr.verdict.notable.some(text), `status ${label}: a warn is not notable`);
+        if (l.effect === 'allow' || l.effect === 'unknown') assert.ok(![...sr.verdict.blocking, ...sr.verdict.notable].some(text), `status ${label}: ${l.effect} reached the verdict`);
+      }
+      if (sdoc.decisions.some((d) => d.fails)) assert.equal(st.status, 1, `status ${label}: a failing decision did not fail the run`);
+
+      const au = run('audit_setup.cjs', ['--json', '--cwd', dir, '--global-config', path.join(dir, 'none.json'), '--as-of', AS_OF, ...flags]);
+      const ar = JSON.parse(au.stdout);
+      const adoc = ar.setup_findings;
+      assert.equal(adoc.schema, 'mcp-vault/findings@1', label);
+      assert.deepEqual(recompute(adoc), adoc.decisions, `audit ${label}: the printed decisions are not decide()'s`);
+      const aOutcomes = adoc.decisions.flatMap((d) => d.rules);
+      for (const f of ar.findings.filter((x) => x.category === 'toxic-flow' || x.category === 'tool-shadowing')) {
+        for (const id of f.finding_ids) {
+          assert.ok(aOutcomes.some((o) => o.rule === f.rule && o.effect === f.effect && o.findings.includes(id)), `audit ${label}: ${f.rule} ${f.effect} is not the decision's`);
+        }
+      }
+      const fails = adoc.decisions.some((d) => d.fails);
+      if (fails) assert.equal(au.status, 1, `audit ${label}: a failing decision did not fail the run`);
+      if (!flags.length && !fails) assert.equal(au.status, 0, `audit ${label}: exit ${au.status} with no failing decision`);
+    }
+  }
+});
+
 // ── who decides ────────────────────────────────────────────────────────────
 
 // Commands whose verdict is a Decision from decide() (and prints findings@1).
@@ -475,6 +531,8 @@ const DECIDES_VIA_MODEL = {
 // Commands that still map their own findings to an exit code. Each moves by
 // emitting findings@1 and exiting via decide() — then its line goes.
 const LEGACY_DECIDERS = {
+  // Their cross-server part (flows/*, shadowing/*) already decides via the
+  // model and is checked above; the rest moves at step 3.
   status:          'step 3: installed rows + audit findings → findings; verdict() → decide()',
   audit:           'step 3: categories → findings audit/<category>; --strict is fail_on',
   budget:          'step 4: the ceiling is the budget/over row explain already uses',

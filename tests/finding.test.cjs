@@ -156,14 +156,19 @@ test('the rule table: stable ids, one row each, every ordered id exists, the ope
     for (const id of PR.ORDER[mode]) assert.equal(PR.RULE_BY_ID.get(id).status, 'active', `${mode}: ${id} is reserved`);
     assert.equal(new Set(PR.ORDER[mode]).size, PR.ORDER[mode].length, `${mode} lists a row twice`);
   }
-  // The two full modes run every rule; `approval` (approve, lock --check) is
-  // a narrower question and runs only the rows that answer it.
+  // The two full modes run every rule; a narrower mode (`approval`: approve,
+  // lock --check, #127; `setup`: a host's session, #123) runs only the rows
+  // that answer its question.
   for (const mode of ['gate', 'evidence']) {
     assert.deepEqual([...PR.ORDER[mode]].sort(), active, `${mode} lists every active row exactly once`);
   }
-  // org/* landed with #127; secrets/* with #122; the rest are still claimed for their PRs.
-  assert.ok(PR.RULES.filter((r) => r.id.startsWith('org/')).every((r) => r.status === 'active'), 'org/* rows are active');
-  for (const family of ['flows/', 'shadowing/', 'tool-scan/', 'lookalike/']) {
+  // org/* landed with #127, secrets/* with #122, flows/* and shadowing/* with
+  // #123; the rest are still claimed for their PRs.
+  for (const family of ['org/', 'flows/', 'shadowing/']) {
+    const rows = PR.RULES.filter((r) => r.id.startsWith(family));
+    assert.ok(rows.length && rows.every((r) => r.status === 'active'), `${family} rows are active`);
+  }
+  for (const family of ['tool-scan/', 'lookalike/']) {
     assert.ok(PR.RULES.some((r) => r.status === 'reserved' && r.id.startsWith(family)), family);
   }
   assert.equal(PR.RULE_BY_ID.get('secrets/*').status, 'active', '#122 landed as its row');
