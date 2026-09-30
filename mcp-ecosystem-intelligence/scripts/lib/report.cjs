@@ -9,7 +9,7 @@
  * annotate the pull request that introduced it.
  *
  * API:
- *   toJsonReport({ results, meta })      -> plain object, JSON-serialisable
+ *   toJsonReport({ results, meta, asOf }) -> plain object, JSON-serialisable (asOf required)
  *   toSarif(report, { dbPath, lineOf })  -> SARIF 2.1.0 log
  *   dbLineIndex(rawJson)                 -> (entryName) => 1-based line number
  *
@@ -19,6 +19,8 @@
  *   WARN, HOOK       → warning
  *   NOTE, DIGEST     → note
  */
+
+const { requireAsOf } = require('./clock.cjs');
 
 const TAG_LEVEL = {
   FAIL:       'error',
@@ -91,7 +93,11 @@ function levelForTag(tag) {
  * `results` entries look like { tool, status, msg, lines?, failures? }; `lines`
  * is a list of [tag, text] pairs.
  */
-function toJsonReport({ results = [], meta = {} } = {}) {
+function toJsonReport({ results = [], meta = {}, asOf } = {}) {
+  // `generated_at` used to be read off the wall clock here, in the middle of
+  // rendering, so no two runs could print the same document. It is now the
+  // run's own instant, read once at the entry point (lib/clock.cjs).
+  const at = new Date(requireAsOf(asOf, 'toJsonReport')).toISOString();
   const entries = results.map((r) => {
     const tool = r.tool || {};
     const findings = (r.lines || []).map(([tag, text]) => ({
@@ -124,8 +130,11 @@ function toJsonReport({ results = [], meta = {} } = {}) {
 
   return {
     schema:       'mcp-vault/verify-report@1',
-    generated_at: new Date().toISOString(),
+    generated_at: at,
     ...meta,
+    // Additive (verify-report@1): the instant evidence was judged at. Equal to
+    // `generated_at` unless `--as-of` replayed another one.
+    as_of: at,
     checked:    entries.length,
     failures:   entries.reduce((n, e) => n + e.failures, 0),
     unverified: entries.filter((e) => e.status === 'UNVERIFIED').length,

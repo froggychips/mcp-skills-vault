@@ -48,6 +48,7 @@
 
 const path = require('path');
 const { exitAfterFlush } = require('./lib/exit.cjs');
+const { readWallClock } = require('./lib/clock.cjs');
 const { readDb } = require('./lib/db_io.cjs');
 const { postJson, getJson, mapLimit } = require('./lib/http.cjs');
 const { npmPkgName, pypiPkgName } = require('./lib/install_cmd.cjs');
@@ -362,7 +363,7 @@ function main(argv) {
     if (opts.json) {
       process.stdout.write(`${JSON.stringify({
         schema: 'mcp-vault/upgrade-plan@1',
-        generated_at: new Date().toISOString(),
+        generated_at: new Date(readWallClock()).toISOString(),
         source: 'OSV.dev',
         checked: rows.length,
         summary: {

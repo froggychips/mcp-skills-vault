@@ -4,6 +4,9 @@ const assert     = require('node:assert/strict');
 
 const drift = require('../mcp-ecosystem-intelligence/scripts/check_license_drift.cjs');
 const calc  = require('../mcp-ecosystem-intelligence/scripts/calculate_health.cjs');
+// A fixed instant, not the wall clock: whether a recorded `gone` is still
+// fresh is judged as of an explicit date (lib/clock.cjs).
+const NOW = Date.parse('2026-09-30T00:00:00Z');
 
 // ── normalizeLicense ──────────────────────────────────────────────────────
 
@@ -196,7 +199,7 @@ test('runDriftCheck: integration over a small DB with stubbed fetcher', async ()
   };
   const fetcher = async (tool) => fixture[tool.name];
 
-  const report = await drift.runDriftCheck(db, { fetcher, noFetch: false });
+  const report = await drift.runDriftCheck(db, { fetcher, noFetch: false, asOf: NOW });
 
   assert.equal(report.checked, 6,            'docker entry is still counted as an item (skipped, not error)');
   assert.equal(report.errors.length, 1,      'fetcher-broke surfaced as an error, not as a drift');
@@ -227,7 +230,7 @@ test('runDriftCheck: --no-fetch produces match-only items, no network calls', as
   // Fetcher that would explode if called — proves --no-fetch never invokes it.
   const fetcher = async () => { throw new Error('fetcher should not be called in --no-fetch'); };
 
-  const report = await drift.runDriftCheck(db, { fetcher, noFetch: true });
+  const report = await drift.runDriftCheck(db, { fetcher, noFetch: true, asOf: NOW });
   assert.equal(report.checked, 2);
   assert.equal(report.drifts.length, 0);
   assert.equal(report.errors.length, 0);
@@ -241,7 +244,7 @@ test('runDriftCheck: --no-fetch produces match-only items, no network calls', as
 test('runDriftCheck: a thrown fetcher exception becomes an error, not a crash', async () => {
   const db = { tools: [{ name: 'kaboom', install_cmd: 'npx -y k@1', license: 'MIT' }] };
   const fetcher = async () => { throw new Error('boom'); };
-  const report = await drift.runDriftCheck(db, { fetcher, noFetch: false });
+  const report = await drift.runDriftCheck(db, { fetcher, noFetch: false, asOf: NOW });
   assert.equal(report.errors.length, 1);
   assert.equal(report.errors[0].error, 'boom');
   assert.equal(report.drifts.length, 0);
@@ -275,7 +278,7 @@ test('licenseExitCode: --strict fails on fetch errors, not just on drift', () =>
 
 // Dates in these fixtures are relative: `availability` is seven-day evidence,
 // so a literal date would start failing this file a week after it was written.
-const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+const daysAgo = (n) => new Date(NOW - n * 86400000).toISOString().slice(0, 10);
 
 test('an entry recorded as availability:gone is reported, not fetched, and does not fail --strict', async () => {
   // @diskd-ai/email-mcp went 404 on npm. check_availability recorded it as
@@ -303,7 +306,7 @@ test('an entry recorded as availability:gone is reported, not fetched, and does 
     return { source: 'npm', license: 'MIT' };
   };
 
-  const report = await drift.runDriftCheck(db, { fetcher, noFetch: false });
+  const report = await drift.runDriftCheck(db, { fetcher, noFetch: false, asOf: NOW });
 
   assert.deepEqual(asked, ['still-there'], 'the gone entry must not be fetched at all');
   assert.equal(report.errors.length, 0,    'a recorded gone is not a fetch error');
@@ -323,7 +326,7 @@ test('a package that disappears before it is recorded still fails --strict', asy
   const db = { tools: [{ name: 'just-vanished', install_cmd: 'npx -y x@1', license: 'MIT' }] };
   const fetcher = async () => ({ source: 'npm', error: 'Command failed: npm view x@1 license --json' });
 
-  const report = await drift.runDriftCheck(db, { fetcher, noFetch: false });
+  const report = await drift.runDriftCheck(db, { fetcher, noFetch: false, asOf: NOW });
 
   assert.equal(report.errors.length, 1);
   assert.equal(drift.licenseExitCode(report, true), 1, 'an unrecorded disappearance is still a failure');
@@ -350,7 +353,7 @@ test('a stale gone is re-fetched: an unpublished name is claimable, so the recor
     return { source: 'npm', error: 'Command failed: npm view vanished@0.3.8 license --json' };
   };
 
-  const report = await drift.runDriftCheck(db, { fetcher, noFetch: false });
+  const report = await drift.runDriftCheck(db, { fetcher, noFetch: false, asOf: NOW });
 
   assert.deepEqual(asked, ['gone-a-while-ago'], 'a stale record is not a reason to skip the fetch');
   assert.equal(report.errors.length, 1, 'still 404 → the error comes back');
@@ -372,7 +375,7 @@ test('a stale gone whose name was re-published reads the new licence', async () 
   };
   const fetcher = async () => ({ source: 'npm', license: 'BSL-1.1' });
 
-  const report = await drift.runDriftCheck(db, { fetcher, noFetch: false });
+  const report = await drift.runDriftCheck(db, { fetcher, noFetch: false, asOf: NOW });
 
   assert.equal(report.drifts.length, 1);
   assert.equal(report.drifts[0].classification, 'drift-osi-to-restrictive');

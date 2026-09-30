@@ -122,12 +122,12 @@ test('deriveTrust: verified-eight-months-ago is not verified', () => {
 
 test('smokeEvidence: a separate stream, with its own date', () => {
   assert.deepEqual(
-    ev.smokeEvidence({ status: 'pass', tool_count: 29, checked_at: '2026-09-10T00:00:00.000Z' }),
+    ev.smokeEvidence({ status: 'pass', tool_count: 29, checked_at: '2026-09-10T00:00:00.000Z' }, { now: NOW }),
     { status: 'pass', checked_at: '2026-09-10', tools: 29, error: undefined },
   );
-  assert.equal(ev.smokeEvidence({ status: 'fail', error_code: 'CRASH' }).status, 'fail');
-  assert.equal(ev.smokeEvidence({ status: 'skip' }).status, 'skipped');
-  assert.equal(ev.smokeEvidence(null), null);
+  assert.equal(ev.smokeEvidence({ status: 'fail', error_code: 'CRASH' }, { now: NOW }).status, 'fail');
+  assert.equal(ev.smokeEvidence({ status: 'skip' }, { now: NOW }).status, 'skipped');
+  assert.equal(ev.smokeEvidence(null, { now: NOW }), null);
 });
 
 test('requiredFor: what "verified" needs depends on what is checkable', () => {

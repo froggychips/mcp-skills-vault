@@ -31,6 +31,7 @@
 const fs   = require('fs');
 const path = require('path');
 const { exitAfterFlush } = require('./lib/exit.cjs');
+const { asOfFromArgv } = require('./lib/clock.cjs');
 
 const DEFAULT_DB = path.resolve(__dirname, '../assets/tools_database.json');
 
@@ -55,8 +56,16 @@ function parseArgs(argv) {
     else if (a === '--cwd')           out.cwd          = argv[++i];
     else if (a === '--db')            out.db           = argv[++i];
     else if (a === '--global-config') out.globalConfig = argv[++i];
+    else if (a === '--as-of')         i++;
+    else if (a.startsWith('--as-of=')) { /* read below */ }
     else return { error: `unknown argument: ${a}` };
   }
+  // Nothing the audit decides ages today, but the instant is still an input
+  // and is printed: findings that do depend on it plug in here (docs/adr/0001).
+  const clock = asOfFromArgv(argv);
+  if (clock.error) return { error: clock.error };
+  out.asOf = clock.asOf;
+  out.asOfIso = clock.iso;
   return out;
 }
 
@@ -64,7 +73,7 @@ const HELP = `audit_setup.cjs — diff installed MCP servers against the vetted 
 
 Usage:
   node scripts/audit_setup.cjs [--cwd <path>] [--db <path>] [--global-config <path>]
-                               [--json] [--strict]
+                               [--json] [--strict] [--as-of <date>]
 
 Reads:
   <cwd>/.mcp.json                          project-scoped servers
@@ -514,6 +523,8 @@ function main(argv) {
   if (args.json) {
     process.stdout.write(JSON.stringify({
       schema:      'mcp-vault/audit@1',
+      // Additive: the instant this audit was judged at (lib/clock.cjs).
+      as_of:       args.asOfIso,
       cwd,
       unreadable,
       db_path:     dbPath,

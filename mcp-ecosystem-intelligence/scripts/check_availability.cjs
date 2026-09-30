@@ -63,6 +63,7 @@
 
 const path = require('path');
 const { exitAfterFlush } = require('./lib/exit.cjs');
+const { readWallClock } = require('./lib/clock.cjs');
 const { readDb, writeDb } = require('./lib/db_io.cjs');
 const { getJson, mapLimit } = require('./lib/http.cjs');
 const { npmPkgName, pypiPkgName } = require('./lib/install_cmd.cjs');
@@ -322,6 +323,9 @@ function main(argv) {
   const opts = parseArgs(argv);
   if (opts.error) { process.stderr.write(`check_availability: ${opts.error}\n\n${HELP}`); return Promise.resolve(2); }
   if (opts.help)  { process.stdout.write(HELP); return Promise.resolve(0); }
+  // When this run looked. Evidence is an observation, dated by the wall clock
+  // read once here (lib/clock.cjs); there is no --as-of for looking.
+  const observedAt = readWallClock();
 
   const { db } = readDb(DB_PATH);
   const tools = (db.tools || []).filter((t) => !opts.entry || t.name === opts.entry);
@@ -345,7 +349,7 @@ function main(argv) {
         // overwrite a dated 'present' with a non-answer and make a feed
         // outage look like a finding.
         if (!row || row.availability.state === 'unknown') continue;
-        const fresh = buildEvidence({ availability: row.availability }, { artifactId: row.artifact_id });
+        const fresh = buildEvidence({ availability: row.availability }, { artifactId: row.artifact_id, now: observedAt });
         tool.trust_evidence = mergeEvidence(tool.trust_evidence, fresh);
         recorded++;
 
@@ -378,7 +382,7 @@ function main(argv) {
     if (opts.json) {
       process.stdout.write(`${JSON.stringify({
         schema:       'mcp-vault/availability@1',
-        generated_at: new Date().toISOString(),
+        generated_at: new Date(observedAt).toISOString(),
         checked:      rows.length,
         summary: {
           present:        rows.filter((r) => r.availability.state === 'present').length,

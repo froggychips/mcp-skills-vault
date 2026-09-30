@@ -60,6 +60,7 @@
  */
 
 const crypto = require('crypto');
+const { requireAsOf } = require('./clock.cjs');
 
 // What npm signs. Documented under "Verifying signatures" in the npm docs and
 // reproduced by `npm audit signatures`.
@@ -84,7 +85,10 @@ function keysUrl(registry = 'https://registry.npmjs.org') {
  * before npm signed anything has no signature (unverified), while a signature
  * that does not verify is an attack or a corrupted response (fail).
  */
-function verifyRegistrySignature({ name, version, integrity, signatures, keys, now = Date.now() }) {
+function verifyRegistrySignature({ name, version, integrity, signatures, keys, now }) {
+  // Key expiry is a judgement about an instant, so the instant is an input
+  // (lib/clock.cjs) rather than whatever the wall clock says mid-run.
+  requireAsOf(now, 'verifyRegistrySignature');
   if (!integrity) return { state: 'unverified', reason: 'no integrity value to verify' };
   if (!Array.isArray(signatures) || signatures.length === 0) {
     return { state: 'unverified', reason: 'the registry published no signature for this version' };

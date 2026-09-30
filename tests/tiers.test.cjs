@@ -235,7 +235,7 @@ test('the shipped eval snapshot cannot promote anything to Core yet', () => {
   const results = require('../mcp-ecosystem-intelligence/assets/eval_results.json').results;
   const ix = evalIndex(results);
   const withIdentity = results.filter((r) => r.identity && r.identity.artifact_id);
-  const core = db.filter((t) => classifyEntry(t, ix.get(t.name) || null).classification === 'Core');
+  const core = db.filter((t) => classifyEntry(t, ix.get(t.name) || null, at).classification === 'Core');
   assert.equal(core.length, withIdentity.length === 0 ? 0 : core.length,
     'a Core tier appeared from a snapshot that records no artifact identity');
 });
@@ -253,7 +253,7 @@ test('the shipped DB stores no tier, no in_registry and no last_checked', () => 
   // And every entry can still be placed, without any of them.
   const ix = evalIndex(require('../mcp-ecosystem-intelligence/assets/eval_results.json').results);
   for (const t of db) {
-    const r = classifyEntry(t, ix.get(t.name) || null);
+    const r = classifyEntry(t, ix.get(t.name) || null, at);
     assert.ok(r.classification in TIER_ORDER, `${t.name}: ${r.classification}`);
     assert.ok(r.why && r.why.length > 0, `${t.name} has a tier with no reason`);
   }

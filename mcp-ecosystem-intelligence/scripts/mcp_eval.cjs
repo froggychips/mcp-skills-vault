@@ -72,6 +72,7 @@ const path          = require('path');
 const { spawn }     = require('child_process');
 const { performance } = require('perf_hooks');
 const { exitAfterFlush } = require('./lib/exit.cjs');
+const { readWallClock } = require('./lib/clock.cjs');
 const { readInstalledServers } = require('./lib/installed.cjs');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -563,7 +564,8 @@ async function smokeEntry(tool, opts) {
     error_code:       null,
     failure_class:    null,
     sandboxed:        false,
-    checked_at:       new Date().toISOString(),
+    // When this run looked: an observation, so the wall clock (lib/clock.cjs).
+    checked_at:       new Date(readWallClock()).toISOString(),
   };
 
   // `_evalSpawn` is a test-only escape hatch: it lets tests inject a
@@ -1154,7 +1156,7 @@ async function main() {
       for (const r of newResults) {
         const tool = (db.tools || []).find((t) => t.name === r.name);
         if (!tool) continue;
-        const dim = smokeEvidence(r);
+        const dim = smokeEvidence(r, { now: readWallClock() });
         if (!dim) continue;
         const typed = toTypedEntry(tool);
         // Only attribute the result to a version if that version is what
@@ -1221,7 +1223,7 @@ async function main() {
 
   const finalPayload = {
     $schema: payload.$schema || 'describes shape; not enforced',
-    generated_at: new Date().toISOString(),
+    generated_at: new Date(readWallClock()).toISOString(),
     generator:    `mcp_eval.cjs v${VERSION}`,
     results:      [...kept, ...newResults],
   };

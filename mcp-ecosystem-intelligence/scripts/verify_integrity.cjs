@@ -39,6 +39,8 @@
  *                                                     attestation not bound to the artifact digest = failure
  *   node scripts/verify_integrity.cjs --json       structured report on stdout
  *   node scripts/verify_integrity.cjs --sarif      SARIF 2.1.0 (GitHub code scanning)
+ *   node scripts/verify_integrity.cjs --as-of DATE judge stored evidence as of DATE
+ *                                                  (YYYY-MM-DD or ISO-8601), not now
  *
  * Exit codes:
  *   0  all checks passed
@@ -78,8 +80,15 @@ const {
   npmPkgName, pypiPkgName, dockerImageRef, dockerDigestPinned, dockerIntegrityMismatch,
 } = require('./lib/install_cmd.cjs');
 const { toJsonReport, toSarif, dbLineIndex } = require('./lib/report.cjs');
+const { asOfFromArgv } = require('./lib/clock.cjs');
 
 const DB_PATH   = path.resolve(__dirname, '../assets/tools_database.json');
+// The instant every time-dependent judgement in this run is made at: read from
+// the clock once, here, or given by --as-of (lib/clock.cjs). Staleness, key
+// expiry and the dates written into evidence all use this one value, so two
+// runs over the same inputs at the same --as-of print the same document.
+const CLOCK     = asOfFromArgv(process.argv);
+const AS_OF     = CLOCK.error ? null : CLOCK.asOf;
 const UPDATE    = process.argv.includes('--update');
 const STRICT    = process.argv.includes('--strict');
 const NO_AUDIT  = process.argv.includes('--no-audit');
@@ -825,6 +834,7 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
     integrity:  npmIntegrity,
     signatures: meta.dist?.signatures,
     keys,
+    now: AS_OF,
   });
   if (sig.state === 'fail') {
     lines.push(['FAIL', `registry signature does not verify — ${sig.reason}`]);
@@ -1337,6 +1347,17 @@ function processOfflinePackage(tool, pkg, ecosystem, results) {
 // ── main ───────────────────────────────────────────────────────────────────
 
 async function main() {
+  if (CLOCK.error) {
+    console.error(CLOCK.error);
+    process.exit(2);
+  }
+  // Evidence written to the DB is an observation, dated when it was made. A
+  // replayed instant would stamp today's look with another day's date — the
+  // one thing that must never be forged — so the two do not combine.
+  if (RECORD_EVIDENCE && CLOCK.source === 'as-of') {
+    console.error('--as-of cannot be combined with --record-evidence: evidence is dated when it is observed.');
+    process.exit(2);
+  }
   // A policy that doesn't parse is not a policy: refuse rather than run a bar
   // nobody set.
   if (POLICY.found && !POLICY.ok) {
@@ -1397,7 +1418,7 @@ async function main() {
       if (AS_JSON || AS_SARIF) {
         // A machine-readable mode always emits a document, even an empty one:
         // "no output" is not something a caller can distinguish from a crash.
-        const empty = toJsonReport({ results: [], meta: { mode: 'installed', subject: 'installed', note } });
+        const empty = toJsonReport({ results: [], asOf: AS_OF, meta: { mode: 'installed', subject: 'installed', note } });
         process.stdout.write(JSON.stringify(AS_SARIF ? toSarif(empty, {}) : empty, null, 2) + '\n');
       } else {
         console.error(note);
@@ -1650,11 +1671,13 @@ async function main() {
       // Built from what the processors established, not from the report text.
       const fresh = buildEvidence(results[i].checks, {
         artifactId: typed ? artifactId(typed.artifact) : null,
+        now: AS_OF,
       });
       if (!Object.keys(fresh.dimensions).length) continue;
       tool.trust_evidence = mergeEvidence(tool.trust_evidence, fresh);
       // The word stays, but it is now computed from the dated evidence.
       tool.trust = deriveTrust(tool.trust_evidence, {
+        now: AS_OF,
         maxAgeDays: evidenceMaxAge(),
         // npm/PyPI have advisory feeds; an image digest does not, so what
         // "verified" requires differs by ecosystem.
@@ -1684,9 +1707,9 @@ async function main() {
     const stored = r.tool && r.tool.trust_evidence;
     if (!stored) continue;
     const typed = r.tool ? toTypedEntry(r.tool) : null;
-    const fresh = buildEvidence(r.checks, { artifactId: typed ? artifactId(typed.artifact) : null });
+    const fresh = buildEvidence(r.checks, { artifactId: typed ? artifactId(typed.artifact) : null, now: AS_OF });
     const evidence = Object.keys(fresh.dimensions).length ? mergeEvidence(stored, fresh) : stored;
-    const stale = staleDimensions(evidence, evidenceMaxAge());
+    const stale = staleDimensions(evidence, evidenceMaxAge(), AS_OF);
     if (!stale.length) continue;
     r.lines = r.lines || [];
     const worst = stale.sort((a, b) => b.age_days - a.age_days).slice(0, 3)
@@ -1709,15 +1732,16 @@ async function main() {
     for (const r of results) {
       if (!r.tool) continue;
       const typed = toTypedEntry(r.tool);
-      const fresh = buildEvidence(r.checks, { artifactId: typed ? artifactId(typed.artifact) : null });
+      const fresh = buildEvidence(r.checks, { artifactId: typed ? artifactId(typed.artifact) : null, now: AS_OF });
       if (!Object.keys(fresh.dimensions).length) continue;
       const effective = mergeEvidence(r.tool.trust_evidence, fresh);
       r.effective_trust = deriveTrust(effective, {
+        now: AS_OF,
         maxAgeDays: evidenceMaxAge(),
         require: requiredFor(typed ? typed.artifact.ecosystem : null),
       });
     }
-    const draft = toJsonReport({ results });
+    const draft = toJsonReport({ results, asOf: AS_OF });
     for (let i = 0; i < results.length; i++) {
       // The policy sees the effective trust, not the stored word.
       const subject = results[i].effective_trust
@@ -1740,6 +1764,7 @@ async function main() {
     totalFails = results.reduce((n, r) => n + (r.failures || 0), 0);
     const report = toJsonReport({
       results,
+      asOf: AS_OF,
       meta: {
         mode: OFFLINE ? 'offline' : (UPDATE ? 'update' : (NO_AUDIT ? 'no-audit' : 'full')),
         subject: INSTALLED ? 'installed' : 'database',

@@ -30,6 +30,7 @@ const { exitAfterFlush } = require('./lib/exit.cjs');
 const { listHosts, resolveTarget, writeServerEntry } = require('./lib/hosts.cjs');
 const { trustScore, fitScore, behaviour, recommend } = require('./lib/scores.cjs');
 const { classifyEntry } = require('./lib/tiers.cjs');
+const { asOfFromArgv, requireAsOf } = require('./lib/clock.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { loadPolicy } = require('./lib/policy.cjs');
 const { readInstalledServers } = require('./lib/installed.cjs');
@@ -395,18 +396,21 @@ const UNIVERSAL_TOOLS = new Set(['mcp-server-filesystem', 'mcp-server-memory', '
 // updating the map, and the matcher silently misses them. Fall back to a
 // substring scan over name+notes when the map has nothing for a signal —
 // covers the common case where the vendor's name is the signal.
-function fallbackBySignal(db, signal) {
+function fallbackBySignal(db, signal, asOf) {
+  requireAsOf(asOf, 'fallbackBySignal');
   const sig = signal.toLowerCase();
   const hits = [];
   for (const t of db.tools) {
-    if (isDeprecated(t)) continue;
+    if (isDeprecated(t, asOf)) continue;
     const hay = `${t.name} ${t.notes || ''}`.toLowerCase();
     if (hay.includes(sig)) hits.push(t.name);
   }
   return hits;
 }
 
-function matchDB(db, stack, query) {
+function matchDB(db, stack, query, asOf) {
+  // The tier filter below ages with the evidence, so the instant is an input.
+  requireAsOf(asOf, 'matchDB');
   const names = new Set(UNIVERSAL_TOOLS);
 
   for (const signal of [...stack.dbs, ...stack.infra]) {
@@ -415,7 +419,7 @@ function matchDB(db, stack, query) {
       for (const name of mapped) names.add(name);
     } else {
       // Curated map said nothing — try semantic fallback.
-      for (const name of fallbackBySignal(db, signal)) names.add(name);
+      for (const name of fallbackBySignal(db, signal, asOf)) names.add(name);
     }
   }
 
@@ -427,7 +431,7 @@ function matchDB(db, stack, query) {
     }
   }
 
-  return db.tools.filter(t => names.has(t.name) && !isDeprecated(t));
+  return db.tools.filter(t => names.has(t.name) && !isDeprecated(t, asOf));
 }
 
 // For every stack signal, decide whether the DB actually had something
@@ -440,13 +444,13 @@ function matchDB(db, stack, query) {
 // Returns one record per gap so the reporter can suggest
 // `discover.cjs --query <signal>` per gap, and so JSON consumers can
 // distinguish fallback-hit signals from curated ones.
-function unmappedSignals(db, stack) {
+function unmappedSignals(db, stack, asOf) {
   const dbNames = new Set(db.tools.map(t => t.name));
   const out     = [];
   for (const signal of [...stack.dbs, ...stack.infra]) {
     const mapped = SIGNAL_TO_TOOLS[signal] || [];
     if (mapped.length === 0) {
-      const fb = fallbackBySignal(db, signal);
+      const fb = fallbackBySignal(db, signal, asOf);
       if (fb.length === 0) {
         out.push({ signal, reason: 'no mapping' });
       } else {
@@ -676,11 +680,11 @@ function behaviourFor(name) {
 // explains why it is not stored. `Deprecated` here means "do not install":
 // nothing to install, wrong bytes, or a known vulnerability at the pinned
 // version. That is the filter `matchDB` and `fallbackBySignal` apply.
-function tierFor(tool) {
-  return classifyEntry(tool, evalIndex().get(tool.name) || null);
+function tierFor(tool, asOf) {
+  return classifyEntry(tool, evalIndex().get(tool.name) || null, { now: asOf });
 }
-function isDeprecated(tool) {
-  return tierFor(tool).classification === 'Deprecated';
+function isDeprecated(tool, asOf) {
+  return tierFor(tool, asOf).classification === 'Deprecated';
 }
 
 // ── Report formatting ───────────────────────────────────────────────────────
@@ -698,12 +702,12 @@ const BEHAVIOUR_TAG = {
   'protocol-error':    () => `${RD}protocol error${RS}`,
 };
 
-function printTool(t) {
+function printTool(t, asOf) {
   const heavy   = t.est_tools_count >= HEAVY;
   const toolTag = heavy
     ? `${YL}${t.est_tools_count} tools ⚠${RS}`
     : `${DM}${t.est_tools_count} tools${RS}`;
-  const tier  = tierFor(t).classification.padEnd(13);
+  const tier  = tierFor(t, asOf).classification.padEnd(13);
   const name  = t.name.padEnd(26);
   const behav = behaviourFor(t.name);
   const tag   = (BEHAVIOUR_TAG[behav.state] || (() => ''))();
@@ -719,7 +723,7 @@ function printTool(t) {
   }
 }
 
-function printReport(stack, matched, installed, db, unmapped) {
+function printReport(stack, matched, installed, db, unmapped, asOf) {
   // Stack line
   const parts = [];
   if (stack.langs.size)  parts.push(`Langs: ${[...stack.langs].join('/')}`);
@@ -737,13 +741,13 @@ function printReport(stack, matched, installed, db, unmapped) {
 
   if (normal.length) {
     process.stdout.write(`${B}── Recommended ${HR.slice(14)}${RS}\n`);
-    for (const t of normal) printTool(t);
+    for (const t of normal) printTool(t, asOf);
     process.stdout.write('\n');
   }
 
   if (heavy.length) {
     process.stdout.write(`${B}── Heavy — scope before global install ${HR.slice(38)}${RS}\n`);
-    for (const t of heavy) printTool(t);
+    for (const t of heavy) printTool(t, asOf);
     process.stdout.write('\n');
   }
 
@@ -821,10 +825,25 @@ if (require.main === module) {
     return exitAfterFlush(0);
   }
 
+  // The clock, read once for this run (or `--as-of`). Everything below that
+  // ages with the evidence — the tier filter, the trust score — gets it passed.
+  const clock = asOfFromArgv(argv);
+  if (clock.error) {
+    process.stderr.write(`${RD}${clock.error}${RS}\n`);
+    return exitAfterFlush(2);
+  }
+  // An install is a decision about now. Replaying it at another instant would
+  // let evidence that has aged out look current, so the two do not combine.
+  if (INSTALL && clock.source === 'as-of') {
+    process.stderr.write(`${RD}--as-of cannot be combined with --install: an install is decided against the current time${RS}\n`);
+    return exitAfterFlush(2);
+  }
+  const asOf = clock.asOf;
+
   const db        = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
   const stack     = detectStack(CWD);
-  const matched   = matchDB(db, stack, QUERY);
-  const unmapped  = unmappedSignals(db, stack);
+  const matched   = matchDB(db, stack, QUERY, asOf);
+  const unmapped  = unmappedSignals(db, stack, asOf);
   const installed = getInstalled(CWD);
 
   // -- install mode --
@@ -843,6 +862,8 @@ if (require.main === module) {
   if (AS_JSON) {
     process.stdout.write(JSON.stringify({
       schema: 'mcp-vault/scan@1',
+      // Additive: the instant tiers and trust were judged at (docs/adr/0001).
+      as_of: clock.iso,
       stack: {
         langs:      [...stack.langs],
         dbs:        [...stack.dbs],
@@ -854,8 +875,8 @@ if (require.main === module) {
         signals:    stack.signals,
         unmapped_signals: unmapped,
       },
-      recommended: matched.filter(t => t.est_tools_count < HEAVY).map(t => slim(t, stack)),
-      heavy:       matched.filter(t => t.est_tools_count >= HEAVY).map(t => slim(t, stack)),
+      recommended: matched.filter(t => t.est_tools_count < HEAVY).map(t => slim(t, stack, asOf)),
+      heavy:       matched.filter(t => t.est_tools_count >= HEAVY).map(t => slim(t, stack, asOf)),
       installed,
       db_entry_count: db.tools.length,
     }, null, 2) + '\n');
@@ -866,7 +887,7 @@ if (require.main === module) {
   }
 
   // -- default: human-readable report --
-  printReport(stack, matched, installed, db, unmapped);
+  printReport(stack, matched, installed, db, unmapped, asOf);
 }
 
 module.exports = {
@@ -883,7 +904,8 @@ module.exports = {
   UNIVERSAL_TOOLS,
 };
 
-function slim(t, stack = null) {
+function slim(t, stack = null, asOf) {
+  requireAsOf(asOf, 'slim');
   // health / trust / fit, kept apart on purpose: health says the project is
   // maintained, trust says we know which bytes we would run, fit says this
   // project has a use for it. A recommendation is a policy over the three —
@@ -897,7 +919,7 @@ function slim(t, stack = null) {
     && (!t.trust_evidence.artifact_id || !currentId || t.trust_evidence.artifact_id === currentId)
     ? t.trust_evidence
     : null;
-  const trust = trustScore(evidence);
+  const trust = trustScore(evidence, { now: asOf });
   if (t.trust_evidence && !evidence) {
     trust.reasons.unshift(`stored evidence describes ${t.trust_evidence.artifact_id}, not ${currentId} — ignored`);
   }
@@ -906,8 +928,8 @@ function slim(t, stack = null) {
   return {
     name:            t.name,
     category:        t.category,
-    classification:  tierFor(t).classification,
-    tier_reason:     tierFor(t).why,
+    classification:  tierFor(t, asOf).classification,
+    tier_reason:     tierFor(t, asOf).why,
     health_score:    t.health_score,
     est_tools_count: t.est_tools_count,
     toolsets:        t.toolsets,

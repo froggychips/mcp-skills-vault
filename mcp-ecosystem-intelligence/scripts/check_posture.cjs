@@ -37,6 +37,7 @@
 
 const path = require('path');
 const { exitAfterFlush } = require('./lib/exit.cjs');
+const { readWallClock } = require('./lib/clock.cjs');
 const { readDb, writeDb } = require('./lib/db_io.cjs');
 const { mapLimit } = require('./lib/http.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
@@ -121,6 +122,9 @@ function main(argv) {
   const opts = parseArgs(argv);
   if (opts.error) { process.stderr.write(`check_posture: ${opts.error}\n\n${HELP}`); return Promise.resolve(2); }
   if (opts.help)  { process.stdout.write(HELP); return Promise.resolve(0); }
+  // When this run looked. Evidence is an observation, dated by the wall clock
+  // read once here (lib/clock.cjs); there is no --as-of for looking.
+  const observedAt = readWallClock();
 
   const { db } = readDb(DB_PATH);
   const tools = (db.tools || []).filter((t) => !opts.entry || t.name === opts.entry);
@@ -152,7 +156,7 @@ function main(argv) {
             checks: row.posture,
             report_date: row.date,
           },
-        }, { artifactId: row.artifact_id });
+        }, { artifactId: row.artifact_id, now: observedAt });
         tool.trust_evidence = mergeEvidence(tool.trust_evidence, fresh);
         recorded++;
       }
@@ -163,7 +167,7 @@ function main(argv) {
     if (opts.json) {
       process.stdout.write(`${JSON.stringify({
         schema: 'mcp-vault/posture@1',
-        generated_at: new Date().toISOString(),
+        generated_at: new Date(observedAt).toISOString(),
         source: 'OpenSSF Scorecard via deps.dev',
         checked: rows.length,
         summary: {

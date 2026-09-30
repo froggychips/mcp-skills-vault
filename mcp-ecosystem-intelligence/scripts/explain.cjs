@@ -26,7 +26,7 @@
  *
  * Usage:
  *   node scripts/explain.cjs <name> [--json] [--verify] [--cwd <path>]
- *                                   [--record <file>] [--installed]
+ *                                   [--record <file>] [--installed] [--as-of <date>]
  *
  * Exit codes:
  *   0  allow
@@ -47,6 +47,7 @@ const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { staleDimensions, DIMENSIONS, DEFAULT_MAX_AGE_DAYS, POSITIVE_STATUSES } = require('./lib/evidence.cjs');
 const { estimateServer, matchDbEntry, wouldExceed, DEFAULT_CONTEXT } = require('./lib/budget.cjs');
 const { readInstalledServers } = require('./lib/installed.cjs');
+const { asOfFromArgv } = require('./lib/clock.cjs');
 
 const DB_PATH    = path.resolve(__dirname, '../assets/tools_database.json');
 const EVAL_PATH  = path.resolve(__dirname, '../assets/eval_results.json');
@@ -61,7 +62,7 @@ const DM = T ? '\x1b[2m'  : '';
 const RS = T ? '\x1b[0m'  : '';
 
 function parseArgs(argv) {
-  const opts = { name: null, json: false, verify: false, cwd: process.cwd(), record: null, help: false };
+  const opts = { name: null, json: false, verify: false, cwd: process.cwd(), record: null, help: false, asOf: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--json') opts.json = true;
@@ -69,12 +70,17 @@ function parseArgs(argv) {
     else if (a === '-h' || a === '--help') opts.help = true;
     else if (a === '--cwd') opts.cwd = argv[++i] || opts.cwd;
     else if (a === '--record') opts.record = argv[++i] || null;
+    else if (a === '--as-of') i++;
+    else if (a.startsWith('--as-of=')) { /* read below */ }
     else if (a.startsWith('--')) return { ...opts, error: `unknown flag ${a}` };
     else if (!opts.name) opts.name = a;
     else return { ...opts, error: 'explain takes one entry name' };
   }
   if (!opts.name && !opts.help) return { ...opts, error: 'which entry? `mcp-vault explain <name>`' };
-  return opts;
+  // The one clock read for this run; see lib/clock.cjs.
+  const clock = asOfFromArgv(argv);
+  if (clock.error) return { ...opts, error: clock.error };
+  return { ...opts, asOf: clock.asOf, asOfIso: clock.iso, asOfSource: clock.source };
 }
 
 const HELP = `explain — why this entry is allowed, or why it is not
@@ -85,6 +91,8 @@ const HELP = `explain — why this entry is allowed, or why it is not
                   answer comes from stored, dated evidence
   --record <file> append the decision record as one JSON line (audit trail)
   --cwd <path>    the project whose policy and configured servers apply
+  --as-of <date>  judge the stored evidence as of this date (YYYY-MM-DD or an
+                  ISO-8601 instant) instead of now
 `;
 
 function readJson(file, fallback) {
@@ -92,8 +100,12 @@ function readJson(file, fallback) {
 }
 
 /** The live gate's own verdict for one entry, when --verify is given. */
-function runGate(name, cwd) {
-  const res = spawnSync(process.execPath, [VERIFY_CJS, '--entry', name, '--json', '--cwd', cwd], {
+function runGate(name, cwd, asOfIso = null) {
+  // The gate judges at the same instant this decision does, or the two halves
+  // of one record would be about different days.
+  const args = [VERIFY_CJS, '--entry', name, '--json', '--cwd', cwd];
+  if (asOfIso) args.push('--as-of', asOfIso);
+  const res = spawnSync(process.execPath, args, {
     encoding: 'utf8', maxBuffer: 32 * 1024 * 1024,
   });
   if (res.error) return { ok: false, error: res.error.message };
@@ -300,8 +312,8 @@ function main(argv) {
   const evidenceIsForAnotherVersion = Boolean(tool.trust_evidence && !evidence);
 
   const maxAge = policy.maxEvidenceAgeDays || DEFAULT_MAX_AGE_DAYS;
-  const trust  = trustScore(evidence, { maxAgeDays: maxAge });
-  const stale  = new Map(staleDimensions(evidence, maxAge).map((s) => [s.dimension, s]));
+  const trust  = trustScore(evidence, { maxAgeDays: maxAge, now: opts.asOf });
+  const stale  = new Map(staleDimensions(evidence, maxAge, opts.asOf).map((s) => [s.dimension, s]));
 
   const evals  = readJson(EVAL_PATH, { results: [] }).results || [];
   const evalBy = new Map(evals.map((r) => [r.name, r]));
@@ -324,7 +336,7 @@ function main(argv) {
 
   let gate = null;
   if (opts.verify) {
-    gate = runGate(tool.name, opts.cwd);
+    gate = runGate(tool.name, opts.cwd, opts.asOfSource === 'as-of' ? opts.asOfIso : null);
     if (!gate.ok) process.stderr.write(`${YL}explain: could not run the live gate (${gate.error}); falling back to stored evidence${RS}\n`);
   }
   const gateEntry = gate && gate.ok
@@ -336,7 +348,9 @@ function main(argv) {
 
   const record = {
     schema:       'mcp-vault/decision@1',
-    evaluated_at: new Date().toISOString(),
+    evaluated_at: opts.asOfIso,
+    // Additive: the instant the evidence was judged at (docs/adr/0001).
+    as_of: opts.asOfIso,
     subject: {
       name:        tool.name,
       artifact_id: currentId,
@@ -407,7 +421,7 @@ function main(argv) {
   // ── human form ──
   const head = verdict.decision === 'deny' ? `${RD}DENIED${RS}` : `${GN}ALLOWED${RS}`;
   process.stdout.write(`\n${head}  ${B}${tool.name}${RS}  ${DM}${currentId || tool.install_cmd}${RS}\n`);
-  process.stdout.write(`${DM}${loaded.found ? `policy: ${loaded.path}` : 'policy: none found — defaults in force'}${RS}\n`);
+  process.stdout.write(`${DM}${loaded.found ? `policy: ${loaded.path}` : 'policy: none found — defaults in force'} · as of ${opts.asOfIso}${RS}\n`);
   if (!loaded.ok) process.stdout.write(`${RD}the policy file has errors: ${loaded.errors.join('; ')}${RS}\n`);
   process.stdout.write('\n');
 

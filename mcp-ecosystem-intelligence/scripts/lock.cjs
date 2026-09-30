@@ -47,6 +47,7 @@ const os   = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { exitAfterFlush } = require('./lib/exit.cjs');
+const { readWallClock, isoDay } = require('./lib/clock.cjs');
 const { readInstalledServers, toInstallCmd } = require('./lib/installed.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { resolveNpmTree } = require('./lib/deps.cjs');
@@ -146,7 +147,7 @@ function subjects(opts, db, unreadable = null) {
 }
 
 /** Resolve one server into a lock record. */
-async function lockOne(tool, { surfaceByName }) {
+async function lockOne(tool, { surfaceByName, now }) {
   const typed = toTypedEntry(tool);
   if (!typed) return { name: tool.name, error: 'no launch command to lock' };
   const a = typed.artifact;
@@ -161,7 +162,7 @@ async function lockOne(tool, { surfaceByName }) {
     integrity: a.integrity || null,
   };
 
-  const entry = { tool, artifact, surface: surfaceByName.get(tool.name) || null };
+  const entry = { tool, artifact, surface: surfaceByName.get(tool.name) || null, now };
 
   // An unpinned launch cannot be locked, and pretending otherwise is worse than
   // refusing. `npx -y pkg` and `pkg@latest` resolve at every start, so a tree
@@ -191,7 +192,7 @@ async function lockOne(tool, { surfaceByName }) {
   if (a.ecosystem === 'npm' && a.package) {
     const tree = await resolveNpmTree(a.package, a.version, { keepLockfile: true });
     if (!tree.ok) return { name: tool.name, error: `could not resolve the dependency tree: ${tree.error}`, entry: lockEntry(entry) };
-    entry.tree = { ...tree, resolved_at: new Date().toISOString().slice(0, 10) };
+    entry.tree = { ...tree, resolved_at: isoDay(now) };
   }
 
   return { name: tool.name, entry: lockEntry(entry), tree_resolved: Boolean(entry.tree) };
@@ -255,6 +256,9 @@ async function main(argv) {
   const opts = parseArgs(argv);
   if (opts.error) { process.stderr.write(`lock: ${opts.error}\n\n${HELP}`); return 2; }
   if (opts.help)  { process.stdout.write(HELP); return 0; }
+  // A lock records when it was taken, which is an observation, not a decision:
+  // the wall clock, read once here. There is no --as-of for taking a lock.
+  const now = readWallClock();
 
   const db      = readJson(DB_PATH, { tools: [] });
   const evals   = readJson(opts.results || EVAL_PATH, { results: [] }).results || [];
@@ -318,18 +322,18 @@ async function main(argv) {
         if (r.launch) process.stdout.write(`     launch with: ${B}${r.launch}${RS}\n`);
         if (r.note)   process.stdout.write(`     ${DM}${r.note}${RS}\n`);
       }
-      process.stdout.write(`\nInstalled from ${file} as written on ${found.lock.generated_at.slice(0, 10)}${RS}\n`);
+      process.stdout.write(`\nInstalled from ${file} as written on ${String(found.lock.generated_at || 'an unrecorded date').slice(0, 10)}${RS}\n`);
       process.stdout.write(`${DM}Point your host config at the launch paths above; nothing is resolved at start.\n`
         + `Add ${VENDOR_DIR}/ to .gitignore unless you mean to commit the tree.${RS}\n`);
     }
     return results.some((r) => !r.ok) ? 1 : 0;
   }
 
-  const fresh = emptyLock();
+  const fresh = emptyLock(now);
   const errors = [];
   for (const tool of targets) {
     if (!opts.json) process.stderr.write(`resolving ${tool.name}…\n`);
-    const res = await lockOne(tool, { surfaceByName });
+    const res = await lockOne(tool, { surfaceByName, now });
     if (res.error) errors.push(res);
     if (res.entry) fresh.servers[res.name] = res.entry;
   }

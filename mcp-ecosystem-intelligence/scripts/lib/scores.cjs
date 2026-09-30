@@ -30,13 +30,14 @@
  * a poor trade.
  *
  * API:
- *   trustScore(evidence, opts)        -> { score, gate, blocking, reasons }
+ *   trustScore(evidence, opts)        -> { score, gate, blocking, reasons }   (opts.now required)
  *   fitScore(tool, stack, opts)       -> { score, reasons }
  *   behaviour(evalResult)             -> { state, tools, reason, requires }
  *   recommend({ trust, health, fit, behaviour }) -> { verdict, reasons }
  */
 
 const { staleDimensions, DEFAULT_MAX_AGE_DAYS } = require('./evidence.cjs');
+const { requireAsOf } = require('./clock.cjs');
 
 // What each dimension is worth when it says something good. Deliberately front
 // loaded on the artifact: knowing *which bytes* you are running is the claim
@@ -98,7 +99,10 @@ function blocks(dimension, status) {
  *   'thin'  — too little is known to call it verified
  *   'ok'    — the artifact is known and nothing contradicts it
  */
-function trustScore(evidence, { now = Date.now(), maxAgeDays = DEFAULT_MAX_AGE_DAYS } = {}) {
+function trustScore(evidence, { now, maxAgeDays = DEFAULT_MAX_AGE_DAYS } = {}) {
+  // Required, not defaulted: staleness makes this a function of the instant,
+  // and an instant nobody passed is the wall clock nobody chose.
+  requireAsOf(now, 'trustScore');
   const dims = (evidence && evidence.dimensions) || {};
   const reasons = [];
   if (!Object.keys(dims).length) {

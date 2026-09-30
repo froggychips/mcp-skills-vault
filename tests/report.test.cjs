@@ -2,6 +2,8 @@
 const { test } = require('node:test');
 const assert   = require('node:assert/strict');
 const r = require('../mcp-ecosystem-intelligence/scripts/lib/report.cjs');
+// The report's timestamp is the run's own instant, passed in (lib/clock.cjs).
+const NOW = Date.parse('2026-09-17T12:00:00Z');
 
 const resultsFixture = [
   {
@@ -21,7 +23,7 @@ const resultsFixture = [
 ];
 
 test('toJsonReport: counts, statuses and flattened findings', () => {
-  const report = r.toJsonReport({ results: resultsFixture, meta: { mode: 'offline' } });
+  const report = r.toJsonReport({ results: resultsFixture, meta: { mode: 'offline' }, asOf: NOW });
   assert.equal(report.schema, 'mcp-vault/verify-report@1');
   assert.equal(report.mode, 'offline');
   assert.equal(report.checked, 3);
@@ -43,7 +45,7 @@ test('toJsonReport: counts, statuses and flattened findings', () => {
 });
 
 test('toSarif: errors and warnings only, anchored at the DB line', () => {
-  const report = r.toJsonReport({ results: resultsFixture });
+  const report = r.toJsonReport({ results: resultsFixture, asOf: NOW });
   const lineOf = (name) => ({ 'bad-entry': 42, 'unknown-entry': 99 })[name] || 1;
   const sarif  = r.toSarif(report, { dbPath: 'db.json', lineOf });
 
@@ -64,7 +66,7 @@ test('toSarif: errors and warnings only, anchored at the DB line', () => {
 });
 
 test('toSarif: does not repeat the entry name already in the message', () => {
-  const report = r.toJsonReport({ results: resultsFixture });
+  const report = r.toJsonReport({ results: resultsFixture, asOf: NOW });
   const sarif  = r.toSarif(report, {});
   const msg = sarif.runs[0].results.find(x => x.ruleId === 'unverified-entry').message.text;
   assert.equal(msg.startsWith('unknown-entry: unknown-entry'), false);

@@ -3,6 +3,10 @@ const { test } = require('node:test');
 const assert   = require('node:assert/strict');
 const o = require('../mcp-ecosystem-intelligence/scripts/orchestrate.cjs');
 
+// The tier filter ages with the evidence, so it is judged at an explicit
+// instant (lib/clock.cjs) rather than whenever the suite happens to run.
+const NOW = Date.parse('2026-09-17T12:00:00Z');
+
 // unmappedSignals(db, stack) returns one record per stack signal that
 // either has no mapping in SIGNAL_TO_TOOLS or whose mapping references
 // a tool absent from the DB.
@@ -14,7 +18,7 @@ test('unmappedSignals: returns [] when every signal maps to a present tool', () 
   // postgres maps to mcp-server-neon per SIGNAL_TO_TOOLS.
   const db    = dbWith('mcp-server-neon');
   const stack = stackWith({ dbs: ['postgres'] });
-  assert.deepEqual(o.unmappedSignals(db, stack), []);
+  assert.deepEqual(o.unmappedSignals(db, stack, NOW), []);
 });
 
 test('unmappedSignals: flags signals without any mapping or fallback (ansible in empty DB)', () => {
@@ -22,7 +26,7 @@ test('unmappedSignals: flags signals without any mapping or fallback (ansible in
   // AND no tool name/notes contains "ansible" — true gap.
   const db    = dbWith('mcp-server-neon');
   const stack = stackWith({ infra: ['ansible'] });
-  const out   = o.unmappedSignals(db, stack);
+  const out   = o.unmappedSignals(db, stack, NOW);
   assert.equal(out.length, 1);
   assert.equal(out[0].signal, 'ansible');
   assert.equal(out[0].reason, 'no mapping');
@@ -40,7 +44,7 @@ test('unmappedSignals: signal resolved via fallback is marked fallback, not gap'
     ],
   };
   const stack = stackWith({ infra: ['loki'] });
-  const out = o.unmappedSignals(db, stack);
+  const out = o.unmappedSignals(db, stack, NOW);
   assert.equal(out.length, 1);
   assert.equal(out[0].signal, 'loki');
   assert.deepEqual(out[0].fallback, ['loki-mcp']);
@@ -67,7 +71,7 @@ test('fallbackBySignal: substring match against name+notes, skips Deprecated', (
       { name: 'irrelevant', notes: 'no match', install_cmd: 'npx -y irrelevant@1.0.0' },
     ],
   };
-  const hits = o.fallbackBySignal(db, 'salesforce');
+  const hits = o.fallbackBySignal(db, 'salesforce', NOW);
   assert.deepEqual(hits, ['@salesforce/mcp']); // Deprecated filtered out
 });
 
@@ -83,7 +87,7 @@ test('matchDB: uses fallback when SIGNAL_TO_TOOLS has no mapping for the signal'
     ],
   };
   const stack = stackWith({ infra: ['loki'] });
-  const matched = o.matchDB(db, stack, null);
+  const matched = o.matchDB(db, stack, null, NOW);
   const names = matched.map(t => t.name);
   assert.ok(names.includes('loki-mcp'), `Expected loki match via fallback, got ${names}`);
 });
@@ -92,7 +96,7 @@ test('unmappedSignals: flags mappings whose referenced tool is missing in DB', (
   // postgres maps to mcp-server-neon, but DB doesn't contain it → drift.
   const db    = dbWith('something-else');
   const stack = stackWith({ dbs: ['postgres'] });
-  const out   = o.unmappedSignals(db, stack);
+  const out   = o.unmappedSignals(db, stack, NOW);
   assert.equal(out.length, 1);
   assert.equal(out[0].signal, 'postgres');
   assert.match(out[0].reason, /not in DB/);
@@ -102,14 +106,14 @@ test('unmappedSignals: handles both dbs and infra signals', () => {
   // kubernetes is infra; mapped to mcp-server-kubernetes per SIGNAL_TO_TOOLS.
   const db    = dbWith();        // empty DB
   const stack = stackWith({ dbs: ['postgres'], infra: ['kubernetes'] });
-  const out   = o.unmappedSignals(db, stack);
+  const out   = o.unmappedSignals(db, stack, NOW);
   assert.equal(out.length, 2);
   const signals = out.map(u => u.signal).sort();
   assert.deepEqual(signals, ['kubernetes', 'postgres']);
 });
 
 test('unmappedSignals: empty stack returns empty array', () => {
-  assert.deepEqual(o.unmappedSignals(dbWith(), stackWith({})), []);
+  assert.deepEqual(o.unmappedSignals(dbWith(), stackWith({}), NOW), []);
 });
 
 test('SIGNAL_TO_TOOLS keys reference tools that exist in the seeded DB', () => {
@@ -504,20 +508,20 @@ test('scan: evidence from a different version does not score the current one', (
     trust_evidence: {
       artifact_id: 'npm:pkg@1.0.0',
       dimensions: {
-        artifact:   { status: 'verified', checked_at: new Date().toISOString().slice(0, 10) },
-        advisories: { status: 'clean',    checked_at: new Date().toISOString().slice(0, 10) },
-        signature:  { status: 'verified', checked_at: new Date().toISOString().slice(0, 10) },
+        artifact:   { status: 'verified', checked_at: '2026-09-17' },
+        advisories: { status: 'clean',    checked_at: '2026-09-17' },
+        signature:  { status: 'verified', checked_at: '2026-09-17' },
       },
     },
   };
-  const out = o.slim(stale, { cats: new Set(['database']), dbs: new Set(), infra: new Set(), signals: [] });
+  const out = o.slim(stale, { cats: new Set(['database']), dbs: new Set(), infra: new Set(), signals: [] }, NOW);
   assert.equal(out.scores.trust.gate, 'thin');
   assert.match(out.scores.trust.reasons.join(' '), /describes npm:pkg@1\.0\.0, not npm:pkg@2\.0\.0/);
   assert.notEqual(out.scores.recommendation.verdict, 'recommended');
 });
 
 test('scan: evidence for the current version is used', () => {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = '2026-09-17';   // the NOW above, not the wall clock
   const current = {
     name: 'pkg', category: 'database', install_cmd: 'npx -y pkg@2.0.0', version: '2.0.0',
     pkg_integrity: 'sha512-new', health_score: 80, est_tools_count: 5,
@@ -531,6 +535,6 @@ test('scan: evidence for the current version is used', () => {
       },
     },
   };
-  const out = o.slim(current, { cats: new Set(['database']), dbs: new Set(), infra: new Set(), signals: [] });
+  const out = o.slim(current, { cats: new Set(['database']), dbs: new Set(), infra: new Set(), signals: [] }, NOW);
   assert.equal(out.scores.trust.gate, 'ok');
 });
