@@ -38,7 +38,7 @@ $ npx -y @froggychips/mcp-vault verify --offline
 | | Without | With |
 |---|---|---|
 | **Discoverability** | search GitHub, hope the README isn't lying | curated DB of **114 entries** with health scores, license, category, est-tools-count |
-| **Trust** | unknown publisher, unknown last commit | `trust` is **derived from dated evidence**, not typed by hand: **101 verified / 1 candidate / 12 unverified** today. The 12 are eight entries with an advisory against the pinned version, two whose repository disagrees with the registry's, one yanked and one unpublished (see [Install-Hook Policy](./CONTRIBUTING.md#install-hook-policy)) |
+| **Trust** | unknown publisher, unknown last commit | `trust` is **derived from dated evidence**, not typed by hand: **101 verified / 1 candidate / 12 unverified** as of 2026-09-17 (the date of the newest evidence in the DB). The 12 are eight entries with an advisory against the pinned version, two whose repository disagrees with the registry's, one yanked and one unpublished (see [Install-Hook Policy](./CONTRIBUTING.md#install-hook-policy)) |
 | **Integrity** | `npx -y whatever@latest` runs whatever ships today | sha512/sha256/Docker `@sha256:` pinned + re-verified against the live registry on every check |
 | **Vulnerabilities** | `npm audit` after the fact, if you remember | 4 advisory feeds merged: npm bulk + OSV.dev + GHSA + Snyk† — checked *before* the install command is written |
 | **Depth** | the package you asked for | `--deps` resolves the whole tree without installing it: **19,377 transitive packages** across the DB, 25 entries whose *dependencies* run install scripts, 38 with a high/critical advisory somewhere in the tree |
@@ -380,7 +380,7 @@ official registry  →  who published it, under a name they proved they own
 mcp-vault          →  supply-chain evidence, policy, behaviour
 ```
 
-11 entries are listed today and all of them agree; a verified namespace under a
+11 entries are listed as of 2026-09-17 and all of them agree; a verified namespace under a
 different owner is the finding worth having. **Being unlisted is explicitly not
 a finding** — listing is opt-in and 102 entries simply are not listed.
 
@@ -737,7 +737,11 @@ maps      memory    meta       mobile     observability   payments
 pm        reasoning search     testing    utility         vcs       web-scraping
 ```
 
-Distribution: **0 Core / 101 Recommended / 4 Experimental / 9 Deprecated**.
+Distribution as of 2026-09-17 (the date of the newest evidence in the DB): **0 Core / 101 Recommended / 4 Experimental / 9 Deprecated**.
+That is a snapshot, not today's split: evidence has a shelf life, so an entry
+whose claims have aged out reads as Experimental on a later day even though no
+commit touched it. `mcp-vault list` (whole DB) and `mcp-vault status` (what you
+have installed) classify against today.
 
 The tier is derived from the evidence below, not stored in the DB and not a
 threshold on `health_score`:

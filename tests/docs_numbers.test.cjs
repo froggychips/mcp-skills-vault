@@ -51,18 +51,26 @@ const count   = (fn) => db.filter(fn).length;
 // copy that goes stale.
 const { classifyEntry, evalIndex } = require('../mcp-ecosystem-intelligence/scripts/lib/tiers.cjs');
 const evalByName = evalIndex(evals);
-// Staleness makes the tier a function of today, and the README states the
-// distribution of the committed evidence — not of whatever day CI happens to
-// run. Classified against the wall clock, this test went red on its own a week
-// after the last evidence refresh (availability and advisories expire in 7
-// days) and 98 entries "moved" from Recommended to Experimental with no commit
-// touching them. So the clock is the snapshot's own: the newest `checked_at`
-// in the DB. Refreshing the evidence moves it forward, and a real change in the
-// distribution still fails here.
+// Staleness makes the tier a function of time, so "the distribution" only
+// means something with a date on it. Time is an explicit input here: the
+// README names the date its figures are as of, and that date has to be the
+// date of the newest `checked_at` in the DB — the snapshot the numbers
+// describe. Classified against the wall clock instead, this test went red on
+// its own a week after every evidence refresh (availability and advisories
+// expire in 7 days) with no commit touching anything. Classified against the
+// snapshot without the README saying so, it would keep accepting a historical
+// distribution presented as current. With the date in the prose, the test is
+// deterministic, and refreshing the evidence without refreshing the README
+// fails below until someone rewrites the figures for the new date.
 const SNAPSHOT_NOW = Math.max(0, ...db.flatMap((t) =>
   Object.values(t.trust_evidence?.dimensions || {})
     .map((d) => Date.parse(d.checked_at))
     .filter(Number.isFinite)));
+const SNAPSHOT_DATE = new Date(SNAPSHOT_NOW).toISOString().slice(0, 10);
+/** A dated claim's date must be the snapshot's, or its numbers describe other data. */
+const dated = (date) => assert.equal(date, SNAPSHOT_DATE,
+  `README.md dates this figure "as of ${date}", but the newest evidence in the DB is from ${SNAPSHOT_DATE}.\n`
+  + 'The evidence was refreshed and the README was not: recompute the figures and update the date.');
 const tierOf  = (t) => classifyEntry(t, evalByName.get(t.name) || null, { now: SNAPSHOT_NOW }).classification;
 const tier    = (name) => count((t) => tierOf(t) === name);
 const withTools = db.filter((t) => Number.isFinite(t.est_tools_count));
@@ -88,8 +96,9 @@ const CLAIMS = [
   {
     what:  'tier distribution',
     file:  'README.md',
-    re:    /Distribution: \*\*(\d+) Core \/ (\d+) Recommended \/ (\d+) Experimental \/ (\d+) Deprecated\*\*/,
-    expected: () => [tier('Core'), tier('Recommended'), tier('Experimental'), tier('Deprecated')],
+    re:    /Distribution as of (\d{4}-\d{2}-\d{2}) \(the date of the newest evidence in the DB\): \*\*(\d+) Core \/ (\d+) Recommended \/ (\d+) Experimental \/ (\d+) Deprecated\*\*/,
+    expected: (captured) => (dated(captured[0]),
+      [SNAPSHOT_DATE, tier('Core'), tier('Recommended'), tier('Experimental'), tier('Deprecated')]),
   },
   {
     what:  'npm entry count',
@@ -136,10 +145,11 @@ const CLAIMS = [
   {
     what:  'derived trust distribution',
     file:  'README.md',
-    re:    /\*\*(\d+) verified \/ (\d+) candidate \/ (\d+) unverified\*\* today/,
-    expected: () => {
+    re:    /\*\*(\d+) verified \/ (\d+) candidate \/ (\d+) unverified\*\* as of (\d{4}-\d{2}-\d{2})/,
+    expected: (captured) => {
+      dated(captured[3]);
       const by = (word) => count((t) => t.trust === word);
-      return [by('verified'), by('candidate'), by('unverified')];
+      return [by('verified'), by('candidate'), by('unverified'), SNAPSHOT_DATE];
     },
   },
   {
@@ -181,8 +191,9 @@ const CLAIMS = [
   {
     what:  'entries listed in the official registry',
     file:  'README.md',
-    re:    /(\d+) entries are listed today and all of them agree/,
-    expected: () => [count((t) => t.trust_evidence?.dimensions?.registry?.status === 'listed')],
+    re:    /(\d+) entries are listed as of (\d{4}-\d{2}-\d{2}) and all of them agree/,
+    expected: (captured) => (dated(captured[1]),
+      [count((t) => t.trust_evidence?.dimensions?.registry?.status === 'listed'), SNAPSHOT_DATE]),
   },
   {
     what:  'DB entry count (SKILL.md)',
