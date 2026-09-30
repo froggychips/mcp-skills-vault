@@ -156,6 +156,25 @@ test('pypiLicenseFromMeta: returns null when nothing usable', () => {
   assert.equal(drift.pypiLicenseFromMeta({}), null);
 });
 
+test('pypiLicenseFromMeta: reads PEP 639 license_expression when the old fields are empty', () => {
+  // The shape PyPI serves for redis-mcp-server 0.5.1 and mcp-clickhouse 0.3.0:
+  // `license: null`, no licence classifier, the SPDX id only in the new field.
+  // Before, this read as `null` and every week reported MIT → (none).
+  const meta = { info: { license: null, license_expression: 'MIT', classifiers: ['Programming Language :: Python :: 3'] } };
+  assert.equal(drift.pypiLicenseFromMeta(meta), 'MIT');
+  assert.equal(drift.diffLicense('MIT', drift.pypiLicenseFromMeta(meta)), 'match');
+});
+
+test('pypiLicenseFromMeta: license_expression wins over a free-form info.license', () => {
+  const meta = { info: { license: 'see LICENSE file', license_expression: 'Apache-2.0', classifiers: [] } };
+  assert.equal(drift.pypiLicenseFromMeta(meta), 'Apache-2.0');
+});
+
+test('pypiLicenseFromMeta: a blank license_expression falls through to the old fields', () => {
+  const meta = { info: { license_expression: '  ', license: '', classifiers: ['License :: OSI Approved :: MIT License'] } };
+  assert.equal(drift.pypiLicenseFromMeta(meta), 'MIT');
+});
+
 test('pypiClassifierToSpdx: known mappings + passthrough tail', () => {
   assert.equal(drift.pypiClassifierToSpdx('License :: OSI Approved :: MIT License'),                'MIT');
   assert.equal(drift.pypiClassifierToSpdx('License :: OSI Approved :: Apache Software License'),   'Apache-2.0');

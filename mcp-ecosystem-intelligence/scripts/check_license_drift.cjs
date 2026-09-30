@@ -22,8 +22,8 @@
  *
  * Sources, by ecosystem (lowest-noise source first):
  *   npm     → `npm view <pkg>@<version> license`
- *   PyPI    → https://pypi.org/pypi/<pkg>/<version>/json → info.license
- *             (falls back to scanning info.classifiers for "License :: ...")
+ *   PyPI    → https://pypi.org/pypi/<pkg>/<version>/json → info.license_expression (PEP 639),
+ *             then info.license, then info.classifiers ("License :: ...")
  *   docker  → skipped (no canonical license field in OCI manifests). DB
  *             entries that carry a `license` for docker images sourced it
  *             from the upstream repo — treat as "docker-license-from-source"
@@ -200,9 +200,18 @@ function pypiClassifierToSpdx(classifier) {
 
 /**
  * Pull the most informative license string out of a PyPI metadata blob.
- * Prefers `info.license` (free-form), falls back to scanning `info.classifiers`.
+ * Prefers `info.license_expression` (SPDX, PEP 639), then `info.license`
+ * (free-form), then scans `info.classifiers`.
  */
 function pypiLicenseFromMeta(meta) {
+  // PEP 639 (core metadata 2.4) moved the licence to `License-Expression`, an
+  // SPDX expression, and packages built with it leave `info.license` null and
+  // ship no licence classifier. Reading only the old fields reported
+  // redis-mcp-server (MIT) and mcp-clickhouse (Apache-2.0) as
+  // `drift-to-unknown` every week — noise that trains a reader to skim past
+  // the drift list. It is the most precise field, so it goes first.
+  const expr = meta?.info?.license_expression;
+  if (expr && String(expr).trim() !== '') return String(expr).trim();
   const lic = meta?.info?.license;
   if (lic && String(lic).trim() !== '' && String(lic).trim().toUpperCase() !== 'UNKNOWN') {
     return String(lic).trim();
