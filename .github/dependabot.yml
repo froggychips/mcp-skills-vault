@@ -10,3 +10,10 @@ updates:
     open-pull-requests-limit: 3
     labels:
       - "dependencies"
+    groups:
+      # init and analyze refuse to run at different versions ("Loaded a
+      # configuration file for version X, but running version Y"), so every
+      # github/codeql-action/* bump must land in a single PR.
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"
