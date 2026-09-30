@@ -176,11 +176,21 @@ test('explain exits as verify does: same policy, flags and --as-of, same exit an
       const label = `${path.basename(dir)} ${flags.join(' ') || '(no flags)'} ${name}`;
       const vr = run('verify_integrity.cjs', ['--offline', '--json', '--entry', name, '--cwd', dir, '--as-of', STALE, ...flags]);
       const er = run('explain.cjs', [name, '--json', '--cwd', dir, '--as-of', STALE, ...flags]);
-      const [ed] = JSON.parse(er.stdout).findings.decisions;
+      // explain also weighs what the configured set would do with the entry
+      // (#123: rows flows/*, shadowing/*), which `verify --entry` does not
+      // evaluate. The artifact part is what the two share: explain's document
+      // without those findings, re-decided, must be verify's decision; the
+      // exit code is explain's whole decision.
+      const edoc = JSON.parse(er.stdout).findings;
+      const setupRule = (rule) => /^(flows|shadowing)\//.test(rule);
+      const setupPart = edoc.findings.filter((f) => setupRule(f.rule));
+      const [ed] = setupPart.length ? recompute({ ...edoc, findings: edoc.findings.filter((f) => !setupRule(f.rule)) }) : edoc.decisions;
       const vd = byId.get(ed.subject.id);
       assert.ok(vd, `${label}: verify made no decision for ${ed.subject.id}`);
       assert.equal(ed.fail_on, vd.fail_on, `${label}: explain and verify hold the entry to different thresholds`);
-      assert.equal(er.status, vr.status, `${label}: explain exits ${er.status}, verify ${vr.status}`);
+      assert.equal(ed.fails, vd.fails, `${label}: explain's artifact part fails=${ed.fails}, verify ${vd.fails}`);
+      if (!setupPart.length) assert.equal(er.status, vr.status, `${label}: explain exits ${er.status}, verify ${vr.status}`);
+      else assert.equal(er.status, edoc.decisions[0].fails ? 1 : 0, `${label}: explain exits ${er.status}, not its decision's`);
       // The case this test is about: nothing denies, and the threshold decides.
       if (vd.fails && vd.effect === 'unknown' && ed.effect !== 'deny') {
         stale++;
