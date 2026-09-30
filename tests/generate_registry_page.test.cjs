@@ -81,3 +81,21 @@ test('renderHtml includes filters and escaped install command', () => {
   assert.match(html, /x&lt;y/);
   assert.match(html, /&lt;bad&gt;/);
 });
+
+test('committed docs/site/registry.{json,html} match tools_database.json', () => {
+  // The public registry is a generated copy of the DB. A DB edit that is not
+  // followed by `mcp-vault site-registry` ships the old install commands to
+  // everyone who reads the site. Tiers age with the clock, so replay the build
+  // at the committed generated_at instead of today.
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const db = JSON.parse(fs.readFileSync(g.DB_PATH, 'utf8'));
+  let evals = null;
+  try { evals = JSON.parse(fs.readFileSync(g.EVAL_PATH, 'utf8')); } catch { /* none shipped */ }
+  const committed = JSON.parse(fs.readFileSync(path.join(g.OUT_DIR, 'registry.json'), 'utf8'));
+  const entries = g.buildEntries(db, evals, Date.parse(committed.generated_at));
+  const hint = 'docs/site is stale: run `mcp-vault site-registry` and commit both files';
+  assert.equal(committed.count, entries.length, hint);
+  assert.deepEqual(committed.entries, entries, hint);
+  assert.equal(fs.readFileSync(path.join(g.OUT_DIR, 'registry.html'), 'utf8'), g.renderHtml(entries), hint);
+});

@@ -20,11 +20,11 @@ function esc(s) {
     .replace(/"/g, "&quot;");
 }
 
-function slimEntry(t, evidence = null, smoke = null) {
+function slimEntry(t, evidence = null, smoke = null, now = Date.now()) {
   // The tier is derived here rather than read off the entry: it is a function
   // of the evidence and of today's date (claims age out), so a stored copy
   // would go quietly wrong while the file sat unchanged.
-  const tier = classifyEntry(t, smoke);
+  const tier = classifyEntry(t, smoke, { now });
   return {
     name: t.name,
     category: t.category,
@@ -142,29 +142,37 @@ function renderHtml(entries) {
 `;
 }
 
-function main() {
-  const db = JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
-  // Behavioural results are a separate stream, and may be absent (nothing has
-  // run yet) — an empty file must not become an empty claim.
-  let smokeByName = new Map();
-  try {
-    const evals = JSON.parse(fs.readFileSync(EVAL_PATH, "utf8"));
-    smokeByName = new Map((evals.results || []).map((r) => [r.name, r]));
-  } catch { /* no results shipped */ }
-
-  const entries = db.tools
-    .map((t) => slimEntry(t, t.trust_evidence || null, smokeByName.get(t.name) || null))
+// Everything the page publishes, as of `now`. The tiers depend on the clock,
+// so a check that the committed files match the DB replays them at the time
+// they were generated rather than today.
+function buildEntries(db, evals, now = Date.now()) {
+  const smokeByName = new Map(((evals && evals.results) || []).map((r) => [r.name, r]));
+  return db.tools
+    .map((t) => slimEntry(t, t.trust_evidence || null, smokeByName.get(t.name) || null, now))
     .sort((a, b) =>
     (a.category || "").localeCompare(b.category || "") ||
     (b.health_score || 0) - (a.health_score || 0) ||
     (a.name || "").localeCompare(b.name || "")
   );
+}
+
+function main() {
+  const db = JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
+  // Behavioural results are a separate stream, and may be absent (nothing has
+  // run yet) — an empty file must not become an empty claim.
+  let evals = null;
+  try {
+    evals = JSON.parse(fs.readFileSync(EVAL_PATH, "utf8"));
+  } catch { /* no results shipped */ }
+
+  const generatedAt = new Date();
+  const entries = buildEntries(db, evals, generatedAt.getTime());
   fs.mkdirSync(OUT_DIR, { recursive: true });
-  fs.writeFileSync(path.join(OUT_DIR, "registry.json"), `${JSON.stringify({ generated_at: new Date().toISOString(), count: entries.length, entries }, null, 2)}\n`);
+  fs.writeFileSync(path.join(OUT_DIR, "registry.json"), `${JSON.stringify({ generated_at: generatedAt.toISOString(), count: entries.length, entries }, null, 2)}\n`);
   fs.writeFileSync(path.join(OUT_DIR, "registry.html"), renderHtml(entries));
   console.log(`Wrote ${entries.length} entries to ${path.join(OUT_DIR, "registry.html")}`);
 }
 
 if (require.main === module) main();
 
-module.exports = { slimEntry, renderHtml };
+module.exports = { slimEntry, renderHtml, buildEntries, DB_PATH, EVAL_PATH, OUT_DIR };
