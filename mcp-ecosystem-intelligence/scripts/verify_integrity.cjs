@@ -1933,6 +1933,12 @@ async function main() {
     if (!OFFLINE || INSTALLED || s.type !== 'artifact' || r.status === 'UPD') return;
     const stored = fromStoredEvidence(r.tool, { asOf: AS_OF, maxAgeDays: evidenceMaxAge(), subject: s, scope: 'database' });
     Object.assign(facts[s.id], stored.facts);
+    // Offline the stored record is all there is to judge a policy
+    // requirement by, so the policy/* rows read it (evidence mode) as they do
+    // in explain: a signature the DB recorded as verified for this artifact is
+    // verified, not "no verifiable registry signature" because this run did
+    // not look. Same rows, same mode, same answer (#131).
+    facts[s.id].mode = 'evidence';
     const seen = new Set(model.observations.map((o) => o.id));
     for (const o of stored.observations) if (!seen.has(o.id)) model.observations.push(o);
     model.findings.push(...stored.findings);
@@ -1986,7 +1992,7 @@ async function main() {
       if (!d) continue;
       const verdicts = d.rules.filter((o) => {
         const row = rowFor(o.rule);
-        return row && row.views.includes('policy-line') && (o.effect === 'deny' || o.effect === 'warn');
+        return row && row.views.includes('policy-line') && o.role !== 'context' && (o.effect === 'deny' || o.effect === 'warn');
       });
       if (!verdicts.length) continue;
       results[i].lines = results[i].lines || [];

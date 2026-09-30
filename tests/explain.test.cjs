@@ -89,15 +89,21 @@ test('behaviour warns and never denies: not starting is not a security refusal',
   }
 });
 
-test('the context ceiling denies only when the policy says fail', () => {
+test('the context ceiling refuses only when the policy says fail — beside the gate, not in its answer', () => {
   const budget = { over: true, after: 120000, limit: 100000, limit_source: 'maxContextTokens' };
   const warn = e.decide({ asOf: NOW,  tool: tool(), policy: { ...DEFAULTS, contextBudget: 'warn' }, gateEntry: null, trust: ok, behav: starts, budget });
   assert.equal(warn.decision, 'allow');
   assert.equal(warn.rules.find((r) => r.rule === 'budget/over').outcome, 'warn');
 
+  // `install` checks the budget itself (--allow-over-budget); the integrity
+  // gate never has, so explain's exit — the gate's — does not either (#131).
   const fail = e.decide({ asOf: NOW,  tool: tool(), policy: { ...DEFAULTS, contextBudget: 'fail' }, gateEntry: null, trust: ok, behav: starts, budget });
-  assert.equal(fail.decision, 'deny');
-  assert.ok(fail.blocking.includes('budget/over'));
+  const rule = fail.rules.find((r) => r.rule === 'budget/over');
+  assert.deepEqual([rule.outcome, rule.role], ['deny', 'context']);
+  assert.equal(fail.decision, 'allow');
+  assert.ok(!fail.blocking.includes('budget/over'));
+  assert.deepEqual(fail.context_blocking, ['budget/over']);
+  assert.equal(fail.model.decision.fails, false);
 });
 
 test('a licence deny list denies, and says which licence', () => {
@@ -141,17 +147,30 @@ test('parseArgs: one name, known flags only', () => {
 const ev = (dims) => ({ artifact_id: 'npm:pkg@1.0.0', dimensions: dims });
 const dim = (status, at = '2026-09-17') => ({ status, checked_at: at, verified_at: at });
 
-test('a rule about a check that never ran is unknown, not a denial', () => {
-  // The bug this covers, found by testing the published package: with no live
-  // gate, `evaluateEntry` saw an empty findings list, read "no SIG finding" as
-  // "no signature", and denied `policy/signatures` on an entry whose stored
-  // evidence said `signature: verified`. `explain --verify` disagreed with
-  // `explain` on the same entry.
+test('a required check that was never recorded refuses, and says to run --verify', () => {
+  // With no live gate, `evaluateEntry` used to read "no SIG finding" as "no
+  // signature" and deny `policy/signatures` on an entry whose stored evidence
+  // said `signature: verified`. That stays fixed: the stored record is what is
+  // judged (next test). But a requirement with *nothing* on record is not met
+  // — as for org/evidence/* — and `verify --offline`, which reads the same
+  // record the same way now, has always refused it (#131).
   const policy = { ...DEFAULTS, signatures: 'require' };
   const rules = e.policyFromEvidence(policy, tool(), ev({}));
   const sig = rules.find((r) => r.rule === 'policy/signatures');
-  assert.equal(sig.outcome, 'unknown');
-  assert.match(sig.detail, /never been checked/);
+  assert.equal(sig.outcome, 'deny');
+  assert.match(sig.detail, /no signature evidence is on record.*--verify/);
+});
+
+test('a stored reading the policy does not require is context: shown, and not the gate\'s answer', () => {
+  // `provenance: prefer` (the default) has never made the gate warn; explain
+  // shows "provenance is absent" and exits as verify does (#131).
+  const d = e.decide({ asOf: NOW, tool: tool(), policy: DEFAULTS, gateEntry: null, trust: ok, behav: starts, budget: null,
+    evidence: ev({ artifact: dim('verified'), provenance: dim('absent') }) });
+  const prov = d.rules.find((r) => r.rule === 'policy/provenance');
+  assert.deepEqual([prov.outcome, prov.role], ['warn', 'context']);
+  assert.notEqual(d.model.decision.decided_by, 'policy/provenance');
+  // Nothing in the gate warns (what is unknown is the dimensions never checked).
+  assert.ok(!d.model.decision.rules.some((r) => r.effect === 'warn' && r.role !== 'context'));
 });
 
 test('evidence that satisfies the policy reads as allow', () => {
@@ -204,7 +223,8 @@ test('an unknown never blocks, and is reported separately', () => {
   const d = e.decide({ asOf: NOW, 
     tool: tool(), policy: { ...DEFAULTS, signatures: 'require', installHooks: 'fail' },
     gateEntry: null, trust: ok, behav: starts, budget: null,
-    evidence: ev({ artifact: dim('verified') }),
+    // A status the rule cannot judge, and a hook only a gate run can see.
+    evidence: ev({ artifact: dim('verified'), signature: dim('error') }),
   });
   assert.equal(d.decision, 'allow');
   assert.ok(d.unevaluated.includes('policy/signatures'));

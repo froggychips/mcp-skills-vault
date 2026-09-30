@@ -34,6 +34,19 @@
  *               "no licence recorded" note never could, and still cannot)
  *   views       legacy renderings that show this rule: 'explain' (explain's
  *               `rules` list), 'policy-line' (verify's POLICY-FAIL/WARN)
+ *   role        'gate' (the default) | 'context', or { <mode>: role } with
+ *               'gate' for a mode not named. A gate outcome is part of the
+ *               answer to "does the install gate pass this subject": it sets
+ *               the effect, `decided_by` and `fails`. A context outcome is
+ *               printed and kept in the trace (`rules`, marked `role:
+ *               'context'`) and decides nothing — it is what explain shows
+ *               beside the gate's answer: the behaviour record, the context
+ *               budget, the tool-description scan, what the configured set
+ *               would do, and a stored-evidence reading the policy does not
+ *               require. So `explain` and `verify` exit alike on the same
+ *               inputs (#131). An outcome may say `role` itself where the row
+ *               cannot know in advance (a policy row in evidence mode is gate
+ *               only when the policy requires what it reads).
  *   evaluate    (ctx) -> [{ rule?, effect, detail, findings? }]
  *   claims      optional: a finding-rule prefix only this row decides; the
  *               generic finding/* rows skip those findings (#121)
@@ -44,11 +57,14 @@
  *             licence/health/trust, the stored evidence and trust score,
  *             behaviour, budget, the live gate's status
  *   mode      'gate' when findings come from a gate run, 'evidence' when only
- *             stored evidence is available (explain without --verify)
+ *             stored evidence is available (explain without --verify),
+ *             'live' for explain --verify (gate semantics; explain's own
+ *             inputs stay context), 'approval', 'setup'
  *
  * API:
  *   RULES, RULE_BY_ID, ORDER, RANK, EFFECTS
  *   rulesFor(mode)                       -> ordered active rows
+ *   roleOf(row, mode)                    -> 'gate' | 'context'
  *   effectivePolicy(base, flags, opts)   -> frozen, normalised policy
  *   loadEffectivePolicy(startDir, opts)  -> { ok, policy, path, found, errors, sources }  (opts.file: a named policy)
  *   flagsFromArgv(argv)                  -> { strict, failUnverified, … }
@@ -90,6 +106,12 @@ const entryOf = (ctx) => (ctx.facts && ctx.facts.entry) || {};
 const isNpx = (ctx) => String(entryOf(ctx).install_cmd || '').startsWith('npx');
 const isDocker = (ctx) => /^docker\s+run/.test(entryOf(ctx).install_cmd || '');
 const out = (effect, detail, findings = [], rule = undefined) => ({ rule, effect, detail, findings });
+// An outcome that is shown and traced but is not part of the gate's answer.
+const context = (o) => ({ ...o, role: 'context' });
+// Explain's own inputs — what the configured set would do, the tool list's
+// scan — are context in explain (offline or --verify) and the whole question
+// in the command that asks it (tool-scan, status / audit).
+const EXPLAIN_CONTEXT = Object.freeze({ evidence: 'context', live: 'context' });
 // A finding family whose own row decides it is judged by that row alone, not
 // by the generic finding/* rows: a row that `claims` a rule prefix (#121:
 // `db/signature-*`, `audits/import-*`), or one that `owns_findings` of the
@@ -169,13 +191,24 @@ const findingRules = [
 // evidence is silent — `evaluateEntry` decided from the *absence* of a
 // finding, which is right after a gate run and wrong when none happened.
 
+//
+// What the stored record says is part of the gate's answer only where the
+// policy requires it (`signatures: require`, …). Under the defaults (`prefer`)
+// the gate has never refused or warned on it — `verify` prints no POLICY line
+// for a missing provenance attestation it merely prefers — so the reading is
+// shown as context: "provenance is absent" is worth knowing, and is not a
+// warning that fails `explain --strict` while `verify --strict` passes (#131).
 const fromEvidence = (ctx, dim, { ok, bad, require: required, message }) => {
   const dims = (ctx.facts && ctx.facts.evidence && ctx.facts.evidence.dimensions) || {};
   const value = dims[dim];
-  if (!value) return required ? [out('unknown', `${dim} has never been checked — run with --verify`)] : [];
-  if (ok.includes(value.status)) return [out('allow', `${dim}: ${value.status} (as of ${value.verified_at || value.checked_at})`)];
-  if (bad.includes(value.status)) return [out(required ? 'deny' : 'warn', message(value))];
-  return [out('unknown', `${dim} is "${value.status}", which this rule cannot judge — run with --verify`)];
+  const role = (o) => (required ? o : context(o));
+  // Required and not on record: the requirement is not met, as for
+  // org/evidence/* — a refusal, not an open question. Offline this is the
+  // answer `verify` has always given (it saw no signature, so it refused).
+  if (!value) return required ? [out('deny', `no ${dim} evidence is on record for this artifact, and this policy requires it — run with --verify`)] : [];
+  if (ok.includes(value.status)) return [role(out('allow', `${dim}: ${value.status} (as of ${value.verified_at || value.checked_at})`))];
+  if (bad.includes(value.status)) return [role(out(required ? 'deny' : 'warn', message(value)))];
+  return [role(out('unknown', `${dim} is "${value.status}", which this rule cannot judge — run with --verify`))];
 };
 
 const policyRules = [
@@ -316,7 +349,8 @@ const policyRules = [
     },
   },
   {
-    id: 'budget/over', status: 'active', thresholded: false, views: ['explain'],
+    id: 'budget/over', status: 'active', thresholded: false, views: ['explain'], role: 'context',
+    doc: 'Context: `install` checks the budget itself (--allow-over-budget); the integrity gate does not.',
     evaluate(ctx) {
       const b = ctx.facts && ctx.facts.budget;
       if (!b || !b.over) return [];
@@ -361,8 +395,8 @@ const explainRules = [
     },
   },
   {
-    id: 'behaviour/*', status: 'active', thresholded: false, views: ['explain'],
-    doc: 'Advisory: a server that does not start is not a security refusal.',
+    id: 'behaviour/*', status: 'active', thresholded: false, views: ['explain'], role: 'context',
+    doc: 'Context: a server that does not start is not a security refusal, and the gate never reads it.',
     evaluate(ctx) {
       const b = ctx.facts && ctx.facts.behaviour;
       if (!b) return [];
@@ -562,22 +596,22 @@ const setJudged = (ctx, match, key) => ctx.findings
   });
 const setupRules = [
   {
-    id: 'flows/lethal-trifecta', status: 'active', thresholded: true, owns_findings: true, views: ['explain'],
+    id: 'flows/lethal-trifecta', status: 'active', thresholded: true, owns_findings: true, role: EXPLAIN_CONTEXT, views: ['explain'],
     doc: 'private data + untrusted content + an outward sink in one session; the level is policy.toxicFlows',
     evaluate: (ctx) => setJudged(ctx, (r) => r === 'flows/lethal-trifecta', 'toxicFlows'),
   },
   {
-    id: 'flows/untrusted-destructive', status: 'active', thresholded: true, owns_findings: true, views: ['explain'],
+    id: 'flows/untrusted-destructive', status: 'active', thresholded: true, owns_findings: true, role: EXPLAIN_CONTEXT, views: ['explain'],
     doc: 'untrusted content next to a destructive tool; the level is policy.toxicFlows',
     evaluate: (ctx) => setJudged(ctx, (r) => r === 'flows/untrusted-destructive', 'toxicFlows'),
   },
   {
-    id: 'shadowing/*', status: 'active', thresholded: true, owns_findings: true, views: ['explain'],
+    id: 'shadowing/*', status: 'active', thresholded: true, owns_findings: true, role: EXPLAIN_CONTEXT, views: ['explain'],
     doc: 'tool names that shadow one another across servers; the level is policy.toolShadowing',
     evaluate: (ctx) => setJudged(ctx, (r) => r.startsWith('shadowing/'), 'toolShadowing'),
   },
   {
-    id: 'flows/no-data', status: 'active', thresholded: false, owns_findings: true, views: [],
+    id: 'flows/no-data', status: 'active', thresholded: false, owns_findings: true, role: EXPLAIN_CONTEXT, views: [],
     doc: 'a server nobody could see into: unknown, never clean — and, as before, never a failing exit',
     evaluate(ctx) {
       return ctx.findings.filter((f) => (f.rule.startsWith('flows/') || f.rule.startsWith('shadowing/')) && f.state !== 'observed')
@@ -596,7 +630,7 @@ const SETUP_ORDER = ['flows/lethal-trifecta', 'flows/untrusted-destructive', 'sh
 
 const toolScanRules = [
   {
-    id: 'tool-scan/*', status: 'active', thresholded: true, views: ['explain'],
+    id: 'tool-scan/*', status: 'active', thresholded: true, role: EXPLAIN_CONTEXT, views: ['explain'],
     doc: 'Tool descriptions: an observed high finding refuses, medium warns, low is listed only; a scan that did not run, did not cover the list or aged out is unknown.',
     evaluate(ctx) {
       const held = ctx.facts && ctx.facts.tool_scan;
@@ -748,9 +782,21 @@ const ORDER = Object.freeze({
   // status / audit over a host's session: only what the set does together.
   setup: Object.freeze([...SETUP_ORDER]),
 });
+// explain --verify: the gate's rows in the gate's order; explain's own inputs
+// are context (EXPLAIN_CONTEXT), so its exit is the live gate's.
+const ORDER_LIVE = ORDER.gate;
+const ROLES = ['gate', 'context'];
+
+/** A row's role in a mode: `role` as a string, or per mode (default gate). */
+function roleOf(row, mode) {
+  const r = row && row.role;
+  const role = !r ? 'gate' : typeof r === 'string' ? r : (r[mode] || 'gate');
+  if (!ROLES.includes(role)) throw new TypeError(`policy_rules: row ${row.id} has role ${JSON.stringify(role)} (one of ${ROLES.join(', ')})`);
+  return role;
+}
 
 function rulesFor(mode) {
-  const order = ORDER[mode] || ORDER.gate;
+  const order = mode === 'live' ? ORDER_LIVE : (ORDER[mode] || ORDER.gate);
   return order.map((id) => RULE_BY_ID.get(id)).filter((r) => r && r.status === 'active');
 }
 
@@ -911,6 +957,6 @@ function evidenceRuleOutcomes(ctx) {
 
 module.exports = {
   EFFECTS, RANK, RULES, RULE_BY_ID, ORDER,
-  rulesFor, rowFor, stricter, deepFreeze,
+  rulesFor, rowFor, roleOf, stricter, deepFreeze,
   flagsFromArgv, effectivePolicy, loadEffectivePolicy, entryRuleOutcomes, evidenceRuleOutcomes,
 };
