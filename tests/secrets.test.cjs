@@ -196,9 +196,10 @@ function assertNoLeak(output, where) {
   }
 }
 
-test('secrets: text, --json, --sarif and --fix-suggest never contain a secret value', () => {
+test('secrets: text, --json (findings@1 included), --sarif, --fix-suggest and --explain never contain a secret value', () => {
   const fx = fixture();
-  for (const args of [[], ['--json'], ['--sarif'], ['--fix-suggest'], ['--json', '--fix-suggest'], ['--sarif', '--fix-suggest']]) {
+  for (const args of [[], ['--json'], ['--sarif'], ['--fix-suggest'], ['--json', '--fix-suggest'], ['--sarif', '--fix-suggest'],
+    ['--explain'], ['--explain', '--fix-suggest']]) {
     const r = run('check_secrets.cjs', ['--no-git', ...args], fx);
     assert.equal(r.status, 1, `secrets ${args.join(' ')} exited ${r.status}: ${r.stderr}`);
     assertNoLeak(r.stdout + r.stderr, `secrets ${args.join(' ') || '(text)'}`);
@@ -210,26 +211,60 @@ test('secrets --json: every fixture is found, with type, file, path, length and 
   const r = run('check_secrets.cjs', ['--json', '--no-git'], fx);
   const doc = JSON.parse(r.stdout);
   assert.equal(doc.schema, 'mcp-vault/secrets@1');
-  const rules = new Set(doc.findings.map((f) => f.rule));
+  assert.equal(doc.findings.schema, 'mcp-vault/findings@1');
+  const found = doc.findings.findings;
+  const rules = new Set(found.map((f) => f.rule));
   for (const rule of ['github-token', 'github-pat', 'gitlab-token', 'aws-access-key', 'slack-token', 'openai-key',
     'anthropic-key', 'stripe-live-key', 'google-api-key', 'jwt', 'private-key', 'connection-string',
     'url-query-token', 'bearer-token', 'named-secret']) {
-    assert.ok(rules.has(rule), `no ${rule} finding`);
+    assert.ok(rules.has(`secrets/${rule}`), `no secrets/${rule} finding`);
   }
-  for (const f of doc.findings) {
-    for (const k of ['type', 'file', 'path', 'length', 'masked', 'host', 'recommendation']) assert.ok(f[k] !== undefined && f[k] !== null, `${f.path}: no ${k}`);
-    assert.ok(f.masked.replace(/…$/, '').length <= 4, `${f.path}: mask ${f.masked} shows more than 4 characters`);
-    assert.equal(f.tracked, null, '--no-git: not established, not false');
+  for (const f of found) {
+    assert.equal(f.subject.type, 'host-config');
+    assert.equal(f.subject.id, `${f.subject.path}${f.subject.line ? `:${f.subject.line}` : ''}`);
+    assert.equal(f.state, 'observed');
+    assert.equal(f.confidence, f.rule === 'secrets/named-secret' ? 'medium' : 'high');
   }
-  assert.ok(!doc.findings.some((f) => /SAFE/.test(f.path)), 'a ${VAR} reference was reported');
-  const hosts = new Set(doc.findings.map((f) => f.host));
+  assert.equal(doc.secrets.length, found.length, 'one detail per finding');
+  for (const d of doc.secrets) {
+    assert.ok(found.some((f) => f.id === d.finding), `${d.path}: detail names no finding`);
+    for (const k of ['type', 'path', 'length', 'masked', 'recommendation']) assert.ok(d[k] !== undefined && d[k] !== null, `${d.path}: no ${k}`);
+    assert.ok(d.masked.replace(/…$/, '').length <= 4, `${d.path}: mask ${d.masked} shows more than 4 characters`);
+    assert.equal(d.tracked, null, '--no-git: not established, not false');
+  }
+  assert.ok(!doc.secrets.some((d) => /SAFE/.test(d.path)), 'a ${VAR} reference was reported');
+  const hosts = new Set(found.map((f) => f.subject.host));
   assert.deepEqual([...hosts].sort(), ['claude-code', 'codex', 'cursor', 'vscode']);
+  // An untracked secret is medium — and still refused: the secrets/* row
+  // decides, not the severity ladder.
+  const denied = doc.findings.decisions.filter((d) => d.effect === 'deny');
+  assert.ok(denied.length && denied.every((d) => d.decided_by.startsWith('secrets/') && d.fails));
+  assert.equal(r.status, 1);
+});
+
+test('decide(): a secrets/* finding is denied by its row at any severity; the trace carries no value', () => {
+  const F = require('../mcp-ecosystem-intelligence/scripts/lib/finding.cjs');
+  const PR = require('../mcp-ecosystem-intelligence/scripts/lib/policy_rules.cjs');
+  const scan = { files: [{ host: 'cursor', scope: 'project', path: '/p/.cursor/mcp.json' }, { host: 'vscode', scope: 'project', path: '/p/.vscode/mcp.json' }],
+    unreadable: [], findings: S.scanDocument({ mcpServers: { a: { env: { GITHUB_TOKEN: T.github } } } }, { host: 'cursor', scope: 'project', path: '/p/.cursor/mcp.json' })
+      .map((f) => ({ ...f, line: 3, tracked: false, severity: 'medium', recommendation: 'x' })) };
+  const { findings, subjects } = S.toFindings(scan, { cwd: '/p' });
+  assert.equal(findings[0].subject.id, '.cursor/mcp.json:3');
+  assert.deepEqual(subjects.map((x) => x.id), ['.vscode/mcp.json'], 'a clean config is a subject, not an absence');
+  const policy = PR.effectivePolicy(null, {}, { policyRules: false });
+  const ds = F.decide(findings, policy, Date.parse('2026-09-30T00:00:00Z'), { subjects });
+  const by = Object.fromEntries(ds.map((d) => [d.subject.id, d]));
+  assert.equal(by['.cursor/mcp.json:3'].effect, 'deny');
+  assert.equal(by['.cursor/mcp.json:3'].decided_by, 'secrets/github-token');
+  assert.equal(by['.vscode/mcp.json'].effect, 'allow');
+  const doc = F.toJson(F.findingsDocument({ asOf: Date.parse('2026-09-30T00:00:00Z'), findings, decisions: ds, policy }));
+  assertNoLeak(JSON.stringify(doc) + F.renderTrace(F.explainTrace(doc)).join('\n') + JSON.stringify(F.toSarif(doc.findings)), 'findings@1 / trace / SARIF');
 });
 
 test('secrets --fix-suggest uses each host’s documented syntax', () => {
   const fx = fixture();
   const doc = JSON.parse(run('check_secrets.cjs', ['--json', '--fix-suggest', '--no-git'], fx).stdout);
-  const by = (p) => doc.findings.find((f) => f.path === p).fix_suggestion;
+  const by = (p) => doc.secrets.find((d) => d.path === p).fix_suggestion;
   assert.match(by('mcpServers.github.env.GITHUB_TOKEN').lines.join('\n'), /"\$\{GITHUB_TOKEN\}"/);
   assert.match(by('mcpServers.s.headers.X-Api-Key').lines.join('\n'), /\$\{env:X_API_KEY\}/);
   assert.match(by('servers.v.args[2]').lines.join('\n'), /\$\{input:aws-secret-access-key\}[\s\S]*"password":true/);
@@ -237,7 +272,8 @@ test('secrets --fix-suggest uses each host’s documented syntax', () => {
   assert.match(by('mcp_servers.gl.http_headers.X-Token').lines.join('\n'), /env_http_headers/);
   // ~/.claude.json: Claude Code documents expansion for .mcp.json only, so no
   // edit is invented for it.
-  const local = doc.findings.find((f) => f.scope === 'local');
+  const localId = doc.findings.findings.find((f) => f.subject.scope === 'local').id;
+  const local = doc.secrets.find((d) => d.finding === localId);
   assert.ok(local.fix_suggestion.manual && !local.fix_suggestion.lines);
 });
 
@@ -258,6 +294,46 @@ test('audit --json and status --json carry the findings and never the values', (
   assert.ok(s.secrets.findings.length >= 15);
   assert.match(s.verdict.notable[0], /secrets? in plain text in host configs/);
   assertNoLeak(run('status.cjs', [], fx).stdout, 'status (text)');
+});
+
+test('redact: a value passed as the argument after a credential-named flag is masked (status `launches`)', () => {
+  const cmd = `npx -y some-mcp --api-key ${T.heuristic} --verbose`;
+  const out = S.redact(cmd);
+  assert.ok(!out.includes(T.heuristic.slice(0, 8)), out);
+  assert.match(out, /--api-key … --verbose$/);
+  assert.equal(S.redact('npx -y some-mcp --port 8080'), 'npx -y some-mcp --port 8080');
+});
+
+test('Codex TOML: root-level dotted `mcp_servers.…` keys and a bare [mcp_servers] table are read', () => {
+  const doc = S.parseCodexTomlServers([
+    'model = "o4"',
+    `mcp_servers.gh.env.GITHUB_TOKEN = "${T.github}"`,
+    `mcp_servers.gl = { command = "npx", env = { GITLAB_TOKEN = "${T.gitlab}" } }`,
+    'other.api_key = "x"',
+    '[mcp_servers]',
+    `aws.env.AWS_ACCESS_KEY_ID = "${T.aws}"`,
+  ].join('\n'));
+  const paths = S.scanDocument(doc, { host: 'codex', scope: 'user', path: 'config.toml' }).map((f) => f.path).sort();
+  assert.deepEqual(paths, ['mcp_servers.aws.env.AWS_ACCESS_KEY_ID', 'mcp_servers.gh.env.GITHUB_TOKEN', 'mcp_servers.gl.env.GITLAB_TOKEN']);
+});
+
+test('a config that does not parse is unreadable (exit 2) — and the parse error never quotes the file', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-secrets-home-'));
+  fs.mkdirSync(path.join(home, '.codex'));
+  fs.writeFileSync(path.join(home, '.codex', 'config.toml'), `[mcp_servers.gl]\nenv = { GITLAB_TOKEN = "${T.codex}"\n`);
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-secrets-'));
+  // Broken JSON with a token right at the fault: V8 would quote it.
+  fs.writeFileSync(path.join(cwd, '.mcp.json'), `{ "mcpServers": { "a": { "env": { "GITHUB_TOKEN": "${T.github}" oops`);
+  for (const args of [['--no-git'], ['--no-git', '--json'], ['--no-git', '--sarif'], ['--no-git', '--explain']]) {
+    const r = run('check_secrets.cjs', args, { cwd, home });
+    assert.equal(r.status, 2, `${args.join(' ')}: ${r.stdout}${r.stderr}`);
+    assertNoLeak(r.stdout + r.stderr, `unreadable ${args.join(' ')}`);
+  }
+  const doc = JSON.parse(run('check_secrets.cjs', ['--no-git', '--json'], { cwd, home }).stdout).findings;
+  const unreadable = doc.findings.filter((f) => f.rule === 'scope/unreadable');
+  assert.equal(unreadable.length, 2);
+  assert.ok(unreadable.every((f) => f.state === 'no-data'));
+  assert.ok(doc.decisions.every((d) => d.effect === 'unknown' && d.unanswered && !d.fails), 'no data is unknown, never allow');
 });
 
 // ── exit codes ─────────────────────────────────────────────────────────────
@@ -304,17 +380,19 @@ test('a secret in a git-tracked .mcp.json is severity high; untracked is medium'
   fs.writeFileSync(path.join(cwd, '.mcp.json'), JSON.stringify({ mcpServers: { a: { env: { GITHUB_TOKEN: T.github } } } }));
 
   let doc = JSON.parse(run('check_secrets.cjs', ['--json'], { cwd, home }).stdout);
-  assert.equal(doc.findings[0].tracked, false);
-  assert.equal(doc.findings[0].severity, 'medium');
+  assert.equal(doc.secrets[0].tracked, false);
+  assert.equal(doc.findings.findings[0].severity, 'medium');
 
   assert.equal(git('add', '.mcp.json').status, 0);
   doc = JSON.parse(run('check_secrets.cjs', ['--json'], { cwd, home }).stdout);
-  assert.equal(doc.findings[0].tracked, true);
-  assert.equal(doc.findings[0].severity, 'high');
-  assert.match(doc.findings[0].recommendation, /rotate/);
+  assert.equal(doc.secrets[0].tracked, true);
+  assert.equal(doc.findings.findings[0].severity, 'high');
+  assert.match(doc.secrets[0].recommendation, /rotate/);
 
   const sarif = JSON.parse(run('check_secrets.cjs', ['--sarif'], { cwd, home }).stdout);
   assert.equal(sarif.runs[0].results[0].level, 'error');
+  assert.equal(sarif.runs[0].results[0].ruleId, 'secrets/github-token');
+  assert.equal(sarif.runs[0].results[0].partialFingerprints.findingId, doc.findings.findings[0].id);
   assert.equal(sarif.runs[0].results[0].locations[0].physicalLocation.artifactLocation.uri, '.mcp.json');
   assertNoLeak(JSON.stringify(sarif), 'sarif (tracked)');
 });

@@ -103,7 +103,7 @@ Every JSON document this tool writes carries a schema identifier of the form
 | `mcp-vault/doctor@1` | `mcp-vault doctor --json` |
 | `mcp-vault/entries@1` | `mcp-vault list --json` |
 | `mcp-vault/eval@1` | `mcp-vault eval --json` |
-| `mcp-vault/findings@1` | the `findings` field of `verify --json`, `explain --json`, `lock --check --json` and `approve --json` (see below) |
+| `mcp-vault/findings@1` | the `findings` field of `verify --json`, `explain --json`, `lock --check --json`, `approve --json` and `secrets --json` (see below) |
 | `mcp-vault/health@1` | `mcp-vault health` |
 | `mcp-vault/identity@1` | `mcp-vault identity --json` |
 | `mcp-vault/license-drift@1` | `mcp-vault license-drift --json` |
@@ -114,7 +114,7 @@ Every JSON document this tool writes carries a schema identifier of the form
 | `mcp-vault/policy@1` | `.mcp-vault.policy.json` (read, not written) |
 | `mcp-vault/posture@1` | `mcp-vault posture --json` |
 | `mcp-vault/scan@1` | `mcp-vault scan --json` |
-| `mcp-vault/secrets@1` | `mcp-vault secrets --json` |
+| `mcp-vault/secrets@1` | `mcp-vault secrets --json` — an envelope for what is not a finding (the masked shape of each value, the recommendation and suggested edit, keyed by finding id); the findings and decisions are `findings@1` under `findings` |
 | `mcp-vault/status@1` | `mcp-vault status --json` |
 | `mcp-vault/token-budget@1` | `mcp-vault budget --json` |
 | `mcp-vault/upgrade-plan@1` | `mcp-vault upgrade --json` |

@@ -92,6 +92,19 @@ const out = (effect, detail, findings = [], rule = undefined) => ({ rule, effect
 // `audits/import-*`). Read at call time: RULES is defined below.
 const claimed = (f) => RULES.some((r) => r.claims && r.status === 'active' && f.rule.startsWith(r.claims));
 
+// ── plain-text secrets in host configs (#122) ───────────────────────────────
+
+const secretRules = [
+  {
+    id: 'secrets/*', status: 'active', thresholded: false, views: [],
+    doc: 'A credential written in plain text into a host config refuses, tracked by git or not: anything that reads the file has it. Tracked only raises the severity (rotate).',
+    evaluate(ctx) {
+      return ctx.findings.filter((f) => f.state === 'observed' && f.rule.startsWith('secrets/'))
+        .map((f) => out('deny', f.message, [f.id], f.rule));
+    },
+  },
+];
+
 // ── rules over findings (any command) ──────────────────────────────────────
 
 const findingRules = [
@@ -523,7 +536,6 @@ const reservedRules = [
   reserved('shadowing/*', '#123', 'tool names that shadow one another across servers'),
   reserved('tool-scan/*', '#124', 'poisoning patterns in tool descriptions and schemas'),
   reserved('lookalike/*', '#125', 'a name one edit away from a vault entry'),
-  reserved('secrets/*', '#122', 'plain-text secrets in host configs'),
 ];
 
 // ── #121: the DB signature and audits ─────────────────────────────────────
@@ -575,7 +587,7 @@ const signatureRules = [
   },
 ];
 
-const RULES = Object.freeze([...explainRules, ...policyRules, ...findingRules, ...orgRules, ...reservedRules, ...signatureRules].map((r) => Object.freeze(r)));
+const RULES = Object.freeze([...explainRules, ...policyRules, ...secretRules, ...findingRules, ...orgRules, ...reservedRules, ...signatureRules].map((r) => Object.freeze(r)));
 const RULE_BY_ID = new Map(RULES.map((r) => [r.id, r]));
 
 // Evaluation order, per mode. It is the order the legacy views have always
@@ -590,6 +602,7 @@ const ORDER = Object.freeze({
     'policy/signatures', 'policy/provenance', 'policy/docker-digest', 'policy/unverified',
     'policy/license', 'policy/health', 'policy/trust',
     'gate/fail', 'gate/unverified', 'behaviour/*', 'budget/over',
+    'secrets/*',
     'gate/require-provenance', 'gate/fail-dep-advisories', 'finding/severity', 'finding/incomplete',
     'audits/recorded',
     'db/signature', 'audits/import',
@@ -601,6 +614,7 @@ const ORDER = Object.freeze({
     'policy/unverified', 'policy/install-hooks', 'policy/docker-digest',
     'policy/license', 'policy/health', 'policy/trust',
     'gate/fail', 'gate/unverified', 'behaviour/*', 'budget/over',
+    'secrets/*',
     'gate/require-provenance', 'gate/fail-dep-advisories', 'finding/severity', 'finding/incomplete',
     'audits/recorded',
     'db/signature', 'audits/import',

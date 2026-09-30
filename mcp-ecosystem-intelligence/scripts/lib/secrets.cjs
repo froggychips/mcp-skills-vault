@@ -31,6 +31,7 @@
  *   fixSuggestion(finding)                 -> { lines: [...] } | { manual: string }
  *   maskValue(value, publicPrefixLen)      -> string
  *   redact(string)                         -> string with every secret masked
+ *   toFindings(scan, { cwd })              -> { findings, subjects, details }  (lib/finding.cjs findings)
  */
 
 const fs   = require('fs');
@@ -38,6 +39,7 @@ const path = require('path');
 const os   = require('os');
 const { spawnSync } = require('child_process');
 const { hostConfigPaths } = require('./installed.cjs');
+const { finding, subject } = require('./finding.cjs');
 
 // ── known formats ──────────────────────────────────────────────────────────
 //
@@ -227,7 +229,14 @@ function redact(value) {
   let out = value;
   // The whole string for the formats, each word for `NAME=value`: a joined
   // command line is one string, and the heuristic reads one value at a time.
-  const hits = [...scanString(value), ...value.split(/\s+/).flatMap((w) => scanString(w))];
+  // A word right after a credential-named flag is filed under that flag
+  // (`--api-key <value>`), the same pairing `leaves()` makes for `args`: the
+  // joined command has lost the array, not the order.
+  const words = value.split(/\s+/);
+  const hits = [...scanString(value), ...words.flatMap((w, i) => {
+    const prev = i > 0 && /^--?[A-Za-z]/.test(words[i - 1]) && !words[i - 1].includes('=') ? words[i - 1] : null;
+    return scanString(w, { name: prev });
+  })];
   for (const hit of hits) out = out.split(hit.secret).join(maskValue(hit.secret, hit.prefix));
   return out;
 }
@@ -348,7 +357,11 @@ function scanDocument(doc, loc) {
  */
 function parseCodexTomlServers(text) {
   const root = { mcp_servers: {} };
-  let table = null;            // object values are assigned into, or null = skip
+  // The object values are assigned into, or null = skip. Before the first
+  // header it is the TOML root, where only `mcp_servers.…` dotted keys count
+  // (`mcp_servers.gh.env.GITHUB_TOKEN = "…"`, `mcp_servers.gh = { … }`).
+  let table = root;
+  let atRoot = true;
   const lines = String(text).split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i].trim();
@@ -356,21 +369,27 @@ function parseCodexTomlServers(text) {
     const header = line.match(/^\[\s*([^\[\]]+?)\s*\]\s*(#.*)?$/);
     if (header) {
       const keys = splitKey(header[1]);
-      if (keys[0] !== 'mcp_servers' || keys.length < 2) { table = null; continue; }
+      atRoot = false;
+      if (keys[0] !== 'mcp_servers') { table = null; continue; }
       table = root;
       for (const k of keys) table = (table[k] && typeof table[k] === 'object') ? table[k] : (table[k] = {});
       continue;
     }
-    if (/^\[\[/.test(line)) { table = null; continue; }
+    if (/^\[\[/.test(line)) { table = null; atRoot = false; continue; }
     if (!table) continue;
     const eq = findAssign(line);
     if (eq < 0) continue;
     const keys = splitKey(line.slice(0, eq));
     let rest = line.slice(eq + 1).trim();
     // Multi-line arrays / inline tables: keep reading until brackets balance.
+    const at = i + 1;
     while (!balanced(rest) && i + 1 < lines.length) rest += '\n' + lines[++i];
+    if (atRoot && keys[0] !== 'mcp_servers') continue;
+    // A value this parser cannot read inside a server table is an unreadable
+    // config, not an empty one: skipping it would report "clean" about a
+    // value nobody looked at (scanHostConfigs turns the throw into exit 2).
     let value;
-    try { value = parseValue(rest, { i: 0 }); } catch { continue; }
+    try { value = parseValue(rest, { i: 0 }); } catch (e) { throw new Error(`line ${at}: ${e.message}`); }
     let t = table;
     for (const k of keys.slice(0, -1)) t = (t[k] && typeof t[k] === 'object') ? t[k] : (t[k] = {});
     t[keys[keys.length - 1]] = value;
@@ -419,6 +438,7 @@ function parseValue(s, pos) {
   if (c === '"') {
     if (s.startsWith('"""', pos.i)) {
       const end = s.indexOf('"""', pos.i + 3);
+      if (end < 0) throw new Error('unterminated string');
       const v = s.slice(pos.i + 3, end).replace(/^\n/, '');
       pos.i = end + 3; return v;
     }
@@ -427,14 +447,23 @@ function parseValue(s, pos) {
       if (s[j] === '\\') { const e = s[j + 1]; v += ({ n: '\n', t: '\t', r: '\r', '"': '"', '\\': '\\' })[e] ?? e; j += 2; }
       else v += s[j++];
     }
+    if (j >= s.length) throw new Error('unterminated string');
     pos.i = j + 1; return v;
   }
-  if (c === "'") { const end = s.indexOf("'", pos.i + 1); const v = s.slice(pos.i + 1, end); pos.i = end + 1; return v; }
+  if (c === "'") {
+    const q = s.startsWith("'''", pos.i) ? "'''" : "'";
+    const end = s.indexOf(q, pos.i + q.length);
+    if (end < 0) throw new Error('unterminated string');
+    let v = s.slice(pos.i + q.length, end);
+    if (q.length === 3) v = v.replace(/^\n/, '');
+    pos.i = end + q.length; return v;
+  }
   if (c === '[') {
     pos.i++; const arr = [];
     for (;;) {
       skipWs(s, pos);
       if (s[pos.i] === ']') { pos.i++; return arr; }
+      if (pos.i >= s.length) throw new Error('unterminated array');
       arr.push(parseValue(s, pos));
       skipWs(s, pos);
       if (s[pos.i] === ',') pos.i++;
@@ -447,6 +476,7 @@ function parseValue(s, pos) {
     for (;;) {
       skipWs(s, pos);
       if (s[pos.i] === '}') { pos.i++; return obj; }
+      if (pos.i >= s.length) throw new Error('unterminated inline table');
       const rest = s.slice(pos.i);
       const eq = findAssign(rest);
       if (eq < 0) throw new Error('bad inline table');
@@ -608,7 +638,7 @@ function scanHostConfigs({ cwd = process.cwd(), home = os.homedir(), platform = 
     }
     let doc;
     try { doc = loc.path.endsWith('.toml') ? parseCodexTomlServers(raw) : JSON.parse(raw); }
-    catch (e) { unreadable.push({ ...loc, error: `parse failed: ${e.message}` }); continue; }
+    catch (e) { unreadable.push({ ...loc, error: `parse failed: ${parseErrorWithoutContent(e)}` }); continue; }
     files.push({ host: loc.host, scope: loc.scope, path: loc.path });
 
     const found = scanDocument(doc, loc);
@@ -648,6 +678,19 @@ function scanHostConfigs({ cwd = process.cwd(), home = os.homedir(), platform = 
   return { files, unreadable, findings: findings.map(strip) };
 }
 
+/**
+ * A parse error, minus the file. V8's JSON errors quote the text around the
+ * fault (`Unexpected token 'o', "{ "env": { "TOKEN": "ghp_…" is not valid
+ * JSON`), and in a config with a secret in it that snippet can be the
+ * secret. Only the position survives.
+ */
+function parseErrorWithoutContent(e) {
+  const msg = String((e && e.message) || '');
+  if (/^line \d+: [a-z ]+$/.test(msg)) return msg;                       // ours (TOML)
+  const at = msg.match(/position \d+(?: \(line \d+ column \d+\))?/);
+  return at ? `not valid JSON at ${at[0]}` : 'not valid JSON';
+}
+
 function findLeaf(doc, f) {
   // Re-walk rather than parse the path back: the path is for humans.
   for (const map of serverMaps(doc, f.host)) {
@@ -679,8 +722,73 @@ function strip(f) {
   return out;
 }
 
+// ── as findings (docs/adr/0001) ────────────────────────────────────────────
+
+/** A config path as a subject path: relative to the project when inside it. */
+function subjectPath(file, cwd) {
+  if (!cwd) return file;
+  const rel = path.relative(cwd, file);
+  return rel && !rel.startsWith('..') && !path.isAbsolute(rel) ? rel.split(path.sep).join('/') : file;
+}
+
+/**
+ * A scan, as lib/finding.cjs findings over host-config subjects (`path:line`).
+ * Nothing here decides: every plain-text secret is an observed
+ * `secrets/<rule>` finding and the `secrets/*` row of lib/policy_rules.cjs
+ * says what that means. A config that could not be read is a
+ * `scope/unreadable` finding (`no-data`), never silence, and a config that was
+ * read and holds nothing is still a subject — so its "allow" is an answer, not
+ * an absence.
+ *
+ * The value stays out here too: the message is built from the same fields the
+ * legacy finding already carried (type, key path, length, mask). `details`
+ * keeps the advice that is not a finding — the recommendation and the
+ * suggested edit — keyed by finding id.
+ *
+ *   -> { findings, subjects, details: [{ finding, path, key, type, length, masked, tracked, recommendation, fix_suggestion }] }
+ */
+function toFindings(result, { cwd = null, scope = 'host-configs' } = {}) {
+  const findings = [];
+  const details = [];
+  const withFindings = new Set();
+  for (const f of result.findings || []) {
+    const s = subject.hostConfig({ path: subjectPath(f.file, cwd), line: f.line, host: f.host, scope: f.scope, server: f.server });
+    const fnd = finding({
+      rule: `secrets/${f.rule}`,
+      subject: s,
+      scope,
+      severity: f.severity,
+      // A known format is what it says it is; the heuristic is a name plus an
+      // entropy bar, which is a good guess and no more.
+      confidence: f.confidence === 'format' ? 'high' : 'medium',
+      state: 'observed',
+      message: `${f.type} in plain text at ${f.path} (${f.length} chars, ${f.masked})`
+        + (f.tracked ? '; the file is tracked by git, so the value is in history' : ''),
+    });
+    findings.push(fnd);
+    withFindings.add(f.file);
+    details.push({
+      finding: fnd.id, path: f.path, key: f.key, type: f.type, length: f.length, masked: f.masked,
+      tracked: f.tracked, recommendation: f.recommendation, fix_suggestion: f.fix_suggestion || null,
+    });
+  }
+  for (const u of result.unreadable || []) {
+    findings.push(finding({
+      rule: 'scope/unreadable',
+      subject: subject.hostConfig({ path: subjectPath(u.path, cwd), host: u.host, scope: u.scope }),
+      scope, severity: 'medium', state: 'no-data',
+      message: `${subjectPath(u.path, cwd)}: ${u.error} — its servers were not scanned`,
+    }));
+  }
+  const subjects = (result.files || []).filter((x) => !withFindings.has(x.path))
+    .map((x) => subject.hostConfig({ path: subjectPath(x.path, cwd), host: x.host, scope: x.scope }));
+  return { findings, subjects, details };
+}
+
 module.exports = {
   KNOWN,
+  toFindings,
+  subjectPath,
   scanString,
   scanServer: (spec, base, origin) => scanServer(spec, base, origin).map(strip),
   scanDocument: (doc, loc) => scanDocument(doc, loc).map(strip),

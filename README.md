@@ -776,12 +776,19 @@ A `${VAR}` / `${env:VAR}` / `${input:id}` reference is not a finding.
 
 ```bash
 mcp-vault secrets                 # exit 1 if anything is found
-mcp-vault secrets --json          # mcp-vault/secrets@1
-mcp-vault secrets --sarif         # for code scanning
+mcp-vault secrets --json          # mcp-vault/secrets@1, findings + decisions as findings@1
+mcp-vault secrets --sarif         # for code scanning (rule ids secrets/<rule>)
 mcp-vault secrets --fix-suggest   # a suggested edit per finding; nothing is changed
+mcp-vault secrets --explain       # the decision trace, rule → finding
 ```
 
-**The value is never printed** — not in text, `--json` or SARIF: a finding is the
+Each hit is a `secrets/<rule>` finding on a host-config subject (`path:line`),
+and the verdict is the `secrets/*` row of the one rule table
+([ADR 0001](./docs/adr/0001-findings-and-time.md)): a plain-text secret is
+refused whether or not the file is tracked; an unreadable config is `unknown`
+(exit 2), never clean.
+
+**The value is never printed** — not in text, `--json`, findings@1, the trace or SARIF: a finding is the
 type, file, path to the key, length and a masked prefix of at most four
 characters (only a format's public prefix, like `ghp_`; nothing for a heuristic
 match). A config tracked by git (`git ls-files`) is severity `high`: the value
