@@ -105,9 +105,10 @@ COMMANDS
   wrap              Generate MCP wrapper boilerplate for a CLI / API tool
   site-registry     Generate registry.html from tools_database.json, every entry's
                     badge + evidence page, and the sub-registry export below
-                    (--out <dir>, --base-url <url>)
+                    (--out <site root> --base-url <url>)
   badge <name>      README snippet for a "vetted by mcp-vault" badge, and what it says today
-  export-registry   The DB as a static MCP sub-registry: docs/site/v0.1/ (API v0.1)
+  export-registry   The DB as a static MCP sub-registry: <out>/v0.1/ (API v0.1)
+                    (--out <site root, default docs/site> --base-url <url>)
   registry-ingest   Official registry snapshot → withdrawn entries + new servers
                     (--fetch --out <file> is the only networked step)
   budget            What your configured servers cost in context tokens

@@ -914,13 +914,23 @@ mcp-vault site-registry --out <site root> --base-url https://mcp.froggychips.xyz
 
 [`scripts/export_subregistry.cjs`](./mcp-ecosystem-intelligence/scripts/export_subregistry.cjs)
 writes the DB as a static [sub-registry](https://modelcontextprotocol.io/registry/registry-aggregators#acting-as-a-subregistry):
-the registry's own read API (v0.1) as files under `docs/site/v0.1/`, so a host
+the registry's own read API (v0.1) as files under `<out>/v0.1/`, so a host
 that already speaks it can point at the site's base URL — VS Code's
 `McpGalleryServiceUrl`, or ToolHive via `v0.1/x/xyz.froggychips.mcp/toolhive.json`.
-`site-registry` runs it too, so the page and the API describe the same DB.
+`site-registry` runs it too, with the same `--out` / `--base-url`, so the page
+and the API describe the same DB.
+
+The export is not committed to this repo. The site
+([mcp.froggychips.xyz](https://mcp.froggychips.xyz)) lives in
+`froggychips/mcp-site`, whose workflow installs a released
+`@froggychips/mcp-vault` from npm and runs the generators with the site's root
+as `--out`. Locally the default `--out` is `docs/site`, where `v0.1/` is
+git-ignored.
 
 ```bash
-mcp-vault export-registry            # docs/site/v0.1/…   (--check: exit 1 if stale)
+mcp-vault export-registry --out <site root> --base-url https://mcp.froggychips.xyz
+mcp-vault site-registry   --out <site root> --base-url https://mcp.froggychips.xyz   # page + export
+mcp-vault export-registry --out <site root> --check   # exit 1 if the tree there is stale
 mcp-vault registry-ingest --fetch --out snap.json      # the only networked step
 mcp-vault registry-ingest --snapshot snap.json         # exit 1: an entry is withdrawn upstream
 mcp-vault discover --source registry-snapshot --snapshot snap.json
@@ -937,12 +947,38 @@ pinned, or a Deprecated tier, is not exported — a host that ignores `_meta`
 would offer it. Deterministic: tiers are computed as of the newest evidence
 date in the data, and the manifest (`export.json`) hashes every file.
 
+Both defaults are one constant each in
+[`lib/subregistry.cjs`](./mcp-ecosystem-intelligence/scripts/lib/subregistry.cjs):
+`NAMESPACE` (the `_meta` key, the names of unlisted entries and the `v0.1/x/…`
+directory) and `DEFAULT_BASE_URL`. Every absolute URL the export writes — the
+`explain.page` link in `_meta`, the ToolHive file's `meta.source` — is built from
+`--base-url`, and the manifest records it as `base_url`.
+
 What static hosting cannot do: `search`, `updated_since`, `version`,
 `include_deleted`, `limit` and `cursor` are ignored — every list request gets
-the whole list as one page with no `nextCursor`. List endpoints are
-`index.html` files (text/html) and versions are extensionless files; the
-bodies are JSON. Names are written both `%2F`-encoded and as subdirectories,
-because static hosts disagree about decoding `%2F`.
+the whole list as one page with no `nextCursor`. Names are written both
+`%2F`-encoded and as subdirectories, because static hosts disagree about
+decoding `%2F`.
+
+Content-Type on GitHub Pages is chosen by extension, so the API paths come back
+as `text/html` (list endpoints are `index.html`, reached via a `301` from
+`/v0.1/servers` to `/v0.1/servers/`) and `application/octet-stream` (single
+versions have no extension). The bodies are JSON. The clients checked parse the
+body and ignore the header: VS Code's gallery (`asJson` is a bare `JSON.parse`)
+and ToolHive's registry client (`json.NewDecoder`, redirects followed). A client
+that insists on `application/json` can use the `.json` twin every endpoint has,
+same bytes:
+
+| API path (what a client builds from the base URL) | `.json` twin (`application/json`) |
+|---|---|
+| `/v0.1/servers` | `/v0.1/servers.json` |
+| `/v0.1/servers/<name>/versions` | `/v0.1/servers/<name>/versions.json` |
+| `/v0.1/servers/<name>/versions/latest` | `…/versions/latest.json` |
+| `/v0.1/servers/<name>/versions/<version>` | `…/versions/<version>.json` |
+| — | `/v0.1/x/xyz.froggychips.mcp/toolhive.json` (ToolHive, one file) |
+
+A client that needs the header on the API paths themselves needs a real server
+(or a proxy in front of Pages) — a static host cannot provide it.
 
 `registry-ingest` goes the other way. It saves a full snapshot of the official
 registry (all or nothing, deleted servers included), then offline reports DB
@@ -1290,7 +1326,7 @@ Running the suite locally:
 ```bash
 node --test tests/*.test.cjs        # unit tests (offline)
 mcp-vault verify --offline          # DB smoke, no network
-mcp-vault site-registry             # regenerate docs/site/registry.html
+mcp-vault site-registry             # regenerate docs/site/registry.html (+ git-ignored v0.1/)
 ```
 
 ---

@@ -37,12 +37,13 @@
  *      skip list, with reasons, is in the export manifest.
  *
  * API:
- *   NAMESPACE, META_KEY, SCHEMA_URL
+ *   NAMESPACE, META_KEY, SCHEMA_URL, DEFAULT_BASE_URL
+ *   normalizeBaseUrl(url)                     -> 'https://host[/path]' (no trailing slash)
  *   asOfDate(db, evals)                       -> 'YYYY-MM-DD' | null
  *   serverName(tool)                          -> { name, source }
  *   packageOf(tool)                           -> { package, pinned } | { skip }
- *   toServerJson(tool, { smoke, asOf, … })    -> { server } | { skip }
- *   buildExport(db, evals, { asOf, … })       -> { files: Map, manifest }
+ *   toServerJson(tool, { smoke, asOf, baseUrl, … }) -> { server } | { skip }
+ *   buildExport(db, evals, { asOf, baseUrl, … })    -> { files: Map, manifest }
  */
 
 const crypto = require('crypto');
@@ -55,11 +56,19 @@ const { githubRepoUrl } = require('./repo_url.cjs');
 // the registry spec asks for `_meta` keys and extension paths. The domain, not
 // `io.github.froggychips`: it is where these files live, so whoever controls
 // the key controls the bytes behind it.
+//
+// THE ONE PLACE the namespace is spelled. Everything else — the `_meta` key,
+// the names of unlisted entries, the `v0.1/x/<namespace>/` directory, the
+// tests — derives from it. Changing it changes every published name, so it is
+// an owner's decision, not a refactor.
 const NAMESPACE  = 'xyz.froggychips.mcp';
 const META_KEY   = `${NAMESPACE}/vault`;
 const SCHEMA_URL = 'https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json';
 const API_PREFIX = 'v0.1';
-const SITE       = 'https://mcp.froggychips.xyz';
+// Where the site is served. Only the default: every absolute URL the export
+// writes is built from the `baseUrl` option (`--base-url`), so a mirror or a
+// staging copy does not point readers back at production.
+const DEFAULT_BASE_URL = 'https://mcp.froggychips.xyz';
 const REPO       = 'https://github.com/froggychips/mcp-skills-vault';
 
 // server.json constraints (2025-12-11 schema).
@@ -273,8 +282,18 @@ function tierHoldsUntil(tool, smoke, asOf, tier, horizon = 120) {
   return null;
 }
 
-function toServerJson(tool, { smoke = null, asOf, minTier = 'Experimental' } = {}) {
+/** An http(s) URL with no query, fragment or trailing slash; throws otherwise. */
+function normalizeBaseUrl(url) {
+  let u;
+  try { u = new URL(String(url)); } catch { throw new Error(`base URL is not a URL: ${url}`); }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new Error(`base URL must be http(s): ${url}`);
+  if (u.search || u.hash || u.username || u.password) throw new Error(`base URL must be a plain origin or path: ${url}`);
+  return `${u.origin}${u.pathname.replace(/\/+$/, '')}`;
+}
+
+function toServerJson(tool, { smoke = null, asOf, minTier = 'Experimental', baseUrl = DEFAULT_BASE_URL } = {}) {
   if (!asOf) throw new Error('toServerJson: asOf is required (the export has no clock)');
+  const site = normalizeBaseUrl(baseUrl);
   const now  = Date.parse(`${asOf}T00:00:00Z`);
   const tier = classifyEntry(tool, smoke, { now });
   if (tier.classification === 'Deprecated') return { skip: `tier Deprecated: ${tier.why}` };
@@ -323,7 +342,7 @@ function toServerJson(tool, { smoke = null, asOf, minTier = 'Experimental' } = {
         : null,
       explain: {
         command: `npx -y @froggychips/mcp-vault explain ${tool.name}`,
-        page:    `${SITE}/registry.html`,
+        page:    `${site}/registry.html`,
         source:  `${REPO}/blob/master/mcp-ecosystem-intelligence/assets/tools_database.json`,
       },
     },
@@ -358,7 +377,23 @@ function versionLeaves(version) {
   return enc === version ? [version] : [enc, version];
 }
 
-function buildExport(db, evals, { asOf = null, minTier = 'Experimental' } = {}) {
+/**
+ * GitHub Pages picks the Content-Type from the extension: `index.html` is
+ * `text/html`, an extensionless file `application/octet-stream`. The API paths
+ * have to be those files (a client builds `/v0.1/servers/<name>/versions/latest`
+ * itself), but every endpoint also gets a `.json` twin with the same bytes,
+ * served as `application/json`, for anything given a URL rather than a base:
+ *
+ *   v0.1/servers/index.html            -> v0.1/servers.json
+ *   …/versions/index.html              -> …/versions.json
+ *   …/versions/latest, …/versions/<v>  -> …/versions/latest.json, …/<v>.json
+ */
+function jsonTwin(rel) {
+  return rel.endsWith('/index.html') ? `${rel.slice(0, -'/index.html'.length)}.json` : `${rel}.json`;
+}
+
+function buildExport(db, evals, { asOf = null, minTier = 'Experimental', baseUrl = DEFAULT_BASE_URL } = {}) {
+  const site = normalizeBaseUrl(baseUrl);
   const at = asOf || asOfDate(db, evals);
   if (!at) throw new Error('no evidence date in the data, and no --as-of given');
   const smokeByName = evalIndex((evals && evals.results) || []);
@@ -367,7 +402,7 @@ function buildExport(db, evals, { asOf = null, minTier = 'Experimental' } = {}) 
 
   const tools = [...((db && db.tools) || [])].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   for (const t of tools) {
-    const r = toServerJson(t, { smoke: smokeByName.get(t.name) || null, asOf: at, minTier });
+    const r = toServerJson(t, { smoke: smokeByName.get(t.name) || null, asOf: at, minTier, baseUrl: site });
     if (r.skip) skipped.push({ name: t.name, reason: r.skip });
     else exported.push(r.server);
   }
@@ -390,7 +425,8 @@ function buildExport(db, evals, { asOf = null, minTier = 'Experimental' } = {}) 
   const response = (s) => ({ server: s, _meta: { [META_KEY]: { isLatest: true, as_of: at } } });
 
   const files = new Map();
-  files.set(`${API_PREFIX}/servers/index.html`, json({
+  const endpoint = (rel, body) => { files.set(rel, body); files.set(jsonTwin(rel), body); };
+  endpoint(`${API_PREFIX}/servers/index.html`, json({
     servers:  exported.map(response),
     metadata: { count: exported.length },
   }));
@@ -398,9 +434,9 @@ function buildExport(db, evals, { asOf = null, minTier = 'Experimental' } = {}) 
     const one = json(response(s));
     const list = json({ servers: [response(s)], metadata: { count: 1 } });
     for (const dir of serverDirs(s.name)) {
-      files.set(`${dir}/versions/index.html`, list);
-      files.set(`${dir}/versions/latest`, one);
-      for (const leaf of versionLeaves(s.version)) files.set(`${dir}/versions/${leaf}`, one);
+      endpoint(`${dir}/versions/index.html`, list);
+      endpoint(`${dir}/versions/latest`, one);
+      for (const leaf of versionLeaves(s.version)) endpoint(`${dir}/versions/${leaf}`, one);
     }
   }
 
@@ -410,7 +446,7 @@ function buildExport(db, evals, { asOf = null, minTier = 'Experimental' } = {}) 
   files.set(`${API_PREFIX}/x/${NAMESPACE}/toolhive.json`, json({
     $schema: 'https://raw.githubusercontent.com/stacklok/toolhive-core/main/registry/types/data/upstream-registry.schema.json',
     version: '1.0.0',
-    meta:    { last_updated: `${at}T00:00:00Z` },
+    meta:    { last_updated: `${at}T00:00:00Z`, source: `${site}/${API_PREFIX}/servers.json` },
     data:    { servers: exported },
   }));
 
@@ -422,6 +458,7 @@ function buildExport(db, evals, { asOf = null, minTier = 'Experimental' } = {}) 
     schema:     'mcp-vault/subregistry-export@1',
     as_of:      at,
     namespace:  NAMESPACE,
+    base_url:   site,
     meta_key:   META_KEY,
     server_schema: SCHEMA_URL,
     api:        API_PREFIX,
@@ -435,7 +472,8 @@ function buildExport(db, evals, { asOf = null, minTier = 'Experimental' } = {}) 
 }
 
 module.exports = {
-  NAMESPACE, META_KEY, SCHEMA_URL, API_PREFIX, NAME_RE,
+  NAMESPACE, META_KEY, SCHEMA_URL, API_PREFIX, NAME_RE, DEFAULT_BASE_URL,
+  normalizeBaseUrl, jsonTwin,
   asOfDate, slug, serverName, packageOf, dockerArguments, serverVersion, repositoryOf, ociIdentifier,
   toServerJson, tierHoldsUntil, buildExport, serverDirs, versionLeaves,
 };

@@ -3,14 +3,16 @@
  * mcp-vault export-registry — the DB as a static sub-registry of the official
  * MCP Registry (API v0.1), servable from GitHub Pages as it is.
  *
- * Writes, under <out>/v0.1/:
+ * Writes, under <out>/v0.1/ (<out> is the site root, served at --base-url):
  *
  *   servers/index.html                         GET /v0.1/servers   (one page, no cursor)
  *   servers/<name>/versions/index.html         GET …/versions
  *   servers/<name>/versions/latest             GET …/versions/latest
  *   servers/<name>/versions/<version>          GET …/versions/<version>
- *   x/xyz.froggychips.mcp/toolhive.json        ToolHive upstream-format registry file
- *   x/xyz.froggychips.mcp/export.json          manifest: as-of date, skips, sha256 per file
+ *   servers.json, …/versions.json, …/latest.json, …/<version>.json
+ *                                              the same bytes, as application/json
+ *   x/<namespace>/toolhive.json                ToolHive upstream-format registry file
+ *   x/<namespace>/export.json                  manifest: as-of date, skips, sha256 per file
  *
  * <name> is written twice, URL-encoded (`io.github.o%2Fr`) and decoded
  * (`io.github.o/r`), because static hosts disagree about `%2F` — see
@@ -21,20 +23,26 @@
  *     ignored — every request for /v0.1/servers gets the whole list;
  *   - `?limit=` / `?cursor=` are ignored — there is one page, and no
  *     `nextCursor`, so a client paginating correctly stops after it;
- *   - list endpoints are served as `text/html` (they are `index.html`) and
- *     single versions as `application/octet-stream` (no extension). The bodies
- *     are JSON; a client that insists on the Content-Type needs a real server.
+ *   - on GitHub Pages the API paths are served as `text/html` (list
+ *     endpoints are `index.html`) and `application/octet-stream` (single
+ *     versions have no extension). The bodies are JSON, and the clients
+ *     checked (VS Code's gallery, ToolHive) parse the body without looking at
+ *     the Content-Type; for anything that does, each endpoint has a `.json`
+ *     twin served as `application/json` — see jsonTwin in lib/subregistry.cjs.
  *
  * Offline and deterministic: no clock, no network. The tier is computed as of
  * the newest evidence date in the data (or --as-of), and the same DB produces
  * the same bytes.
  *
  * Usage:
- *   node scripts/export_subregistry.cjs [--out <dir>] [--as-of YYYY-MM-DD]
+ *   node scripts/export_subregistry.cjs [--out <dir>] [--base-url <url>]
+ *                                       [--as-of YYYY-MM-DD]
  *                                       [--min-tier Core|Recommended|Experimental]
  *                                       [--check] [--json]
  *
- *   --out       site root to write under (default: docs/site)
+ *   --out       site root to write under (default: docs/site, git-ignored)
+ *   --base-url  where that root is served; every absolute URL written is built
+ *               from it (default: https://mcp.froggychips.xyz)
  *   --check     write nothing; exit 1 if the files on disk differ from a fresh export
  *   --json      print the manifest (schema mcp-vault/subregistry-export@1)
  *
@@ -49,7 +57,7 @@
 const fs   = require('fs');
 const path = require('path');
 const { exitAfterFlush } = require('./lib/exit.cjs');
-const { buildExport, API_PREFIX, NAMESPACE } = require('./lib/subregistry.cjs');
+const { buildExport, normalizeBaseUrl, jsonTwin, API_PREFIX, NAMESPACE, DEFAULT_BASE_URL } = require('./lib/subregistry.cjs');
 
 const ROOT      = path.resolve(__dirname, '..', '..');
 const DB_PATH   = path.join(ROOT, 'mcp-ecosystem-intelligence', 'assets', 'tools_database.json');
@@ -59,6 +67,7 @@ const DEFAULT_OUT = path.join(ROOT, 'docs', 'site');
 const HELP = `export-registry — the vault as a static MCP sub-registry (API v0.1)
 
   --out <dir>        site root to write under (default: docs/site)
+  --base-url <url>   where that root is served (default: ${DEFAULT_BASE_URL})
   --as-of <date>     compute tiers as of YYYY-MM-DD (default: newest evidence date)
   --min-tier <t>     Core | Recommended | Experimental (default: Experimental)
   --check            write nothing; exit 1 if the on-disk export is stale
@@ -66,7 +75,7 @@ const HELP = `export-registry — the vault as a static MCP sub-registry (API v0
 `;
 
 function parseArgs(argv) {
-  const opts = { out: DEFAULT_OUT, asOf: null, minTier: 'Experimental', check: false, json: false };
+  const opts = { out: DEFAULT_OUT, baseUrl: DEFAULT_BASE_URL, asOf: null, minTier: 'Experimental', check: false, json: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const val = () => {
@@ -75,6 +84,7 @@ function parseArgs(argv) {
       return v;
     };
     if (a === '--out') opts.out = path.resolve(val());
+    else if (a === '--base-url') opts.baseUrl = val();
     else if (a === '--as-of') opts.asOf = val();
     else if (a === '--min-tier') opts.minTier = val();
     else if (a === '--check') opts.check = true;
@@ -82,6 +92,7 @@ function parseArgs(argv) {
     else if (a === '-h' || a === '--help') opts.help = true;
     else throw new Error(`unknown argument: ${a}`);
   }
+  opts.baseUrl = normalizeBaseUrl(opts.baseUrl);
   if (opts.asOf && !/^\d{4}-\d{2}-\d{2}$/.test(opts.asOf)) throw new Error('--as-of must be YYYY-MM-DD');
   if (!['Core', 'Recommended', 'Experimental'].includes(opts.minTier)) {
     throw new Error('--min-tier must be Core, Recommended or Experimental');
@@ -104,6 +115,8 @@ function ownedFiles(out) {
   };
   walk(`${API_PREFIX}/servers`);
   walk(`${API_PREFIX}/x/${NAMESPACE}`);
+  const listTwin = jsonTwin(`${API_PREFIX}/servers/index.html`);
+  if (fs.existsSync(path.join(out, listTwin))) found.push(listTwin);
   return found.sort();
 }
 
@@ -125,6 +138,7 @@ function writeExport(out, files) {
   // site belongs to other generators.
   fs.rmSync(path.join(out, API_PREFIX, 'servers'), { recursive: true, force: true });
   fs.rmSync(path.join(out, API_PREFIX, 'x', NAMESPACE), { recursive: true, force: true });
+  fs.rmSync(path.join(out, jsonTwin(`${API_PREFIX}/servers/index.html`)), { force: true });
   for (const rel of [...files.keys()].sort()) {
     const abs = path.join(out, rel);
     fs.mkdirSync(path.dirname(abs), { recursive: true });
@@ -150,7 +164,7 @@ function run(argv, { dbPath = DB_PATH, evalPath = EVAL_PATH } = {}) {
   try { evals = JSON.parse(fs.readFileSync(evalPath, 'utf8')); } catch { /* none shipped */ }
 
   let built;
-  try { built = buildExport(db, evals, { asOf: opts.asOf, minTier: opts.minTier }); } catch (e) {
+  try { built = buildExport(db, evals, { asOf: opts.asOf, minTier: opts.minTier, baseUrl: opts.baseUrl }); } catch (e) {
     process.stderr.write(`export-registry: ${e.message}\n`);
     return 2;
   }

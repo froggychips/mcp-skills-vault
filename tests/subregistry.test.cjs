@@ -74,7 +74,7 @@ test('an official name is kept only when identity recorded it; otherwise our nam
   assert.deepEqual(sub.serverName(listed), { name: 'io.github.o/x', source: 'official-registry' });
 
   const unlisted = npmEntry('@scope/pkg', '@scope/pkg', '1.0.0', { registry: { status: 'unlisted', checked_at: '2026-09-17' } });
-  assert.deepEqual(sub.serverName(unlisted), { name: 'xyz.froggychips.mcp/scope.pkg', source: 'vault' });
+  assert.deepEqual(sub.serverName(unlisted), { name: `${sub.NAMESPACE}/scope.pkg`, source: 'vault' });
 
   // Not derived from the source URL: that would print a namespace nobody proved.
   const junk = npmEntry('y', 'y', '1.0.0', { registry: { status: 'listed', checked_at: '2026-09-17', server_id: 'no slash here' } });
@@ -149,13 +149,18 @@ test('static layout: one list page without a cursor, both spellings of a name, l
   const list = JSON.parse(files.get('v0.1/servers/index.html'));
   assert.equal(list.metadata.count, 2);
   assert.equal(list.metadata.nextCursor, undefined);
-  assert.deepEqual(list.servers.map((r) => r.server.name), ['io.github.o/a', 'xyz.froggychips.mcp/b']);
+  assert.deepEqual(list.servers.map((r) => r.server.name), ['io.github.o/a', `${sub.NAMESPACE}/b`]);
 
   for (const dir of ['v0.1/servers/io.github.o%2Fa', 'v0.1/servers/io.github.o/a']) {
     assert.equal(files.get(`${dir}/versions/latest`), files.get(`${dir}/versions/1.0.0`), dir);
     assert.equal(JSON.parse(files.get(`${dir}/versions/index.html`)).servers.length, 1);
     assert.equal(JSON.parse(files.get(`${dir}/versions/latest`)).server.version, '1.0.0');
   }
+  // Every endpoint has a .json twin with the same bytes (application/json on Pages).
+  assert.equal(files.get('v0.1/servers.json'), files.get('v0.1/servers/index.html'));
+  assert.equal(files.get('v0.1/servers/io.github.o%2Fa/versions.json'), files.get('v0.1/servers/io.github.o%2Fa/versions/index.html'));
+  assert.equal(files.get('v0.1/servers/io.github.o/a/versions/latest.json'), files.get('v0.1/servers/io.github.o/a/versions/latest'));
+  assert.equal(files.get('v0.1/servers/io.github.o/a/versions/1.0.0.json'), files.get('v0.1/servers/io.github.o/a/versions/1.0.0'));
   // The manifest hashes every other file it describes.
   for (const k of files.keys()) {
     if (k.endsWith('/export.json')) continue;
@@ -165,7 +170,7 @@ test('static layout: one list page without a cursor, both spellings of a name, l
 
 test('two entries that would publish one name are refused, not silently shadowed', () => {
   const db = { tools: [npmEntry('@o/x', '@o/x', '1.0.0'), npmEntry('o.x', 'o.x', '1.0.0')] };
-  assert.throws(() => sub.buildExport(db, { results: [] }), /two entries export as xyz\.froggychips\.mcp\/o\.x/);
+  assert.throws(() => sub.buildExport(db, { results: [] }), new RegExp(`two entries export as ${sub.NAMESPACE.replace(/\./g, '\\.')}/o\\.x`));
 });
 
 test('--min-tier narrows the export and the skip says why', () => {
@@ -206,6 +211,7 @@ test('CLI: writes the tree, --check is 0 when current and 1 when stale or litter
     assert.equal(cli.run(['--as-of', 'yesterday']), 2);
     assert.equal(cli.run(['--min-tier', 'Deprecated']), 2);
     assert.equal(cli.run(['--bogus']), 2);
+    assert.equal(cli.run(['--base-url', 'ftp://x']), 2);
     assert.equal(cli.run(['--out', out], { dbPath: path.join(out, 'missing.json') }), 2);
   } finally { process.stderr.write = err; }
 });
@@ -218,4 +224,36 @@ test('CLI --json prints the manifest under its schema id', () => {
   const doc = JSON.parse(r.stdout);
   assert.equal(doc.schema, 'mcp-vault/subregistry-export@1');
   assert.equal(doc.meta_key, sub.META_KEY);
+});
+
+test('--base-url: every absolute site URL is built from it, default is the production site', () => {
+  const db = { tools: [npmEntry('b', 'b', '2.0.0')] };
+  const def = sub.buildExport(db, { results: [] });
+  assert.equal(def.manifest.base_url, sub.DEFAULT_BASE_URL);
+  const { files, manifest } = sub.buildExport(db, { results: [] }, { baseUrl: 'https://staging.example.org/site/' });
+  assert.equal(manifest.base_url, 'https://staging.example.org/site');
+  const one = JSON.parse(files.get(`v0.1/servers/${encodeURIComponent(`${sub.NAMESPACE}/b`)}/versions/latest`));
+  assert.equal(one.server._meta[sub.META_KEY].explain.page, 'https://staging.example.org/site/registry.html');
+  const th = JSON.parse(files.get(`v0.1/x/${sub.NAMESPACE}/toolhive.json`));
+  assert.equal(th.meta.source, 'https://staging.example.org/site/v0.1/servers.json');
+  assert.equal(th.data.servers[0]._meta[sub.META_KEY].explain.page, 'https://staging.example.org/site/registry.html');
+  // Nothing written under the export still names the production site.
+  for (const [k, body] of files) assert.ok(!body.includes(sub.DEFAULT_BASE_URL), k);
+  assert.throws(() => sub.normalizeBaseUrl('ftp://x'), /http\(s\)/);
+  assert.throws(() => sub.normalizeBaseUrl('https://x/?q=1'), /plain/);
+  assert.throws(() => sub.normalizeBaseUrl('not a url'), /not a URL/);
+});
+
+test('site-registry --out --base-url writes the page and the export under one root', () => {
+  const { spawnSync } = require('child_process');
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-site-'));
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'mcp-ecosystem-intelligence/scripts/generate_registry_page.cjs'),
+    '--out', out, '--base-url', 'https://mirror.example.org'], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  for (const f of ['registry.html', 'registry.json', 'v0.1/servers/index.html', 'v0.1/servers.json', `v0.1/x/${sub.NAMESPACE}/toolhive.json`]) {
+    assert.ok(fs.existsSync(path.join(out, f)), f);
+  }
+  assert.equal(JSON.parse(fs.readFileSync(path.join(out, `v0.1/x/${sub.NAMESPACE}/export.json`), 'utf8')).base_url, 'https://mirror.example.org');
+  const bad = spawnSync(process.execPath, [path.join(ROOT, 'mcp-ecosystem-intelligence/scripts/generate_registry_page.cjs'), '--bogus'], { encoding: 'utf8' });
+  assert.equal(bad.status, 2);
 });
