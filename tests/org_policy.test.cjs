@@ -446,6 +446,30 @@ test('mcp-vault approve: shows the diff, writes mcp.lock.json, and exits via dec
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test('mcp-vault approve: an invalid policy is exit 2 and the lockfile is not touched', () => {
+  const dir = tmp('approve-badpolicy');
+  const v1 = path.join(dir, 'v1.json');
+  writeJson(v1, { tools: TOOLS_V1 });
+  const lockFile = path.join(dir, 'mcp.lock.json');
+  const run = () => spawnSync(process.execPath, [path.join(SCRIPTS, 'approve.cjs'), 'acme-mcp', '--tools', v1, '--cwd', dir], { encoding: 'utf8', env: { ...process.env, HOME: dir, NO_COLOR: '1', MCP_VAULT_ORG_POLICY: '' } });
+  for (const bad of ['{ not json', JSON.stringify({ toolApproval: 'sometimes' })]) {
+    fs.writeFileSync(path.join(dir, '.mcp-vault.policy.json'), bad);
+    const r = run();
+    assert.equal(r.status, 2, `${bad}: ${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /policy error/);
+    assert.equal(fs.existsSync(lockFile), false, `${bad}: approve wrote the lock under an invalid policy`);
+  }
+  // An existing lock is left byte for byte.
+  fs.writeFileSync(path.join(dir, '.mcp-vault.policy.json'), JSON.stringify({ toolApproval: 'require' }));
+  assert.equal(run().status, 0);
+  const before = fs.readFileSync(lockFile, 'utf8');
+  fs.writeFileSync(path.join(dir, '.mcp-vault.policy.json'), JSON.stringify({ toolApproval: 'sometimes' }));
+  writeJson(v1, { tools: TOOLS_V2 });
+  assert.equal(run().status, 2);
+  assert.equal(fs.readFileSync(lockFile, 'utf8'), before);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 // ── explain ─────────────────────────────────────────────────────────────────
 
 test('explain --json names the policy rule and file that decided', () => {
