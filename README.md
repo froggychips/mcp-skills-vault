@@ -487,9 +487,11 @@ mcp-vault tool-scan --rules             # the table: id, severity, why
 ```
 
 Each match is a finding `tool-scan/<rule>` on the tool it was found in, and
-the verdict is the `tool-scan/*` row of the one policy table: high denies —
-in `tool-scan`, in `explain` and in `eval --fail-tool-scan` alike — medium
-warns, low is listed with `--show-low`. Recorded with `eval --record-evidence`
+the verdict is the `tool-scan/*` row of the one policy table: high denies in
+`tool-scan` and in `eval --fail-tool-scan`, medium warns, low is listed with
+`--show-low`. `explain` shows the same outcomes as context beside the gate's
+answer ("refused beside the gate"): the integrity gate does not read the scan,
+and explain's exit code is the gate's. Recorded with `eval --record-evidence`
 it also blocks trust through a `tool_descriptions` evidence dimension.
 "Nothing was read" is never "clean": a row listed before the scan existed is
 `not-run`, a `tools/list` with an unfetched next page or an empty one is
@@ -822,7 +824,9 @@ are matched to the vault by what they launch, not by their config key. A flow
 that needs a code capability to close is low confidence: reported, never
 enforced. `"toxicFlows"` and `"toolShadowing"` in the policy file (`fail` |
 `warn` | `allow`, default `warn`) set how loud it is: `warn` fails only under
-`--strict`.
+`--strict`. That is the exit code of `status` and `audit`; `explain <name>`
+shows what the entry would do to your set as context, since it answers what
+the install gate answers.
 
 ### Plain-text secrets in host configs (`secrets`)
 
