@@ -13,9 +13,12 @@
  * report is offline and repeatable: the same snapshot and the same DB give
  * the same answer, and the snapshot is a file a reviewer can open.
  *
- * Nothing here changes the DB. Two outputs, both for a human:
- *   - DB entries whose server the registry now marks deprecated or deleted —
- *     the latest version, or the exact version this DB pins;
+ * Nothing here changes the DB. Two outputs:
+ *   - findings (lib/finding.cjs) on DB entries whose server the registry now
+ *     marks deprecated or deleted — the latest version, or the exact version
+ *     this DB pins — and, from a latest-only snapshot, a `not-run` finding
+ *     where the pinned version could not be seen: "not seen" is not "fine".
+ *     Whether any of it fails a run is `decide()`'s call, not this file's;
  *   - servers the registry lists that the DB does not have — discovery
  *     candidates, fed to `discover --source registry-snapshot`.
  *
@@ -23,7 +26,8 @@
  *   fetchSnapshot({ get, base, maxPages, now })  -> { ok, snapshot } | { ok:false, error }
  *   slimRecord(row)                              -> snapshot record | null
  *   latestByServer(snapshot)                     -> Map<name, record>
- *   ingestReport(db, snapshot)                   -> report (mcp-vault/registry-ingest@1)
+ *   ingestReport(db, snapshot)                   -> { snapshot, db_entries, matched, withdrawn, unseen, new_servers… }
+ *   ingestFindings(db, report)                   -> { subjects, observations, findings }
  *   snapshotAsRegistryPage(snapshot)             -> { servers: [{ server }] } — discover's input shape
  */
 
@@ -31,6 +35,9 @@ const { getJson } = require('./http.cjs');
 const { githubSlug } = require('./repo_url.cjs');
 const { toTypedEntry } = require('./entry_model.cjs');
 const { META_KEY: OFFICIAL } = require('./mcp_registry.cjs');
+const { readWallClock, isoInstant } = require('./clock.cjs');
+const { observation, finding } = require('./finding.cjs');
+const { subjectForTool } = require('./findings_from.cjs');
 
 const REGISTRY  = 'https://registry.modelcontextprotocol.io';
 // The registry caps `limit` at 100; a larger value is refused, not clamped.
@@ -81,7 +88,9 @@ function slimRecord(row) {
  */
 async function fetchSnapshot({
   get = getJson, base = REGISTRY, maxPages = DEFAULT_MAX_PAGES, latestOnly = false,
-  now = () => new Date().toISOString(), onPage = null,
+  // When the registry was looked at: an observation time, so the wall clock
+  // (docs/adr/0001 §4), never a replayed --as-of.
+  now = () => isoInstant(readWallClock()), onPage = null,
 } = {}) {
   const records = [];
   let cursor = null;
@@ -155,15 +164,46 @@ function latestByServer(snapshot) {
   return out;
 }
 
-/** What an entry installs, in the registry's vocabulary: [{ registryType, identifier, version }]. */
+const SEMVER = /^v?\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$/;
+
+/**
+ * What an entry installs, in the registry's vocabulary:
+ * { registryType, identifier, version, digest }. An image is pinned by its
+ * digest; its `version` is the entry's release version when it has one (an
+ * OCI record carries it as the server version or the tag), never `latest`.
+ */
 function entryPackage(tool) {
   const typed = toTypedEntry(tool);
   const a = (typed && typed.artifact) || {};
   if ((a.ecosystem === 'npm' || a.ecosystem === 'pypi') && a.package) {
-    return { registryType: a.ecosystem, identifier: a.package, version: a.version || null };
+    return { registryType: a.ecosystem, identifier: a.package, version: a.version || null, digest: null };
   }
-  if (a.ecosystem === 'oci' && a.image) return { registryType: 'oci', identifier: a.image, version: null };
+  if (a.ecosystem === 'oci' && a.image) {
+    const v = typeof tool.version === 'string' && SEMVER.test(tool.version) ? tool.version.replace(/^v/, '') : null;
+    return { registryType: 'oci', identifier: a.image, version: v, digest: a.digest || null };
+  }
   return null;
+}
+
+/**
+ * Is this registry record the exact artifact the entry pins? npm/PyPI: the
+ * package version. OCI: the same digest in the identifier, or — when the
+ * record names a tag rather than a digest — the entry's release version as the
+ * tag, the package version or the server version.
+ */
+function isPinnedRecord(ours, record) {
+  if (!ours) return false;
+  return record.packages.some((p) => {
+    if (!samePackage(ours, p)) return false;
+    if (ours.registryType !== 'oci') return Boolean(ours.version) && p.version === ours.version;
+    const id = String(p.identifier || '');
+    const digest = (id.match(/@(sha256:[a-f0-9]{64})$/) || [])[1] || null;
+    if (digest && ours.digest) return digest === ours.digest;
+    if (!ours.version) return false;
+    const tag = digest ? null : (id.match(/:([^:/@]+)$/) || [])[1] || null;
+    const bare = (v) => String(v || '').replace(/^v/, '');
+    return bare(tag) === ours.version || bare(p.version) === ours.version || bare(record.version) === ours.version;
+  });
 }
 
 /** `ghcr.io/o/r:1.0` and `docker.io/o/r@sha256:…` → `ghcr.io/o/r`, `o/r`. */
@@ -205,6 +245,10 @@ function ingestReport(db, snapshot) {
   const claimedServers = new Set();
   const matched = [];
   const withdrawn = [];
+  // Matched, pinned to a version, and the pin could not be looked up because
+  // the snapshot holds latest versions only.
+  const unseen = [];
+  const latestOnly = snapshot.scope === 'latest';
 
   for (const t of tools) {
     const reg = t.trust_evidence && t.trust_evidence.dimensions && t.trust_evidence.dimensions.registry;
@@ -223,12 +267,11 @@ function ingestReport(db, snapshot) {
       claimedServers.add(n);
       const head = latest.get(n);
       // The version this DB pins, when the registry lists that exact version.
-      const pinned = pkg && pkg.version
-        ? byServer.get(n).find((r) => r.packages.some((p) => samePackage(pkg, p) && p.version === pkg.version)) || null
-        : null;
+      const pinned = byServer.get(n).find((r) => isPinnedRecord(pkg, r)) || null;
       const row = { name: t.name, server_id: n, matched_by: by, latest: statusOf(head), pinned: statusOf(pinned) };
       matched.push(row);
       if (WITHDRAWN.has(head.status) || (pinned && WITHDRAWN.has(pinned.status))) withdrawn.push(row);
+      if (latestOnly && !pinned && pkg && (pkg.version || pkg.digest)) unseen.push(row);
     }
   }
 
@@ -246,17 +289,68 @@ function ingestReport(db, snapshot) {
   }
 
   return {
-    schema:      'mcp-vault/registry-ingest@1',
     snapshot:    {
       source: snapshot.source || null, fetched_at: snapshot.fetched_at || null,
       scope: snapshot.scope || null, count: snapshot.servers.length,
     },
     db_entries:  tools.length,
     matched:     matched.length,
+    matched_rows: matched,
     withdrawn,
+    unseen,
     new_servers_count: newServers.length,
     new_servers: newServers,
   };
+}
+
+/**
+ * The report's statements about DB entries, as observations and findings on
+ * the entries' artifact subjects. Every matched entry is a subject — examined,
+ * so an allow when nothing is wrong — and nothing else is: an entry the
+ * registry does not list was not examined here.
+ *
+ *   registry/deleted-upstream     high   usually a moderation action (spam, malware)
+ *   registry/deprecated-upstream  medium the maintainer's own withdrawal
+ *   registry/pinned-unseen        info, not-run — a latest-only snapshot
+ *                                 cannot see the pinned version
+ */
+function ingestFindings(db, report) {
+  const byName = new Map(((db && db.tools) || []).map((t) => [t.name, t]));
+  const observed = String(report.snapshot.fetched_at || '1970-01-01');
+  const subjects = new Map();
+  const observations = [];
+  const findings = [];
+  const seen = new Set();
+  for (const row of report.matched_rows) {
+    const s = subjectForTool(byName.get(row.name));
+    subjects.set(s.id, s);
+    for (const [which, rec] of [['latest', row.latest], ['pinned', row.pinned]]) {
+      if (!rec || !WITHDRAWN.has(rec.status)) continue;
+      const key = `${s.id}\u0000${row.server_id}\u0000${rec.version}`;
+      if (seen.has(key)) continue;     // the latest version is the pinned one
+      seen.add(key);
+      const o = observation({
+        subject: s, dimension: `registry-status:${row.server_id}@${rec.version}`, status: rec.status,
+        observed_at: observed, source: 'registry-snapshot', detail: rec.statusMessage || null,
+      });
+      observations.push(o);
+      const deleted = rec.status === 'deleted';
+      findings.push(finding({
+        rule: deleted ? 'registry/deleted-upstream' : 'registry/deprecated-upstream',
+        subject: s, scope: 'database', severity: deleted ? 'high' : 'medium', state: 'observed', refs: [o.id],
+        message: `${which === 'pinned' || (row.pinned && row.pinned.version === rec.version) ? 'pinned' : 'latest'} ${rec.version} of ${row.server_id} is ${rec.status} upstream`
+          + ` (matched by ${row.matched_by})${rec.statusMessage ? `: "${rec.statusMessage}"` : ''}`,
+      }));
+    }
+  }
+  for (const row of report.unseen) {
+    const s = subjectForTool(byName.get(row.name));
+    findings.push(finding({
+      rule: 'registry/pinned-unseen', subject: s, scope: 'database', severity: 'info', state: 'not-run',
+      message: `the snapshot holds latest versions only: whether the version pinned here is withdrawn from ${row.server_id} was not checked`,
+    }));
+  }
+  return { subjects: [...subjects.values()], observations, findings };
 }
 
 /**
@@ -285,6 +379,6 @@ function snapshotAsRegistryPage(snapshot) {
 
 module.exports = {
   REGISTRY, WITHDRAWN, PAGE_SIZE, DEFAULT_MAX_PAGES,
-  fetchSnapshot, slimRecord, checkSnapshot, latestByServer, entryPackage, samePackage, ociRepo,
-  ingestReport, snapshotAsRegistryPage,
+  fetchSnapshot, slimRecord, checkSnapshot, latestByServer, entryPackage, samePackage, isPinnedRecord, ociRepo,
+  ingestReport, ingestFindings, snapshotAsRegistryPage,
 };

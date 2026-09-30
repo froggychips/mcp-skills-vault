@@ -15,6 +15,13 @@
  *                          exact version the DB pins), and how many listed
  *                          servers the DB does not have.
  *
+ * What the snapshot says about an entry is a finding (lib/finding.cjs:
+ * `registry/deleted-upstream`, `registry/deprecated-upstream`,
+ * `registry/pinned-unseen`); the exit code is the Decision's, from
+ * `decide()` over the table in lib/policy_rules.cjs (docs/adr/0001). A
+ * project's policy file has no rule about upstream withdrawals, so only the
+ * gate's own rows apply; --strict / --fail-unverified set the threshold.
+ *
  * The DB is never changed. Withdrawals are a report for a human; new servers
  * go to the discovery inbox through
  *   mcp-vault discover --source registry-snapshot --snapshot <file>
@@ -23,12 +30,16 @@
  * Usage:
  *   node scripts/registry_ingest.cjs --fetch --out <file> [--registry <url>]
  *                                    [--latest-only] [--max-pages N]
- *   node scripts/registry_ingest.cjs --snapshot <file> [--json]
+ *   node scripts/registry_ingest.cjs --snapshot <file> [--json] [--as-of <date>]
+ *                                    [--strict] [--fail-unverified]
  *
- * Exit codes:
- *   0  report produced, no DB entry is withdrawn upstream (or: snapshot written)
- *   1  at least one DB entry's server is deprecated or deleted upstream
- *   2  bad arguments, an unreadable snapshot, or a fetch that did not complete
+ * Exit codes (--snapshot: the decisions' — lib/finding.cjs exitCode):
+ *   0  nothing fails at the threshold (or: snapshot written)
+ *   1  a decision fails: a pinned or latest version deleted upstream always;
+ *      deprecated under --strict; a pin a latest-only snapshot could not see
+ *      under --fail-unverified
+ *   2  bad arguments, an unreadable snapshot, a snapshot fetched after
+ *      --as-of, or a fetch that did not complete
  */
 
 'use strict';
@@ -36,7 +47,10 @@
 const fs   = require('fs');
 const path = require('path');
 const { exitAfterFlush } = require('./lib/exit.cjs');
-const { fetchSnapshot, ingestReport, REGISTRY, DEFAULT_MAX_PAGES } = require('./lib/registry_snapshot.cjs');
+const { fetchSnapshot, ingestReport, ingestFindings, REGISTRY, DEFAULT_MAX_PAGES } = require('./lib/registry_snapshot.cjs');
+const { asOfFromArgv } = require('./lib/clock.cjs');
+const { decide, exitCode, findingsDocument, toJson } = require('./lib/finding.cjs');
+const { loadEffectivePolicy, flagsFromArgv } = require('./lib/policy_rules.cjs');
 
 const DB_PATH = path.resolve(__dirname, '../assets/tools_database.json');
 
@@ -48,7 +62,12 @@ const HELP = `registry-ingest — the official MCP Registry's view of this DB, f
                          withdrawn pinned version that is not the latest)
   --max-pages <n>        page cap for --fetch (default: ${DEFAULT_MAX_PAGES}; hitting it writes nothing)
   --snapshot <file>      compare the DB with a saved snapshot (offline)
-  --json                 machine-readable report (mcp-vault/registry-ingest@1)
+  --json                 machine-readable report (mcp-vault/registry-ingest@1), with
+                         findings and decisions under \`findings\` (mcp-vault/findings@1)
+  --as-of <date>         decide as of YYYY-MM-DD or an ISO-8601 instant (--snapshot
+                         only; a snapshot fetched later did not exist then)
+  --strict               a deprecation upstream fails the run too
+  --fail-unverified      a pin a latest-only snapshot could not see fails the run
 `;
 
 function parseArgs(argv) {
@@ -66,6 +85,9 @@ function parseArgs(argv) {
     else if (a === '--registry') o.registry = val().replace(/\/+$/, '');
     else if (a === '--json') o.json = true;
     else if (a === '--latest-only') o.latestOnly = true;
+    else if (a === '--strict' || a === '--fail-unverified') { /* policy flags: flagsFromArgv */ }
+    else if (a === '--as-of') val();                 // read by asOfFromArgv
+    else if (a.startsWith('--as-of=')) { /* read by asOfFromArgv */ }
     else if (a === '--max-pages') {
       o.maxPages = Number(val());
       if (!Number.isInteger(o.maxPages) || o.maxPages < 1) throw new Error('--max-pages must be a positive integer');
@@ -78,22 +100,30 @@ function parseArgs(argv) {
   if (!o.fetch && !o.snapshot) throw new Error('give --fetch --out <file> or --snapshot <file>');
   if (o.fetch && o.snapshot) throw new Error('--fetch and --snapshot are separate steps');
   if (!/^https:\/\//.test(o.registry)) throw new Error('--registry must be an https:// URL');
+  // The one clock read for this run (lib/clock.cjs). --fetch observes the
+  // registry now, and a replayed instant must never date an observation.
+  const clock = asOfFromArgv(argv);
+  if (clock.error) throw new Error(clock.error);
+  if (o.fetch && clock.source === 'as-of') throw new Error('--as-of replays a saved snapshot; --fetch observes the registry now');
+  o.clock = clock;
+  o.flags = flagsFromArgv(argv);
   return o;
 }
 
-function printHuman(r) {
+function printHuman(r, doc) {
   const out = [];
   out.push(`Official registry snapshot: ${r.snapshot.count} records (${r.snapshot.scope || 'unknown scope'}), fetched ${r.snapshot.fetched_at || 'unknown'}`);
   if (r.snapshot.scope === 'latest') out.push('  latest versions only: a withdrawn pinned version that is not the latest is not visible');
-  out.push(`${r.matched} DB entr${r.matched === 1 ? 'y' : 'ies'} matched to a registry server (of ${r.db_entries})`);
-  if (r.withdrawn.length) {
-    out.push('', `Withdrawn upstream (${r.withdrawn.length}) — review; the DB was not changed:`);
-    for (const w of r.withdrawn) {
-      const parts = [];
-      if (w.latest && w.latest.status !== 'active') parts.push(`latest ${w.latest.version} is ${w.latest.status}`);
-      if (w.pinned && w.pinned.status !== 'active') parts.push(`pinned ${w.pinned.version} is ${w.pinned.status}`);
-      const msg = (w.pinned && w.pinned.statusMessage) || (w.latest && w.latest.statusMessage);
-      out.push(`  ${w.name}  →  ${w.server_id} (by ${w.matched_by}): ${parts.join('; ')}${msg ? ` — "${msg}"` : ''}`);
+  out.push(`${r.matched} DB entr${r.matched === 1 ? 'y' : 'ies'} matched to a registry server (of ${r.db_entries}), decided as of ${doc.as_of}`);
+  // The decisions, rendered: each subject that is not a plain allow, with the
+  // rule that decided and the findings behind it.
+  const byId = new Map(doc.findings.map((f) => [f.id, f]));
+  const notAllow = doc.decisions.filter((d) => d.effect !== 'allow');
+  if (notAllow.length) {
+    out.push('', `Withdrawn upstream, or not checkable (${notAllow.length}) — review; the DB was not changed:`);
+    for (const d of notAllow) {
+      out.push(`  ${d.effect.toUpperCase()}${d.fails ? ' (fails)' : ''}  ${d.subject.entry}  — ${d.decided_by}`);
+      for (const id of d.findings) if (byId.has(id)) out.push(`      ${byId.get(id).rule}: ${byId.get(id).message}`);
     }
   } else {
     out.push('', 'No matched entry is deprecated or deleted upstream.');
@@ -105,7 +135,7 @@ function printHuman(r) {
   process.stdout.write(`${out.join('\n')}\n`);
 }
 
-async function run(argv, { get, dbPath = DB_PATH } = {}) {
+async function run(argv, { get, dbPath = DB_PATH, cwd = process.cwd() } = {}) {
   let o;
   try { o = parseArgs(argv); } catch (e) {
     process.stderr.write(`registry-ingest: ${e.message}\n\n${HELP}`);
@@ -143,9 +173,38 @@ async function run(argv, { get, dbPath = DB_PATH } = {}) {
     process.stderr.write(`registry-ingest: ${e.message}\n`);
     return 2;
   }
-  if (o.json) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-  else printHuman(report);
-  return report.withdrawn.length ? 1 : 0;
+  // A look dated after the instant decided at did not exist then.
+  const fetchedAt = Date.parse(report.snapshot.fetched_at || '');
+  if (o.clock.source === 'as-of' && Number.isFinite(fetchedAt) && fetchedAt > o.clock.asOf) {
+    process.stderr.write(`registry-ingest: the snapshot was fetched ${report.snapshot.fetched_at}, after --as-of ${o.clock.iso}\n`);
+    return 2;
+  }
+
+  // The project's policy file has no rules about upstream withdrawals
+  // (noPolicy drops the file's rows, the gate's stay); the flags set fail_on.
+  const loaded = loadEffectivePolicy(cwd, { flags: o.flags, noPolicy: true });
+  const { subjects, observations, findings } = ingestFindings(db, report);
+  const facts = Object.fromEntries(subjects.map((s) => [s.id, { mode: 'gate' }]));
+  const decisions = decide(findings, loaded.policy, o.clock.asOf, { subjects, facts });
+  const doc = toJson(findingsDocument({
+    asOf: o.clock.asOf, observations, findings, decisions, scope: 'database', policy: loaded.policy, facts,
+  }));
+
+  if (o.json) {
+    // The envelope keeps what is not a finding: the snapshot it read, the
+    // match count and the discovery candidates.
+    process.stdout.write(`${JSON.stringify({
+      schema:            'mcp-vault/registry-ingest@1',
+      as_of:             doc.as_of,
+      snapshot:          report.snapshot,
+      db_entries:        report.db_entries,
+      matched:           report.matched,
+      new_servers_count: report.new_servers_count,
+      new_servers:       report.new_servers,
+      findings:          doc,
+    }, null, 2)}\n`);
+  } else printHuman(report, doc);
+  return exitCode(decisions);
 }
 
 if (require.main === module) {

@@ -620,6 +620,77 @@ test('tool-scan: its decisions are decide() of its own document, and its exit co
   }
 });
 
+// ── #126: export-registry and registry-ingest ──────────────────────────────
+
+test('export-registry: _meta verdicts and skips are views of decide(), and agree with explain', () => {
+  const sub = require(path.join(S, 'lib', 'subregistry.cjs'));
+  for (const [pname, dir] of Object.entries(DIRS)) {
+    const out = fs.mkdtempSync(path.join(TMP, `export-${pname}-`));
+    const r = run('export_subregistry.cjs', ['--out', out, '--json', '--cwd', dir, '--as-of', AS_OF]);
+    assert.equal(r.status, 0, `${pname}: ${r.stderr}`);
+    const man = JSON.parse(r.stdout);
+    const doc = man.findings;
+    assert.equal(doc.schema, 'mcp-vault/findings@1');
+    assert.equal(doc.as_of, AS_OF);
+    assert.deepEqual(recompute(doc), doc.decisions, `${pname}: the export's decisions are not decide()'s`);
+    const byEntry = new Map(doc.decisions.map((d) => [d.subject.entry, d]));
+    const list = JSON.parse(fs.readFileSync(path.join(out, 'v0.1/servers.json'), 'utf8'));
+    for (const { server } of list.servers) {
+      const m = server._meta[sub.META_KEY];
+      const d = byEntry.get(m.vault_name);
+      assert.ok(d, `${pname} ${m.vault_name}: exported without a decision`);
+      assert.deepEqual([m.verdict.effect, m.verdict.decided_by, m.verdict.as_of], [d.effect, d.decided_by, d.as_of], `${pname} ${m.vault_name}`);
+      assert.notEqual(d.effect, 'deny', `${pname} ${m.vault_name}: a denied entry was exported`);
+    }
+    for (const d of doc.decisions.filter((x) => x.effect === 'deny')) {
+      const skip = man.skipped.find((x) => x.name === d.subject.entry);
+      assert.ok(skip && skip.reason.startsWith(`denied by ${d.decided_by}`), `${pname} ${d.subject.entry}: denied, but not skipped as denied`);
+    }
+    // One subject, one answer: explain over the same entry, policy and instant.
+    for (const name of SAMPLE) {
+      const x = JSON.parse(run('explain.cjs', [name, '--json', '--cwd', dir, '--as-of', AS_OF]).stdout).findings.decisions[0];
+      const d = byEntry.get(name);
+      assert.ok(d, `${pname} ${name}: no decision in the export`);
+      assert.deepEqual([d.subject.id, d.effect, d.decided_by, d.rules], [x.subject.id, x.effect, x.decided_by, x.rules],
+        `${pname} ${name}: export and explain decide the same entry differently`);
+    }
+  }
+});
+
+test('registry-ingest: every decision is decide() of the document, and the exit code is theirs', async () => {
+  const snap = require(path.join(S, 'lib', 'registry_snapshot.cjs'));
+  const cli = require(path.join(S, 'registry_ingest.cjs'));
+  const pages = require(path.join(ROOT, 'tests', 'fixtures', 'registry_v0.1_pages.json')).pages;
+  const get = async (url) => {
+    const cursor = new URL(url).searchParams.get('cursor');
+    const i = cursor ? pages.findIndex((p, k) => k > 0 && pages[k - 1].metadata.nextCursor === cursor) : 0;
+    return { ok: true, status: 200, data: pages[i] };
+  };
+  const snapshot = (await snap.fetchSnapshot({ get, now: () => '2026-09-20T00:00:00.000Z' })).snapshot;
+  const snapFile = path.join(TMP, 'ingest-snap.json');
+  fs.writeFileSync(snapFile, JSON.stringify(snapshot));
+  // The real DB, plus the fixture's withdrawn servers as entries of it.
+  const dbFile = path.join(TMP, 'ingest-db.json');
+  fs.writeFileSync(dbFile, JSON.stringify({ tools: [...DB,
+    { name: 'pw-fixture', install_cmd: 'npx -y @playwright/mcp@0.0.75', version: '0.0.75' },
+    { name: 'ch-fixture', install_cmd: 'uvx mcp-clickhouse==0.3.0', version: '0.3.0' }] }));
+  for (const flags of [[], ['--strict'], ['--fail-unverified']]) {
+    let text = '';
+    const [o, er] = [process.stdout.write, process.stderr.write];
+    process.stdout.write = (t) => { text += t; return true; };
+    process.stderr.write = () => true;
+    let code;
+    try { code = await cli.run(['--snapshot', snapFile, '--json', '--as-of', AS_OF, ...flags], { dbPath: dbFile, cwd: TMP }); }
+    finally { process.stdout.write = o; process.stderr.write = er; }
+    const doc = JSON.parse(text).findings;
+    const label = flags.join(' ') || '(no flags)';
+    assert.equal(doc.schema, 'mcp-vault/findings@1');
+    assert.ok(doc.findings.length >= 2, `${label}: the fixture withdrawals produced no findings`);
+    assert.deepEqual(recompute(doc), doc.decisions, `${label}: the printed decisions are not decide()'s`);
+    assert.equal(code, F.exitCode(doc.decisions), `${label}: the exit code is not the decisions'`);
+  }
+});
+
 // ── who decides ────────────────────────────────────────────────────────────
 
 // Commands whose verdict is a Decision from decide() (and prints findings@1).
@@ -641,6 +712,10 @@ const DECIDES_VIA_MODEL = {
   // A badge's state is a view of the entry's Decision (#119); its exit code
   // is 0 or a usage error, never the verdict.
   badge:   'badge.cjs',
+  // #126: the export publishes each entry's Decision in `_meta` (and leaves a
+  // denied one out); ingest's exit code is its decisions'.
+  'export-registry': 'export_subregistry.cjs',
+  'registry-ingest': 'registry_ingest.cjs',
 };
 // Commands that still map their own findings to an exit code. Each moves by
 // emitting findings@1 and exiting via decide() — then its line goes.

@@ -932,7 +932,7 @@ mcp-vault export-registry --out <site root> --base-url https://mcp.froggychips.x
 mcp-vault site-registry   --out <site root> --base-url https://mcp.froggychips.xyz   # page + export
 mcp-vault export-registry --out <site root> --check   # exit 1 if the tree there is stale
 mcp-vault registry-ingest --fetch --out snap.json      # the only networked step
-mcp-vault registry-ingest --snapshot snap.json         # exit 1: an entry is withdrawn upstream
+mcp-vault registry-ingest --snapshot snap.json         # exit 1: a pinned/latest version deleted upstream (--strict: deprecated too)
 mcp-vault discover --source registry-snapshot --snapshot snap.json
 ```
 
@@ -940,12 +940,18 @@ Each entry is a valid `server.json` (validated in the tests against the vendored
 2025-12-11 schema) with a pinned package — npm/PyPI by exact version, images as
 `oci` by `@sha256` digest — and our evidence under
 `_meta["xyz.froggychips.mcp/vault"]`: tier and why, pinned version and
-integrity, the date of each check, and how to ask `explain`. The name is the
-official one only when `identity` recorded it; everything else is published
-under `xyz.froggychips.mcp/…`, never under a namespace nobody proved. Nothing
-pinned, or a Deprecated tier, is not exported — a host that ignores `_meta`
-would offer it. Deterministic: tiers are computed as of the newest evidence
-date in the data, and the manifest (`export.json`) hashes every file.
+integrity, the date of each check, and how to ask `explain`. The `verdict`
+there is the entry's Decision — effect, the rule that decided it, why, as of
+when — made by `decide()` over the stored evidence exactly as `explain` makes
+it, under the policy that applies to `--cwd`; `tier_holds_until` is the first
+instant a piece of that evidence ages out. The name is the official one only
+when `identity` recorded it; everything else is published under
+`xyz.froggychips.mcp/…`, never under a namespace nobody proved. A denied entry,
+a Deprecated tier, or nothing pinned is not exported — a host that ignores
+`_meta` would offer it. Everything is judged as of one instant: now, or
+`--as-of` (`--check` replays the instant the export on disk was made at), and
+the same DB, policy and instant give the same bytes; the manifest
+(`export.json`) hashes every file, and `--json` adds the findings@1 document.
 
 Both defaults are one constant each in
 [`lib/subregistry.cjs`](./mcp-ecosystem-intelligence/scripts/lib/subregistry.cjs):
@@ -983,8 +989,13 @@ A client that needs the header on the API paths themselves needs a real server
 `registry-ingest` goes the other way. It saves a full snapshot of the official
 registry (all or nothing, deleted servers included), then offline reports DB
 entries whose server is `deprecated` or `deleted` — the latest version *or the
-exact version pinned here* — and the listed servers the DB lacks. It never
-edits the DB.
+exact version pinned here* (for images: the pinned digest, or the release
+version as tag) — and the listed servers the DB lacks. It never edits the DB.
+Withdrawals are findings (`registry/deleted-upstream`, high;
+`registry/deprecated-upstream`, medium; `registry/pinned-unseen`, not-run, when
+a latest-only snapshot cannot see the pin) and the exit code is `decide()`'s:
+`--strict` fails on a deprecation, `--fail-unverified` on an unseen pin, and
+`--as-of` replays a saved snapshot.
 
 ### Health scorer
 
