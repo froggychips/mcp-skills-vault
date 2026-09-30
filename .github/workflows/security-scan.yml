@@ -148,18 +148,29 @@ jobs:
         uses: ./.github/actions/docker-preflight
         with:
           required: 'true'
+      # What this job asks is "is the DB consistent": every entry pinned, the
+      # two copies of a docker digest in agreement, images pinned by digest,
+      # the policy met. It is not "is every entry installable today". Since
+      # the offline gate applies stored evidence, an advisory the weekly
+      # refresh recorded against a pinned version fails a plain `--offline`
+      # (as it fails `explain` and an install) — and would turn every PR red
+      # until someone bumps that entry. So the job states its question with
+      # --fail-families: the families below fail it; `evidence/*` and
+      # `trust/*` are still decided, printed and uploaded as SARIF, they just
+      # are not this job's exit code. Not a weaker gate — a narrower question.
       - name: verify_integrity --offline
         env:
           JAIL_IMAGE: node:22-alpine
+          DB_FAMILIES: integrity,pin,oci,verify,policy
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             docker run --rm --network none \
               --cap-drop ALL --security-opt no-new-privileges \
               -v "$PWD":/w:ro -w /w "$JAIL_IMAGE" \
-              node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --offline
+              node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --offline --fail-families "$DB_FAMILIES"
           else
-            node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --offline
+            node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --offline --fail-families "$DB_FAMILIES"
           fi
       # Same run, machine-readable: each finding lands on the tools_database.json
       # line that caused it, so a PR that adds an entry with no pin gets the
@@ -169,6 +180,7 @@ jobs:
         if: always()
         env:
           JAIL_IMAGE: node:22-alpine
+          DB_FAMILIES: integrity,pin,oci,verify,policy
         # The redirect target is a fresh file under RUNNER_TEMP, never a path
         # inside the checkout. Redirecting to `./verify.sarif` ran on the host
         # and followed that path wherever it led — and a PR can commit
@@ -187,9 +199,9 @@ jobs:
             docker run --rm --network none \
               --cap-drop ALL --security-opt no-new-privileges \
               -v "$PWD":/w:ro -w /w "$JAIL_IMAGE" \
-              node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --offline --sarif > "$out"
+              node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --offline --sarif --fail-families "$DB_FAMILIES" > "$out"
           else
-            node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --offline --sarif > "$out"
+            node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --offline --sarif --fail-families "$DB_FAMILIES" > "$out"
           fi
       - name: Upload to code scanning
         if: always()

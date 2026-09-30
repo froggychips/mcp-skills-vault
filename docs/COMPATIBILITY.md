@@ -64,6 +64,20 @@ Which *conditions* produce a `1` can become stricter only behind a flag
 (`--strict`, `--fail-*`). Making a default stricter — something that exited `0`
 yesterday exiting `1` today with the same arguments — is a major release.
 
+One such change was made before 1.0, and is recorded here so nobody has to
+find it in a diff: **`verify --offline` applies the stored evidence.** It used
+to check that pins were present and nothing else, so an entry with a known
+advisory recorded against its pinned version, or a yanked / unpublished
+release, exited `0` from `verify --offline` and `1` from `explain` over the
+same DB. Both now build the stored part of the decision with one function,
+and `verify --offline` exits `1` on those entries, as `explain` does. A found
+problem does not age out: an advisory observed three weeks ago still fails.
+A claim of absence ("no advisories", "still published") past its shelf life
+is `unknown` — it fails only under `--fail-unverified` / `unverified: fail`.
+A job whose question is narrower ("is the DB consistent") says so with
+`--fail-families` (for example `integrity,pin,oci,verify,policy`): the same
+findings are decided and reported, only the listed families fail the run.
+
 ### 3. `--json` payloads
 
 Every JSON document this tool writes carries a schema identifier of the form
