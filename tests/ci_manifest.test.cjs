@@ -273,3 +273,65 @@ test('a pull_request build refuses to fall back to the host when it cannot isola
   const hostFallbacks = src.split('\n').filter((l) => /^\s+node (--test|mcp-ecosystem)/.test(l));
   assert.ok(hostFallbacks.length > 0, 'expected the trusted-context branches to exist');
 });
+
+// ── the weekly refresh writes evidence even when it has findings ────────────
+
+function jobBlock(src, job) {
+  return src.split(/\n  (?=[a-z0-9_-]+:\n)/i).slice(1).find((b) => b.startsWith(`${job}:`));
+}
+function stepsOf(block) {
+  return block.split(/\n      - (?=name:|uses:|run:)/).slice(1).map((step) => ({
+    name: ((step.match(/^name:\s*(.+)/) || [])[1] || '').trim(),
+    code: step.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n'),
+  }));
+}
+
+test('refresh: an advisory finding does not stop the evidence write or the PR', () => {
+  // `verify_integrity --record-evidence` exits 1 on any hard finding. Run as a
+  // bare step, seven advisories failed it, skipped every later step (the PR
+  // included) and threw away the evidence written for the other 107 entries.
+  const block = jobBlock(sources.get('.github/workflows/security-scan.yml'), 'refresh-hashes');
+  assert.ok(block, 'refresh-hashes job missing');
+  const steps = stepsOf(block);
+  const reverify = steps.find((s) => /--record-evidence/.test(s.code));
+  assert.ok(reverify, 'the refresh no longer records evidence');
+  assert.match(reverify.code, /--record-evidence[^\n]*\|\|\s*rc=\$\?/, 'the verifier exit code must be captured, not left to fail the step');
+  assert.match(reverify.code, /verify_summary\.cjs[^\n]*--rc "\$rc"/, 'a captured exit code must still be judged: a crash has to stop the job');
+  assert.doesNotMatch(reverify.code, /continue-on-error:\s*true/, 'a broken verifier run must not be waved through');
+  assert.doesNotMatch(reverify.code, /--fail-unverified|--strict/, 'the writer step must not fail on evidence it is about to refresh');
+});
+
+test('refresh: availability is recorded before the re-verify reads it', () => {
+  // Availability is seven-day evidence and only check_availability records it.
+  // Run after the re-verify, it was skipped whenever the re-verify failed, and
+  // the re-verify then kept reporting it as aged out.
+  const steps = stepsOf(jobBlock(sources.get('.github/workflows/security-scan.yml'), 'refresh-hashes'));
+  const at = (re) => steps.findIndex((s) => re.test(s.code));
+  const reverify = at(/--record-evidence/);
+  const availability = at(/check_availability\.cjs --write/);
+  assert.ok(availability !== -1, 'availability check missing from the refresh');
+  assert.ok(availability < reverify, 'availability must record its evidence before the re-verify');
+  // The other evidence writers still have to run before the PR is opened.
+  const pr = at(/create-pull-request/);
+  for (const re of [/check_identity\.cjs --write/, /check_posture\.cjs --write/]) {
+    const i = at(re);
+    assert.ok(i !== -1 && i < pr, `${re} must run before the PR`);
+  }
+  assert.match(steps[pr].code, /body-path:/, 'the PR body must carry the re-verify summary');
+});
+
+test('artifacts are short-lived and never the reason a job fails', () => {
+  // "Artifact storage quota has been hit" failed the eval job after its
+  // snapshot PR had already been updated.
+  let seen = 0;
+  for (const [file, src] of sources) {
+    for (const step of src.split(/\n      - (?=name:|uses:|run:)/).slice(1)) {
+      if (!/uses:\s*actions\/upload-artifact@/.test(step)) continue;
+      seen++;
+      const days = Number((step.match(/retention-days:\s*(\d+)/) || [])[1]);
+      assert.ok(days >= 1 && days <= 3, `${file}: upload-artifact needs retention-days 1–3, has ${days || 'default (90)'}`);
+      assert.match(step, /continue-on-error:\s*true/, `${file}: an artifact upload must not fail the job`);
+    }
+  }
+  assert.ok(seen > 0, 'expected at least one upload-artifact step to check');
+});

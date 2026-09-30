@@ -14,8 +14,9 @@ name: security-scan
 #                         assets/discovery/candidates.json. Pure inbox for triage;
 #                         the DB stays the deterministic source of truth.
 #   mcp-eval-smoke      — weekly + manual, spawns each DB entry's MCP server,
-#                         runs handshake + tools/list + schema lint, uploads
-#                         eval_results.json as an artifact (no auto-commit).
+#                         runs handshake + tools/list + schema lint, opens a PR
+#                         with the slimmed assets/eval_results.json snapshot
+#                         (the raw run is uploaded only if that PR fails).
 #                         Needs network (npx/uvx package fetch); --sandbox, so
 #                         third-party code never runs on the host. Cron-only.
 #
@@ -227,13 +228,15 @@ jobs:
           node-version: '20'
       - name: verify_integrity --update
         run: node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --update
-      - name: Re-verify with refreshed hashes, recording dated evidence
-        # --record-evidence writes per-dimension results with the date they were
-        # established, so `trust` becomes derived rather than asserted. This job
-        # is the right place for it: it is the one that talks to every feed.
-        run: node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --deep --record-evidence
-      - name: refresh_scores --write
-        run: node mcp-ecosystem-intelligence/scripts/refresh_scores.cjs --write
+      # Order matters. Availability is seven-day evidence that only this check
+      # records, so it runs *before* the re-verify: the re-verify then merges
+      # it in, derives `trust` from it and judges freshness on what this run
+      # established. It used to run after — and was skipped whenever the
+      # re-verify failed, so `availability` stayed permanently stale and every
+      # entry read as "evidence aged out". Identity (30 days) and posture (60)
+      # stay after the re-verify: a registry sweep can take 20+ minutes, and
+      # the re-verify must not wait on it inside a 45-minute job.
+      #
       # Whether each entry is still published at all. This is the one question
       # the gate structurally cannot answer: a 404 and a network failure arrive
       # on the same code path, so both read as "could not check" and an entry
@@ -267,7 +270,38 @@ jobs:
             }
             require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
           '
+      - name: Re-verify with refreshed hashes, recording dated evidence
+        id: reverify
+        # --record-evidence writes per-dimension results with the date they were
+        # established, so `trust` becomes derived rather than asserted. This job
+        # is the right place for it: it is the one that talks to every feed.
+        #
+        # Here an advisory is a result, not a reason to stop. The verifier exits
+        # 1 whenever any entry has a hard finding — correct for an install gate,
+        # and exactly what used to fail this step, skip everything after it and
+        # discard the evidence it had just written for every other entry. The
+        # finding is recorded (`advisories: vulnerable` → `trust: unverified`)
+        # and goes to the PR and the summary. verify_summary.cjs still fails the
+        # step when the run itself is broken: no report, a crash exit code, or
+        # an exit code its findings don't explain.
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/verify-report.json"
+          rc=0
+          node mcp-ecosystem-intelligence/scripts/verify_integrity.cjs --deep --record-evidence --json > "$report" || rc=$?
+          node mcp-ecosystem-intelligence/scripts/verify_summary.cjs "$report" --rc "$rc" \
+            --db mcp-ecosystem-intelligence/assets/tools_database.json \
+            --out "$RUNNER_TEMP/verify-summary.md"
+          cat "$RUNNER_TEMP/verify-summary.md" >> "$GITHUB_STEP_SUMMARY"
+          fails=$(node -e 'console.log(require(process.argv[1]).failures)' "$report")
+          echo "failures=$fails" >> "$GITHUB_OUTPUT"
+          if [ "$fails" != "0" ]; then
+            echo "::warning::re-verify: $fails hard finding(s) recorded as evidence — see the job summary and the PR body"
+          fi
+      - name: refresh_scores --write
+        run: node mcp-ecosystem-intelligence/scripts/refresh_scores.cjs --write
       - name: Registry identity (official MCP registry)
+        timeout-minutes: 15
         id: identity
         continue-on-error: true
         run: |
@@ -291,6 +325,7 @@ jobs:
             require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
           '
       - name: Upstream repository posture (OpenSSF Scorecard)
+        timeout-minutes: 15
         continue-on-error: true
         run: node mcp-ecosystem-intelligence/scripts/check_posture.cjs --write
       # Capability delta. Only versions this refresh has not scanned before are
@@ -353,42 +388,63 @@ jobs:
         with:
           base: HEAD
           title: MCP eval (entries changed by this refresh)
+      # The PR body carries the re-verify result (FAIL / unverified entries and
+      # how fresh the evidence now is), so the reviewer sees what the DB now
+      # records without opening the run: the job summary expires, the PR stays.
+      - name: Compose the PR body
+        id: prbody
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/pr-body.md" <<'EOF'
+          Automated weekly refresh via:
+          - `verify_integrity.cjs --update` — refreshes `version` + `pkg_integrity`
+          - `check_availability.cjs --write` — gone / yanked / deprecated / relocated
+          - `verify_integrity.cjs --deep --record-evidence` — dated evidence per dimension
+          - `refresh_scores.cjs --write` — refreshes `stars`, `last_commit_days`,
+            `open_issues`, `health_score` from GitHub API
+          - `check_identity.cjs --write` — the official registry's ownership-verified listing
+          - `check_posture.cjs --write` — OpenSSF Scorecard for the upstream repo
+          - `check_capabilities.cjs --write` — what each package can do, and what it gained
+          - `suggest_upgrade.cjs` — the shortest version that clears any advisory
+
+          Read the job summary: it carries the availability, identity, capability-delta
+          and upgrade tables for this run.
+
+          EOF
+          if [ -f "$RUNNER_TEMP/verify-summary.md" ]; then
+            cat "$RUNNER_TEMP/verify-summary.md" >> "$RUNNER_TEMP/pr-body.md"
+          else
+            echo "**No re-verify summary was produced** — read the job log before merging." >> "$RUNNER_TEMP/pr-body.md"
+          fi
+          cat >> "$RUNNER_TEMP/pr-body.md" <<'EOF'
+
+          ## Reviewer checklist
+          - [ ] Diff each version bump against the package's CHANGELOG / GitHub releases
+          - [ ] Look for unexplained major-version jumps (could indicate package hijack)
+          - [ ] Confirm no entry switched maintainer / org silently
+          - [ ] Check tier changes (Recommended → Experimental, etc.) — may need manual follow-up
+          - [ ] Large star-count drops may indicate repo transfer or star-farming removal
+          - [ ] Read the **FAIL** table above: those entries are recorded as `trust: unverified`
+                and the install gate refuses them — re-pin, upgrade or remove them in a follow-up
+          - [ ] Read the **Capability delta** table: a new `shell`, `dynamic_code`,
+                `credential_paths` or `install_script` in a patch release is the shape a
+                compromised release takes before it has a CVE
+          - [ ] Read the **Availability** table in the job summary: `gone` / `version-gone`
+                / `yanked` entries have had their trust downgraded and need re-pinning or
+                removal; `relocated` means the registry now points somewhere else
+          - [ ] Re-run `verify_integrity.cjs` locally — it should fail on nothing except the
+                FAIL entries listed above
+
+          > ⚠️ This PR is the **only** human gate between npm/PyPI publishing
+          > a new version and our DB blessing it. Don't auto-merge.
+          EOF
+          echo "path=$RUNNER_TEMP/pr-body.md" >> "$GITHUB_OUTPUT"
       - name: Open PR if anything changed
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1   # v8.1.1
         with:
           commit-message: 'chore: weekly refresh of hashes + GitHub metrics'
           title: 'chore: weekly refresh of hashes + GitHub metrics'
-          body: |
-            Automated weekly refresh via:
-            - `verify_integrity.cjs --update` — refreshes `version` + `pkg_integrity`
-            - `verify_integrity.cjs --deep --record-evidence` — dated evidence per dimension
-            - `refresh_scores.cjs --write` — refreshes `stars`, `last_commit_days`,
-              `open_issues`, `health_score` from GitHub API
-            - `check_availability.cjs --write` — gone / yanked / deprecated / relocated
-            - `check_identity.cjs --write` — the official registry's ownership-verified listing
-            - `check_posture.cjs --write` — OpenSSF Scorecard for the upstream repo
-            - `check_capabilities.cjs --write` — what each package can do, and what it gained
-            - `suggest_upgrade.cjs` — the shortest version that clears any advisory
-
-            Read the job summary: it carries the availability, identity, capability-delta
-            and upgrade tables for this run.
-
-            ## Reviewer checklist
-            - [ ] Diff each version bump against the package's CHANGELOG / GitHub releases
-            - [ ] Look for unexplained major-version jumps (could indicate package hijack)
-            - [ ] Confirm no entry switched maintainer / org silently
-            - [ ] Check tier changes (Recommended → Experimental, etc.) — may need manual follow-up
-            - [ ] Large star-count drops may indicate repo transfer or star-farming removal
-            - [ ] Read the **Capability delta** table: a new `shell`, `dynamic_code`,
-                  `credential_paths` or `install_script` in a patch release is the shape a
-                  compromised release takes before it has a CVE
-            - [ ] Read the **Availability** table in the job summary: `gone` / `version-gone`
-                  / `yanked` entries have had their trust downgraded and need re-pinning or
-                  removal; `relocated` means the registry now points somewhere else
-            - [ ] Re-run `verify_integrity.cjs` locally — should exit 0
-
-            > ⚠️ This PR is the **only** human gate between npm/PyPI publishing
-            > a new version and our DB blessing it. Don't auto-merge.
+          body-path: ${{ steps.prbody.outputs.path }}
           branch: chore/refresh-hashes
           delete-branch: true
           add-paths: |
@@ -520,13 +576,30 @@ jobs:
         run: |
           set -o pipefail
           node mcp-ecosystem-intelligence/scripts/check_license_drift.cjs --json | tee license-drift.json
-          {
-            echo "## License-drift check"
-            echo
-            echo '```json'
-            cat license-drift.json
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          # A table, split by what --strict acts on. The raw JSON dump put 18
+          # soft drifts and the one line that actually failed the job in the
+          # same undifferentiated list.
+          node -e '
+            const r = require("./license-drift.json");
+            const hard = (r.drifts || []).filter((d) => d.classification === "drift-osi-to-restrictive");
+            const soft = (r.drifts || []).filter((d) => d.classification !== "drift-osi-to-restrictive");
+            const esc = (s) => String(s == null ? "(none)" : s).replace(/\|/g, "\\|").slice(0, 120);
+            const L = ["## License-drift check", "",
+              `${r.checked} checked — ${hard.length} OSI → restrictive, ${(r.errors || []).length} fetch error(s), ${soft.length} other drift(s). ` +
+              "--strict fails on the first two only.", ""];
+            if (hard.length || (r.errors || []).length) {
+              L.push("### Fails --strict", "", "| entry | what | source |", "| --- | --- | --- |");
+              for (const d of hard) L.push(`| ${d.name} | ${esc(d.old)} → **${esc(d.new)}** | ${d.source} |`);
+              for (const e of r.errors || []) L.push(`| ${e.name} | fetch error: ${esc(e.error)} | ${e.source} |`);
+              L.push("", "A fetch error for a package that 404s is expected to clear once `availability: gone` is recorded (weekly refresh PR, merged) — seven-day evidence, so an unmerged refresh PR brings it back.", "");
+            }
+            if (soft.length) {
+              L.push("### Other drifts (informational — DB not changed automatically)", "", "| entry | DB | registry | class | source |", "| --- | --- | --- | --- | --- |");
+              for (const d of soft) L.push(`| ${d.name} | ${esc(d.old)} | ${esc(d.new)} | ${d.classification} | ${d.source} |`);
+              L.push("");
+            }
+            console.log(L.join("\n"));
+          ' >> "$GITHUB_STEP_SUMMARY"
           # --strict separately so the JSON dump above always lands in the summary
           node mcp-ecosystem-intelligence/scripts/check_license_drift.cjs --strict
 
@@ -612,9 +685,9 @@ jobs:
     name: MCP eval smoke (behavioural)
     # Spawns each DB entry, runs initialize → tools/list, lints schemas.
     # Needs network to fetch npx packages / uvx wheels / docker images,
-    # so PR triggers are explicitly excluded — cron only. The eval
-    # results.json is uploaded as an artifact; humans review and decide
-    # whether to update the DB. Nothing here writes to the DB.
+    # so PR triggers are explicitly excluded — cron only. The slimmed
+    # snapshot goes to a PR; humans review and decide whether to update the
+    # DB. Nothing here writes to the DB.
     if: github.event_name != 'pull_request' && ((github.event_name == 'schedule' && github.event.schedule == '17 6 * * 1') || github.event_name == 'workflow_dispatch')
     needs: unit-tests
     permissions:
@@ -705,16 +778,6 @@ jobs:
             }
             require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
           '
-      - name: Upload eval results
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
-        with:
-          name: eval-results
-          path: eval_results_run.json
-          # The default 90-day retention filled this account's artifact quota,
-          # and "Artifact storage quota has been hit" is what failed the run —
-          # not the eval itself. A week is longer than anyone reads these.
-          retention-days: 7
       # An artifact is operational evidence: it expires, and someone who clones
       # the repo or installs the package cannot see it. The shipped
       # eval_results.json was `results: []`, so the behavioural layer existed in
@@ -768,6 +831,7 @@ jobs:
           '
           git --no-pager diff --stat -- mcp-ecosystem-intelligence/assets/eval_results.json
       - name: Open a PR with the refreshed eval snapshot
+        id: snapshot_pr
         if: always()
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1   # v8.1.1
         with:
@@ -791,7 +855,24 @@ jobs:
           delete-branch: true
           add-paths: |
             mcp-ecosystem-intelligence/assets/eval_results.json
-          # The default 90-day retention filled this account's artifact quota,
-          # and "Artifact storage quota has been hit" is what failed the run —
-          # not the eval itself. A week is longer than anyone reads these.
-          retention-days: 7
+      # The raw run as an artifact — only when the snapshot did not reach a PR.
+      #
+      # It used to be uploaded on every run, before the snapshot step, and an
+      # account whose artifact quota was full ("Artifact storage quota has been
+      # hit") failed the whole job even though the snapshot had been committed
+      # and the PR updated a second later. The committed snapshot is the
+      # durable copy; the artifact duplicated it. Worse, the raw file keeps the
+      # stderr tails the snapshot deliberately drops (they can carry paths and
+      # tokens from a failing server), and this repository is public.
+      #
+      # So: a fallback for the run where the PR could not be opened, short-lived,
+      # and never the reason the job is red — the failed PR step already is.
+      - name: Upload the raw eval run (fallback, snapshot PR failed)
+        if: always() && steps.snapshot_pr.outcome != 'success'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
+        with:
+          name: eval-results
+          path: eval_results_run.json
+          if-no-files-found: ignore
+          retention-days: 3
