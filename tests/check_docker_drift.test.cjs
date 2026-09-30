@@ -137,3 +137,66 @@ test('--write is reflected in the exit code: a diff is not a failure', () => {
   assert.equal(d.driftExitCode({ drifts: 2, errors: 0, strict: true }), 1);
   assert.equal(d.driftExitCode({ drifts: 0, errors: 1, strict: false }), 1);
 });
+
+// ── --write with a drift that cannot be applied ────────────────────────────
+
+const PINNED = 'sha256:' + 'a'.repeat(64);
+const GOOD   = 'sha256:' + 'b'.repeat(64);
+
+function driftItem(upstream) {
+  const tool = {
+    name: 'demo', install_cmd: `docker run -i --rm ghcr.io/o/r@${PINNED}`,
+    pkg_integrity: `sha256-${'a'.repeat(64)}`,
+  };
+  return { _tool: tool, repo: 'o/r', tag: 'latest', pinned: PINNED, upstream, source_url: null };
+}
+
+test('writeDrifts: a malformed upstream digest is reported as unapplied, pin untouched', () => {
+  const bad = driftItem('sha256:not-a-digest');
+  const ok  = driftItem(GOOD);
+  const before = { ...bad._tool };
+  const { updated, unapplied } = d.writeDrifts([bad, ok]);
+  assert.equal(updated.length, 1);
+  assert.equal(updated[0].to, GOOD);
+  assert.equal(unapplied.length, 1);
+  assert.equal(unapplied[0].upstream, 'sha256:not-a-digest');
+  assert.match(unapplied[0].reason, /malformed/);
+  assert.deepEqual(bad._tool, before, 'the stale pin must not be half-moved');
+});
+
+test('driftExitCode: an unapplied --write drift is a failure, not a clean run', () => {
+  // --write passes drifts: 0; the unapplied count must still fail the run.
+  assert.equal(d.driftExitCode({ drifts: 0, unapplied: 1, errors: 0, checked: 1 }), 1);
+  assert.equal(d.driftExitCode({ drifts: 0, unapplied: 0, errors: 0, checked: 1 }), 0);
+});
+
+test('CLI --write --json: malformed Docker-Content-Digest exits 1 and lists it in `unapplied`', () => {
+  const fs   = require('fs');
+  const os   = require('os');
+  const path = require('path');
+  const { spawnSync } = require('child_process');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'drift-'));
+  const dbFile = path.join(dir, 'db.json');
+  const written = path.join(dir, 'written.json');
+  fs.writeFileSync(dbFile, JSON.stringify({ tools: [driftItem(null)._tool] }));
+  const script = path.resolve(__dirname, '../mcp-ecosystem-intelligence/scripts/check_docker_drift.cjs');
+  const run = (args) => spawnSync(process.execPath,
+    ['-r', path.join(__dirname, 'fixtures/docker_drift_stub.cjs'), script, ...args], {
+      encoding: 'utf8',
+      env: { ...process.env, DRIFT_STUB_DB: dbFile, DRIFT_STUB_DIGEST: 'sha512:deadbeef', DRIFT_STUB_WRITTEN: written },
+    });
+
+  const r = run(['--write', '--json']);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  const out = JSON.parse(r.stdout);
+  assert.equal(out.drifts, 1);
+  assert.equal(out.updated.length, 0);
+  assert.equal(out.unapplied.length, 1);
+  assert.equal(out.unapplied[0].upstream, 'sha512:deadbeef');
+  assert.equal(fs.existsSync(written), false, 'nothing was applied, so nothing is written');
+
+  const t = run(['--write']);
+  assert.equal(t.status, 1);
+  assert.match(t.stdout, /UNAPPLIED 1 drift/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});

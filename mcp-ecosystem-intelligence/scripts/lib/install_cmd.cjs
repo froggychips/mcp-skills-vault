@@ -18,6 +18,8 @@
  *   pypiPkgName(cmd)        -> "pkg" | null
  *   dockerImageRef(cmd)     -> "ghcr.io/o/r@sha256:…" | null
  *   dockerDigestPinned(ref) -> boolean
+ *   ociIntegrity(digest)    -> "sha256-<hex>" | null   (either spelling in)
+ *   dockerIntegrityMismatch(tool) -> null | "why install_cmd and pkg_integrity disagree"
  *   isExactVersion(runner, version) -> boolean
  */
 
@@ -96,6 +98,44 @@ function dockerImageRef(cmd) {
  */
 function dockerDigestPinned(ref) {
   return /@sha256:[a-f0-9]{64}$/.test(String(ref || ''));
+}
+
+/**
+ * A docker entry carries its digest twice: `image@sha256:<hex>` inside
+ * install_cmd (the registry's spelling) and `pkg_integrity` (the DB's SRI
+ * spelling, `sha256-<hex>`, the same form PyPI entries use). Two spellings of
+ * one fact drift apart: the drift refresher used to move pkg_integrity only
+ * when it was already in the `sha256-` form, so an entry stored as
+ * `sha256:<hex>` kept its old digest while install_cmd moved on.
+ *
+ * ociIntegrity accepts either spelling and returns the canonical one, or null
+ * for anything that is not a sha256 digest.
+ */
+const OCI_DIGEST_RE = /^sha256[:-]([a-f0-9]{64})$/;
+function ociIntegrity(digest) {
+  const m = String(digest ?? '').trim().match(OCI_DIGEST_RE);
+  return m ? `sha256-${m[1]}` : null;
+}
+
+/**
+ * Does a docker entry's pkg_integrity say the same thing as its install_cmd?
+ * Returns null when it does (or when the entry is not a digest-pinned docker
+ * launch, which other checks own), otherwise a sentence saying why not.
+ * Non-canonical spelling is a finding too: it is exactly the shape the
+ * refresher once skipped.
+ */
+function dockerIntegrityMismatch(tool) {
+  if (!tool || typeof tool.install_cmd !== 'string') return null;
+  const ref = dockerImageRef(tool.install_cmd);
+  if (!ref || !dockerDigestPinned(ref)) return null;
+  const want = ociIntegrity(ref.slice(ref.lastIndexOf('@') + 1));
+  const stored = tool.pkg_integrity;
+  if (stored == null || stored === '') return `pkg_integrity is empty, install_cmd pins ${want}`;
+  const got = ociIntegrity(stored);
+  if (!got) return `pkg_integrity "${stored}" is not a sha256 digest`;
+  if (got !== want) return `pkg_integrity ${got} does not match the digest install_cmd pins (${want})`;
+  if (stored !== want) return `pkg_integrity "${stored}" is not in the canonical form "${want}"`;
+  return null;
 }
 
 // "Exact" has to mean exact. `1`, `1.2` and `1.x` are ranges wearing a pin's
@@ -200,6 +240,8 @@ module.exports = {
   pypiPkgName,
   dockerImageRef,
   dockerDigestPinned,
+  ociIntegrity,
+  dockerIntegrityMismatch,
   DOCKER_VALUE_FLAGS,
   DOCKER_BOOL_FLAGS,
 };
