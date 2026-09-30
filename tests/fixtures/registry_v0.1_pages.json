@@ -1,0 +1,84 @@
+{
+  "_comment": "Two /v0.1/servers pages (include_deleted=true), shaped like registry.modelcontextprotocol.io responses as of 2026-09. Names are invented.",
+  "pages": [
+    {
+      "servers": [
+        {
+          "server": {
+            "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+            "name": "com.example/remote-only",
+            "description": "Remote endpoint, nothing to install",
+            "version": "1.0.0",
+            "remotes": [{ "type": "streamable-http", "url": "https://mcp.example.com" }]
+          },
+          "_meta": { "io.modelcontextprotocol.registry/official": { "status": "active", "publishedAt": "2026-05-01T00:00:00Z", "isLatest": true } }
+        },
+        {
+          "server": {
+            "name": "com.microsoft/playwright",
+            "description": "Browser automation",
+            "version": "0.0.75",
+            "repository": { "url": "https://github.com/microsoft/playwright-mcp", "source": "github" },
+            "packages": [{ "registryType": "npm", "identifier": "@playwright/mcp", "version": "0.0.75", "transport": { "type": "stdio" } }]
+          },
+          "_meta": { "io.modelcontextprotocol.registry/official": { "status": "deleted", "statusMessage": "malicious postinstall in this build", "statusChangedAt": "2026-09-20T10:00:00Z", "publishedAt": "2026-09-01T00:00:00Z", "isLatest": false } }
+        },
+        {
+          "server": {
+            "name": "com.microsoft/playwright",
+            "description": "Browser automation",
+            "version": "0.0.80",
+            "repository": { "url": "https://github.com/microsoft/playwright-mcp", "source": "github" },
+            "packages": [{ "registryType": "npm", "identifier": "@playwright/mcp", "version": "0.0.80", "transport": { "type": "stdio" } }]
+          },
+          "_meta": { "io.modelcontextprotocol.registry/official": { "status": "active", "publishedAt": "2026-09-21T00:00:00Z", "isLatest": true } }
+        }
+      ],
+      "metadata": { "count": 3, "nextCursor": "com.microsoft/playwright:0.0.80" }
+    },
+    {
+      "servers": [
+        {
+          "server": {
+            "name": "io.github.ClickHouse/mcp-clickhouse",
+            "description": "ClickHouse",
+            "version": "0.3.0",
+            "repository": { "url": "https://github.com/ClickHouse/mcp-clickhouse", "source": "github" },
+            "packages": [{ "registryType": "pypi", "identifier": "mcp-clickhouse", "version": "0.3.0", "transport": { "type": "stdio" } }]
+          },
+          "_meta": { "io.modelcontextprotocol.registry/official": { "status": "deprecated", "statusMessage": "moved to io.github.ClickHouse/clickhouse", "statusChangedAt": "2026-09-10T00:00:00Z", "publishedAt": "2026-01-01T00:00:00Z", "isLatest": true } }
+        },
+        {
+          "server": {
+            "name": "io.github.newbie/shiny-mcp",
+            "title": "Shiny",
+            "description": "A new server",
+            "version": "0.1.0",
+            "repository": { "url": "https://github.com/newbie/shiny-mcp", "source": "github" },
+            "packages": [{ "registry_name": "npm", "identifier": "shiny-mcp", "version": "0.1.0", "transport": { "type": "stdio" } }]
+          },
+          "_meta": { "io.modelcontextprotocol.registry/official": { "status": "active", "publishedAt": "2026-09-25T00:00:00Z", "isLatest": true } }
+        },
+        {
+          "server": {
+            "name": "io.github.spam/bad-mcp",
+            "description": "Removed by moderation",
+            "version": "9.9.9",
+            "packages": [{ "registryType": "npm", "identifier": "bad-mcp", "version": "9.9.9", "transport": { "type": "stdio" } }]
+          },
+          "_meta": { "io.modelcontextprotocol.registry/official": { "status": "deleted", "publishedAt": "2026-09-02T00:00:00Z", "isLatest": true } }
+        },
+        {
+          "server": {
+            "name": "io.github.tavily-ai/tavily-mcp",
+            "description": "Search",
+            "version": "0.2.9",
+            "packages": [{ "registryType": "npm", "identifier": "tavily-mcp", "version": "0.2.9", "transport": { "type": "stdio" } }]
+          },
+          "_meta": { "io.modelcontextprotocol.registry/official": { "status": "active", "publishedAt": "2026-08-01T00:00:00Z", "isLatest": true } }
+        }
+      ],
+      "metadata": { "count": 4 }
+    }
+  ]
+}

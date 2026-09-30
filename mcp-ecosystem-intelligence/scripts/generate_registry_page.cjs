@@ -215,7 +215,12 @@ function main(argv = process.argv.slice(2)) {
   // of one is a rebuild of the other — into the same root, for the same URL.
   const badgeArgs = ["--write", "--out", outDir, "--as-of", clock.iso];
   if (opts.base) badgeArgs.push("--base-url", opts.base);
-  const code = require("./badge.cjs").main(badgeArgs);
+  const badgeCode = require("./badge.cjs").main(badgeArgs);
+
+  // The same site carries the sub-registry export (v0.1/), so one
+  // regeneration keeps the page and the API files describing the same DB.
+  const exportCode = require("./export_subregistry.cjs").run(["--out", outDir]);
+  const code = badgeCode || exportCode;
   if (code !== 0) process.exitCode = code;
 }
 

@@ -910,6 +910,46 @@ mcp-vault site-registry --out <site root> --base-url https://mcp.froggychips.xyz
 
 [`.github/scripts/finding_reports.cjs`](./.github/scripts/finding_reports.cjs) drafts a short issue text for each entry with a real finding (advisory, repository mismatch, yanked or unpublished release, install scripts in the tree, tool surface changed without a release). It writes files only; nothing is opened in anyone's repository.
 
+### Sub-registry of the official MCP Registry (`export-registry`, `registry-ingest`)
+
+[`scripts/export_subregistry.cjs`](./mcp-ecosystem-intelligence/scripts/export_subregistry.cjs)
+writes the DB as a static [sub-registry](https://modelcontextprotocol.io/registry/registry-aggregators#acting-as-a-subregistry):
+the registry's own read API (v0.1) as files under `docs/site/v0.1/`, so a host
+that already speaks it can point at the site's base URL — VS Code's
+`McpGalleryServiceUrl`, or ToolHive via `v0.1/x/xyz.froggychips.mcp/toolhive.json`.
+`site-registry` runs it too, so the page and the API describe the same DB.
+
+```bash
+mcp-vault export-registry            # docs/site/v0.1/…   (--check: exit 1 if stale)
+mcp-vault registry-ingest --fetch --out snap.json      # the only networked step
+mcp-vault registry-ingest --snapshot snap.json         # exit 1: an entry is withdrawn upstream
+mcp-vault discover --source registry-snapshot --snapshot snap.json
+```
+
+Each entry is a valid `server.json` (validated in the tests against the vendored
+2025-12-11 schema) with a pinned package — npm/PyPI by exact version, images as
+`oci` by `@sha256` digest — and our evidence under
+`_meta["xyz.froggychips.mcp/vault"]`: tier and why, pinned version and
+integrity, the date of each check, and how to ask `explain`. The name is the
+official one only when `identity` recorded it; everything else is published
+under `xyz.froggychips.mcp/…`, never under a namespace nobody proved. Nothing
+pinned, or a Deprecated tier, is not exported — a host that ignores `_meta`
+would offer it. Deterministic: tiers are computed as of the newest evidence
+date in the data, and the manifest (`export.json`) hashes every file.
+
+What static hosting cannot do: `search`, `updated_since`, `version`,
+`include_deleted`, `limit` and `cursor` are ignored — every list request gets
+the whole list as one page with no `nextCursor`. List endpoints are
+`index.html` files (text/html) and versions are extensionless files; the
+bodies are JSON. Names are written both `%2F`-encoded and as subdirectories,
+because static hosts disagree about decoding `%2F`.
+
+`registry-ingest` goes the other way. It saves a full snapshot of the official
+registry (all or nothing, deleted servers included), then offline reports DB
+entries whose server is `deprecated` or `deleted` — the latest version *or the
+exact version pinned here* — and the listed servers the DB lacks. It never
+edits the DB.
+
 ### Health scorer
 
 [`scripts/calculate_health.cjs`](./mcp-ecosystem-intelligence/scripts/calculate_health.cjs) — score any MCP candidate:
@@ -1110,6 +1150,7 @@ Everything in this table is scripted and tested; the column says where it lives.
 | Machine-readable report + SARIF | [`lib/report.cjs`](./mcp-ecosystem-intelligence/scripts/lib/report.cjs) |
 | Behavioural smoke in a rebuilt jail | [`mcp_eval.cjs`](./mcp-ecosystem-intelligence/scripts/mcp_eval.cjs), [`lib/mcp_stdio.cjs`](./mcp-ecosystem-intelligence/scripts/lib/mcp_stdio.cjs) |
 | Discovery pipeline (npm / gh / README) | [`discover.cjs`](./mcp-ecosystem-intelligence/scripts/discover.cjs) |
+| Static sub-registry export (MCP Registry API v0.1) + official-registry ingest | [`lib/subregistry.cjs`](./mcp-ecosystem-intelligence/scripts/lib/subregistry.cjs), [`lib/registry_snapshot.cjs`](./mcp-ecosystem-intelligence/scripts/lib/registry_snapshot.cjs) |
 | Wrapper generator (CLI/API → MCP) | [`generate_wrapper.cjs`](./mcp-ecosystem-intelligence/scripts/generate_wrapper.cjs) |
 | Provenance bound to the artifact digest, not just read | [`lib/npm_signatures.cjs`](./mcp-ecosystem-intelligence/scripts/lib/npm_signatures.cjs) |
 | Behaviour capping the recommendation | [`lib/scores.cjs`](./mcp-ecosystem-intelligence/scripts/lib/scores.cjs) |
