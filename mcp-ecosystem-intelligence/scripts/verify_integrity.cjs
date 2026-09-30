@@ -1263,7 +1263,12 @@ async function processDocker(tool, results) {
     // the question a reviewer has to answer.
     const disagreement = dockerIntegrityMismatch(tool);
     if (disagreement) {
-      lines.push(['FAIL', `install_cmd and pkg_integrity disagree: ${disagreement}`]);
+      // Typed, not the generic `verify/check-failed`: an observed, high
+      // finding, so decide() refuses it through `finding/severity` in every
+      // mode (--offline included) — the FAIL tag and the exit code are the
+      // renderings of that decision, unchanged.
+      lines.push(['FAIL', `install_cmd and pkg_integrity disagree: ${disagreement}`,
+        { rule: 'integrity/docker-pin-mismatch', severity: 'high', state: 'observed' }]);
       failures++;
     }
     // --deep: a digest *is* the sha256 of the manifest document, so the pin can

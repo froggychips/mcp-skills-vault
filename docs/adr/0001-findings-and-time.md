@@ -115,7 +115,10 @@ tag means as a finding.
 decision's, compared with the counters, and a disagreement fails closed and is
 printed. Next: processors emit typed findings only (`verify/check-failed`
 split per check), counters and flag-dependent FAIL-vs-NOTE tags become a
-rendering of the Decision, and the comparison goes.
+rendering of the Decision, and the comparison goes. The first split is in:
+the docker cross-check from #117 (install_cmd and pkg_integrity naming
+different digests) is `integrity/docker-pin-mismatch`, observed and high, so
+`finding/severity` refuses it in every mode, `--offline` included.
 
 **The nine PRs** — one schema, `mcp-vault/findings@1`, instead of fifteen; the
 new commands keep a thin schema of their own only for data that is not a
