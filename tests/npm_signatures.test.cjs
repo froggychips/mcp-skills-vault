@@ -22,6 +22,8 @@ function makeKey(keyid = 'SHA256:test', expires = null) {
 const NAME      = '@scope/pkg';
 const VERSION   = '1.2.3';
 const INTEGRITY = 'sha512-abc123==';
+// Key expiry is judged at an explicit instant (lib/clock.cjs).
+const NOW       = Date.parse('2026-09-17T12:00:00Z');
 
 test('signatureMessage: the string npm actually signs', () => {
   assert.equal(s.signatureMessage(NAME, VERSION, INTEGRITY), '@scope/pkg@1.2.3:sha512-abc123==');
@@ -39,6 +41,7 @@ test('verifyRegistrySignature: a good signature verifies', () => {
     name: NAME, version: VERSION, integrity: INTEGRITY,
     signatures: [{ keyid: k.entry.keyid, sig }],
     keys: { keys: [k.entry] },
+    now: NOW,
   });
   assert.deepEqual(r, { state: 'ok', keyid: 'SHA256:test' });
 });
@@ -52,6 +55,7 @@ test('verifyRegistrySignature: a swapped integrity value cannot pass', () => {
     name: NAME, version: VERSION, integrity: 'sha512-TAMPERED==',
     signatures: [{ keyid: k.entry.keyid, sig }],
     keys: { keys: [k.entry] },
+    now: NOW,
   });
   assert.equal(r.state, 'fail');
   assert.match(r.reason, /does not verify/);
@@ -65,13 +69,14 @@ test('verifyRegistrySignature: signed by a key that is not the registry\'s', () 
     name: NAME, version: VERSION, integrity: INTEGRITY,
     signatures: [{ keyid: 'SHA256:real', sig }],
     keys: { keys: [real.entry] },
+    now: NOW,
   });
   assert.equal(r.state, 'fail');
 });
 
 test('verifyRegistrySignature: absent is unverified, not failed', () => {
   const k = makeKey();
-  const base = { name: NAME, version: VERSION, integrity: INTEGRITY, keys: { keys: [k.entry] } };
+  const base = { name: NAME, version: VERSION, integrity: INTEGRITY, keys: { keys: [k.entry] }, now: NOW };
   // A package published before npm signed anything.
   assert.equal(s.verifyRegistrySignature({ ...base, signatures: [] }).state, 'unverified');
   assert.equal(s.verifyRegistrySignature({ ...base, signatures: undefined }).state, 'unverified');
@@ -92,6 +97,7 @@ test('verifyRegistrySignature: an expired key is unverified, not a pass', () => 
     name: NAME, version: VERSION, integrity: INTEGRITY,
     signatures: [{ keyid: 'SHA256:old', sig }],
     keys: { keys: [k.entry] },
+    now: NOW,
   });
   assert.equal(r.state, 'unverified');
   assert.match(r.reason, /expired/);
@@ -102,6 +108,7 @@ test('verifyRegistrySignature: malformed key material does not throw', () => {
     name: NAME, version: VERSION, integrity: INTEGRITY,
     signatures: [{ keyid: 'SHA256:bad', sig: 'AAAA' }],
     keys: { keys: [{ keyid: 'SHA256:bad', key: 'not-a-der-key' }] },
+    now: NOW,
   });
   assert.equal(r.state, 'unverified');
   assert.match(r.reason, /could not check/);

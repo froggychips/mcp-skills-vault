@@ -4,6 +4,9 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const g = require('../mcp-ecosystem-intelligence/scripts/generate_registry_page.cjs');
 
+// The tier is judged as of an explicit instant (lib/clock.cjs), not today.
+const NOW = Date.parse('2026-09-17T12:00:00Z');
+
 test('slimEntry keeps public registry fields only', () => {
   const out = g.slimEntry({
     name: 'x',
@@ -15,7 +18,7 @@ test('slimEntry keeps public registry fields only', () => {
     install_cmd: 'npx -y x@1.0.0',
     source_url: 'https://github.com/a/b',
     notes: 'internal audit trail',
-  });
+  }, null, null, NOW);
   assert.deepEqual(Object.keys(out).sort(), [
     'category',
     'classification',
@@ -53,6 +56,7 @@ test('slimEntry publishes evidence with its dates, and nothing else from it', ()
       },
     },
     { name: 'x', status: 'pass', tool_count: 12, checked_at: '2026-09-10T00:00:00.000Z', stderr_tail: 'secret-ish path' },
+    NOW,
   );
   assert.deepEqual(out.evidence, {
     artifact:   { status: 'verified', checked_at: '2026-09-17' },

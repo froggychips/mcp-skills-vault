@@ -52,6 +52,7 @@ const https = require('https');
 const path  = require('path');
 const { execFileSync } = require('child_process');
 const { exitAfterFlush } = require('./lib/exit.cjs');
+const { readWallClock } = require('./lib/clock.cjs');
 const { githubSlug, isGithubUrl } = require('./lib/repo_url.cjs');
 
 const DB_PATH      = path.resolve(__dirname, '../assets/tools_database.json');
@@ -399,7 +400,7 @@ function annotateHealthFromGh(cand) {
                        '--jq', '{stars: .stargazers_count, pushed_at, open_issues_count, license: .license.spdx_id, archived, fork, default_branch}']);
   if (!data) return null;
   if (data.archived || data.fork) return null;
-  const days = data.pushed_at ? Math.floor((Date.now() - new Date(data.pushed_at).getTime()) / 86400000) : 9999;
+  const days = data.pushed_at ? Math.floor((readWallClock() - new Date(data.pushed_at).getTime()) / 86400000) : 9999;
   return {
     stars:             data.stars ?? 0,
     last_commit_days:  days,
@@ -585,7 +586,7 @@ async function main() {
 
   const out = {
     schema:       'mcp-vault/candidates@1',
-    generated_at: new Date().toISOString(),
+    generated_at: new Date(readWallClock()).toISOString(),
     sources:      SOURCES,
     raw_count:    merged.size,
     kept_count:   top.length,

@@ -35,6 +35,7 @@
 const fs   = require('fs');
 const path = require('path');
 const { exitAfterFlush } = require('./lib/exit.cjs');
+const { readWallClock } = require('./lib/clock.cjs');
 const { readInstalledServers } = require('./lib/installed.cjs');
 const {
   estimateServer, matchDbEntry, summarise,
@@ -125,7 +126,7 @@ function main(argv) {
   const report = {
     schema: 'mcp-vault/token-budget@1',
     unreadable,
-    generated_at: new Date().toISOString(),
+    generated_at: new Date(readWallClock()).toISOString(),
     cwd: opts.cwd,
     context_window: opts.context,
     servers: rows.sort((a, b) => (b.tokens || 0) - (a.tokens || 0)),

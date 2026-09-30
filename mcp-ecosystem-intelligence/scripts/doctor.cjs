@@ -10,6 +10,7 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 const { exitAfterFlush } = require("./lib/exit.cjs");
+const { readWallClock } = require("./lib/clock.cjs");
 
 function parseArgs(argv) {
   const out = { json: false, strict: false, help: false, cwd: process.cwd() };
@@ -156,7 +157,7 @@ function runDoctor({ cwd }) {
   return {
     schema: "mcp-vault/doctor@1",
     cwd,
-    checked_at: new Date().toISOString(),
+    checked_at: new Date(readWallClock()).toISOString(),
     counts: {
       ok: checks.filter(c => c.level === "ok").length,
       warn: checks.filter(c => c.level === "warn").length,

@@ -53,7 +53,8 @@ const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { resolveNpmTreeCached, summarizeTree } = require('./lib/deps.cjs');
 const { purlFor } = require('./lib/npm_signatures.cjs');
 const { behaviour } = require('./lib/scores.cjs');
-const { staleDimensions } = require('./lib/evidence.cjs');
+const { staleDimensions, DEFAULT_MAX_AGE_DAYS, dbAsOf, evalResultsAsOf } = require('./lib/evidence.cjs');
+const { asOfFromArgv, requireAsOf } = require('./lib/clock.cjs');
 const { OSI_APPROVED } = require('./calculate_health.cjs');
 
 const DB_PATH   = path.resolve(__dirname, '../assets/tools_database.json');
@@ -64,6 +65,12 @@ const SUPPORTED_SPECS = ['1.5', '1.6'];
 
 function parseArgs(argv) {
   const opts = { installed: false, cwd: process.cwd(), entry: null, deps: false, out: null, spec: '1.6', help: false };
+  // Read once (or `--as-of`): the classification and staleness below are
+  // judgements about that instant, and the BOM records which one.
+  const clock = asOfFromArgv(argv);
+  if (clock.error) return { ...opts, error: clock.error };
+  opts.asOf = clock.asOf;
+  opts.asOfIso = clock.iso;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--installed') opts.installed = true;
@@ -73,6 +80,8 @@ function parseArgs(argv) {
     else if (a === '--entry') opts.entry = argv[++i] || null;
     else if (a === '--out') opts.out = argv[++i] || null;
     else if (a === '--spec') opts.spec = argv[++i] || opts.spec;
+    else if (a === '--as-of') i++;
+    else if (a.startsWith('--as-of=')) { /* read above */ }
     else return { ...opts, error: `unknown flag ${a}` };
   }
   if (!SUPPORTED_SPECS.includes(opts.spec)) {
@@ -84,7 +93,7 @@ function parseArgs(argv) {
 const HELP = `sbom — CycloneDX bill of materials for MCP servers
 
   node scripts/sbom.cjs [--installed] [--cwd <path>] [--entry <name>] [--deps]
-                        [--out <file>] [--spec 1.5|1.6]
+                        [--out <file>] [--spec 1.5|1.6] [--as-of <date>]
 
   (default)      describe every entry in the vault DB
   --installed    describe the servers this project's hosts are configured to run
@@ -93,6 +102,7 @@ const HELP = `sbom — CycloneDX bill of materials for MCP servers
                  (resolves each npm tree — slow, and needs network)
   --out <file>   write here instead of stdout
   --spec <v>     CycloneDX spec version (default 1.6)
+  --as-of <date> judge stored evidence as of this date instead of now
 `;
 
 function readJson(file, fallback) {
@@ -157,7 +167,8 @@ function licencesFor(license) {
 }
 
 /** The `mcp-vault:` properties for one entry — what CycloneDX has no field for. */
-function propertiesFor(tool, evalResult) {
+function propertiesFor(tool, evalResult, asOf) {
+  requireAsOf(asOf, 'propertiesFor');
   const props = [];
   const put = (name, value) => {
     if (value === null || value === undefined || value === '') return;
@@ -168,7 +179,7 @@ function propertiesFor(tool, evalResult) {
   // The `last-checked` property is deliberately gone: it was one entry-level
   // date that no longer tracked anything, and every `evidence.*` property here
   // already carries the date its own claim was established.
-  put('classification', classifyEntry(tool, evalResult).classification);
+  put('classification', classifyEntry(tool, evalResult, { now: asOf }).classification);
   put('category', tool.category);
   put('health-score', tool.health_score);
   put('tools-estimated', tool.est_tools_count);
@@ -181,7 +192,7 @@ function propertiesFor(tool, evalResult) {
       // a reader of an SBOM three months from now needs.
       put(`evidence.${dimension}`, `${value.status} (${value.verified_at || value.checked_at})`);
     }
-    const stale = staleDimensions(tool.trust_evidence);
+    const stale = staleDimensions(tool.trust_evidence, DEFAULT_MAX_AGE_DAYS, asOf);
     if (stale.length) put('evidence.stale', stale.map((s) => `${s.dimension} (${s.age_days}d)`).join(', '));
   }
 
@@ -196,7 +207,7 @@ function propertiesFor(tool, evalResult) {
 }
 
 /** One server → a CycloneDX component. */
-function componentFor(tool, evalResult) {
+function componentFor(tool, evalResult, asOf) {
   const typed = toTypedEntry(tool);
   const a = typed ? typed.artifact : {};
   const id = artifactId(a) || tool.name;
@@ -213,7 +224,7 @@ function componentFor(tool, evalResult) {
           ? `pkg:oci/${a.image.split('/').pop()}@${a.digest || a.tag || ''}?repository_url=${a.image}`
           : undefined,
     licenses: licencesFor(tool.license),
-    properties: propertiesFor(tool, evalResult),
+    properties: propertiesFor(tool, evalResult, asOf),
   };
 
   const hash = toHash(a.ecosystem === 'oci' && a.digest ? a.digest.replace(':', '-') : a.integrity);
@@ -250,8 +261,9 @@ async function main(argv) {
   if (opts.error) { process.stderr.write(`sbom: ${opts.error}\n\n${HELP}`); return 2; }
   if (opts.help)  { process.stdout.write(HELP); return 0; }
 
-  const db    = readJson(DB_PATH, { tools: [] }).tools || [];
-  const evals = readJson(EVAL_PATH, { results: [] }).results || [];
+  // The record as it stood at asOf: a look dated later did not exist then.
+  const db    = dbAsOf(readJson(DB_PATH, { tools: [] }).tools || [], opts.asOf);
+  const evals = evalResultsAsOf(readJson(EVAL_PATH, { results: [] }).results || [], opts.asOf);
   const pkg   = readJson(PKG_PATH, { name: '@froggychips/mcp-vault', version: '0.0.0' });
   const evalBy = new Map(evals.map((r) => [r.name, r]));
 
@@ -297,7 +309,7 @@ async function main(argv) {
   const dependencies = [];
 
   for (const tool of subjects) {
-    const component = componentFor(tool, evalBy.get(tool.name));
+    const component = componentFor(tool, evalBy.get(tool.name), opts.asOf);
     if (tool._not_in_vault) {
       component.properties = [...(component.properties || []), { name: 'mcp-vault:in-registry', value: 'false' }];
     }
@@ -328,10 +340,10 @@ async function main(argv) {
         seen.add(ref);
         components.push(depComponent(dep));
       }
-      dependencies.push({ ref: componentFor(tool, null)['bom-ref'], dependsOn: refs });
+      dependencies.push({ ref: componentFor(tool, null, opts.asOf)['bom-ref'], dependsOn: refs });
       const sum = summarizeTree(tree.packages);
       if (sum.withInstallScripts.length) {
-        const c = components.find((x) => x['bom-ref'] === componentFor(tool, null)['bom-ref']);
+        const c = components.find((x) => x['bom-ref'] === componentFor(tool, null, opts.asOf)['bom-ref']);
         if (c) c.properties = [...(c.properties || []), { name: 'mcp-vault:tree-install-scripts', value: sum.withInstallScripts.join(', ') }];
       }
     }
@@ -346,7 +358,7 @@ async function main(argv) {
     serialNumber: `urn:uuid:${contentUuid({ subjectName, components, dependencies })}`,
     version: 1,
     metadata: {
-      timestamp: new Date().toISOString(),
+      timestamp: opts.asOfIso,
       tools: { components: [{ type: 'application', name: 'mcp-vault', version: pkg.version, publisher: 'froggychips' }] },
       component: {
         type: 'application',
@@ -357,6 +369,8 @@ async function main(argv) {
       properties: [
         { name: 'mcp-vault:subject', value: opts.installed ? 'installed' : (opts.entry ? 'entry' : 'registry') },
         { name: 'mcp-vault:includes-transitive-dependencies', value: String(opts.deps) },
+        // Additive: the instant classifications and staleness were judged at.
+        { name: 'mcp-vault:as-of', value: opts.asOfIso },
       ],
     },
     components,

@@ -76,6 +76,7 @@ Every JSON document this tool writes carries a schema identifier of the form
 | `mcp-vault/doctor@1` | `mcp-vault doctor --json` |
 | `mcp-vault/entries@1` | `mcp-vault list --json` |
 | `mcp-vault/eval@1` | `mcp-vault eval --json` |
+| `mcp-vault/findings@1` | the `findings` field of `verify --json` and `explain --json` (see below) |
 | `mcp-vault/health@1` | `mcp-vault health` |
 | `mcp-vault/identity@1` | `mcp-vault identity --json` |
 | `mcp-vault/license-drift@1` | `mcp-vault license-drift --json` |
@@ -113,6 +114,24 @@ Within one schema major:
 - **`null` keeps meaning "not established".** It is never swapped for a
   default, a `false`, or an empty string. This is the single rule the whole
   project is built on and it will not be traded for a tidier schema.
+
+Two things every decision-bearing document now carries, both additive:
+
+- **`as_of`** — the ISO-8601 instant the stored evidence was judged at. It is
+  the wall clock at start-up unless `--as-of` gave another one (`verify`,
+  `status`, `explain`, `audit`, `list`, `scan`, `license-drift`; `sbom` records
+  it as the `mcp-vault:as-of` property). The same inputs at the same `as_of`
+  produce the same bytes.
+- **`findings`** — `mcp-vault/findings@1`, the one shape for what a check
+  concluded ([ADR 0001](adr/0001-findings-and-time.md)): `observations` (dated
+  facts with `expires_at`), `findings` (a `rule` id `<family>/<rule>`, a typed
+  `subject`, `severity`, `confidence`, and a `state` of `observed`, `not-run`,
+  `no-data` or `stale` — only `observed` is a statement about the subject),
+  and `decisions` (`effect` allow/warn/deny/unknown, `decided_by` a rule id,
+  `fails`, `fail_on`). It also carries the `policy` and `facts` it was decided
+  on, so a consumer can recompute the decisions from the document. Rule ids in
+  `decided_by` are part of the contract: a rule keeps its id and its meaning.
+  New commands report through this schema rather than a new one.
 
 Removing a field, changing its type, or changing what an existing value means
 bumps the schema to `@2`. When that happens, `@1` keeps being written for at

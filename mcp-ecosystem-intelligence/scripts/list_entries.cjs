@@ -20,6 +20,8 @@ const fs   = require("fs");
 const path = require("path");
 const { exitAfterFlush } = require("./lib/exit.cjs");
 const { classifyEntry, evalIndex, TIER_ORDER } = require("./lib/tiers.cjs");
+const { asOfFromArgv } = require("./lib/clock.cjs");
+const { dbAsOf, evalResultsAsOf } = require("./lib/evidence.cjs");
 
 const DB_PATH = path.join(
   __dirname, "..", "assets", "tools_database.json"
@@ -39,12 +41,14 @@ const TRUST    = argVal("--trust");     // verified | candidate
 const QUERY    = argVal("--query");     // substring on .name
 const AS_JSON  = argv.includes("--json");
 const HELP     = argv.includes("--help") || argv.includes("-h");
+// The one clock read for this run, or `--as-of` (lib/clock.cjs).
+const CLOCK    = asOfFromArgv(argv);
 
 if (HELP) {
   process.stdout.write(`mcp-vault list — show every server in the vault DB.
 
 USAGE
-  mcp-vault list [--category <c>] [--tier <t>] [--trust <t>] [--query <s>] [--json]
+  mcp-vault list [--category <c>] [--tier <t>] [--trust <t>] [--query <s>] [--json] [--as-of <date>]
 
 FILTERS
   --category <c>   browser, database, search, infra, observability, ...
@@ -52,6 +56,7 @@ FILTERS
   --trust <t>      verified | candidate
   --query <s>      substring on entry name (case-insensitive)
   --json           machine-readable output
+  --as-of <date>   derive tiers as of this date (YYYY-MM-DD or ISO-8601), not now
 
 EXAMPLES
   mcp-vault list
@@ -62,9 +67,15 @@ EXAMPLES
   process.exit(0);
 }
 
+if (CLOCK.error) {
+  process.stderr.write(`list: ${CLOCK.error}\n`);
+  process.exit(2);
+}
+
 let db;
 try {
-  db = JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
+  // The record as it stood at asOf: a look dated later did not exist then.
+  db = dbAsOf(JSON.parse(fs.readFileSync(DB_PATH, "utf8")), CLOCK.asOf);
 } catch (e) {
   process.stderr.write(`list: cannot read DB at ${DB_PATH}: ${e.message}\n`);
   process.exit(2);
@@ -74,12 +85,12 @@ try {
 // "not observed", never "observed to fail".
 let evals = new Map();
 try {
-  evals = evalIndex(JSON.parse(fs.readFileSync(EVAL_PATH, "utf8")).results);
+  evals = evalIndex(evalResultsAsOf(JSON.parse(fs.readFileSync(EVAL_PATH, "utf8")).results, CLOCK.asOf));
 } catch { /* no results shipped */ }
 
 // The tier is derived from evidence, not stored: see lib/tiers.cjs.
 let rows = (Array.isArray(db?.tools) ? db.tools : []).map((r) => {
-  const tier = classifyEntry(r, evals.get(r.name) || null);
+  const tier = classifyEntry(r, evals.get(r.name) || null, { now: CLOCK.asOf });
   return { ...r, classification: tier.classification, tier_reason: tier.why };
 });
 
@@ -105,6 +116,8 @@ rows.sort((a, b) => {
 if (AS_JSON) {
   process.stdout.write(JSON.stringify({
     schema: "mcp-vault/entries@1",
+    // Additive: tiers age with the evidence, so say when they were derived.
+    as_of: CLOCK.iso,
     filters: { category: CATEGORY, tier: TIER, trust: TRUST, query: QUERY },
     count: rows.length,
     entries: rows.map(r => ({

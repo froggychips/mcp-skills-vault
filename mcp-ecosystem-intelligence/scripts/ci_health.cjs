@@ -46,6 +46,7 @@
 
 const { execFileSync } = require('child_process');
 const { exitAfterFlush } = require('./lib/exit.cjs');
+const { readWallClock } = require('./lib/clock.cjs');
 
 const DEFAULTS = {
   queueLimitMin:  30,
@@ -228,7 +229,7 @@ function main() {
   }
 
   const verdict = evaluate({
-    nowMs: Date.now(),
+    nowMs: readWallClock(),
     ...state,
     queueLimitMin: opts.queueLimitMin,
     staleLimitDays: opts.staleLimitDays,

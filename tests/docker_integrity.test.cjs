@@ -108,4 +108,20 @@ test('CLI: verify fails when install_cmd moved and pkg_integrity did not (PR #10
   ], { cwd: tmp, encoding: 'utf8' });
   assert.equal(r.status, 1, r.stdout + r.stderr);
   assert.match(r.stdout, /install_cmd and pkg_integrity disagree/);
+
+  // The same refusal, as the findings model states it: a typed, observed,
+  // high finding, refused by decide() — not a counter inside the processor.
+  const j = spawnSync(process.execPath, [
+    'mcp-ecosystem-intelligence/scripts/verify_integrity.cjs', '--offline', '--json', '--as-of', '2026-09-30', '--entry', entry.name,
+  ], { cwd: tmp, encoding: 'utf8' });
+  assert.equal(j.status, 1, j.stdout + j.stderr);
+  const doc = JSON.parse(j.stdout);
+  const f = doc.findings.findings.find((x) => x.rule === 'integrity/docker-pin-mismatch');
+  assert.ok(f, 'a finding with the integrity/docker-pin-mismatch rule');
+  assert.equal(f.severity, 'high');
+  assert.equal(f.state, 'observed');
+  const d = doc.findings.decisions.find((x) => x.findings.includes(f.id));
+  assert.equal(d.effect, 'deny');
+  assert.equal(d.decided_by, 'finding/severity');
+  assert.equal(d.fails, true);
 });

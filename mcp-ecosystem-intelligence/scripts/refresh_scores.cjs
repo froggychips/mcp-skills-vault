@@ -29,6 +29,7 @@ const { execFileSync } = require('child_process');
 const fs   = require('fs');
 const path = require('path');
 const { writeDb } = require('./lib/db_io.cjs');
+const { readWallClock } = require('./lib/clock.cjs');
 const { githubSlug } = require('./lib/repo_url.cjs');
 
 const DB_PATH  = path.resolve(__dirname, '../assets/tools_database.json');
@@ -92,7 +93,7 @@ function githubOwnerRepo(url) {
 }
 
 function daysSince(isoDate) {
-  return Math.floor((Date.now() - new Date(isoDate).getTime()) / 86400000);
+  return Math.floor((readWallClock() - new Date(isoDate).getTime()) / 86400000);
 }
 
 // ── main ───────────────────────────────────────────────────────────────────

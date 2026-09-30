@@ -73,7 +73,7 @@
  * exactly what `in_registry` and `last_checked` both did.
  *
  * API:
- *   classifyEntry(tool, evalResult, opts) -> { classification, why, bound }
+ *   classifyEntry(tool, evalResult, opts) -> { classification, why, bound }   (opts.now required)
  *   evalIndex(results)                    -> Map<name, result>
  *   TIERS, TIER_ORDER
  */
@@ -81,6 +81,7 @@
 const { behaviour, blocks } = require('./scores.cjs');
 const { deriveTrust, requiredFor, staleDimensions, isPositive, DEFAULT_MAX_AGE_DAYS } = require('./evidence.cjs');
 const { toTypedEntry, comparableArtifactId, comparableId, packageKey } = require('./entry_model.cjs');
+const { requireAsOf } = require('./clock.cjs');
 
 const TIERS = ['Core', 'Recommended', 'Experimental', 'Deprecated'];
 const TIER_ORDER = { Core: 0, Recommended: 1, Experimental: 2, Deprecated: 3 };
@@ -218,7 +219,9 @@ function behaviourBinding(tool, evalResult) {
  * @returns {{classification: string, why: string, bound: object}}
  */
 function classifyEntry(tool, evalResult = null, opts = {}) {
-  const { now = Date.now(), maxAgeDays = DEFAULT_MAX_AGE_DAYS } = opts;
+  const { now, maxAgeDays = DEFAULT_MAX_AGE_DAYS } = opts;
+  // The tier is "a function of today" (see above), so today is an argument.
+  requireAsOf(now, 'classifyEntry');
   const evidence = (tool && tool.trust_evidence) || null;
   const dims = (evidence && evidence.dimensions) || {};
   const typed = toTypedEntry(tool);

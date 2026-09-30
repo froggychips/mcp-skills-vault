@@ -46,6 +46,7 @@ const fs   = require('fs');
 const path = require('path');
 const https = require('https');
 const { exitAfterFlush } = require('./lib/exit.cjs');
+const { readWallClock } = require('./lib/clock.cjs');
 const { readDb } = require('./lib/db_io.cjs');
 const { getJson, mapLimit } = require('./lib/http.cjs');
 const { npmPkgName } = require('./lib/install_cmd.cjs');
@@ -292,14 +293,14 @@ function main(argv) {
     if (opts.write) {
       for (const r of scanned) {
         history.packages[`npm:${r.package}@${r.version}`] = {
-          checked_at: new Date().toISOString().slice(0, 10),
+          checked_at: new Date(readWallClock()).toISOString().slice(0, 10),
           // Evidence, not just the capability names: a reader of the diff
           // should be able to go and look at the line.
           found: r.found,
           coverage: r.coverage,
         };
       }
-      history.generated_at = new Date().toISOString();
+      history.generated_at = new Date(readWallClock()).toISOString();
       history.note = 'Capability presence with evidence, per package version. `found` is a fact; absence is never recorded — see lib/capabilities.cjs.';
       const ordered = { $schema: history.$schema, generated_at: history.generated_at, note: history.note, packages: {} };
       for (const key of Object.keys(history.packages).sort()) ordered.packages[key] = history.packages[key];
@@ -310,7 +311,7 @@ function main(argv) {
     if (opts.json) {
       process.stdout.write(`${JSON.stringify({
         schema: 'mcp-vault/capability-scan@1',
-        generated_at: new Date().toISOString(),
+        generated_at: new Date(readWallClock()).toISOString(),
         scanned: scanned.length,
         summary: {
           with_additions: withAdditions.length,

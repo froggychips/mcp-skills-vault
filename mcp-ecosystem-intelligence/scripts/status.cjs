@@ -18,7 +18,7 @@
  * minute is not a first command.
  *
  * Usage:
- *   node scripts/status.cjs [--cwd <dir>] [--json] [--strict]
+ *   node scripts/status.cjs [--cwd <dir>] [--json] [--strict] [--as-of <date>]
  *
  * Exit codes:
  *   0  nothing installed is blocked, and the environment can run this
@@ -40,7 +40,8 @@ const { classifyEntry, evalIndex, currentArtifactId, packageKeyOfId, NAME_SCOPED
 const {
   toTypedEntry, artifactId, comparableArtifactId, comparableId, packageKey, isExactArtifact,
 } = require('./lib/entry_model.cjs');
-const { staleDimensions, DEFAULT_MAX_AGE_DAYS } = require('./lib/evidence.cjs');
+const { staleDimensions, DEFAULT_MAX_AGE_DAYS, dbAsOf, evalResultsAsOf } = require('./lib/evidence.cjs');
+const { asOfFromArgv, requireAsOf } = require('./lib/clock.cjs');
 const budget               = require('./lib/budget.cjs');
 const { runDoctor }        = require('./doctor.cjs');
 const orchestrate          = require('./orchestrate.cjs');
@@ -60,26 +61,34 @@ const RS = T ? '\x1b[0m'  : '';
 
 const HELP = `mcp-vault status — one screen: what is installed, what is wrong, what is missing
 
-  node scripts/status.cjs [--cwd <dir>] [--json] [--strict]
+  node scripts/status.cjs [--cwd <dir>] [--json] [--strict] [--as-of <date>]
 
   --cwd      project to read (default: the current directory)
   --json     machine-readable (schema mcp-vault/status@1)
   --strict   also exit 1 on drift, unvetted servers and stale evidence
+  --as-of    judge the stored evidence as of this date (YYYY-MM-DD or an
+             ISO-8601 instant) instead of now — for reproducing a past answer
 
 Reads only what is already on disk, so it makes no network calls. The footer
 names the commands that do.
 `;
 
 function parseArgs(argv) {
-  const opts = { cwd: process.cwd(), json: false, strict: false, help: false };
+  const opts = { cwd: process.cwd(), json: false, strict: false, help: false, asOf: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--json') opts.json = true;
     else if (a === '--strict') opts.strict = true;
     else if (a === '--help' || a === '-h') opts.help = true;
     else if (a === '--cwd') { opts.cwd = argv[++i]; if (!opts.cwd) return { error: '--cwd needs a directory' }; }
+    else if (a === '--as-of' || a.startsWith('--as-of=')) { if (a === '--as-of') i++; }
     else return { error: `unknown argument: ${a}` };
   }
+  // The clock is read here, once, and nowhere below (lib/clock.cjs).
+  const clock = asOfFromArgv(argv);
+  if (clock.error) return { error: clock.error };
+  opts.asOf = clock.asOf;
+  opts.asOfIso = clock.iso;
   return opts;
 }
 
@@ -131,7 +140,8 @@ function environment(cwd) {
  *   unpinned   the command resolves at launch, so what runs is not knowable
  *              from here at all
  */
-function installed({ cwd, db, evals }) {
+function installed({ cwd, db, evals, asOf }) {
+  requireAsOf(asOf, 'status installed()');
   const unreadable = [];
   const servers = readInstalledServers({ cwd, onUnreadable: (loc) => unreadable.push(loc) });
 
@@ -211,8 +221,8 @@ function installed({ cwd, db, evals }) {
       continue;
     }
 
-    const tier  = classifyEntry(entry, evals.get(entry.name) || null);
-    const trust = trustScore(entry.trust_evidence || null);
+    const tier  = classifyEntry(entry, evals.get(entry.name) || null, { now: asOf });
+    const trust = trustScore(entry.trust_evidence || null, { now: asOf });
     const dims  = (entry.trust_evidence && entry.trust_evidence.dimensions) || {};
     const dates = Object.values(dims).map((d) => d.checked_at).filter(Boolean).sort();
     rows.push({
@@ -222,7 +232,7 @@ function installed({ cwd, db, evals }) {
       trust_gate: trust.gate,
       blocking: trust.blocking.map((b) => `${b.dimension}: ${b.status}`),
       oldest_evidence: dates[0] || null,
-      stale: staleDimensions(entry.trust_evidence || null).map((s) => s.dimension),
+      stale: staleDimensions(entry.trust_evidence || null, DEFAULT_MAX_AGE_DAYS, asOf).map((s) => s.dimension),
     });
   }
   // A host config that could not be read is not a host with no servers.
@@ -329,9 +339,9 @@ function context(rows, db, evals) {
 }
 
 /** What this project's stack suggests that is not already installed. */
-function project({ cwd, db, installedRows }) {
+function project({ cwd, db, installedRows, asOf }) {
   const stack   = orchestrate.detectStack(cwd);
-  const matched = orchestrate.matchDB(db, stack, null);
+  const matched = orchestrate.matchDB(db, stack, null, asOf);
   const have    = new Set(installedRows.filter((r) => r.in_db).map((r) => r.db_entry));
   const missing = matched.filter((t) => !have.has(t.name));
   // `matchDB` always adds the universal three, so "no signals detected → 3
@@ -437,7 +447,7 @@ const label = (s) => `${B}${String(s).padEnd(16)}${RS}`;
 
 function printReport(r) {
   const out = (s) => process.stdout.write(s);
-  out(`\n${B}mcp-vault ${r.version}${RS} ${DM}· ${r.cwd}${RS}\n\n`);
+  out(`\n${B}mcp-vault ${r.version}${RS} ${DM}· ${r.cwd} · as of ${r.as_of}${RS}\n\n`);
 
   // 1. environment
   const envBits = [`Node ${r.environment.node}`];
@@ -544,16 +554,18 @@ function main(argv) {
     return 2;
   }
 
-  const db = readJson(DB_PATH);
-  if (!db || !Array.isArray(db.tools)) {
+  const rawDb = readJson(DB_PATH);
+  if (!rawDb || !Array.isArray(rawDb.tools)) {
     process.stderr.write(`status: DB not found or malformed: ${DB_PATH}\n`);
     return 2;
   }
-  const evals = evalIndex((readJson(EVAL_PATH) || {}).results);
+  // The record as it stood at asOf: a look dated later did not exist then.
+  const db = dbAsOf(rawDb, opts.asOf);
+  const evals = evalIndex(evalResultsAsOf((readJson(EVAL_PATH) || {}).results, opts.asOf));
   const pkg   = readJson(PKG_PATH) || {};
 
   const env           = environment(opts.cwd);
-  const installedRows = installed({ cwd: opts.cwd, db, evals });
+  const installedRows = installed({ cwd: opts.cwd, db, evals, asOf: opts.asOf });
   // The audit's own reads can fail too, and its default settings are the
   // answer that *creates* heavy-unbounded findings, so an unreadable
   // `.claude/settings.json` must not silently become "nothing is scoped".
@@ -570,14 +582,17 @@ function main(argv) {
     schema:  'mcp-vault/status@1',
     version: pkg.version || 'unknown',
     cwd:     opts.cwd,
-    generated_at: new Date().toISOString(),
+    generated_at: opts.asOfIso,
+    // Additive: the instant every stored claim below was judged at. The same
+    // as `generated_at` unless `--as-of` replayed another one.
+    as_of: opts.asOfIso,
     // Said once, out loud: nothing below was measured during this run.
     evidence_source: 'stored',
     max_age_days: DEFAULT_MAX_AGE_DAYS,
     environment: env,
     installed:   installedRows,
     context:     context(installedRows, db, evals),
-    project:     project({ cwd: opts.cwd, db, installedRows }),
+    project:     project({ cwd: opts.cwd, db, installedRows, asOf: opts.asOf }),
     audit:       auditFindings,
   };
   report.verdict = verdict({ env, installedRows, auditFindings, auditUnreadable, strict: opts.strict });

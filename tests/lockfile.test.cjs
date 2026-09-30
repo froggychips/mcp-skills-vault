@@ -33,7 +33,9 @@ const entry = (over = {}) => ({
   ...over,
 });
 
-const lockOf = (servers) => ({ ...L.emptyLock(), servers });
+// Lock dates are observations; tests pass a fixed one rather than the clock.
+const NOW = Date.parse('2026-09-17T12:00:00Z');
+const lockOf = (servers) => ({ ...L.emptyLock(NOW), servers });
 
 test('no difference is reported when nothing moved', () => {
   const a = lockOf({ s: entry() });
@@ -131,6 +133,7 @@ test('readLock: absent is not an error, but a foreign schema is', () => {
 test('lockEntry keeps npm\'s lockfile verbatim and derives the readable index', () => {
   const npmLock = { lockfileVersion: 3, packages: { '': { name: 'probe' }, 'node_modules/dep-a': { version: '1.0.0', integrity: 'sha512-A' } } };
   const e = L.lockEntry({
+    now: NOW,
     tool: { name: 's', install_cmd: 'npx -y pkg@1.0.0' },
     artifact: { ecosystem: 'npm', id: 'npm:pkg@1.0.0', package: 'pkg', version: '1.0.0' },
     tree: { packages: [{ name: 'dep-a', version: '1.0.0', integrity: 'sha512-A', hasInstallScript: true }], lockfile: npmLock, lockfileVersion: 3 },
@@ -142,6 +145,7 @@ test('lockEntry keeps npm\'s lockfile verbatim and derives the readable index', 
 
 test('vendorFiles pins exactly, and normalises what npm left unusable', () => {
   const e = L.lockEntry({
+    now: NOW,
     tool: { name: 's', install_cmd: 'npx -y pkg@1.0.0' },
     artifact: { ecosystem: 'npm', id: 'npm:pkg@1.0.0', package: 'pkg', version: '1.0.0' },
     tree: {
@@ -171,6 +175,7 @@ test('vendorFiles refuses rather than re-resolving', () => {
   // Without a stored lockfile the only way to install would be a fresh
   // resolve, which is exactly what a lockfile exists to prevent.
   const noLock = L.lockEntry({
+    now: NOW,
     tool: { name: 's', install_cmd: 'npx -y pkg@1.0.0' },
     artifact: { ecosystem: 'npm', id: 'npm:pkg@1.0.0', package: 'pkg', version: '1.0.0' },
   });

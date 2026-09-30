@@ -67,7 +67,8 @@ const https        = require('https');
 const path         = require('path');
 const { githubSlug } = require('./lib/repo_url.cjs');
 // Freshness is decided in one place; `availability` is seven-day evidence.
-const { staleDimensions } = require('./lib/evidence.cjs');
+const { staleDimensions, DEFAULT_MAX_AGE_DAYS, dbAsOf } = require('./lib/evidence.cjs');
+const { asOfFromArgv, requireAsOf } = require('./lib/clock.cjs');
 
 const { classifyLicense } = require('./calculate_health.cjs');
 
@@ -305,7 +306,9 @@ async function defaultFetcher(tool) {
  *                                  a no-op; lets CI run an offline smoke step)
  * @returns {Promise<{ checked, drifts, errors, items }>}
  */
-async function runDriftCheck(db, { fetcher, noFetch }) {
+async function runDriftCheck(db, { fetcher, noFetch, asOf }) {
+  // Whether a recorded `gone` is still fresh is a question about an instant.
+  requireAsOf(asOf, 'runDriftCheck');
   const items   = [];
   const drifts  = [];
   const errors  = [];
@@ -347,7 +350,7 @@ async function runDriftCheck(db, { fetcher, noFetch }) {
     //     evidence needs re-running.
     const availabilityDim = tool?.trust_evidence?.dimensions?.availability;
     if (availabilityDim?.status === 'gone'
-        && !staleDimensions(tool.trust_evidence).some((d) => d.dimension === 'availability')) {
+        && !staleDimensions(tool.trust_evidence, DEFAULT_MAX_AGE_DAYS, asOf).some((d) => d.dimension === 'availability')) {
       items.push({
         name: tool.name,
         old: tool.license || null,
@@ -403,12 +406,19 @@ async function runDriftCheck(db, { fetcher, noFetch }) {
 
 function parseArgs(argv) {
   const out = { strict: false, json: false, noFetch: false, dbPath: DEFAULT_DB_PATH };
+  const clock = asOfFromArgv(argv);
+  if (clock.error) { console.error(clock.error); process.exit(2); }
+  out.asOf = clock.asOf;
+  out.asOfIso = clock.iso;
+  out.asOfSource = clock.source;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if      (a === '--strict')                            out.strict = true;
     else if (a === '--json')                              out.json = true;
     else if (a === '--no-fetch' || a === '--offline')     out.noFetch = true;
     else if (a === '--db')                                out.dbPath = argv[++i];
+    else if (a === '--as-of')                             i++;
+    else if (a.startsWith('--as-of='))                    { /* read above */ }
     else if (a === '--help' || a === '-h')                out.help = true;
     else {
       console.error(`Unknown argument: ${a}`);
@@ -420,7 +430,7 @@ function parseArgs(argv) {
 
 function helpText() {
   return [
-    'Usage: node check_license_drift.cjs [--strict] [--json] [--no-fetch] [--db <path>]',
+    'Usage: node check_license_drift.cjs [--strict] [--json] [--no-fetch] [--db <path>] [--as-of <date>]',
     '',
     'Detects upstream license drift vs the recorded `license` field in',
     'tools_database.json. --strict exits 1 on any OSI → restrictive drift',
@@ -434,18 +444,27 @@ async function main() {
 
   let db;
   try {
-    db = JSON.parse(fs.readFileSync(opts.dbPath, 'utf8'));
+    // The record as it stood at asOf: a look dated later did not exist then.
+    db = dbAsOf(JSON.parse(fs.readFileSync(opts.dbPath, 'utf8')), opts.asOf);
   } catch (e) {
     console.error(`Cannot read DB at ${opts.dbPath}: ${e.message}`);
     process.exit(2);
   }
 
-  const report = await runDriftCheck(db, { fetcher: defaultFetcher, noFetch: opts.noFetch });
+  // A fetch reads the registries today; --as-of replays only what the DB
+  // already holds, or today's licences would be reported as another day's.
+  if (opts.asOfSource === 'as-of' && !opts.noFetch) {
+    console.error('--as-of replays stored evidence and needs --no-fetch: a fetch observes today, and its results cannot be dated in the past.');
+    process.exit(2);
+  }
+
+  const report = await runDriftCheck(db, { fetcher: defaultFetcher, noFetch: opts.noFetch, asOf: opts.asOf });
 
   if (opts.json) {
     // Match the documented output shape.
     process.stdout.write(JSON.stringify({
       schema: 'mcp-vault/license-drift@1',
+      as_of:   opts.asOfIso,
       checked: report.checked,
       drifts:  report.drifts,
       errors:  report.errors,

@@ -28,7 +28,7 @@
  * meaningful.
  *
  * API:
- *   emptyLock()                             -> lock document
+ *   emptyLock(now)                          -> lock document   (now required)
  *   lockEntry({ tool, tree, surface, … })   -> server record
  *   readLock(file)                          -> { ok, lock, error? }
  *   writeLock(file, lock)                   -> void
@@ -38,14 +38,15 @@
 
 const fs   = require('fs');
 const path = require('path');
+const { requireAsOf } = require('./clock.cjs');
 
 const LOCK_SCHEMA   = 'mcp-vault/lock@1';
 const LOCK_FILENAME = 'mcp.lock.json';
 
-function emptyLock() {
+function emptyLock(now) {
   return {
     $schema:      LOCK_SCHEMA,
-    generated_at: new Date().toISOString(),
+    generated_at: new Date(requireAsOf(now, 'emptyLock')).toISOString(),
     // Deliberately not "verified_at": this file records what a run observed,
     // and the words `trust` and `verified` belong to the evidence model.
     servers:      {},
@@ -58,9 +59,10 @@ function emptyLock() {
  * `tree` is stored sorted and flat rather than nested: a flat list with depths
  * diffs cleanly, and the nesting carries no information a consumer here needs.
  */
-function lockEntry({ tool, artifact = null, tree = null, surface = null, now = new Date() } = {}) {
+function lockEntry({ tool, artifact = null, tree = null, surface = null, now } = {}) {
   const entry = {
-    locked_at: now.toISOString().slice(0, 10),
+    // When the lock was taken — an observation date, read once by lock.cjs.
+    locked_at: new Date(requireAsOf(now, 'lockEntry')).toISOString().slice(0, 10),
     artifact: artifact || null,
     launch:   tool && tool.install_cmd ? tool.install_cmd : null,
   };
@@ -132,7 +134,9 @@ function readLock(file) {
     // are about to compare mean something else.
     return { ok: false, lock: null, error: `${file} has schema ${doc.$schema}, expected ${LOCK_SCHEMA}` };
   }
-  return { ok: true, lock: { ...emptyLock(), ...doc, servers: doc.servers || {} } };
+  // The shape of an empty lock without its timestamp: a lock read from disk
+  // carries its own, and inventing one here would be reading the clock.
+  return { ok: true, lock: { $schema: LOCK_SCHEMA, generated_at: null, ...doc, servers: doc.servers || {} } };
 }
 
 function writeLock(file, lock) {

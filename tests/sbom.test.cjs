@@ -21,6 +21,8 @@ const test   = require('node:test');
 const assert = require('node:assert/strict');
 
 const s = require('../mcp-ecosystem-intelligence/scripts/sbom.cjs');
+// Classification and staleness are judged at an explicit instant (lib/clock.cjs).
+const NOW = Date.parse('2026-09-17T12:00:00Z');
 
 test('toHash: base64 and hex both arrive as hex of the right length', () => {
   const sha512 = `sha512-${Buffer.alloc(64, 7).toString('base64')}`;
@@ -79,7 +81,7 @@ test('components carry the artifact identity, not just a label', () => {
     license: 'Apache-2.0',
     source_url: 'https://github.com/microsoft/playwright-mcp',
     trust: 'verified',
-  }, null);
+  }, null, NOW);
   assert.equal(c.type, 'application');
   assert.equal(c.name, '@playwright/mcp');
   assert.equal(c.version, '0.0.75');
@@ -99,6 +101,7 @@ test('behavioural status and evidence dates travel with the component', () => {
       } },
     },
     { status: 'fail', failure_class: 'NEEDS_ENV', tool_count: null },
+    NOW,
   );
   const byName = Object.fromEntries(props.map((p) => [p.name, p.value]));
   assert.equal(byName['mcp-vault:behaviour'], 'needs-credentials');

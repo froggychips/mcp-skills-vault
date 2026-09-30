@@ -6,6 +6,8 @@
 const fs = require("fs");
 const path = require("path");
 const { classifyEntry } = require("./lib/tiers.cjs");
+const { asOfFromArgv, requireAsOf } = require("./lib/clock.cjs");
+const { dbAsOf, evalResultsAsOf } = require("./lib/evidence.cjs");
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const DB_PATH = path.join(ROOT, "mcp-ecosystem-intelligence", "assets", "tools_database.json");
@@ -20,11 +22,12 @@ function esc(s) {
     .replace(/"/g, "&quot;");
 }
 
-function slimEntry(t, evidence = null, smoke = null, now = Date.now()) {
+function slimEntry(t, evidence = null, smoke = null, asOf) {
   // The tier is derived here rather than read off the entry: it is a function
-  // of the evidence and of today's date (claims age out), so a stored copy
-  // would go quietly wrong while the file sat unchanged.
-  const tier = classifyEntry(t, smoke, { now });
+  // of the evidence and of the date it is judged at (claims age out), so a
+  // stored copy would go quietly wrong while the file sat unchanged. That
+  // date is passed in, and the page says which one it used.
+  const tier = classifyEntry(t, smoke, { now: requireAsOf(asOf, 'slimEntry') });
   return {
     name: t.name,
     category: t.category,
@@ -142,13 +145,16 @@ function renderHtml(entries) {
 `;
 }
 
-// Everything the page publishes, as of `now`. The tiers depend on the clock,
-// so a check that the committed files match the DB replays them at the time
-// they were generated rather than today.
-function buildEntries(db, evals, now = Date.now()) {
-  const smokeByName = new Map(((evals && evals.results) || []).map((r) => [r.name, r]));
-  return db.tools
-    .map((t) => slimEntry(t, t.trust_evidence || null, smokeByName.get(t.name) || null, now))
+// Everything the page publishes, as of `asOf` (lib/clock.cjs). The tiers
+// depend on it, so a check that the committed files match the DB replays them
+// at the instant they were generated rather than today. No default: a caller
+// that forgets the instant must fail, not quietly judge at the wall clock.
+function buildEntries(db, evals, asOf) {
+  requireAsOf(asOf, 'buildEntries');
+  // The record as it stood at asOf: a look dated later did not exist then.
+  const smokeByName = new Map((evalResultsAsOf((evals && evals.results) || [], asOf)).map((r) => [r.name, r]));
+  return dbAsOf(db, asOf).tools
+    .map((t) => slimEntry(t, t.trust_evidence || null, smokeByName.get(t.name) || null, asOf))
     .sort((a, b) =>
     (a.category || "").localeCompare(b.category || "") ||
     (b.health_score || 0) - (a.health_score || 0) ||
@@ -157,6 +163,9 @@ function buildEntries(db, evals, now = Date.now()) {
 }
 
 function main() {
+  // Read once (or `--as-of`), so a regenerated page is reproducible.
+  const clock = asOfFromArgv(process.argv.slice(2));
+  if (clock.error) { console.error(clock.error); process.exit(2); }
   const db = JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
   // Behavioural results are a separate stream, and may be absent (nothing has
   // run yet) — an empty file must not become an empty claim.
@@ -165,10 +174,9 @@ function main() {
     evals = JSON.parse(fs.readFileSync(EVAL_PATH, "utf8"));
   } catch { /* no results shipped */ }
 
-  const generatedAt = new Date();
-  const entries = buildEntries(db, evals, generatedAt.getTime());
+  const entries = buildEntries(db, evals, clock.asOf);
   fs.mkdirSync(OUT_DIR, { recursive: true });
-  fs.writeFileSync(path.join(OUT_DIR, "registry.json"), `${JSON.stringify({ generated_at: generatedAt.toISOString(), count: entries.length, entries }, null, 2)}\n`);
+  fs.writeFileSync(path.join(OUT_DIR, "registry.json"), `${JSON.stringify({ generated_at: clock.iso, as_of: clock.iso, count: entries.length, entries }, null, 2)}\n`);
   fs.writeFileSync(path.join(OUT_DIR, "registry.html"), renderHtml(entries));
   console.log(`Wrote ${entries.length} entries to ${path.join(OUT_DIR, "registry.html")}`);
 }

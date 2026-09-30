@@ -35,6 +35,12 @@
  *   mergeEvidence(existing, fresh)            -> merged   (per-dimension, newest wins)
  *   staleDimensions(evidence, maxAgeDays, now)-> [names]
  *   deriveTrust(evidence, opts)               -> 'verified' | 'candidate' | 'unverified'
+ *   evidenceAsOf / entryAsOf / dbAsOf / evalResultsAsOf (…, asOf)
+ *                                             -> the record without looks dated after asOf
+ *
+ * `now` is required wherever it appears (opts.now for the object forms). It
+ * used to default to `Date.now()`, which made every verdict here a function of
+ * the day it happened to run; lib/clock.cjs says where the instant comes from.
  *   DIMENSIONS                                -> ordered list of dimension names
  */
 
@@ -72,7 +78,9 @@ const DEFAULT_MAX_AGE_DAYS = {
   smoke:          30,
 };
 
-const today = (now = Date.now()) => new Date(now).toISOString().slice(0, 10);
+const { requireAsOf } = require('./clock.cjs');
+
+const today = (now, where) => new Date(requireAsOf(now, where)).toISOString().slice(0, 10);
 
 // What counts as an answer in the affirmative, per dimension vocabulary. Used
 // where "did this actually check out?" is being asked, so that a new status
@@ -124,8 +132,8 @@ function isPositive(dimension, status) {
  * established, and anything it did not examine is simply absent — which is what
  * lets a later run fill it in without overwriting a real answer.
  */
-function buildEvidence(checks, { now = Date.now(), artifactId = null } = {}) {
-  const at = today(now);
+function buildEvidence(checks, { now, artifactId = null } = {}) {
+  const at = today(now, 'buildEvidence');
   const dimensions = {};
   const put = (name, status, extra = {}) => {
     // `checked_at` is when we looked; `verified_at` is when it last checked
@@ -182,7 +190,8 @@ function buildEvidence(checks, { now = Date.now(), artifactId = null } = {}) {
 }
 
 /** Evidence from a behavioural run, which is a separate stream. */
-function smokeEvidence(evalResult, { now = Date.now() } = {}) {
+function smokeEvidence(evalResult, { now } = {}) {
+  requireAsOf(now, 'smokeEvidence');
   if (!evalResult || !evalResult.status) return null;
   return {
     status:     evalResult.status === 'pass' ? 'pass' : (evalResult.status === 'skip' ? 'skipped' : 'fail'),
@@ -247,7 +256,8 @@ function daysBetween(fromIso, now) {
  * Dimensions whose answer is too old to rely on.
  * `maxAgeDays` may be a number (same bar for all) or a per-dimension object.
  */
-function staleDimensions(evidence, maxAgeDays = DEFAULT_MAX_AGE_DAYS, now = Date.now()) {
+function staleDimensions(evidence, maxAgeDays = DEFAULT_MAX_AGE_DAYS, now) {
+  requireAsOf(now, 'staleDimensions');
   const dims = (evidence && evidence.dimensions) || {};
   const out = [];
   for (const [name, value] of Object.entries(dims)) {
@@ -280,7 +290,8 @@ function requiredFor(ecosystem) {
   return REQUIRED_BY_ECOSYSTEM[ecosystem] || ['artifact'];
 }
 
-function deriveTrust(evidence, { maxAgeDays = DEFAULT_MAX_AGE_DAYS, now = Date.now(), require: required = ['artifact'] } = {}) {
+function deriveTrust(evidence, { maxAgeDays = DEFAULT_MAX_AGE_DAYS, now, require: required = ['artifact'] } = {}) {
+  requireAsOf(now, 'deriveTrust');
   const dims = (evidence && evidence.dimensions) || {};
   // Actively wrong, not merely unknown. A package that is no longer published
   // belongs here rather than in 'candidate': candidate means "not vetted yet",
@@ -306,8 +317,63 @@ function deriveTrust(evidence, { maxAgeDays = DEFAULT_MAX_AGE_DAYS, now = Date.n
   return 'verified';
 }
 
+// ── the record as it stood at an instant ──────────────────────────────────
+//
+// `--as-of` replays a decision at another instant, but the DB only holds the
+// latest look at each dimension. A look dated after `asOf` did not exist
+// then, so a replay must not lean on it: staleness alone cannot say so (its
+// age is negative, and a negative age is "fresh"). The honest reading of such
+// a dimension is "never checked", which is what dropping it gives every
+// consumer — trust, tiers, findings and the printed evidence alike. The
+// comparison is by day, the grain `checked_at` is written at, so a look on
+// the `asOf` day itself stands. At the wall clock nothing is later than now,
+// and each of these returns its input unchanged (the same object).
+
+const lookedAfter = (checkedAt, asOf) => {
+  if (!checkedAt) return false;
+  const day = Date.parse(`${String(checkedAt).slice(0, 10)}T00:00:00Z`);
+  return Number.isFinite(day) && day > asOf;
+};
+
+/** `evidence` without the dimensions first looked at after `asOf`. */
+function evidenceAsOf(evidence, asOf) {
+  requireAsOf(asOf, 'evidenceAsOf');
+  if (!evidence || !evidence.dimensions) return evidence;
+  const kept = Object.entries(evidence.dimensions).filter(([, v]) => !(v && lookedAfter(v.checked_at, asOf)));
+  if (kept.length === Object.keys(evidence.dimensions).length) return evidence;
+  return { ...evidence, dimensions: Object.fromEntries(kept) };
+}
+
+/** A DB entry whose `trust_evidence` is read as of `asOf` (a copy only if it changes). */
+function entryAsOf(tool, asOf) {
+  if (!tool || !tool.trust_evidence) return tool;
+  const ev = evidenceAsOf(tool.trust_evidence, asOf);
+  return ev === tool.trust_evidence ? tool : { ...tool, trust_evidence: ev };
+}
+
+/** `db.tools` read as of `asOf`; accepts the DB object or its `tools` array. */
+function dbAsOf(db, asOf) {
+  requireAsOf(asOf, 'dbAsOf');
+  if (Array.isArray(db)) {
+    const tools = db.map((t) => entryAsOf(t, asOf));
+    return tools.every((t, i) => t === db[i]) ? db : tools;
+  }
+  if (!db || !Array.isArray(db.tools)) return db;
+  const tools = dbAsOf(db.tools, asOf);
+  return tools === db.tools ? db : { ...db, tools };
+}
+
+/** Behavioural results (eval_results.json `results`) that existed at `asOf`. */
+function evalResultsAsOf(results, asOf) {
+  requireAsOf(asOf, 'evalResultsAsOf');
+  if (!Array.isArray(results)) return results;
+  const kept = results.filter((r) => !(r && lookedAfter(r.checked_at, asOf)));
+  return kept.length === results.length ? results : kept;
+}
+
 module.exports = {
   DIMENSIONS, DEFAULT_MAX_AGE_DAYS, POSITIVE_STATUSES, POSITIVE_BY_DIMENSION, isPositive,
-  REQUIRED_BY_ECOSYSTEM, requiredFor,
+  REQUIRED_BY_ECOSYSTEM, requiredFor, daysBetween,
   buildEvidence, smokeEvidence, mergeEvidence, staleDimensions, deriveTrust,
+  evidenceAsOf, entryAsOf, dbAsOf, evalResultsAsOf,
 };
