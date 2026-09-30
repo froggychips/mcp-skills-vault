@@ -21,6 +21,8 @@
  *   hostConfigPaths({ cwd, home, platform })  -> [{ host, scope, path }]
  *   parseConfig(json, origin)                 -> [{ name, command, args, … }]
  *   toInstallCmd(server)                      -> "npx -y pkg@1.2.3" | null
+ *   explicitConfigPaths(list, { cwd })        -> [{ host, scope, path, explicit }]
+ *   serverLine(text, name)                    -> 1-based line naming the server | null
  *   readInstalledServers({ cwd, home, … })    -> [{ … , install_cmd }]
  */
 
@@ -85,6 +87,31 @@ function hostConfigPaths({ cwd = process.cwd(), home = os.homedir(), platform = 
     { host: 'vscode',         scope: 'project', path: path.join(cwd, '.vscode', 'mcp.json') },
     { host: 'codex',          scope: 'user',    path: path.join(home, '.codex', 'config.toml') },
   ];
+}
+
+/**
+ * Config files named on the command line (`verify --config <path>`), as
+ * location records. CI checks the configs committed to a repository; the
+ * runner's home directory is not the project, and reading it made the verdict
+ * depend on whichever machine picked the job up.
+ *
+ * The host is inferred from the file name only to label the report — the
+ * parser reads both `mcpServers` and `servers` either way. `explicit` marks a
+ * path somebody asked for, so a missing one is reported instead of skipped: a
+ * typo in a workflow file must not turn into "no servers configured".
+ */
+function explicitConfigPaths(list, { cwd = process.cwd() } = {}) {
+  return (list || []).map((p) => {
+    const abs  = path.resolve(cwd, p);
+    const norm = abs.split(path.sep).join('/');
+    const host = /\/\.vscode\/mcp\.json$/.test(norm) ? 'vscode'
+      : /\/\.cursor\/mcp\.json$/.test(norm) ? 'cursor'
+      : /\/claude_desktop_config\.json$/.test(norm) ? 'claude-desktop'
+      : /\.toml$/.test(norm) ? 'codex'
+      : /\/\.mcp\.json$/.test(norm) || /\/\.claude\.json$/.test(norm) ? 'claude-code'
+      : 'custom';
+    return { host, scope: 'project', path: abs, explicit: true };
+  });
 }
 
 /**
@@ -162,6 +189,20 @@ function toInstallCmd(server) {
 }
 
 /**
+ * The 1-based line that names a server in its config text — where a finding
+ * about it belongs (a host-config subject is `path:line`), because that is the
+ * line a pull request changed. The first key spelled like the name, in JSON
+ * (`"name":`) or Codex TOML (`[mcp_servers.name]`); null when not found.
+ */
+function serverLine(text, name) {
+  if (typeof text !== 'string' || !name) return null;
+  const quoted = JSON.stringify(name);
+  const idx = text.split('\n').findIndex((l) => l.includes(`${quoted}:`) || l.includes(`${quoted} :`)
+    || l.includes(`[mcp_servers.${name}]`) || l.includes(`[mcp_servers.${quoted}]`));
+  return idx === -1 ? null : idx + 1;
+}
+
+/**
  * Every configured server across every host config found.
  *
  * `onUnreadable` is called for a config that exists but cannot be parsed —
@@ -179,7 +220,13 @@ function readInstalledServers({ cwd = process.cwd(), home = os.homedir(), platfo
       // else — EACCES, EISDIR, a dangling symlink — is a file we were meant to
       // read and could not, and swallowing it made "no servers configured"
       // indistinguishable from "we were not allowed to look".
-      if (e.code !== 'ENOENT' && onUnreadable) onUnreadable({ ...loc, error: `${e.code || 'read failed'}: ${e.message}` });
+      // A path named explicitly is expected to exist, so its absence is a
+      // finding too.
+      if (e.code === 'ENOENT' && loc.explicit) {
+        if (onUnreadable) onUnreadable({ ...loc, error: 'file not found' });
+      } else if (e.code !== 'ENOENT' && onUnreadable) {
+        onUnreadable({ ...loc, error: `${e.code || 'read failed'}: ${e.message}` });
+      }
       continue;
     }
     let doc;
@@ -190,10 +237,10 @@ function readInstalledServers({ cwd = process.cwd(), home = os.homedir(), platfo
       continue;
     }
     for (const server of parseConfig(doc, loc, onUnreadable)) {
-      servers.push({ ...server, install_cmd: toInstallCmd(server) });
+      servers.push({ ...server, line: serverLine(raw, server.name), install_cmd: toInstallCmd(server) });
     }
   }
   return servers;
 }
 
-module.exports = { hostConfigPaths, parseConfig, toInstallCmd, readInstalledServers, parseCodexToml };
+module.exports = { hostConfigPaths, explicitConfigPaths, serverLine, parseConfig, toInstallCmd, readInstalledServers, parseCodexToml };

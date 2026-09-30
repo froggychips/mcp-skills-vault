@@ -43,7 +43,15 @@ function subjectForTool(tool) {
   const inst = tool && tool._installed;
   // A host config that did not parse is not an artifact: point at the file.
   if (inst && inst.kind === 'unreadable') {
-    return subject.hostConfig({ path: inst.source || tool.name, host: inst.host || null, scope: inst.scope || null });
+    return subject.hostConfig({ path: inst.ref || inst.source || tool.name, host: inst.host || null, scope: inst.scope || null });
+  }
+  // A configured server (verify --installed / --config) is the line of the
+  // host config that launches it: that is what a finding is about and where
+  // SARIF anchors it (docs/adr/0001, #120).
+  if (inst && (inst.ref || inst.source)) {
+    return subject.hostConfig({
+      path: inst.ref || inst.source, line: inst.line, host: inst.host || null, scope: inst.scope || null, server: tool.name,
+    });
   }
   let id = null;
   try { const t = toTypedEntry(tool); id = t ? artifactId(t.artifact) : null; } catch { id = null; }
@@ -93,7 +101,7 @@ function fromVerifyResults(results, { asOf, maxAgeDays = {}, scope = 'database' 
     const fresh = buildEvidence(r.checks, { artifactId: typed ? artifactId(typed.artifact) : null, now: at });
     const freshDims = new Set(Object.keys(fresh.dimensions));
     const effective = freshDims.size ? mergeEvidence(stored, fresh) : stored;
-    const obs = s.type === 'artifact'
+    const obs = !(r.tool._installed && r.tool._installed.kind === 'unreadable')
       ? observationsFromEvidence(effective, { subject: s, source: 'stored', maxAgeDays, freshDimensions: freshDims, positive: isPositive })
       : [];
     observations.push(...obs);

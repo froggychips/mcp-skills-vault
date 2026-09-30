@@ -46,6 +46,7 @@
  * API:
  *   findPolicyFile(startDir)      -> path | null
  *   loadPolicy(startDir, opts)    -> { ok, policy, path, errors, sources }
+ *   loadPolicyFile(file, opts)    -> same, for one named file instead of the search
  *   normalizePolicy(raw)          -> { ok, policy, errors }
  *   policyToFlags(policy)         -> ["--fail-unverified", …]
  *   evaluateEntry(entry, policy)  -> [{ level, rule, message }]
@@ -223,8 +224,11 @@ function readLayer(file) {
  * cannot be read makes the whole policy invalid: an org bar that silently
  * failed to load would be enforced by nobody.
  */
-function loadPolicy(startDir = process.cwd(), { env = process.env } = {}) {
-  const file = findPolicyFile(startDir);
+function loadPolicy(startDir = process.cwd(), { env = process.env, file: named = null } = {}) {
+  // A file named outright (`verify --policy <path>`, #120) replaces the
+  // search upwards; its org layers apply as for a found one. One that does
+  // not exist is that file's error (readLayer), never the defaults.
+  const file = named ? path.resolve(named) : findPolicyFile(startDir);
   const envOrg = env && env.MCP_VAULT_ORG_POLICY ? path.resolve(env.MCP_VAULT_ORG_POLICY) : null;
   if (!file && !envOrg) return { ok: true, policy: { ...DEFAULTS }, path: null, errors: [], found: false, sources: [] };
 
@@ -342,7 +346,16 @@ function evaluateEntry(entry, policy = DEFAULTS, dbEntry = null) {
     .map((o) => ({ level: o.effect === 'deny' ? 'fail' : 'warn', rule: o.rule, message: o.detail }));
 }
 
+/**
+ * One named policy file (`verify --policy <path>`). A path somebody typed that
+ * does not exist is an error, not "no policy": falling back to the defaults
+ * would enforce a bar nobody chose while the workflow reads as if theirs is on.
+ */
+function loadPolicyFile(file, opts = {}) {
+  return loadPolicy(path.dirname(path.resolve(file)), { ...opts, file });
+}
+
 module.exports = {
   DEFAULTS, POLICY_FILENAMES,
-  findPolicyFile, loadPolicy, normalizePolicy, policyToFlags, evaluateEntry,
+  findPolicyFile, loadPolicy, loadPolicyFile, normalizePolicy, policyToFlags, evaluateEntry,
 };

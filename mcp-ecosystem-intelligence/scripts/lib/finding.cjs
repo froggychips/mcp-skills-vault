@@ -43,7 +43,7 @@
  *   exitCode(decisions)                                    -> 0 | 1 | 2
  *   findingsDocument({ asOf, observations, findings, decisions }) -> mcp-vault/findings@1
  *   toJson(doc) / canonicalJson(value) / sortFindings(list)
- *   toSarif(findings, opts)                                -> SARIF 2.1.0
+ *   toSarif(findings, opts)                                -> SARIF 2.1.0 (opts.decisions: + finding-less outcomes)
  *   explainTrace(doc, subjectId) / renderTrace(trace)      -> observation → finding → decision
  */
 
@@ -466,12 +466,34 @@ function sarifLocation(s, { dbPath, lineOf }) {
   }
 }
 
+/**
+ * `decisions` (optional): also render each rule outcome that is not `allow`
+ * and rests on no finding — a policy licence deny, a missing signature the
+ * policy requires — at its subject. Those decide the run but are not
+ * findings, so without them the annotations would not explain a red job.
+ * A rendering of the Decision: the level is read off its effect, not decided.
+ */
 function toSarif(findings, {
   toolName = 'mcp-vault', dbPath = 'mcp-ecosystem-intelligence/assets/tools_database.json',
-  lineOf = () => 1, includeNotes = false, ruleHelp = {},
+  lineOf = () => 1, includeNotes = false, ruleHelp = {}, decisions = null,
 } = {}) {
   const results = [];
   const used = new Map();
+  for (const d of [...(decisions || [])].sort((a, b) => cmp(a.subject.id, b.subject.id))) {
+    for (const o of d.rules || []) {
+      if (o.effect === 'allow' || (o.findings && o.findings.length)) continue;
+      const level = o.effect === 'deny' ? 'error' : 'warning';
+      used.set(o.rule, level === 'error' || used.get(o.rule) === 'error' ? 'error' : 'warning');
+      results.push({
+        ruleId: o.rule,
+        level,
+        message: { text: o.detail || o.rule },
+        locations: [sarifLocation(d.subject, { dbPath, lineOf })],
+        partialFingerprints: { decisionId: `d:${shortHash({ rule: o.rule, subject: d.subject.id, detail: o.detail || null })}` },
+        properties: { effect: o.effect, subject: d.subject.id },
+      });
+    }
+  }
   for (const f of sortFindings(findings)) {
     const level = sarifLevel(f);
     if (level === 'note' && !includeNotes) continue;

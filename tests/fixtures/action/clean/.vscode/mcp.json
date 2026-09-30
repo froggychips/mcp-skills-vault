@@ -1,0 +1,8 @@
+{
+  "servers": {
+    "mongodb-mcp-server": {
+      "command": "npx",
+      "args": ["-y", "mongodb-mcp-server@1.10.0"]
+    }
+  }
+}

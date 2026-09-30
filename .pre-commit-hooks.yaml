@@ -1,0 +1,21 @@
+# pre-commit hook: check a staged MCP config before it is committed.
+#
+#   repos:
+#     - repo: https://github.com/froggychips/mcp-skills-vault
+#       rev: <full commit SHA>   # vX.Y.Z — `pre-commit autoupdate --freeze` writes it
+#       hooks:
+#         - id: mcp-vault
+#
+# Offline: no network, no token — the staged configs are checked against the
+# pins in the vault DB at `rev`. The package has no dependencies and no install
+# scripts, so pre-commit's `npm install` of it runs nothing but a copy.
+# pre-commit appends the staged file names to `entry`; `--config` takes them
+# all, wherever the hook's `args` land: `args: [--strict]` works as written.
+- id: mcp-vault
+  name: mcp-vault (verify MCP server configs)
+  description: Fail when a committed .mcp.json / .vscode/mcp.json / .cursor/mcp.json launches a server that is unpinned, not in the vault, or does not match its pinned hash.
+  entry: mcp-vault verify --offline --fail-on unknown --config
+  language: node
+  files: '(^|/)(\.mcp\.json|\.vscode/mcp\.json|\.cursor/mcp\.json)$'
+  pass_filenames: true
+  require_serial: true
