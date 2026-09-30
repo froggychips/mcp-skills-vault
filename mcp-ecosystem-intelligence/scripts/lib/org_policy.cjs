@@ -57,19 +57,28 @@
  *   mergeStricter(base, over, explicit, o) -> { policy, conflicts }
  *   hasOrgRules(policy)                    -> boolean
  *   subjectFacts(tool, dbEntry)            -> { … what a rule can match }
- *   evaluateOrg(tool, policy, ctx)         -> [{ rule, outcome, detail, source?, index? }]
- *   loadOrgContext({ cwd, … })             -> shared lookups, read once
- *   contextFor(shared, tool, extra)        -> ctx for evaluateOrg
+ *   ruleMatches(rule, facts, forAllow)     -> boolean
+ *   loadOrgContext({ cwd, dbTools, asOf }) -> shared lookups, read once, as of asOf
+ *   orgModel(tool, policy, shared, o)      -> { subject, facts, findings }  (facts → facts[id].org)
+ *   toolApprovalModel({ subject, server, approved, observation, currentArtifactId, asOf })
+ *                                          -> { fact, findings }   (org/tool-approval findings)
+ *
+ * The rules are rows `org/*` in lib/policy_rules.cjs and `decide()` evaluates
+ * them (docs/adr/0001): this file produces their inputs and decides nothing.
  */
 
 const fs   = require('fs');
 const path = require('path');
 const { toTypedEntry, artifactId, comparableArtifactId, comparableId, packageKey } = require('./entry_model.cjs');
 const { githubOwner } = require('./repo_url.cjs');
-const { DIMENSIONS, DEFAULT_MAX_AGE_DAYS, isPositive } = require('./evidence.cjs');
+const { DIMENSIONS, DEFAULT_MAX_AGE_DAYS, evalResultsAsOf } = require('./evidence.cjs');
 const { CAPABILITIES } = require('./capabilities.cjs');
 const { TIERS, TIER_ORDER, classifyEntry } = require('./tiers.cjs');
-const { APPROVALS_KEY, observationFromSurface, pendingTools, describePending, describeLines } = require('./tool_approval.cjs');
+const { requireAsOf } = require('./clock.cjs');
+const { RANK } = require('./policy_rules.cjs');
+const {
+  APPROVALS_KEY, observationFromSurface, pendingTools, approvalFor, describePending, describeLines,
+} = require('./tool_approval.cjs');
 
 const ORG_DEFAULTS = {
   extends:              null,
@@ -191,20 +200,9 @@ function finishOrg(policy, raw, errors) {
 
 // ── merging an org layer with a project's override ──────────────────────────
 
-// Weakest first. A key missing here and set in both layers is a conflict unless
-// the two values are equal: we cannot tell which is stricter, so neither wins.
-const RANK = {
-  unverified:           ['warn', 'fail'],
-  installHooks:         ['allow', 'warn', 'fail'],
-  dependencyHooks:      ['allow', 'warn', 'fail'],
-  dependencyAdvisories: ['allow', 'warn', 'fail'],
-  signatures:           ['prefer', 'require'],
-  provenance:           ['prefer', 'require', 'bound'],
-  docker:               ['tag', 'digest'],
-  contextBudget:        ['warn', 'fail'],
-  default:              ['allow', 'deny'],
-  toolApproval:         ['off', 'require'],
-};
+// Weakest first, from the one table (lib/policy_rules.cjs RANK). A key missing
+// there and set in both layers is a conflict unless the two values are equal:
+// we cannot tell which is stricter, so neither wins.
 const HIGHER_IS_STRICTER = new Set(['minHealthScore']);
 const LOWER_IS_STRICTER  = new Set(['maxContextTokens', 'maxContextPercent', 'maxEvidenceAgeDays']);
 const BOOLEAN_STRICT     = new Set(['deep', 'deps']);
@@ -285,7 +283,8 @@ function mergeStricter(base, over, explicit = new Set(), { baseSource = 'org pol
     }
     if (key === 'requireEvidence') {
       if (!b) { out[key] = o; continue; }
-      if (!o) { continue; }   // null adds nothing and cannot remove the base's layer
+      // An explicit null is an attempt to drop the org's requirements.
+      if (!o) { loosen(key, 'is null, which cannot remove the org policy\'s evidence requirements'); continue; }
       const merged = { ...b };
       for (const [dim, age] of Object.entries(o)) {
         if (!(dim in b)) { merged[dim] = age; continue; }
@@ -407,188 +406,191 @@ function ruleMatches(rule, facts, forAllow) {
 
 const describeRule = (r) => `${r.match} ${r.value}${r.integrity ? ` (${r.integrity.slice(0, 19)}…)` : ''}${r.reason ? ` — ${r.reason}` : ''}`;
 
-function daysSince(iso, now) {
-  const then = Date.parse(`${String(iso).slice(0, 10)}T00:00:00Z`);
-  return Number.isNaN(then) ? Infinity : Math.floor((now - then) / 86400000);
-}
-
-/**
- * Judge one server against the organisation rules.
- *
- * ctx: { dbEntry, evidence, evalResult, capabilities, lock, surface, now }
- * Every rule is returned with its outcome — allow, deny, warn or unknown — and
- * the layer (`source`) and position (`index`) of the rule that decided, which
- * is what `explain` prints.
- */
-function evaluateOrg(tool, policy, ctx = {}) {
-  const out = [];
-  if (!hasOrgRules(policy)) return out;
-  const now = ctx.now || Date.now();
-  const dbEntry = ctx.dbEntry === undefined ? tool : ctx.dbEntry;
-  const facts = subjectFacts(tool, dbEntry);
-  const add = (rule, outcome, detail, extra = {}) => out.push({ rule, outcome, detail, ...extra });
-
-  // 1. The denylist, first and final.
-  let denied = false;
-  for (const layer of policy.deny || []) {
-    const hit = layer.rules.find((r) => ruleMatches(r, facts, false));
-    if (hit) {
-      denied = true;
-      add('org/denylist', 'deny', `denied by deny[${hit.index}] (${describeRule(hit)}) in ${layer.source}; the denylist outranks any allow rule`,
-        { source: layer.source, index: hit.index });
-    }
-  }
-
-  // 2. The allowlist, per layer.
-  if (!denied) {
-    const layers = (policy.allow || []);
-    if (policy.default === 'deny' && !layers.length) {
-      add('org/allowlist', 'deny', 'the policy denies by default and allows nothing', { source: null, index: null });
-    }
-    for (const layer of layers) {
-      const hit = layer.rules.find((r) => ruleMatches(r, facts, true));
-      if (hit) {
-        add('org/allowlist', 'allow', `allowed by allow[${hit.index}] (${describeRule(hit)}) in ${layer.source}`, { source: layer.source, index: hit.index });
-      } else {
-        // Say what almost matched: an unbound GitHub owner is a different fix
-        // from not being on the list at all.
-        const near = layer.rules.find((r) => ruleMatches(r, facts, false));
-        const why = near
-          ? `allow[${near.index}] (${describeRule(near)}) names it, but the match is not established — ${near.match === 'githubOwner' ? 'source_binding has not verified the repository' : near.match === 'registryNamespace' ? 'the registry record is not "listed"' : 'the artifact bytes are not known to be the named ones'}`
-          : (facts.in_vault ? 'no allow rule matches it' : `it is not in the vault DB and no allow rule names ${facts.raw_artifact_id || facts.name}`);
-        add('org/allowlist', 'deny', `not on the allowlist in ${layer.source} (default: deny): ${why}`, { source: layer.source, index: near ? near.index : null });
-      }
-    }
-  }
-
-  // 3. A tier floor. A server the vault does not know has no tier at all.
-  if (policy.minTier) {
-    if (!facts.in_vault) {
-      add('org/min-tier', 'deny', `not in the vault DB, so it has no tier (policy floor: ${policy.minTier})`);
-    } else {
-      const tier = classifyEntry(dbEntry, ctx.evalResult || null, { now });
-      const ok = TIER_ORDER[tier.classification] <= TIER_ORDER[policy.minTier];
-      add('org/min-tier', ok ? 'allow' : 'deny', `tier ${tier.classification} ${ok ? 'meets' : 'is below'} the ${policy.minTier} floor — ${tier.why}`);
-    }
-  }
-
-  // 4. Evidence that must be on record, and how old it may be.
-  if (policy.requireEvidence) {
-    const evidence = ctx.evidence !== undefined ? ctx.evidence : (facts.in_vault ? dbEntry.trust_evidence : null);
-    const idOk = evidence && (!evidence.artifact_id || !facts.artifact_id || comparableId(evidence.artifact_id) === facts.artifact_id);
-    const dims = idOk ? (evidence.dimensions || {}) : {};
-    for (const [dim, age] of Object.entries(policy.requireEvidence)) {
-      const rule = `org/evidence/${dim}`;
-      const limit = age ?? DEFAULT_MAX_AGE_DAYS[dim];
-      const v = dims[dim];
-      // The requirement is that it be on record; a missing record is the
-      // answer, not a missing input.
-      if (!v) { add(rule, 'deny', evidence && !idOk ? `the stored evidence is about ${evidence.artifact_id}, not this artifact` : `${dim} has never been established for this artifact`); continue; }
-      if (!isPositive(dim, v.status)) { add(rule, 'deny', `${dim} is ${v.status} (as of ${v.checked_at || 'unknown'})`); continue; }
-      const when = v.verified_at || v.checked_at;
-      const days = daysSince(when, now);
-      if (days > limit) add(rule, 'deny', `${dim}: ${v.status} was established ${days}d ago (${when}); the policy accepts ${limit}d`);
-      else add(rule, 'allow', `${dim}: ${v.status} as of ${when} (within ${limit}d)`);
-    }
-  }
-
-  // 5. Capabilities the organisation refuses, unless excused by the same layer.
-  if (policy.denyCapabilities && policy.denyCapabilities.length) {
-    const scans = (ctx.capabilities && ctx.capabilities.packages) || {};
-    const scan = facts.raw_artifact_id ? scans[facts.raw_artifact_id] : null;
-    if (!scan) {
-      // Absence is never recorded (lib/capabilities.cjs), and an unscanned
-      // package is an input that is missing — not a verdict either way.
-      const caps = [...new Set(policy.denyCapabilities.flatMap((l) => l.capabilities))];
-      add('org/capabilities', 'unknown', `${facts.raw_artifact_id || facts.name} has not been scanned for ${caps.join(', ')} — run \`mcp-vault capabilities --write\``);
-    } else {
-      const found = new Set(Object.keys(scan.found || {}));
-      const denied = [...new Set(policy.denyCapabilities.flatMap((l) => l.capabilities))];
-      const clear = denied.filter((c) => !found.has(c));
-      if (clear.length) {
-        add('org/capabilities', 'allow', `${clear.join(', ')} not found in the scan of ${facts.raw_artifact_id} (${scan.checked_at || 'undated'}) — a scan cannot prove absence`);
-      }
-      for (const layer of policy.denyCapabilities) {
-        for (const cap of layer.capabilities) {
-          const rule = `org/capability/${cap}`;
-          if (!found.has(cap)) continue;
-          const excused = (policy.capabilityExceptions || []).find((x) => x.source === layer.source
-            && facts.entry && (x.exceptions[facts.entry] || []).includes(cap));
-          const where = scan.found[cap][0];
-          const at = where ? ` (${where.file}:${where.line})` : '';
-          add(rule, excused ? 'allow' : 'deny', excused
-            ? `${cap} found${at}, excused for ${facts.entry} by capabilityExceptions in ${layer.source}`
-            : `${cap} found${at}, and ${layer.source} denies it without an exception for ${facts.entry || facts.name}`,
-          { source: layer.source });
-        }
-      }
-    }
-  }
-
-  // 6. Tools approved one by one.
-  if (policy.toolApproval === 'require') {
-    const name = facts.name;
-    const approvals = (ctx.lock && ctx.lock[APPROVALS_KEY]) || {};
-    const approved = approvals[name] || null;
-    const observation = ctx.surface ? observationFromSurface(ctx.surface) : null;
-    if (!observation) {
-      add('org/tool-approval', 'unknown', `no tool surface has been observed for ${name} — run \`mcp-vault eval --name ${name} --sandbox\``);
-    } else if (!approved) {
-      add('org/tool-approval', 'deny', `none of ${name}'s ${observation.fingerprint.count} tools are approved — \`mcp-vault approve ${name}\``);
-    } else {
-      const pending = pendingTools(approved, observation);
-      const n = pending.added.length + pending.changed.length;
-      if (n) {
-        const lines = describeLines(describePending(pending, approved, observation));
-        add('org/tool-approval', 'deny', `${n} tool${n === 1 ? '' : 's'} not approved since ${approved.approved_at}: ${lines.map((l) => l.trim()).join('; ')} — \`mcp-vault approve ${name}\``);
-      } else {
-        add('org/tool-approval', 'allow', `all ${observation.fingerprint.count} tools match the approval of ${approved.approved_at}${pending.removed.length ? ` (${pending.removed.length} approved tool(s) no longer offered)` : ''}`);
-      }
-    }
-  }
-
-  return out;
-}
-
-// ── the lookups a rule needs, read once ─────────────────────────────────────
+// ── the facts the org rows read (lib/policy_rules.cjs `org/*`) ──────────────
+//
+// The rules themselves are rows in lib/policy_rules.cjs, evaluated by
+// `decide()` like every other rule; nothing here produces an effect. What
+// lives here is the part that needs files and lookups: which vault entry a
+// launch is, its tier and capability scan as of `asOf`, the stored evidence,
+// and — for `toolApproval` — the approval state as findings on the server.
+// Everything written into `facts` is plain JSON, so a findings@1 document
+// carries it and `decide()` over the document reproduces the decision.
 
 const ASSETS = path.resolve(__dirname, '../../assets');
+const dayStart = (iso) => Date.parse(`${String(iso).slice(0, 10)}T00:00:00Z`);
+// A look dated after the instant decided at did not exist then.
+const after = (iso, asOf) => Boolean(iso) && dayStart(iso) > asOf;
 
 function readJson(file, fallback) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
 }
 
+/** The lookups a rule needs, read once per run, as they stood at `asOf`. */
 function loadOrgContext({ cwd = process.cwd(), evalPath = path.join(ASSETS, 'eval_results.json'),
-  capsPath = path.join(ASSETS, 'capabilities.json'), lockFile = null, dbTools = null } = {}) {
-  const evals = readJson(evalPath, { results: [] }).results || [];
+  capsPath = path.join(ASSETS, 'capabilities.json'), lockFile = null, dbTools = null, asOf } = {}) {
+  const at = requireAsOf(asOf, 'loadOrgContext');
+  const evals = evalResultsAsOf(readJson(evalPath, { results: [] }).results || [], at);
+  const dbByPackage = new Map();
+  for (const t of dbTools || []) {
+    const typed = safeTyped(t);
+    const key = typed ? packageKey(typed.artifact) : null;
+    if (!key) continue;
+    if (!dbByPackage.has(key)) dbByPackage.set(key, []);
+    dbByPackage.get(key).push(t);
+  }
   return {
+    asOf:         at,
     evalByName:   new Map(evals.map((r) => [r.name, r])),
     capabilities: readJson(capsPath, { packages: {} }),
     lock:         readJson(lockFile || path.join(cwd, 'mcp.lock.json'), null),
     dbByName:     dbTools ? new Map(dbTools.map((t) => [t.name, t])) : null,
+    dbByPackage,
   };
 }
 
-function contextFor(shared, tool, extra = {}) {
-  let dbEntry = extra.dbEntry !== undefined
-    ? extra.dbEntry
-    : (shared.dbByName ? shared.dbByName.get(tool.name) || null : tool);
-  // A configured server that shares a DB entry's name but launches another
-  // package is not that entry, and neither its eval nor its surface applies.
-  if (dbEntry && dbEntry !== tool && !subjectFacts(tool, dbEntry).in_vault) dbEntry = null;
-  const evalResult = shared.evalByName.get((dbEntry && dbEntry.name) || tool.name) || null;
-  return {
-    evalResult,
-    capabilities: shared.capabilities,
-    lock:         shared.lock,
-    surface:      evalResult && evalResult.surface && evalResult.surface.tools ? evalResult.surface : null,
-    ...extra,
-    dbEntry,
+/**
+ * The vault entry a launch *is*. A host config names a server whatever it
+ * likes (`"docs": npx context7@…`), so the name is tried first and the
+ * package identity decides: an entry of the same name that installs another
+ * package is not this server, and an entry of another name that installs
+ * this one is.
+ */
+function vaultEntryFor(shared, tool, explicit) {
+  if (explicit !== undefined) return explicit && subjectFacts(tool, explicit).in_vault ? explicit : null;
+  if (!shared || !shared.dbByName) return tool;
+  const byName = shared.dbByName.get(tool.name) || null;
+  if (byName && subjectFacts(tool, byName).in_vault) return byName;
+  const typed = safeTyped(tool);
+  const key = typed ? packageKey(typed.artifact) : null;
+  const same = (key && shared.dbByPackage && shared.dbByPackage.get(key)) || [];
+  if (!same.length) return null;
+  const id = comparableArtifactId(typed.artifact);
+  const exact = same.filter((t) => { const x = safeTyped(t); return x && comparableArtifactId(x.artifact) === id; });
+  const pool = (exact.length ? exact : same).slice().sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  return pool[0];
+}
+
+/**
+ * Tool approval for one server, as findings on `subject` plus the fact the
+ * row reads. One finding per tool that is new or changed since it was
+ * approved (`observed`), or one `no-data` finding when no surface can be
+ * relied on — under `toolApproval: require` that refuses, because an
+ * approval nobody could check is not an approval.
+ *
+ * An approval is for the artifact it was made on (`artifact_id`): after an
+ * upgrade the old approval does not carry over, and neither does an eval
+ * surface recorded for another artifact.
+ */
+function toolApprovalModel({ subject: subj, server, approved = null, observation = null, currentArtifactId = null, asOf, missing = null }) {
+  const at = requireAsOf(asOf, 'toolApprovalModel');
+  const { finding } = require('./finding.cjs');
+  const mk = (state, message) => finding({ rule: 'org/tool-approval', subject: subj, severity: 'info', confidence: 'high', state, message });
+  // Only what had been approved by `asOf`.
+  let dated = null;
+  if (approved && !after(approved.approved_at, at)) {
+    const tools = Object.fromEntries(Object.entries(approved.tools || {}).filter(([, t]) => !after(t && t.approved_at, at)));
+    dated = { ...approved, tools };
+  }
+  const approvedId = dated ? dated.artifact_id || null : null;
+  const fact = {
+    server, observed: Boolean(observation), count: observation ? observation.fingerprint.count : 0,
+    approved_at: dated ? dated.approved_at : null, approved_artifact_id: approvedId,
+    current_artifact_id: currentArtifactId || null, rebind: false, pending: 0, removed: 0,
   };
+  if (!observation) {
+    return { fact, findings: [mk('no-data', missing || `no tool surface has been observed for ${server} — run \`mcp-vault eval --name ${server} --sandbox\``)] };
+  }
+  const bound = approvalFor(dated, currentArtifactId);
+  fact.rebind = Boolean(dated && !bound);
+  const pending = pendingTools(bound, observation);
+  fact.pending = pending.added.length + pending.changed.length;
+  fact.removed = pending.removed.length;
+  const lines = describeLines(describePending({ ...pending, removed: [] }, bound, observation))
+    .filter((l) => /^[+~]/.test(l)).map((l) => l.trim());
+  return { fact, findings: lines.map((l) => mk('observed', l)) };
+}
+
+/**
+ * The org part of one subject's decision inputs: `{ subject, facts, findings }`,
+ * where `facts` goes under `facts[subject.id].org`.
+ *
+ * `tool` is what runs (a DB entry, or a configured server). `dbEntry` pins the
+ * vault record (null: none); left out, it is looked up in `shared`.
+ * `evidence` overrides the stored evidence (verify passes what the run
+ * established merged over it); `surface` overrides the eval's tool surface.
+ */
+function orgModel(tool, policy, shared = {}, { subject: subj = null, dbEntry, evidence, surface, asOf } = {}) {
+  const at = requireAsOf(asOf === undefined ? shared.asOf : asOf, 'orgModel');
+  const s = subj || require('./findings_from.cjs').subjectForTool(tool);
+  const vault = vaultEntryFor(shared, tool, dbEntry);
+  const facts = { subject: subjectFacts(tool, vault) };
+  const findings = [];
+  const evalRow = vault && shared.evalByName ? shared.evalByName.get(vault.name) || null : null;
+
+  if (policy.minTier && facts.subject.in_vault) {
+    const t = classifyEntry(vault, evalRow, { now: at });
+    facts.tier = { classification: t.classification, why: t.why };
+  }
+
+  if (policy.requireEvidence) {
+    const ev = evidence !== undefined ? evidence : (vault ? vault.trust_evidence : null);
+    if (!ev) {
+      facts.evidence = null;
+    } else {
+      const forThis = !ev.artifact_id || !facts.subject.artifact_id || comparableId(ev.artifact_id) === facts.subject.artifact_id;
+      const dims = {};
+      for (const dim of Object.keys(policy.requireEvidence)) {
+        const v = ev.dimensions && ev.dimensions[dim];
+        if (v) dims[dim] = { status: v.status, checked_at: v.checked_at || null, verified_at: v.verified_at || null };
+      }
+      facts.evidence = { artifact_id: ev.artifact_id || null, for_this_artifact: forThis, dimensions: dims };
+    }
+  }
+
+  if (policy.denyCapabilities && policy.denyCapabilities.length) {
+    const scans = (shared.capabilities && shared.capabilities.packages) || {};
+    const scan = facts.subject.raw_artifact_id ? scans[facts.subject.raw_artifact_id] : null;
+    if (!scan || after(scan.checked_at, at)) {
+      facts.capabilities = null;
+    } else {
+      const denied = [...new Set(policy.denyCapabilities.flatMap((l) => l.capabilities))];
+      const found = {};
+      for (const cap of denied) {
+        if (!scan.found || !(cap in scan.found)) continue;
+        const where = scan.found[cap] && scan.found[cap][0];
+        found[cap] = where ? { file: where.file || null, line: where.line || null } : null;
+      }
+      facts.capabilities = { artifact_id: facts.subject.raw_artifact_id, checked_at: scan.checked_at || null, found };
+    }
+  }
+
+  if (policy.toolApproval === 'require') {
+    const approvals = (shared.lock && shared.lock[APPROVALS_KEY]) || {};
+    const approved = approvals[tool.name] || (vault && approvals[vault.name]) || null;
+    let surf = surface;
+    let missing = null;
+    if (surf === undefined) {
+      surf = evalRow && evalRow.surface && evalRow.surface.tools ? evalRow.surface : null;
+      // A surface recorded against another artifact says nothing about this one.
+      const recorded = evalRow && evalRow.identity && evalRow.identity.artifact_id;
+      if (surf && recorded && facts.subject.artifact_id && comparableId(recorded) !== facts.subject.artifact_id) {
+        missing = `the observed tool surface is for ${recorded}, and ${tool.name} launches ${facts.subject.artifact_id} — run \`mcp-vault eval --name ${vault.name} --sandbox\``;
+        surf = null;
+      }
+    }
+    const m = toolApprovalModel({
+      subject: s, server: tool.name, approved, observation: surf ? observationFromSurface(surf) : null,
+      currentArtifactId: facts.subject.artifact_id, asOf: at, missing,
+    });
+    facts.tool_approval = m.fact;
+    findings.push(...m.findings);
+  }
+  return { subject: s, facts, findings };
 }
 
 module.exports = {
-  ORG_DEFAULTS, ORG_KEYS, SELECTORS, RANK,
+  ORG_DEFAULTS, ORG_KEYS, SELECTORS,
   normalizeOrgKey, finishOrg, mergeStricter, hasOrgRules,
-  subjectFacts, ruleMatches, evaluateOrg, loadOrgContext, contextFor,
+  subjectFacts, ruleMatches, describeRule, vaultEntryFor,
+  loadOrgContext, orgModel, toolApprovalModel,
 };

@@ -47,6 +47,7 @@ const { readDb } = require('./lib/db_io.cjs');
 const { DEFAULTS } = require('./lib/policy.cjs');
 const { effectivePolicy, loadEffectivePolicy, flagsFromArgv, evidenceRuleOutcomes, rowFor } = require('./lib/policy_rules.cjs');
 const { decide: decideFindings, findingsDocument, toJson, explainTrace, renderTrace } = require('./lib/finding.cjs');
+const { hasOrgRules, loadOrgContext, orgModel } = require('./lib/org_policy.cjs');
 const { subjectForTool, fromStoredEvidence, storedEvidenceFor, fromReportEntry } = require('./lib/findings_from.cjs');
 const { trustScore, fitScore, behaviour, recommend } = require('./lib/scores.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
@@ -170,7 +171,7 @@ function asEffective(policy) {
  * from the evidence and — with `--verify` — from the live gate, and the one
  * Decision `decide()` makes over them. explain renders it; it decides nothing.
  */
-function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, behav, budget, evidence = null, asOf, maxAgeDays = DEFAULT_MAX_AGE_DAYS }) {
+function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, behav, budget, evidence = null, asOf, maxAgeDays = DEFAULT_MAX_AGE_DAYS, org = null }) {
   const ep = asEffective(policy);
   const s = subjectForTool(tool);
   // The stored part of the decision, from the one producer verify --offline
@@ -179,10 +180,14 @@ function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, b
   // The gate's own findings, typed, when its report carries them; its tags
   // otherwise.
   const gateFindings = gateEntry
-    ? ((gateDoc && Array.isArray(gateDoc.findings)) ? gateDoc.findings.filter((f) => f.subject && f.subject.id === s.id)
+    // (org/* findings excepted: explain produces its own, below.)
+    ? ((gateDoc && Array.isArray(gateDoc.findings)) ? gateDoc.findings.filter((f) => f.subject && f.subject.id === s.id && !f.rule.startsWith('org/'))
       : fromReportEntry(gateEntry, { subject: s }).findings)
     : [];
-  const findings = [...ev.findings, ...gateFindings];
+  // Organisation rules read their own facts (lib/org_policy.cjs orgModel);
+  // tool approvals arrive as findings on this subject.
+  const orgPart = org ? orgModel(tool, ep, org, { subject: s, asOf, evidence }) : null;
+  const findings = [...ev.findings, ...gateFindings, ...(orgPart ? orgPart.findings : [])];
   const facts = {
     [s.id]: {
       mode: gateEntry ? 'gate' : 'evidence',
@@ -197,6 +202,7 @@ function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, b
       ...ev.facts,
       behaviour: behav ? { state: behav.state, reason: behav.reason } : null,
       budget: budget || null,
+      ...(orgPart ? { org: orgPart.facts } : {}),
     },
   };
   // The threshold is the effective policy's fail_on — the one verify uses —
@@ -214,13 +220,17 @@ function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, b
  * words explain has always used, because the useful part of a denial is
  * which rule denied it.
  */
-function decide({ tool, policy, gateEntry, gateDoc = null, trust, behav, budget, evidence = null, asOf, maxAgeDays }) {
-  const m = explainModel({ tool, policy, gateEntry, gateDoc, trust, behav, budget, evidence, asOf, maxAgeDays });
+function decide({ tool, policy, gateEntry, gateDoc = null, trust, behav, budget, evidence = null, asOf, maxAgeDays, org = null }) {
+  const m = explainModel({ tool, policy, gateEntry, gateDoc, trust, behav, budget, evidence, asOf, maxAgeDays, org });
   const rules = m.decision.rules
     .filter((r) => { const row = rowFor(r.rule); return row && row.views.includes('explain'); })
     .map((r) => ({ rule: r.rule, outcome: r.effect, detail: r.detail }));
   return {
     decision: m.decision.effect === 'deny' ? 'deny' : 'allow',
+    // The rule id that decided (docs/adr/0001): a string, the same one the
+    // findings document's decision carries. Which layer and which position
+    // of a list matched is in that rule's detail.
+    decided_by: m.decision.decided_by,
     blocking: rules.filter((r) => r.outcome === 'deny').map((r) => r.rule),
     // Named separately so a caller can tell "allowed" from "allowed as far as
     // anyone has looked".
@@ -288,9 +298,16 @@ function main(argv) {
     ? (gate.report.entries || []).find((e) => e.name === tool.name) || null
     : null;
 
+  // Organisation rules need the eval, the capability scan and the project's
+  // lockfile (tool approvals) — read once, as of asOf, and only when the
+  // policy has any.
+  const org = hasOrgRules(loaded.policy)
+    ? loadOrgContext({ cwd: opts.cwd, dbTools: db.tools || [], asOf: opts.asOf })
+    : null;
+
   const verdict = decide({
     tool, policy: loaded.policy, gateEntry, gateDoc: gate && gate.ok ? gate.report.findings : null,
-    trust, behav, budget, evidence, asOf: opts.asOf, maxAgeDays: maxAge,
+    trust, behav, budget, evidence, asOf: opts.asOf, maxAgeDays: maxAge, org,
   });
   const m = verdict.model;
   const trace = toJson(findingsDocument({
@@ -311,12 +328,15 @@ function main(argv) {
       trust_field: tool.trust,
     },
     decision: verdict.decision,
+    decided_by: verdict.decided_by,
     blocking: verdict.blocking,
     rules:    verdict.rules,
     unevaluated: verdict.unevaluated,
     policy: {
       path:   loaded.path,
       found:  loaded.found,
+      // Every file that contributed, org layers first.
+      sources: loaded.sources || [],
       valid:  loaded.ok,
       errors: loaded.errors,
       // The policy as applied, so a record from six months ago can be read
@@ -378,7 +398,9 @@ function main(argv) {
   // ── human form ──
   const head = verdict.decision === 'deny' ? `${RD}DENIED${RS}` : `${GN}ALLOWED${RS}`;
   process.stdout.write(`\n${head}  ${B}${tool.name}${RS}  ${DM}${currentId || tool.install_cmd}${RS}\n`);
-  process.stdout.write(`${DM}${loaded.found ? `policy: ${loaded.path}` : 'policy: none found — defaults in force'} · as of ${opts.asOfIso}${RS}\n`);
+  process.stdout.write(`${DM}${loaded.found
+    ? `policy: ${(loaded.sources.length ? loaded.sources : [{ path: loaded.path, role: 'local' }]).map((x) => `${x.path} (${x.role})`).join(' → ')}`
+    : 'policy: none found — defaults in force'} · as of ${opts.asOfIso}${RS}\n`);
   if (!loaded.ok) process.stdout.write(`${RD}the policy file has errors: ${loaded.errors.join('; ')}${RS}\n`);
   process.stdout.write('\n');
 
@@ -409,6 +431,7 @@ function main(argv) {
   if (verdict.blocking.length) {
     process.stdout.write(`\n${RD}Blocking: ${verdict.blocking.join(', ')}${RS}\n`);
   }
+  process.stdout.write(`${verdict.decision === 'deny' ? RD : DM}Decided by ${verdict.decided_by}${RS}\n`);
   if (verdict.unevaluated.length) {
     process.stdout.write(`${DM}Not evaluated without a gate run: ${verdict.unevaluated.join(', ')}${RS}\n`);
   }

@@ -25,9 +25,19 @@
  *   node scripts/approve.cjs <server> [--tool <name>]... [--tools <file>]
  *                            [--results <file>] [--cwd <path>] [--dry-run] [--json]
  *
+ * The exit code is a Decision (docs/adr/0001): what is still pending after
+ * this run — everything, with --dry-run — becomes findings `org/tool-approval`
+ * on the server, and `decide()` over the project's effective policy says
+ * whether that blocks. It blocks under `toolApproval: "require"`; without
+ * it, pending tools are reported and nothing refuses.
+ *
+ * An approval names the artifact it was made on (the vault entry's, or the
+ * configured launch's): after an upgrade, every tool is pending again.
+ *
  * Exit codes:
- *   0  approved, or nothing was pending
- *   1  --dry-run, and something is pending approval
+ *   0  nothing left pending, or the policy does not require approval
+ *   1  under toolApproval: require, a tool is still pending (--dry-run: before
+ *      anything is written; otherwise what --tool left out)
  *   2  bad arguments, no observed tool surface, or an unreadable lockfile
  */
 
@@ -36,13 +46,20 @@
 const fs   = require('fs');
 const path = require('path');
 const { exitAfterFlush } = require('./lib/exit.cjs');
+const { readWallClock } = require('./lib/clock.cjs');
+const { loadEffectivePolicy } = require('./lib/policy_rules.cjs');
+const { subject, decide, exitCode, findingsDocument, toJson } = require('./lib/finding.cjs');
+const { subjectForTool } = require('./lib/findings_from.cjs');
+const { subjectFacts, toolApprovalModel } = require('./lib/org_policy.cjs');
+const { readInstalledServers, toInstallCmd } = require('./lib/installed.cjs');
 const { emptyLock, lockPath, readLock, writeLock } = require('./lib/lockfile.cjs');
 const {
   APPROVALS_KEY, parseToolsFile, observeTools, observationFromSurface,
-  pendingTools, approve, describePending, describeLines, HASHES_ONLY_NOTE,
+  pendingTools, approvalFor, approve, describePending, describeLines, HASHES_ONLY_NOTE,
 } = require('./lib/tool_approval.cjs');
 
 const EVAL_PATH = path.resolve(__dirname, '../assets/eval_results.json');
+const DB_PATH   = path.resolve(__dirname, '../assets/tools_database.json');
 
 const T  = process.stdout.isTTY;
 const B  = T ? '\x1b[1m'  : '';
@@ -61,7 +78,8 @@ const HELP = `approve — approve a server's tools in mcp.lock.json
   --results <file>  eval results to read the observed surface from
                     (default: assets/eval_results.json; hashes only)
   --cwd <path>      the project whose mcp.lock.json is updated
-  --dry-run         show what is pending and exit 1 if anything is; write nothing
+  --dry-run         show what is pending and write nothing; exit 1 if the
+                    policy (toolApproval: require) would block on it
 `;
 
 function parseArgs(argv) {
@@ -105,10 +123,30 @@ function observe(opts) {
   return { observation, source: `${file}${row.checked_at ? ` (${String(row.checked_at).slice(0, 10)})` : ''}` };
 }
 
+/**
+ * What `server` launches: the vault entry of that name, or the project's
+ * configured server of that name. Its artifact is what the approval is for.
+ */
+function launched(server, cwd) {
+  let db = [];
+  try { db = JSON.parse(fs.readFileSync(DB_PATH, 'utf8')).tools || []; } catch { db = []; }
+  const entry = db.find((t) => t.name === server);
+  if (entry) return entry;
+  let srv = null;
+  try { srv = readInstalledServers({ cwd }).find((x) => x.name === server && !x.remote) || null; } catch { srv = null; }
+  return srv ? { name: server, install_cmd: srv.install_cmd || toInstallCmd(srv) } : null;
+}
+
 function main(argv) {
   const opts = parseArgs(argv);
   if (opts.error) { process.stderr.write(`approve: ${opts.error}\n\n${HELP}`); return 2; }
   if (opts.help)  { process.stdout.write(HELP); return 0; }
+  // When an approval was made is an observation: the wall clock, read once.
+  // There is no --as-of: a replayed instant must never date a real approval.
+  const now = readWallClock();
+  const tool = launched(opts.server, opts.cwd);
+  const artifactId = tool ? subjectFacts(tool).artifact_id : null;
+  const subj = tool ? subjectForTool(tool) : subject.artifact({ entry: opts.server });
 
   const seen = observe(opts);
   if (seen.error) { process.stderr.write(`approve: ${seen.error}\n`); return 2; }
@@ -117,22 +155,33 @@ function main(argv) {
   const file = lockPath(opts.cwd);
   const found = readLock(file);
   if (!found.ok) { process.stderr.write(`approve: ${found.error}\n`); return 2; }
-  const lock = found.lock || emptyLock();
+  const lock = found.lock || emptyLock(now);
   const approvals = { ...(lock[APPROVALS_KEY] || {}) };
   const before = approvals[opts.server] || null;
+  // An approval of another artifact does not count for this one.
+  const bound = approvalFor(before, artifactId);
 
-  const pending = pendingTools(before, observation);
-  const details = describePending(pending, before, observation);
+  const pending = pendingTools(bound, observation);
+  const details = describePending(pending, bound, observation);
   const pendingCount = pending.added.length + pending.changed.length;
 
   let result = null;
   if (!opts.dryRun && (pendingCount || pending.removed.length || opts.tools.length)) {
-    result = approve(before, observation, { tools: opts.tools });
+    result = approve(before, observation, { tools: opts.tools, now, artifactId });
     if (result.error) { process.stderr.write(`approve: ${result.error}\n`); return 2; }
     approvals[opts.server] = result.record;
     lock[APPROVALS_KEY] = Object.fromEntries(Object.keys(approvals).sort().map((k) => [k, approvals[k]]));
     writeLock(file, lock);
   }
+
+  // What is pending now, as findings, and the policy's answer to it.
+  const loaded = loadEffectivePolicy(opts.cwd);
+  const model = toolApprovalModel({
+    subject: subj, server: opts.server, approved: result ? result.record : before,
+    observation, currentArtifactId: artifactId, asOf: now,
+  });
+  const facts = { [subj.id]: { mode: 'approval', org: { tool_approval: model.fact } } };
+  const decisions = decide(model.findings, loaded.policy, now, { subjects: [subj], facts });
 
   if (opts.json) {
     process.stdout.write(`${JSON.stringify({
@@ -140,18 +189,25 @@ function main(argv) {
       server:   opts.server,
       lockfile: file,
       observed: { source, count: observation.fingerprint.count, detailed: observation.detailed },
+      artifact_id: artifactId,
       previously_approved_at: before ? before.approved_at : null,
+      // Set when the previous approval was made on another artifact.
+      previous_artifact_id: before && !bound ? before.artifact_id || null : null,
       pending:  details,
       approved: result ? result.approved : [],
       remaining: result ? result.remaining : [...pending.added, ...pending.changed.map((c) => c.name)].sort(),
       dropped:  result ? result.dropped : [],
       wrote:    Boolean(result),
+      // Additive (mcp-vault/findings@1): what is still pending, and the
+      // Decision the exit code is.
+      findings: toJson(findingsDocument({ asOf: now, findings: model.findings, decisions, scope: 'approval', policy: loaded.policy, facts })),
     }, null, 2)}\n`);
   } else {
     process.stdout.write(`${B}${opts.server}${RS}  ${DM}observed ${observation.fingerprint.count} tools from ${source}${RS}\n`);
     process.stdout.write(before
-      ? `${DM}last approved ${before.approved_at} (${before.count} tools)${RS}\n`
+      ? `${DM}last approved ${before.approved_at} (${before.count} tools${before.artifact_id ? `, ${before.artifact_id}` : ''})${RS}\n`
       : `${DM}nothing approved for this server yet${RS}\n`);
+    if (before && !bound) process.stdout.write(`${YL}that approval is for ${before.artifact_id}; ${opts.server} now launches ${artifactId} — every tool is pending again${RS}\n`);
     if (!details.length) {
       process.stdout.write(`\n${GN}Nothing pending${RS} — every tool matches its approval.\n`);
     } else {
@@ -172,7 +228,9 @@ function main(argv) {
     }
   }
 
-  return opts.dryRun && pendingCount ? 1 : 0;
+  const [d] = decisions;
+  if (d.fails && !opts.json) process.stdout.write(`${YL}Blocked by ${d.decided_by} (toolApproval: require)${RS}\n`);
+  return exitCode(decisions) === 1 ? 1 : 0;
 }
 
 if (require.main === module) {

@@ -14,7 +14,9 @@
  *                    the description and schema hashes somebody approved. `lock`
  *                    carries it over untouched; only `mcp-vault approve` writes
  *                    it. It is committed, so the approval is a reviewable diff
- *                    with an author.
+ *                    with an author. Each record names the `artifact_id` it
+ *                    was made on: an upgrade needs a new approval, because
+ *                    the new version's tools are not the ones anyone saw.
  *
  * A tool that is new, or whose description or schema hash differs from the
  * approved one, is *pending*, and with `toolApproval: "require"` a pending tool
@@ -42,13 +44,17 @@
  *   observeTools(tools)                 -> { fingerprint, shapes, texts, chars }
  *   observationFromSurface(surface)     -> same shape, hashes only
  *   pendingTools(approved, observation) -> { added, removed, changed, unchanged }
- *   approve(approved, observation, opts)-> { record, approved, remaining, dropped }
+ *   approvalFor(approved, artifactId)   -> approved | null (made on another artifact)
+ *   approve(approved, observation, { tools, now, artifactId })
+ *                                       -> { record, approved, remaining, dropped }  (now required)
  *   describePending(pending, approved, observation) -> [{ tool, change, … }]
  *   describeLines(details)              -> [string]
  *   APPROVALS_KEY
  */
 
 const { fingerprintTools, diffSurface, sha256 } = require('./surface.cjs');
+const { requireAsOf, isoDay } = require('./clock.cjs');
+const { comparableId } = require('./entry_model.cjs');
 
 const APPROVALS_KEY = 'tool_approvals';
 
@@ -118,6 +124,17 @@ function pendingTools(approved, observation) {
   return diffSurface({ tools: (approved && approved.tools) || {} }, observation.fingerprint);
 }
 
+/**
+ * The approval as it applies to `artifactId`: itself, or null when it was
+ * made on a different artifact. Either side unknown cannot contradict the
+ * other, so the approval stands.
+ */
+function approvalFor(approved, artifactId) {
+  if (!approved) return null;
+  if (!approved.artifact_id || !artifactId) return approved;
+  return comparableId(approved.artifact_id) === comparableId(artifactId) ? approved : null;
+}
+
 function hasPending(pending) {
   return Boolean(pending) && (pending.added.length > 0 || pending.changed.length > 0);
 }
@@ -139,11 +156,16 @@ function toolRecord(name, observation, today) {
  * pending and keeps every other approval as it was: a partial approval is a
  * statement about those tools and nothing else.
  */
-function approve(approved, observation, { tools = null, now = new Date() } = {}) {
-  const today = now.toISOString().slice(0, 10);
-  const pending = pendingTools(approved, observation);
+function approve(approved, observation, { tools = null, now, artifactId = null } = {}) {
+  // When the approval was made is an observation, not a decision: the caller
+  // reads the wall clock (lib/clock.cjs readWallClock) and passes it.
+  const today = isoDay(requireAsOf(now, 'approve'));
+  // An approval of another artifact is not carried over: after an upgrade
+  // every tool is pending again, and a partial approval starts from nothing.
+  const base = approvalFor(approved, artifactId);
+  const pending = pendingTools(base, observation);
   const pendingNames = [...pending.added, ...pending.changed.map((c) => c.name)].sort();
-  const current = { ...((approved && approved.tools) || {}) };
+  const current = { ...((base && base.tools) || {}) };
 
   let chosen;
   if (tools && tools.length) {
@@ -162,7 +184,7 @@ function approve(approved, observation, { tools = null, now = new Date() } = {})
 
   const sorted = Object.fromEntries(Object.keys(current).sort().map((n) => [n, current[n]]));
   return {
-    record: { approved_at: today, count: Object.keys(sorted).length, tools: sorted },
+    record: { approved_at: today, artifact_id: artifactId || null, count: Object.keys(sorted).length, tools: sorted },
     approved: chosen.filter((n) => pendingNames.includes(n)),
     remaining: pendingNames.filter((n) => !chosen.includes(n)),
     dropped,
@@ -275,5 +297,5 @@ function describeLines(details) {
 
 module.exports = {
   APPROVALS_KEY, HASHES_ONLY_NOTE, parseToolsFile, observeTools, observationFromSurface, schemaShape,
-  pendingTools, hasPending, approve, describePending, describeLines, quote,
+  pendingTools, hasPending, approvalFor, approve, describePending, describeLines, quote,
 };

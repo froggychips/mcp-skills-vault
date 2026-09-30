@@ -604,7 +604,11 @@ deny rule outranks every allow. A project file can only tighten the org's: a
 looser value is a policy error (exit 2). With `toolApproval: "require"` a new or
 changed tool blocks until `mcp-vault approve <server> [--tool X]` records it in
 `mcp.lock.json` — the output shows which tools changed, in description or schema.
-`explain` names the rule, and the file, that decided.
+An approval is for the artifact it was made on, so an upgrade needs a new one, and
+a server whose tool surface nobody observed is refused rather than waved through.
+The rules are the `org/*` rows of the one rule table, so `verify`, `install`,
+`explain`, `lock --check` and `approve` cannot answer differently; `decided_by`
+names the rule, and its detail the file and list position that matched.
 
 ### Doctor
 

@@ -342,7 +342,9 @@ function decide(findings, policy, asOf, { subjects = [], facts = {}, mode = 'gat
     // producer happened to emit its findings in.
     const fs = sortFindings(unsorted);
     const subjectFacts = (facts && facts[s.id]) || {};
-    const ctx = { subject: s, findings: fs, policy, facts: subjectFacts, mode: subjectFacts.mode || mode };
+    // `asOf` is in the context so that a rule judging an age (org/evidence/*)
+    // reads the decision's instant, never the clock.
+    const ctx = { subject: s, findings: fs, policy, facts: subjectFacts, mode: subjectFacts.mode || mode, asOf: at };
     const outcomes = [];
     for (const row of rulesFor(ctx.mode)) {
       // --no-policy drops the policy file's rules; the gate's own stay.

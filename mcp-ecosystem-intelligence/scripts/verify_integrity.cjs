@@ -71,6 +71,7 @@ const {
   resolveNpmTreeCached, pypiDirectDependencies, summarizeTree,
 } = require('./lib/deps.cjs');
 const { loadEffectivePolicy, flagsFromArgv, rowFor } = require('./lib/policy_rules.cjs');
+const { hasOrgRules, loadOrgContext, orgModel } = require('./lib/org_policy.cjs');
 const { decide, exitCode, outcomeFails, findingsDocument, toJson } = require('./lib/finding.cjs');
 const { fromVerifyResults, fromStoredEvidence, foundProblem } = require('./lib/findings_from.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
@@ -1386,6 +1387,7 @@ async function main() {
     process.stdout.write(JSON.stringify({
       policy_file: POLICY.path,
       found:       POLICY.found,
+      sources:     EFFECTIVE.sources || [],
       effective:   POLICY.policy || null,
       // Additive: the frozen policy `decide()` actually receives, flags applied.
       decision_policy: EP,
@@ -1760,6 +1762,7 @@ async function main() {
     const fresh = buildEvidence(r.checks, { artifactId: typed ? artifactId(typed.artifact) : null, now: AS_OF });
     if (!Object.keys(fresh.dimensions).length) continue;
     const effective = mergeEvidence(r.tool.trust_evidence, fresh);
+    r.effective_evidence = effective;
     r.effective_trust = deriveTrust(effective, {
       now: AS_OF,
       maxAgeDays: evidenceMaxAge(),
@@ -1780,6 +1783,7 @@ async function main() {
   // with one exit code. Not for --installed: a configured server's version
   // need not be the one the DB's evidence describes.
   const storedFindings = [];
+  let orgShared = null;
   results.forEach((r, i) => {
     const s = model.subjects[i];
     if (!s || !r.tool) return;
@@ -1793,6 +1797,17 @@ async function main() {
         trust:        r.effective_trust || r.tool.trust || null,
       },
     };
+    // Organisation rules (lib/policy_rules.cjs org/*) read what this server
+    // is — its vault entry, tier, capability scan, tool approvals — as facts,
+    // and its tool approvals as findings. Only when the policy has any.
+    if (hasOrgRules(EP)) {
+      orgShared = orgShared || loadOrgContext({ cwd: CWD, dbTools: allTools, asOf: AS_OF });
+      const org = orgModel(r.tool, EP, orgShared, {
+        subject: s, asOf: AS_OF, ...(r.effective_evidence ? { evidence: r.effective_evidence } : {}),
+      });
+      facts[s.id].org = org.facts;
+      model.findings.push(...org.findings);
+    }
     if (!OFFLINE || INSTALLED || s.type !== 'artifact' || r.status === 'UPD') return;
     const stored = fromStoredEvidence(r.tool, { asOf: AS_OF, maxAgeDays: evidenceMaxAge(), subject: s, scope: 'database' });
     Object.assign(facts[s.id], stored.facts);
