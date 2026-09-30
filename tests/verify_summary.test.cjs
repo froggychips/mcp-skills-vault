@@ -98,7 +98,7 @@ test('freshness counts what the DB now holds, per dimension', () => {
 });
 
 test('the markdown names the FAIL entries and says the gate still refuses them', () => {
-  const { markdown, verdict } = s.renderMarkdown(report([ok('a'), fail('mcp-server-kubernetes'), staleOnly('b')]), { rc: 1, now: NOW });
+  const { markdown, verdict } = s.renderMarkdown(report([ok('a'), fail('mcp-server-kubernetes'), staleOnly('b')]), { rc: 1, asOf: NOW });
   assert.equal(verdict.ok, true);
   assert.match(markdown, /\*\*1 FAIL\*\*/);
   assert.match(markdown, /\| mcp-server-kubernetes \| 3\.5\.1 \| \[CVE\] \[HIGH\]/);
@@ -109,19 +109,19 @@ test('the markdown names the FAIL entries and says the gate still refuses them',
 test('a pipe in a finding cannot break the table', () => {
   const e = fail('x');
   e.findings[1].message = 'a | b';
-  const { markdown } = s.renderMarkdown(report([e]), { rc: 1, now: NOW });
+  const { markdown } = s.renderMarkdown(report([e]), { rc: 1, asOf: NOW });
   assert.match(markdown, /a \\\| b/);
 });
 
 test('a trailing backslash cannot un-escape the pipe after it', () => {
   const e = fail('x');
   e.findings[1].message = 'a \\| b';
-  const { markdown } = s.renderMarkdown(report([e]), { rc: 1, now: NOW });
+  const { markdown } = s.renderMarkdown(report([e]), { rc: 1, asOf: NOW });
   assert.ok(markdown.includes('a \\\\\\| b'), 'expected the backslash and the pipe each escaped');
 });
 
 test('an unusable run renders a warning, not a findings table', () => {
-  const { markdown, verdict } = s.renderMarkdown(null, { rc: 1, now: NOW });
+  const { markdown, verdict } = s.renderMarkdown(null, { rc: 1, asOf: NOW });
   assert.equal(verdict.ok, false);
   assert.match(markdown, /not usable/);
   assert.doesNotMatch(markdown, /### FAIL/);
@@ -147,6 +147,32 @@ test('CLI: exit 0 on findings, 2 on a missing or truncated report', () => {
 
     r = spawnSync(process.execPath, [SCRIPT, good, '--rc', 'x'], { encoding: 'utf8' });
     assert.equal(r.status, 2);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('time is an input: freshness needs asOf; the CLI judges at --as-of, else the report\'s as_of', () => {
+  assert.throws(() => s.freshness({ tools: [] }), /asOf is required/);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vsum-'));
+  try {
+    const db = path.join(dir, 'db.json');
+    fs.writeFileSync(db, JSON.stringify({ tools: [{ name: 'x', trust: 'verified', trust_evidence: { dimensions: {
+      availability: { status: 'present', checked_at: '2026-09-30' },
+    } } }] }));
+    const rep = path.join(dir, 'r.json');
+    fs.writeFileSync(rep, JSON.stringify({ ...report([ok('x')]), as_of: '2026-09-30T08:00:00.000Z' }));
+    // Same inputs, same bytes: the report's own instant is used, not today's.
+    let r = spawnSync(process.execPath, [SCRIPT, rep, '--rc', '0', '--db', db], { encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /1 of 1 entries carry evidence dated today; 1 have no dimension past/);
+    // --as-of overrides it: three weeks later the same evidence has aged out.
+    r = spawnSync(process.execPath, [SCRIPT, rep, '--rc', '0', '--db', db, '--as-of', '2026-10-21'], { encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /0 of 1 entries carry evidence dated today; 0 have no dimension past/);
+    assert.match(r.stdout, /`availability` \(max 7d\): 1 — x/);
+    r = spawnSync(process.execPath, [SCRIPT, rep, '--as-of', '2026-10-21T10:00'], { encoding: 'utf8' });
+    assert.equal(r.status, 2, 'an instant without a zone is refused');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

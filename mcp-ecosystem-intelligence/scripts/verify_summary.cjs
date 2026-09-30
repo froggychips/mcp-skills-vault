@@ -32,16 +32,23 @@
  * Usage:
  *   node scripts/verify_summary.cjs <report.json> [--rc <verifier exit code>]
  *                                   [--db <tools_database.json>] [--out <file>]
+ *                                   [--as-of <date|instant>]
  *
  *   --rc   the verifier's exit code (default 0)
  *   --db   the DB after the run; adds how many entries now carry fresh evidence
  *   --out  write the markdown there as well as to stdout
+ *   --as-of the instant freshness is judged at (lib/clock.cjs). Default: the
+ *          report's own `as_of` — the instant the verifier judged and dated
+ *          the evidence at — so "dated today" and "past its age limit" agree
+ *          with the run being summarised; the wall clock (read once, in main)
+ *          only when the report carries none.
  */
 
 'use strict';
 
 const fs = require('fs');
 const { staleDimensions, DEFAULT_MAX_AGE_DAYS } = require('./lib/evidence.cjs');
+const { asOfFromArgv, readWallClock, requireAsOf, isoDay, stripAsOf } = require('./lib/clock.cjs');
 
 // GitHub rejects a PR body over 65536 characters; the summary shares the body
 // with the checklist, so it gets well under that.
@@ -111,8 +118,9 @@ function classify(report) {
  * today, and which dimensions are still past their age limit (dimensions this
  * run does not produce, and nothing earlier in the job refreshed).
  */
-function freshness(db, now = Date.now()) {
-  const today = new Date(now).toISOString().slice(0, 10);
+function freshness(db, asOf) {
+  const now = requireAsOf(asOf, 'verify_summary.freshness');
+  const today = isoDay(now);
   const tools = (db && db.tools) || [];
   const staleBy = {};
   const trust = {};
@@ -129,7 +137,7 @@ function freshness(db, now = Date.now()) {
   return { total: tools.length, datedToday, fullyFresh, staleBy, trust };
 }
 
-function renderMarkdown(report, { rc = 0, db = null, now = Date.now() } = {}) {
+function renderMarkdown(report, { rc = 0, db = null, asOf } = {}) {
   const verdict = judgeRun(report, rc);
   const lines = ['## Re-verify and dated evidence', ''];
   if (!verdict.ok) {
@@ -143,7 +151,7 @@ function renderMarkdown(report, { rc = 0, db = null, now = Date.now() } = {}) {
   lines.push(`${report.entries.length} entries checked — ${ok} OK, **${failed.length} FAIL**, ${nUnverified} unverified (verifier exit ${rc}).`, '');
 
   if (db) {
-    const f = freshness(db, now);
+    const f = freshness(db, asOf);
     const trust = Object.entries(f.trust).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${v} ${k}`).join(', ');
     lines.push(`Evidence written: ${f.datedToday} of ${f.total} entries carry evidence dated today; `
       + `${f.fullyFresh} have no dimension past its age limit. Trust now: ${trust}.`, '');
@@ -191,7 +199,11 @@ function renderMarkdown(report, { rc = 0, db = null, now = Date.now() } = {}) {
 }
 
 function parseArgs(argv) {
-  const out = { report: null, rc: 0, db: null, out: null };
+  const out = { report: null, rc: 0, db: null, out: null, asOf: null };
+  const clock = asOfFromArgv(argv);
+  if (clock.error) return { error: clock.error };
+  if (clock.source === 'as-of') out.asOf = clock.asOf;
+  argv = stripAsOf(argv);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--rc') out.rc = Number(argv[++i]);
@@ -217,7 +229,14 @@ function main(argv) {
   if (opts.db) {
     try { db = JSON.parse(fs.readFileSync(opts.db, 'utf8')); } catch { db = null; }
   }
-  const { markdown, verdict } = renderMarkdown(report, { rc: opts.rc, db });
+  // Time is an input (docs/adr/0001): --as-of, else the instant the verifier
+  // judged at, else the wall clock — read once, here.
+  let asOf = opts.asOf;
+  if (asOf === null && report && typeof report.as_of === 'string' && Number.isFinite(Date.parse(report.as_of))) {
+    asOf = Date.parse(report.as_of);
+  }
+  if (asOf === null) asOf = readWallClock();
+  const { markdown, verdict } = renderMarkdown(report, { rc: opts.rc, db, asOf });
   process.stdout.write(markdown);
   if (opts.out) fs.writeFileSync(opts.out, markdown);
   if (!verdict.ok) process.stderr.write(`verify_summary: ${verdict.reason}\n`);
