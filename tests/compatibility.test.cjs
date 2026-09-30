@@ -86,6 +86,7 @@ test('every offline --json command actually emits a listed schema', () => {
     ['doctor.cjs',           ['--json', '--cwd', cwd]],
     ['audit_setup.cjs',      ['--json', '--cwd', cwd]],
     ['status.cjs',           ['--json', '--cwd', cwd]],
+    ['check_secrets.cjs',    ['--json', '--cwd', cwd]],
     ['orchestrate.cjs',      ['--json', '--cwd', cwd]],
     // `health` has no --json: its only output is the document.
     ['calculate_health.cjs', ['100', '30', 'true', '1', 'MIT']],
@@ -123,6 +124,7 @@ test('every command that reads a host config answers 2 when it cannot', () => {
     ['token_budget.cjs', []],
     ['lock.cjs', ['--check']],
     ['sbom.cjs', ['--installed']],
+    ['check_secrets.cjs', ['--no-git']],
     ['verify_integrity.cjs', ['--installed', '--offline']],
   ];
   for (const [script, extra] of commands) {

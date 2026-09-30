@@ -7,6 +7,8 @@
  * file, so we never read or echo the rest), matches each installed server
  * against the DB, and reports drift, untrusted candidates in active use,
  * unbounded heavy servers, unknown servers, and global-scope misplacement.
+ * The secret scan also walks the per-project `mcpServers` maps under
+ * `projects` — still server maps only, and it never prints a value.
  *
  * Closes the "Audit my MCP setup" use case from README/SKILL.md with a
  * deterministic script instead of asking Claude to step through it.
@@ -32,6 +34,7 @@ const fs   = require('fs');
 const path = require('path');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { asOfFromArgv } = require('./lib/clock.cjs');
+const { scanHostConfigs } = require('./lib/secrets.cjs');
 
 const DEFAULT_DB = path.resolve(__dirname, '../assets/tools_database.json');
 
@@ -78,7 +81,8 @@ Usage:
 Reads:
   <cwd>/.mcp.json                          project-scoped servers
   <cwd>/.claude/settings.json              enabledMcpjsonServers + permissions.allow
-  ~/.claude.json                           ONLY the mcpServers key
+  ~/.claude.json                           ONLY the mcpServers maps (top level
+                                           and per project, for the secret scan)
   assets/tools_database.json               vetted DB
 
 Finding categories:
@@ -87,10 +91,12 @@ Finding categories:
   heavy-unbounded    est_tools_count > 15 (or unknown) with no scoping
   unknown            installed but not in DB (legitimate custom servers ok)
   scope              global install of a project-scoped category
+  secret             credential written in plain text into env/args/headers/url
+                     (the value is never printed; see mcp-vault secrets)
 
 Flags:
   --json             emit findings array as JSON
-  --strict           exit 1 on any drift/untrusted/heavy-unbounded
+  --strict           exit 1 on any drift/untrusted/heavy-unbounded/secret
   --cwd <path>       project root override (default: process.cwd())
   --db <path>        DB path override
   --global-config    ~/.claude.json path override (testability)
@@ -436,9 +442,10 @@ const GN = T ? '\x1b[32m' : '';
 const RS = T ? '\x1b[0m'  : '';
 
 const CATEGORY_ORDER = [
-  'drift', 'untrusted', 'heavy-unbounded', 'scope', 'unknown', 'version-unknown',
+  'secret', 'drift', 'untrusted', 'heavy-unbounded', 'scope', 'unknown', 'version-unknown',
 ];
 const CATEGORY_COLOR = {
+  'secret':          RD,
   'drift':           RD,
   'untrusted':       YL,
   'heavy-unbounded': YL,
@@ -446,7 +453,7 @@ const CATEGORY_COLOR = {
   'unknown':         DM,
   'version-unknown': DM,
 };
-const STRICT_CATEGORIES = new Set(['drift', 'untrusted', 'heavy-unbounded']);
+const STRICT_CATEGORIES = new Set(['drift', 'untrusted', 'heavy-unbounded', 'secret']);
 
 function printReport(findings, counts) {
   const total = findings.length;
@@ -470,9 +477,15 @@ function printReport(findings, counts) {
       if (cat === 'heavy-unbounded' && f.toolsets_hint) {
         process.stdout.write(`    ${DM}→ ${f.toolsets_hint}${RS}\n`);
       }
+      if (cat === 'secret') {
+        process.stdout.write(`    ${DM}${f.file}${f.line ? `:${f.line}` : ''}${f.tracked ? ' (tracked by git: rotate it)' : ''}${RS}\n`);
+      }
       if (cat === 'untrusted' && f.notes) {
         process.stdout.write(`    ${DM}${truncate(f.notes, 110)}${RS}\n`);
       }
+    }
+    if (cat === 'secret') {
+      process.stdout.write(`  ${DM}→ mcp-vault secrets --fix-suggest: the substitution syntax each host documents${RS}\n`);
     }
   }
 
@@ -486,6 +499,43 @@ function printReport(findings, counts) {
 function truncate(s, n) {
   s = String(s).replace(/\s+/g, ' ');
   return s.length > n ? s.slice(0, n - 1) + '…' : s;
+}
+
+// ── secrets ────────────────────────────────────────────────────────────────
+
+/**
+ * Plain-text credentials in the same two files this audit reads. Only their
+ * server maps are walked (`mcpServers`, and the per-project `mcpServers` under
+ * `projects` in ~/.claude.json, where `claude mcp add` puts local-scope
+ * servers) — never the rest of ~/.claude.json. The value is never part of a
+ * finding. Unreadable files are already reported by the reads above.
+ */
+function secretFindings(cwd, globalCfg, { git = true } = {}) {
+  const { findings } = scanHostConfigs({
+    git,
+    paths: [
+      { host: 'claude-code', scope: 'project', path: path.join(cwd, '.mcp.json') },
+      { host: 'claude-code', scope: 'user',    path: globalCfg },
+    ],
+  });
+  return findings.map((f) => ({
+    category:   'secret',
+    server:     f.server,
+    scope:      f.scope === 'project' ? 'project' : 'global',
+    rule:       f.rule,
+    type:       f.type,
+    confidence: f.confidence,
+    file:       f.file,
+    path:       f.path,
+    line:       f.line,
+    length:     f.length,
+    masked:     f.masked,
+    tracked:    f.tracked,
+    severity:   f.severity,
+    recommendation: f.recommendation,
+    message:    `${f.type} in plain text at ${f.path} (${f.length} chars, ${f.masked})`
+      + (f.tracked ? ' — the file is tracked by git' : ''),
+  }));
 }
 
 // ── main ───────────────────────────────────────────────────────────────────
@@ -519,6 +569,7 @@ function main(argv) {
 
   const counts = { project: Object.keys(project).length, global: Object.keys(global_).length };
   const findings = audit({ project, global: global_, settings, db });
+  findings.push(...secretFindings(cwd, globalCfg));
 
   if (args.json) {
     process.stdout.write(JSON.stringify({
@@ -567,6 +618,7 @@ module.exports = {
   hasAllowedToolsScope,
   hasArgScope,
   audit,
+  secretFindings,
   main,
   PROJECT_SCOPED_CATEGORIES,
   HEAVY_THRESHOLD,
