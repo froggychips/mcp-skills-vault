@@ -32,7 +32,7 @@
 const fs    = require('fs');
 const path  = require('path');
 const { exitAfterFlush } = require('./lib/exit.cjs');
-const { dockerImageRef } = require('./lib/install_cmd.cjs');
+const { dockerImageRef, ociIntegrity } = require('./lib/install_cmd.cjs');
 const { writeDb } = require('./lib/db_io.cjs');
 // The registry client, allowlist included, now lives in lib/oci.cjs —
 // verify --deep needs the same auth dance to hash a manifest.
@@ -69,6 +69,20 @@ function driftExitCode({ drifts = 0, errors = 0, checked = null, strict = false 
   if (errors > 0 && checked !== null && drifts === 0 && errors >= checked) return 2;
   if (errors > 0) return 1;
   return 0;
+}
+
+/**
+ * Move one docker entry from `pinned` to `upstream`, in place. Both copies of
+ * the digest move: install_cmd, and pkg_integrity in its canonical spelling.
+ * Returns false (and leaves the entry untouched) when install_cmd does not
+ * contain `pinned` or `upstream` is not a sha256 digest.
+ */
+function applyDriftUpdate(tool, pinned, upstream) {
+  const integrity = ociIntegrity(upstream);
+  if (!integrity || typeof tool.install_cmd !== 'string' || !tool.install_cmd.includes(pinned)) return false;
+  tool.install_cmd = tool.install_cmd.replace(pinned, upstream);
+  tool.pkg_integrity = integrity;
+  return true;
 }
 
 // ── main ───────────────────────────────────────────────────────────────────
@@ -126,17 +140,16 @@ async function main() {
   // --write moves each drifted pin to the digest upstream serves now. The DB
   // keeps the digest in two places for docker entries — inside install_cmd and
   // in pkg_integrity — and both have to move together or the next verify run
-  // contradicts itself.
+  // contradicts itself. pkg_integrity is rewritten unconditionally, in the
+  // canonical `sha256-<hex>` form: it used to move only when it was already
+  // spelled `sha256-…`, so an entry stored as `sha256:…` kept the old digest
+  // while its install_cmd moved on (PR #106, terraform-mcp-server).
   const updated = [];
   if (WRITE && drifts.length) {
     for (const item of drifts) {
       const tool = item._tool;
-      const before = tool.install_cmd;
-      tool.install_cmd = before.replace(item.pinned, item.upstream);
-      if (tool.install_cmd === before) continue;            // nothing replaced: leave it alone
-      if (typeof tool.pkg_integrity === 'string' && tool.pkg_integrity.startsWith('sha256-')) {
-        tool.pkg_integrity = `sha256-${item.upstream.replace(/^sha256:/, '')}`;
-      }
+      const moved = applyDriftUpdate(tool, item.pinned, item.upstream);
+      if (!moved) continue;                                 // nothing replaced: leave it alone
       updated.push({
         name: tool.name,
         repo: item.repo,
@@ -203,6 +216,7 @@ module.exports = {
   apiHostFor,
   realmAllowed,
   driftExitCode,
+  applyDriftUpdate,
   REGISTRY_API_HOST,
   ALLOWED_REGISTRIES,
 };

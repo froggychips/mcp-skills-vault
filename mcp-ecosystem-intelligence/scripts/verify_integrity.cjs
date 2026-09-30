@@ -75,7 +75,7 @@ const { writeDb } = require('./lib/db_io.cjs');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 // install_cmd parsing lives in one place — see lib/install_cmd.cjs for why.
 const {
-  npmPkgName, pypiPkgName, dockerImageRef, dockerDigestPinned,
+  npmPkgName, pypiPkgName, dockerImageRef, dockerDigestPinned, dockerIntegrityMismatch,
 } = require('./lib/install_cmd.cjs');
 const { toJsonReport, toSarif, dbLineIndex } = require('./lib/report.cjs');
 
@@ -1238,6 +1238,17 @@ async function processDocker(tool, results) {
     // manifest, so the artifact is unverified — it was previously recorded as
     // verified purely because the entry looked well-formed.
     checks.artifact = { state: 'unverified', method: 'digest-pin-only' };
+    // The digest is stored twice — in install_cmd and in pkg_integrity — and
+    // --deep only ever hashed the first. A refresh that moved install_cmd but
+    // not pkg_integrity (PR #106) therefore passed --deep while the DB said
+    // two different things about one image. Offline and cheap, so it runs in
+    // every mode, and it is a hard failure: which copy is right is exactly
+    // the question a reviewer has to answer.
+    const disagreement = dockerIntegrityMismatch(tool);
+    if (disagreement) {
+      lines.push(['FAIL', `install_cmd and pkg_integrity disagree: ${disagreement}`]);
+      failures++;
+    }
     // --deep: a digest *is* the sha256 of the manifest document, so the pin can
     // be verified by hashing what the registry serves. No layers to download.
     if (DEEP && !OFFLINE) {
@@ -1265,6 +1276,9 @@ async function processDocker(tool, results) {
         }
       }
     }
+    // A manifest that hashes to install_cmd's digest does not make the entry
+    // verified while pkg_integrity names another one.
+    if (disagreement) checks.artifact = { ...checks.artifact, state: 'mismatch' };
     results.push({
       tool,
       status: verdictFor(failures, lines),
