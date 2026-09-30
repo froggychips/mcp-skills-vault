@@ -23,7 +23,10 @@
  * Exit codes:
  *   0  all pins match upstream (or --strict not set and only drifts found)
  *   1  --strict + at least one drift, or a hard error during fetch (any mode —
- *      a registry we couldn't read is not a registry that agrees with us)
+ *      a registry we couldn't read is not a registry that agrees with us), or
+ *      --write + a drift that could not be applied (malformed or unsupported
+ *      upstream digest, pin missing from install_cmd) — the old pin is still
+ *      there and nobody was told
  *   2  bad arguments
  */
 
@@ -63,8 +66,13 @@ const WRITE   = argv.includes('--write');
  * and a reader of the exit status could not tell "your pins moved" from "we
  * could not reach a registry".
  */
-function driftExitCode({ drifts = 0, errors = 0, checked = null, strict = false } = {}) {
+function driftExitCode({ drifts = 0, errors = 0, unapplied = 0, checked = null, strict = false } = {}) {
   if (strict && drifts > 0) return 1;
+  // --write found a drift and could not move the pin: an unresolved finding.
+  // It used to be swallowed with the rest of the drift count, so the job
+  // exited 0, the stale pin stayed, and the workflow (which opens a PR only
+  // when something was updated) did nothing.
+  if (unapplied > 0) return 1;
   // Nothing was read at all: an unanswered question.
   if (errors > 0 && checked !== null && drifts === 0 && errors >= checked) return 2;
   if (errors > 0) return 1;
@@ -83,6 +91,42 @@ function applyDriftUpdate(tool, pinned, upstream) {
   tool.install_cmd = tool.install_cmd.replace(pinned, upstream);
   tool.pkg_integrity = integrity;
   return true;
+}
+
+/**
+ * Apply --write to every drifted item. Returns { updated, unapplied }: the
+ * pins that moved, and the drifts that could not be moved (with a reason).
+ * An unapplied drift is not a quiet no-op — the caller reports it and fails.
+ */
+function writeDrifts(drifts) {
+  const updated = [];
+  const unapplied = [];
+  for (const item of drifts) {
+    const tool = item._tool;
+    if (!applyDriftUpdate(tool, item.pinned, item.upstream)) {
+      unapplied.push({
+        name: tool.name,
+        repo: item.repo,
+        tag: item.tag,
+        pinned: item.pinned,
+        upstream: item.upstream,
+        reason: ociIntegrity(item.upstream)
+          ? 'pinned digest not found in install_cmd'
+          : 'upstream digest is malformed or not sha256',
+      });
+      continue;
+    }
+    updated.push({
+      name: tool.name,
+      repo: item.repo,
+      tag: item.tag,
+      from: item.pinned,
+      to: item.upstream,
+      // Where a human should look to judge the change.
+      review: item.source_url ? `${item.source_url.replace(/\/$/, '')}/releases` : null,
+    });
+  }
+  return { updated, unapplied };
 }
 
 // ── main ───────────────────────────────────────────────────────────────────
@@ -144,22 +188,10 @@ async function main() {
   // canonical `sha256-<hex>` form: it used to move only when it was already
   // spelled `sha256-…`, so an entry stored as `sha256:…` kept the old digest
   // while its install_cmd moved on (PR #106, terraform-mcp-server).
-  const updated = [];
+  let updated = [];
+  let unapplied = [];
   if (WRITE && drifts.length) {
-    for (const item of drifts) {
-      const tool = item._tool;
-      const moved = applyDriftUpdate(tool, item.pinned, item.upstream);
-      if (!moved) continue;                                 // nothing replaced: leave it alone
-      updated.push({
-        name: tool.name,
-        repo: item.repo,
-        tag: item.tag,
-        from: item.pinned,
-        to: item.upstream,
-        // Where a human should look to judge the change.
-        review: item.source_url ? `${item.source_url.replace(/\/$/, '')}/releases` : null,
-      });
-    }
+    ({ updated, unapplied } = writeDrifts(drifts));
     if (updated.length) writeDb(DB_PATH, db);
   }
 
@@ -168,6 +200,7 @@ async function main() {
       schema: 'mcp-vault/docker-drift@1',
       checked: items.length, drifts: drifts.length, errors: errors.length,
       updated,
+      unapplied,
       items: items.map(({ _tool, ...rest }) => rest),
     }, null, 2) + '\n');
   } else {
@@ -189,17 +222,26 @@ async function main() {
         if (u.review) console.log(`    review: ${u.review}`);
       }
       console.log('\nReview the diff before merging: a rebuilt tag is routine, a hijack looks identical from here.');
-    } else if (drifts.length) {
+    }
+    if (unapplied.length) {
+      console.log(`\nUNAPPLIED ${unapplied.length} drift(s) — the old pin is still in the DB:`);
+      for (const u of unapplied) {
+        console.log(`  ${u.name}: ${u.reason} (upstream: ${JSON.stringify(u.upstream)})`);
+      }
+    }
+    if (!WRITE && drifts.length) {
       console.log('Refresh with: node scripts/check_docker_drift.cjs --write (then review the diff).');
     }
   }
 
   // With --write the drift has been turned into a diff, so it is no longer a
-  // failure — the review is the gate. Errors still fail: an unreachable
-  // registry means nothing was compared.
+  // failure — the review is the gate. A drift --write could NOT turn into a
+  // diff still fails, and so do errors: an unreachable registry means nothing
+  // was compared.
   exitAfterFlush(driftExitCode({
-    drifts:  WRITE ? 0 : drifts.length,
-    errors:  errors.length,
+    drifts:    WRITE ? 0 : drifts.length,
+    unapplied: unapplied.length,
+    errors:    errors.length,
     checked: items.length,
     strict:  STRICT,
   }));
@@ -217,6 +259,7 @@ module.exports = {
   realmAllowed,
   driftExitCode,
   applyDriftUpdate,
+  writeDrifts,
   REGISTRY_API_HOST,
   ALLOWED_REGISTRIES,
 };

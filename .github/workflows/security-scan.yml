@@ -417,23 +417,40 @@ jobs:
       # a pull request says what moved, from which digest to which, with a link
       # to the upstream releases page — which is what a human needs to tell a
       # routine rebuild from a hijack. Errors still fail the job: an unreachable
-      # registry means nothing was compared.
+      # registry means nothing was compared. So does a drift --write could not
+      # apply (malformed / unsupported upstream digest): the old pin is still
+      # there, and without a failure the job would end green with no PR.
+      # The exit code is captured, not acted on here, so the summary is always
+      # written and the PR still opens for the pins that did move; the last
+      # step fails the job with that code.
       - name: check_docker_drift --write
         id: drift
         # Trusted context only (cron / manual dispatch), so writing inside the
         # checkout is fine here — unlike the PR path above.
         run: |
           set -o pipefail
-          node mcp-ecosystem-intelligence/scripts/check_docker_drift.cjs --write --json | tee drift.json
-          drifts=$(node -e "console.log(JSON.parse(require('fs').readFileSync('drift.json','utf8')).drifts)")
-          updated=$(node -e "console.log(JSON.parse(require('fs').readFileSync('drift.json','utf8')).updated.length)")
-          echo "drifts=$drifts"   >> "$GITHUB_OUTPUT"
-          echo "updated=$updated" >> "$GITHUB_OUTPUT"
+          rc=0
+          node mcp-ecosystem-intelligence/scripts/check_docker_drift.cjs --write --json | tee drift.json || rc=$?
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          field() { node -e "const j=JSON.parse(require('fs').readFileSync('drift.json','utf8')); console.log($1)" 2>/dev/null || echo "?"; }
+          drifts=$(field 'j.drifts')
+          updated=$(field 'j.updated.length')
+          unapplied=$(field '(j.unapplied||[]).length')
+          errors=$(field 'j.errors')
+          # "?" (unparseable output) must not open a PR.
+          [ "$updated" = "?" ] && updated=0
+          echo "drifts=$drifts"       >> "$GITHUB_OUTPUT"
+          echo "updated=$updated"     >> "$GITHUB_OUTPUT"
+          echo "unapplied=$unapplied" >> "$GITHUB_OUTPUT"
           {
             echo "## Docker drift check"
             echo
-            echo "Drifts: **$drifts** · pins updated: **$updated**"
+            echo "Drifts: **$drifts** · pins updated: **$updated** · unapplied: **$unapplied** · errors: **$errors** · exit: **$rc**"
             echo
+            if [ "$unapplied" != "0" ] && [ "$unapplied" != "?" ]; then
+              echo "> **Unapplied drift:** the registry served a digest \`--write\` could not use; the old pin is still in the DB. See \`unapplied\` below."
+              echo
+            fi
             echo '```json'
             cat drift.json
             echo '```'
@@ -471,6 +488,12 @@ jobs:
           delete-branch: true
           add-paths: |
             mcp-ecosystem-intelligence/assets/tools_database.json
+      # Fail last, after the summary and the PR for the pins that did move.
+      - name: Fail on errors or unapplied drift
+        if: steps.drift.outputs.rc != '0'
+        run: |
+          echo "::error::check_docker_drift --write exited ${{ steps.drift.outputs.rc }} (unapplied: ${{ steps.drift.outputs.unapplied }}) — see the job summary"
+          exit 1
 
   license-drift:
     name: Weekly license-drift check
