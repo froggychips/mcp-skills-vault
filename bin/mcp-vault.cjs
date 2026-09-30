@@ -51,6 +51,7 @@ const COMMANDS = {
   "site-registry": "generate_registry_page.cjs",
   budget:          "token_budget.cjs",
   lock:            "lock.cjs",
+  approve:         "approve.cjs",
   sbom:            "sbom.cjs",
 };
 
@@ -87,6 +88,8 @@ COMMANDS
   sbom              CycloneDX bill of materials (--installed / --deps)
   lock              Freeze the verified dependency tree + tool surface (mcp.lock.json)
                     (--check: diff a fresh resolve against it; --vendor: install it)
+  approve <server>  Approve a server's tools in mcp.lock.json (policy toolApproval)
+                    (--tool X: one tool; shows what changed in descriptions/schemas)
 
 COMMON OPTIONS
   --json            Machine-readable output

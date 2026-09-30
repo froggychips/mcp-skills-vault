@@ -55,6 +55,10 @@ const { isExactVersion } = require('./lib/install_cmd.cjs');
 const {
   LOCK_FILENAME, emptyLock, lockEntry, lockPath, readLock, writeLock, diffLock, vendorFiles,
 } = require('./lib/lockfile.cjs');
+const { loadPolicy } = require('./lib/policy.cjs');
+const {
+  APPROVALS_KEY, observationFromSurface, pendingTools, hasPending, describePending, describeLines,
+} = require('./lib/tool_approval.cjs');
 
 const DB_PATH   = path.resolve(__dirname, '../assets/tools_database.json');
 const EVAL_PATH = path.resolve(__dirname, '../assets/eval_results.json');
@@ -345,6 +349,29 @@ async function main(argv) {
       return 2;
     }
     const diff = diffLock(found.lock, fresh);
+    // With `toolApproval: "require"`, a tool nobody approved is a difference
+    // too — from the approvals, which only `mcp-vault approve` moves.
+    const policy = loadPolicy(opts.cwd);
+    if (policy.ok && policy.policy.toolApproval === 'require') {
+      const approvals = found.lock[APPROVALS_KEY] || {};
+      for (const tool of targets) {
+        const observed = surfaceByName.get(tool.name);
+        if (!observed) continue;   // `surface-unobserved` already speaks for a locked surface
+        const observation = observationFromSurface(observed);
+        const approved = approvals[tool.name] || null;
+        const pending = pendingTools(approved, observation);
+        if (!hasPending(pending)) continue;
+        let row = diff.servers.find((x) => x.name === tool.name);
+        if (!row) { row = { name: tool.name, changes: [] }; diff.servers.push(row); }
+        const lines = describeLines(describePending({ ...pending, removed: [] }, approved, observation));
+        row.changes.push({
+          kind: 'tool-unapproved',
+          detail: `${pending.added.length + pending.changed.length} tool(s) not approved${approved ? ` since ${approved.approved_at}` : ''}: `
+            + `${lines.filter((l) => /^[+~]/.test(l)).join('; ')} — \`mcp-vault approve ${tool.name}\``,
+        });
+      }
+      diff.servers.sort((x, y) => (x.name < y.name ? -1 : 1));
+    }
     const suspicious = diff.servers.filter((s) => s.changes.some((c) => SUSPICIOUS.has(c.kind)));
     if (opts.json) {
       process.stdout.write(`${JSON.stringify({
@@ -378,6 +405,9 @@ async function main(argv) {
   }
 
   // ── write ──
+  // Tool approvals are a person's decision, not something a resolve observes:
+  // carried over untouched, and only `mcp-vault approve` changes them.
+  if (found.lock && found.lock[APPROVALS_KEY]) fresh[APPROVALS_KEY] = found.lock[APPROVALS_KEY];
   writeLock(file, fresh);
   if (opts.json) {
     process.stdout.write(`${JSON.stringify({ schema: 'mcp-vault/lock-write@1', lockfile: file, servers: Object.keys(fresh.servers), errors: errors.map((e) => ({ name: e.name, error: e.error })) }, null, 2)}\n`);

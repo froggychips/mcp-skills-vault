@@ -31,13 +31,19 @@
  *     "deps": true                     // resolve and check dependency trees
  *   }
  *
+ * Organisations add which servers may run at all — `extends`, `default`,
+ * `allow`, `deny`, `minTier`, `requireEvidence`, `denyCapabilities`,
+ * `capabilityExceptions`, `toolApproval` — documented in lib/org_policy.cjs.
+ * An org policy (`extends`, or the MCP_VAULT_ORG_POLICY path) is a layer the
+ * local file can tighten and cannot loosen.
+ *
  * Every key is optional. An unknown key is an error rather than a silent
  * no-op: a typo in a policy that then quietly does nothing is worse than no
  * policy, because it reads as a bar that is being enforced.
  *
  * API:
  *   findPolicyFile(startDir)      -> path | null
- *   loadPolicy(startDir)          -> { ok, policy, path, errors }
+ *   loadPolicy(startDir, opts)    -> { ok, policy, path, errors, sources }
  *   normalizePolicy(raw)          -> { ok, policy, errors }
  *   policyToFlags(policy)         -> ["--fail-unverified", …]
  *   evaluateEntry(entry, policy)  -> [{ level, rule, message }]
@@ -45,6 +51,7 @@
 
 const fs   = require('fs');
 const path = require('path');
+const { ORG_DEFAULTS, ORG_KEYS, normalizeOrgKey, finishOrg, mergeStricter } = require('./org_policy.cjs');
 
 const POLICY_FILENAMES = ['.mcp-vault.policy.json', '.mcp-vault.policy'];
 
@@ -69,6 +76,8 @@ const DEFAULTS = {
   trust:                null,
   deep:                 false,
   deps:                 false,
+  // Organisation rules: lib/org_policy.cjs.
+  ...ORG_DEFAULTS,
 };
 
 const ENUMS = {
@@ -96,10 +105,13 @@ function findPolicyFile(startDir = process.cwd()) {
   }
 }
 
-function normalizePolicy(raw) {
+function normalizePolicy(raw, { source = null } = {}) {
   const errors = [];
+  // Which keys the file actually wrote, so a merge can tell "left at its
+  // default" from "set to something looser".
+  const explicit = new Set();
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-    return { ok: false, policy: { ...DEFAULTS }, errors: ['policy must be a JSON object'] };
+    return { ok: false, policy: { ...DEFAULTS }, errors: ['policy must be a JSON object'], explicit };
   }
 
   const policy = { ...DEFAULTS };
@@ -109,6 +121,13 @@ function normalizePolicy(raw) {
       // Loudly, on purpose: a policy with a typo that silently enforces nothing
       // is worse than no policy at all.
       errors.push(`unknown policy key "${key}"`);
+      continue;
+    }
+    explicit.add(key);
+    if (ORG_KEYS.has(key)) {
+      const r = normalizeOrgKey(key, value, source);
+      if (r.error) errors.push(r.error);
+      else policy[key] = r.value;
       continue;
     }
     if (ENUMS[key]) {
@@ -170,19 +189,89 @@ function normalizePolicy(raw) {
     }
   }
 
-  return { ok: errors.length === 0, policy, errors };
+  finishOrg(policy, raw, errors);
+  if (policy.default !== DEFAULTS.default) explicit.add('default');
+
+  return { ok: errors.length === 0, policy, errors, explicit };
 }
 
-function loadPolicy(startDir = process.cwd()) {
-  const file = findPolicyFile(startDir);
-  if (!file) return { ok: true, policy: { ...DEFAULTS }, path: null, errors: [], found: false };
+function readLayer(file) {
   let raw;
   try { raw = JSON.parse(fs.readFileSync(file, 'utf8')); }
-  catch (e) {
-    return { ok: false, policy: { ...DEFAULTS }, path: file, errors: [`could not read ${file}: ${e.message}`], found: true };
+  catch (e) { return { ok: false, raw: null, policy: null, explicit: new Set(), errors: [`could not read ${file}: ${e.message}`] }; }
+  const n = normalizePolicy(raw, { source: file });
+  return { ok: n.ok, raw, policy: n.policy, explicit: n.explicit, errors: n.errors };
+}
+
+/**
+ * The policy in force for `startDir`: the nearest local file, over any org
+ * policy it sits on.
+ *
+ * An org policy comes from `extends` in the local file (resolved against that
+ * file's directory) and/or from `MCP_VAULT_ORG_POLICY`. One that is named and
+ * cannot be read makes the whole policy invalid: an org bar that silently
+ * failed to load would be enforced by nobody.
+ */
+function loadPolicy(startDir = process.cwd(), { env = process.env } = {}) {
+  const file = findPolicyFile(startDir);
+  const envOrg = env && env.MCP_VAULT_ORG_POLICY ? path.resolve(env.MCP_VAULT_ORG_POLICY) : null;
+  if (!file && !envOrg) return { ok: true, policy: { ...DEFAULTS }, path: null, errors: [], found: false, sources: [] };
+
+  let local = null;
+  if (file) {
+    local = readLayer(file);
+    // As before org layers existed: a local file that does not parse is
+    // reported as that file's problem, and nothing else is read.
+    if (!local.raw) return { ok: false, policy: { ...DEFAULTS }, path: file, errors: local.errors, found: true, sources: [{ path: file, role: 'local' }] };
   }
-  const { ok, policy, errors } = normalizePolicy(raw);
-  return { ok, policy, path: file, errors, found: true };
+
+  const orgFiles = [];
+  if (envOrg) orgFiles.push(envOrg);
+  if (local && local.policy.extends) {
+    const ext = path.resolve(path.dirname(file), local.policy.extends);
+    if (!orgFiles.includes(ext)) orgFiles.push(ext);
+  }
+  // The env var pointing at the project's own file is one layer, not two.
+  if (file && orgFiles.includes(path.resolve(file))) orgFiles.splice(orgFiles.indexOf(path.resolve(file)), 1);
+
+  const errors = [];
+  const sources = [];
+  let merged = null;
+  let mergedFrom = null;
+  const mergedExplicit = new Set();
+  for (const org of orgFiles) {
+    const layer = readLayer(org);
+    sources.push({ path: org, role: 'org' });
+    errors.push(...layer.errors.map((e) => (e.startsWith('could not read') ? e : `${org}: ${e}`)));
+    if (!layer.policy) continue;
+    if (layer.raw && layer.raw.extends) {
+      errors.push(`${org}: an org policy cannot itself use "extends" — one layer of inheritance keeps the bar in one place`);
+    }
+    if (!merged) {
+      merged = layer.policy;
+      mergedFrom = org;
+    } else {
+      const m = mergeStricter(merged, layer.policy, layer.explicit, { baseSource: mergedFrom, baseExplicit: mergedExplicit });
+      merged = m.policy;
+      errors.push(...m.conflicts.map((c) => `${org}: ${c}`));
+    }
+    for (const k of layer.explicit) mergedExplicit.add(k);
+  }
+
+  if (local) {
+    sources.push({ path: file, role: 'local' });
+    errors.push(...local.errors);
+    if (!merged) {
+      merged = local.policy;
+    } else {
+      const m = mergeStricter(merged, local.policy, local.explicit, { baseSource: mergedFrom, baseExplicit: mergedExplicit });
+      merged = m.policy;
+      errors.push(...m.conflicts.map((c) => `${file}: ${c}`));
+    }
+  }
+
+  const policy = { ...(merged || DEFAULTS), extends: local ? local.policy.extends : null };
+  return { ok: errors.length === 0, policy, path: file || orgFiles[0], errors, found: true, sources };
 }
 
 /**

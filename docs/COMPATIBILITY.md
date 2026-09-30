@@ -85,6 +85,7 @@ Every JSON document this tool writes carries a schema identifier of the form
 
 | Identifier | Written by |
 |---|---|
+| `mcp-vault/approve@1` | `mcp-vault approve --json` |
 | `mcp-vault/audit@1` | `mcp-vault audit --json` |
 | `mcp-vault/availability@1` | `mcp-vault availability --json` |
 | `mcp-vault/capabilities@1` | `assets/capabilities.json` (the stored scan) |

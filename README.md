@@ -581,6 +581,31 @@ nothing is worse than no policy, because it reads as a bar being enforced.
 
 `mcp-vault verify --show-policy` prints what is in force and where it came from.
 
+#### Organisation policy
+
+For a tenant-wide allowlist, an org keeps one policy and projects inherit it
+with `"extends": "<path>"` (or `MCP_VAULT_ORG_POLICY` on managed machines) — see
+[`.mcp-vault.org-policy.example.json`](./.mcp-vault.org-policy.example.json):
+
+```json
+{
+  "allow": [{ "npmScope": "@modelcontextprotocol" }, { "githubOwner": "microsoft" },
+            { "artifact": "npm:@acme/mcp@2.3.1", "integrity": "sha512-…" }],
+  "deny": [{ "entry": "mcp-server-everything" }],
+  "minTier": "Recommended",
+  "requireEvidence": { "signature": 90, "advisories": 7 },
+  "denyCapabilities": ["shell"],
+  "toolApproval": "require"
+}
+```
+
+An allow list means default deny, a server outside the vault DB included; a
+deny rule outranks every allow. A project file can only tighten the org's: a
+looser value is a policy error (exit 2). With `toolApproval: "require"` a new or
+changed tool blocks until `mcp-vault approve <server> [--tool X]` records it in
+`mcp.lock.json` — the output shows which tools changed, in description or schema.
+`explain` names the rule, and the file, that decided.
+
 ### Doctor
 
 [`scripts/doctor.cjs`](./mcp-ecosystem-intelligence/scripts/doctor.cjs) — local readiness check:
@@ -907,6 +932,7 @@ Everything in this table is scripted and tested; the column says where it lives.
 | Capability presence with evidence, and the version-to-version delta | [`lib/capabilities.cjs`](./mcp-ecosystem-intelligence/scripts/lib/capabilities.cjs), [`lib/tarball.cjs`](./mcp-ecosystem-intelligence/scripts/lib/tarball.cjs) |
 | Tool-surface fingerprint, for the rug-pull case | [`lib/surface.cjs`](./mcp-ecosystem-intelligence/scripts/lib/surface.cjs) |
 | Lockfile + vendored tree, so nothing re-resolves at launch | [`lib/lockfile.cjs`](./mcp-ecosystem-intelligence/scripts/lib/lockfile.cjs), [`lock.cjs`](./mcp-ecosystem-intelligence/scripts/lock.cjs) |
+| Org allowlist / denylist, inherited and only tightened; tools approved one by one | [`lib/org_policy.cjs`](./mcp-ecosystem-intelligence/scripts/lib/org_policy.cjs), [`approve.cjs`](./mcp-ecosystem-intelligence/scripts/approve.cjs) |
 | Shortest safe upgrade for anything with an advisory | [`suggest_upgrade.cjs`](./mcp-ecosystem-intelligence/scripts/suggest_upgrade.cjs), [`lib/versions.cjs`](./mcp-ecosystem-intelligence/scripts/lib/versions.cjs) |
 | A decision, with the rule that made it, as an audit record | [`explain.cjs`](./mcp-ecosystem-intelligence/scripts/explain.cjs) |
 | CycloneDX SBOM | [`sbom.cjs`](./mcp-ecosystem-intelligence/scripts/sbom.cjs) |

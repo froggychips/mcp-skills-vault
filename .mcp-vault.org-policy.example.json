@@ -1,0 +1,28 @@
+{
+  "$schema": "mcp-vault/policy@1",
+  "comment": "An organisation policy: which MCP servers may run at all. Keep it in one place (a repo every project vendors, or a managed path) and point projects at it with \"extends\": \"<path>\" in their own .mcp-vault.policy.json, or set MCP_VAULT_ORG_POLICY. A project file can only tighten it: a looser value is a policy error, not a quiet override. An allow list means default deny — a server not on it, including one the vault DB does not know, is refused; a deny rule outranks every allow. githubOwner admits only a repository source_binding verified; entry admits only a launch of that entry's own package. toolApproval: require blocks any new or changed tool until `mcp-vault approve <server>` records it in mcp.lock.json.",
+
+  "default": "deny",
+  "allow": [
+    { "npmScope": "@modelcontextprotocol", "reason": "reference servers" },
+    { "githubOwner": "microsoft" },
+    { "registryNamespace": "io.github.mongodb-js" },
+    { "entry": "context7" },
+    { "artifact": "npm:@acme/internal-mcp@2.3.1", "integrity": "sha512-REPLACE-WITH-THE-PUBLISHED-INTEGRITY", "reason": "internal, not in the vault DB" }
+  ],
+  "deny": [
+    { "entry": "mcp-server-everything", "reason": "test server, not for production" }
+  ],
+
+  "minTier": "Recommended",
+  "requireEvidence": { "artifact": 30, "signature": 90, "advisories": 7 },
+  "denyCapabilities": ["shell", "dynamic_code"],
+  "capabilityExceptions": { "playwright-mcp": ["shell"] },
+  "toolApproval": "require",
+
+  "unverified": "fail",
+  "signatures": "require",
+  "installHooks": "fail",
+  "docker": "digest",
+  "licenses": { "deny": ["BUSL-1.1", "SSPL-1.0", "Elastic-2.0", "Proprietary"] }
+}
