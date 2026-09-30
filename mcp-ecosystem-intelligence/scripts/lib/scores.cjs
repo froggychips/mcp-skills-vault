@@ -69,7 +69,8 @@ const TRUST_WEIGHTS = {
   // veto when a high-severity rule fired: hidden text, terminal escapes or an
   // injected instruction in what the model is handed is not a defect to weigh,
   // it is the attack.
-  tool_descriptions: { clean: 0, suspicious: 0, 'high-risk': -100 },
+  // `incomplete`: a first page only (tools/list returned a cursor) — not a claim.
+  tool_descriptions: { clean: 0, suspicious: 0, incomplete: 0, 'high-risk': -100 },
 };
 
 // A negative weight is a finding, not a deduction: it blocks — but only for the
