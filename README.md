@@ -73,28 +73,42 @@ npx -y @froggychips/mcp-vault status
 ```
 
 ```text
-mcp-vault <version> · /Users/me/repos/my-project
+mcp-vault <version> · /Users/me/repos/my-project · as of 2026-09-30T12:00:00.000Z
 
-Environment     Node v22.3.0 · missing: uvx
-Installed       7 servers · 3 matched in the vault DB · 2 on another version · 2 unvetted
-                3 Recommended
+Environment     Node v25.9.0
+Installed       7 servers · 2 matched in the vault DB · 3 on another version · 2 unvetted
+                1 Deprecated · 1 Experimental
 Evidence        oldest claim 2026-09-17 (stored; nothing was re-checked just now)
-Context         14,200 tokens on every request · 7.1% of a 200k window · 4 not measured
-This project    postgres, aws, Node → 3 matching servers not installed (mcp-server-neon, …)
+Context         10,500 tokens on every request · 5.3% of a 200k window · 5 not measured
+Flows           claude-code: 2 toxic flows · 2 without data
+This project    postgres, aws, Node → 1 matching server not installed (mcp-server-neon)
 
 Blocking
-  ✗ mcp-atlassian: advisories: vulnerable (as of 2026-09-17)
+  ✗ aws: availability: yanked (as of 2026-09-17)
 
 Worth knowing
   ! 2 configured servers are not in the vault DB, so nothing here has checked them: my-own-server, internal-tools
-  ! search: the launch command resolves at start-up (npm:some-search-mcp), so what runs is not the npm:some-search-mcp@1.4.0 the vault verified
-  ! browser: the vault verified npm:some-browser-mcp@0.26.0; this host launches npm:some-browser-mcp@2.0.0
+  ! mcp-atlassian: the vault verified pypi:mcp-atlassian@0.22; this host launches pypi:mcp-atlassian@0.21.1
+  ! filesystem: 2 claim(s) past their shelf life (availability, advisories)
+  ! search: the launch command resolves at start-up (npm:exa-mcp-server), so what runs is not the npm:exa-mcp-server@3.2.1 the vault verified
+  ! browser: the vault verified npm:chrome-devtools-mcp@0.26.0; this host launches npm:chrome-devtools-mcp@1.10.1
+  ! claude-code: untrusted content + private data + outward sink across aws, browser, filesystem, mcp-atlassian, search — keep mcp-atlassian, search, browser and aws, filesystem in separate profiles (different project configs or hosts), or drop the outward tools of search, browser
+  …and 4 more (mcp-vault audit)
 
 Deeper:  verify --installed  re-hash what your hosts launch, live
          explain <name>      why one entry is allowed or denied
          scan                what to add for this stack
          audit --strict      every drift and scope finding in full
+         secrets             plain-text credentials in host configs
 ```
+
+<sub>`status --as-of 2026-09-30T12:00:00Z` over a `.mcp.json` of seven servers
+(mcp-atlassian 0.21.1, awslabs.core-mcp-server 1.0.27, server-filesystem,
+unpinned exa-mcp-server, chrome-devtools-mcp 1.10.1 and two local ones) and a
+`package.json` using `pg` and the AWS SDK; exit `1`. The DB pins
+mcp-atlassian 0.22.0 since 2026-09-30, so an old 0.21.1 launch is *version
+drift* — evidence about 0.22.0 says nothing about 0.21.1 in either direction —
+not an advisory finding.</sub>
 
 Servers are matched by **artifact identity, not by the name in your config** —
 and the version is compared separately, because stored evidence about `x@1.0.0`
@@ -510,46 +524,75 @@ reaches it.
 
 ```bash
 mcp-vault upgrade
-mcp-vault upgrade --entry gitlab-mcp --json
+mcp-vault upgrade --entry chrome-devtools-mcp --json
 ```
 
 ```
-UPGRADE  gitlab-mcp @zereight/mcp-gitlab@2.1.10
-  CRITICAL  GHSA-2h44-8472-frjj — fixed in 2.1.27
-  HIGH      GHSA-5648-rgj9-v224 — fixed in 2.1.30
-  CRITICAL  GHSA-cv3r-c5h8-f4g5 — fixed in 2.1.27
-  CRITICAL  GHSA-vmp7-252j-cwp7 — fixed in 2.1.30
-  → @zereight/mcp-gitlab@2.1.30 clears 4 of 4  (latest is 2.1.63)
+UPGRADE  chrome-devtools-mcp chrome-devtools-mcp@0.26.0
+  MODERATE  GHSA-3pvj-jv98-qhjq — fixed in 1.1.0
+            Chrome DevTools for agents: daemon.pid write follows symlinks in /tmp fallback runtime directory
+  MODERATE  GHSA-8qf9-62x2-82pp — fixed in 1.1.0
+            chrome-devtools-mcp: validatePath() does not canonicalize symlinks before enforcing roots
+  → chrome-devtools-mcp@1.1.0 clears 2 of 2  (latest is 1.10.1)
+  verify_integrity.cjs --update will re-pin and re-hash it
 ```
+
+<sub>`upgrade --entry chrome-devtools-mcp` against OSV.dev on 2026-09-30
+(`upgrade` asks OSV live; it has no `--as-of`).</sub>
 
 The shortest hop, not the newest release. The candidate is queried too, because
 "fixed in 2.1.30" means fixed for *that* advisory — a recommendation onto a
 version with a different CVE would be worse than none. An advisory with no
 published fix stays in the output rather than being dropped into a false
-all-clear. All 8 affected entries in this DB have a safe path today.
+all-clear. On 2026-09-30 one entry in this DB is affected — chrome-devtools-mcp,
+two MODERATE advisories, which do not fail `verify` — and it has a safe path;
+the seven entries with high/critical advisories were moved to the version
+`upgrade` computed for each that day.
 
 ### Why was it denied? (`explain`)
 
 Everything needed to answer that existed; what did not exist was a way to ask.
 
 ```bash
-mcp-vault explain gitlab-mcp
-mcp-vault explain gitlab-mcp --json --record decisions.jsonl
+mcp-vault explain mcp-server-aws
+mcp-vault explain mcp-server-aws --json --record decisions.jsonl
 ```
 
 ```
-DENIED  gitlab-mcp  npm:@zereight/mcp-gitlab@2.1.10
+DENIED  mcp-server-aws  pypi:awslabs.core-mcp-server@1.0.27
+policy: none found — defaults in force · as of 2026-09-30T12:00:00.000Z
+
+  ? availability    yanked (13d old, shelf life 7d)
   ✓ artifact        verified (2026-09-17)
-  ✓ signature       verified (2026-09-17)
-  ✓ provenance      bound (2026-09-17)
-  ? advisories      vulnerable (2026-09-17)
-  trust 85/100 (block)   health 80   behaviour never-started
+  ✓ source_binding  verified (2026-09-17)
+  ? registry        unlisted (2026-09-17)
+  ✓ repository_posture clean (2026-09-17)
+  ✓ advisories      clean (13d old, shelf life 7d)
+  · signature       never checked
+  · provenance      never checked
+  · license         never checked
+  · dependencies    never checked
+  · smoke           never checked
+  · tool_descriptions never checked
+
+  trust 63/100 (block)   health 75   behaviour never-started
+  did not complete a handshake in a clean sandbox (CRASH, exit 1)
 
 Rules:
-  ✗ trust/advisories               advisories is vulnerable (as of 2026-09-17)
-  ! behaviour/never-started        did not complete a handshake in a clean sandbox
-Blocking: trust/advisories
+  ✗ trust/availability             availability is yanked (as of 2026-09-17)
+  ✓ policy/unverified              artifact: verified (as of 2026-09-17) (context)
+  ! behaviour/never-started        did not complete a handshake in a clean sandbox (CRASH, exit 1) (context)
+
+Blocking: trust/availability
+Decided by trust/availability
+…
 ```
+
+<sub>`explain mcp-server-aws --as-of 2026-09-30T12:00:00Z`, exit `1`; the trace
+that follows is cut. Every release of awslabs.core-mcp-server is yanked on
+PyPI ("load individual MCPs"). Rules marked `(context)` are shown and do not
+decide: the exit code is the one `verify --offline --entry mcp-server-aws`
+gives on the same inputs.</sub>
 
 Each dimension with the date it was established and whether that date is inside
 its shelf life; the policy in force; every rule with its outcome; the rule that
