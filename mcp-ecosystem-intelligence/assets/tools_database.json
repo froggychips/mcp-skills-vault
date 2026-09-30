@@ -5904,63 +5904,6 @@
       }
     },
     {
-      "name": "@taazkareem/clickup-mcp-server",
-      "category": "pm",
-      "install_cmd": "npx -y @taazkareem/clickup-mcp-server",
-      "source_url": "https://github.com/taazkareem/clickup-mcp-server",
-      "version": "0.14.4",
-      "pkg_integrity": "sha512-66ti6ENoiQYcC+bUka7trnOhrIYDs0FYz+aiAT+/RllPJX2NsRVTnrxcuXC80sQyFOvpCuWPPhd+U8TWzo6olQ==",
-      "trust": "verified",
-      "license": "Proprietary",
-      "health_score": 66.99,
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": "ClickUp MCP Server - Powering AI Agents with full ClickUp task, document, and chat management capabilities.\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\".\n\n[LICENSE 2026-09-30] NOASSERTION \u2192 Proprietary (no SPDX identifier exists; the value is npm's, so license-drift keeps matching). The LICENSE shipped in the @taazkareem/clickup-mcp-server@0.14.4 tarball, and in the repository, reads \"All Rights Reserved \u2026 Unauthorized copying, modification, distribution, or use of this Software \u2026 is strictly prohibited without express written permission\" and sends users to a paid checkout: running it needs a purchased licence. The \"license OSI\" in the [VERIFIED 2026-05-14] line above was not true. CONTRIBUTING rejects a non-OSI licence only when nobody explains it; there is no automatic reject for an existing entry, so it stays, marked \u2014 a candidate for removal on the owner's call, since the vault cannot tell a user they may run it. health_score already carried the \u221210 penalty.",
-      "stars": 49,
-      "last_commit_days": 0,
-      "open_issues": 3,
-      "trust_evidence": {
-        "artifact_id": "npm:@taazkareem/clickup-mcp-server@0.14.4",
-        "dimensions": {
-          "availability": {
-            "status": "present",
-            "checked_at": "2026-09-30",
-            "verified_at": "2026-09-30"
-          },
-          "artifact": {
-            "status": "verified",
-            "checked_at": "2026-09-30",
-            "method": "deep-hash",
-            "verified_at": "2026-09-30"
-          },
-          "signature": {
-            "status": "verified",
-            "checked_at": "2026-09-30",
-            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
-            "verified_at": "2026-09-30"
-          },
-          "provenance": {
-            "status": "absent",
-            "checked_at": "2026-09-30"
-          },
-          "source_binding": {
-            "status": "verified",
-            "checked_at": "2026-09-30",
-            "verified_at": "2026-09-30"
-          },
-          "registry": {
-            "status": "unlisted",
-            "checked_at": "2026-09-30"
-          },
-          "advisories": {
-            "status": "clean",
-            "checked_at": "2026-09-30",
-            "verified_at": "2026-09-30"
-          }
-        }
-      }
-    },
-    {
       "name": "@theia/ai-mcp-server",
       "category": "utility",
       "install_cmd": "npx -y @theia/ai-mcp-server",

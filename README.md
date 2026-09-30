@@ -33,7 +33,7 @@ $ npx -y @froggychips/mcp-vault verify --offline
 FAIL  mcp-server-aws@1.0.27 (PyPI offline pin present for awslabs.core-mcp-server)
         [FAIL] stored evidence: availability: yanked (observed 2026-09-17)
 …
-113 entries checked — 1 failure(s)
+112 entries checked — 1 failure(s)
 ```
 
 ## Without this vault vs. with it
@@ -41,7 +41,7 @@ FAIL  mcp-server-aws@1.0.27 (PyPI offline pin present for awslabs.core-mcp-serve
 | | Without | With |
 |---|---|---|
 | **Discoverability** | search GitHub, hope the README isn't lying | curated DB of **113 entries** with health scores, license, category, est-tools-count |
-| **Trust** | unknown publisher, unknown last commit | `trust` is **derived from dated evidence**, not typed by hand: **108 verified / 1 candidate / 4 unverified** as of 2026-09-30 (the date of the newest evidence in the DB). The 4 are one entry with an advisory recorded against the pinned version, two whose repository disagrees with the registry's, and one yanked (see [Install-Hook Policy](./CONTRIBUTING.md#install-hook-policy)) |
+| **Trust** | unknown publisher, unknown last commit | `trust` is **derived from dated evidence**, not typed by hand: **107 verified / 1 candidate / 4 unverified** as of 2026-09-30 (the date of the newest evidence in the DB). The 4 are one entry with an advisory recorded against the pinned version, two whose repository disagrees with the registry's, and one yanked (see [Install-Hook Policy](./CONTRIBUTING.md#install-hook-policy)) |
 | **Integrity** | `npx -y whatever@latest` runs whatever ships today | sha512/sha256/Docker `@sha256:` pinned + re-verified against the live registry on every check |
 | **Vulnerabilities** | `npm audit` after the fact, if you remember | 4 advisory feeds merged: npm bulk + OSV.dev + GHSA + Snyk† — checked *before* the install command is written |
 | **Depth** | the package you asked for | `--deps` resolves the whole tree without installing it: **19,377 transitive packages** across the DB, 25 entries whose *dependencies* run install scripts, 38 with a high/critical advisory somewhere in the tree |
@@ -222,7 +222,7 @@ produced, the publish stops rather than shipping without it.
 
 Every npm entry's registry signature is checked on every run: npm signs
 `<name>@<version>:<integrity>` with a published ECDSA key, so a response with a
-swapped `dist.integrity` cannot pass. 100 of the DB's 101 npm entries verify
+swapped `dist.integrity` cannot pass. 99 of the DB's 100 npm entries verify
 today; 45 also publish a provenance attestation, whose claimed source
 repository is compared against `source_url`. Provenance is reported as a claim,
 not a proof — verifying the sigstore bundle itself (Fulcio chain, Rekor
@@ -344,7 +344,7 @@ dimensions it fills for this DB today:
 availability   present 104, deprecated 4, yanked 1
 artifact       verified 112, unverified 1
 signature      verified 100, absent 1
-provenance     bound 45, absent 56
+provenance     bound 45, absent 55
 source_binding verified 98, unverified 9, mismatch 2
 registry       listed 11, unlisted 101
 advisories     clean 107, vulnerable 1, advisories-present 1
@@ -438,13 +438,13 @@ scanned so far — every npm entry's current pin, plus the six pins those entrie
 moved off, kept as the baseline their delta is computed against — it can read:
 
 ```
-env_access  90    shell           38    dynamic_code      16
+env_access  89    shell           38    dynamic_code      16
 network     79    install_script  32    dynamic_require    8
 fs_read     62    fs_write        41    credential_paths   5
 ```
 
-31 of those packages can both run other programs and reach the network. 21 of
-105 ship at least one minified file, where a pattern scan can show presence and
+31 of those packages can both run other programs and reach the network. 20 of
+104 ship at least one minified file, where a pattern scan can show presence and
 nothing else.
 
 Two rules make this honest rather than theatrical:
@@ -616,7 +616,7 @@ Drift = upstream rebuilt the tag under a new digest. The weekly CI job (`docker-
 
 [`scripts/mcp_eval.cjs`](./mcp-ecosystem-intelligence/scripts/mcp_eval.cjs) — closes the "did the artifact actually start?" gap. The integrity gate verifies the *file* you downloaded; this script verifies that spawning the server produces a usable tool surface.
 
-**What the last full run found.** 40 of the 112 entries with a runnable launch command complete a handshake in a clean container; 39 of them list at least one tool, listing 1,021 tools between them, ≈294k tokens of `tools/list` payload if every one were enabled at once. The rest fail for their own reasons — 62 crash, 7 exceed a 90-second deadline, 2 want network access they are not given, 1 wants credentials, 1 needs an argument you have to supply by hand. Those results live in [`assets/eval_results.json`](./mcp-ecosystem-intelligence/assets/eval_results.json) and feed the `behaviour` axis of a recommendation: an entry nothing has ever seen start cannot read as "recommended". 8 entries report a tool count that differs from the DB's (`tool_count_drift`), which is a reviewer's decision rather than an automatic correction.
+**What the last full run found.** 40 of the 111 entries with a runnable launch command complete a handshake in a clean container; 39 of them list at least one tool, listing 1,021 tools between them, ≈294k tokens of `tools/list` payload if every one were enabled at once. The rest fail for their own reasons — 62 crash, 7 exceed a 90-second deadline, 2 want network access they are not given, 1 wants credentials, 1 needs an argument you have to supply by hand. Those results live in [`assets/eval_results.json`](./mcp-ecosystem-intelligence/assets/eval_results.json) and feed the `behaviour` axis of a recommendation: an entry nothing has ever seen start cannot read as "recommended". 8 entries report a tool count that differs from the DB's (`tool_count_drift`), which is a reviewer's decision rather than an automatic correction.
 
 Each passing run also records a **tool-surface fingerprint** — every tool's name with its description and input schema hashed separately (hashes only: a tool description is attacker-controlled text, and it reaches the model's system prompt) — together with the **identity of what ran**: the artifact id, its integrity value, the DB version and a digest of the launch contract. `tool_count` alone never saw a rename or a rewritten description.
 
@@ -741,7 +741,7 @@ database](#vetted-database).
 
 ### Vetted database
 
-`mcp-ecosystem-intelligence/assets/tools_database.json` — **113 entries** across ~26 categories, all with pinned versions, integrity hashes (npm sha512 / PyPI sha256 / Docker @sha256), SPDX license, and `trust` field.
+`mcp-ecosystem-intelligence/assets/tools_database.json` — **112 entries** across ~26 categories, all with pinned versions, integrity hashes (npm sha512 / PyPI sha256 / Docker @sha256), SPDX license, and `trust` field.
 
 ```
 ai        browser   ci-cd      cms       communication   crm
@@ -750,8 +750,8 @@ maps      memory    meta       mobile     observability   payments
 pm        reasoning search     testing    utility         vcs       web-scraping
 ```
 
-Distribution as of 2026-09-30 (the date of the newest evidence in the DB): **0 Core / 11 Recommended / 101 Experimental / 1 Deprecated**.
-On that date only the ten entries re-checked that day carry fresh evidence. The
+Distribution as of 2026-09-30 (the date of the newest evidence in the DB): **0 Core / 10 Recommended / 101 Experimental / 1 Deprecated**.
+On that date only the nine entries re-checked that day carry fresh evidence. The
 rest hold evidence from 2026-09-17, and wherever it includes `availability` or
 `advisories` (a seven-day shelf life) it has aged out, so those 101 read
 Experimental until the next refresh.
@@ -940,7 +940,7 @@ the string, and moving them over is the next step.
 
 ## Token cost management
 
-Every active MCP server injects its full tool list into Claude's system prompt (~200–500 tokens per tool). With 113 servers in the DB the spread is wide: `mcp-server-fetch` = 1 tool vs. `gitlab-mcp` = 153 tools.
+Every active MCP server injects its full tool list into Claude's system prompt (~200–500 tokens per tool). With 112 servers in the DB the spread is wide: `mcp-server-fetch` = 1 tool vs. `gitlab-mcp` = 153 tools.
 
 **First, measure.** `mcp-vault budget` reads your host configs and totals the
 surface, stating where each number came from:

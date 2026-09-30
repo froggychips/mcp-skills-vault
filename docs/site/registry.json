@@ -1,7 +1,7 @@
 {
   "generated_at": "2026-09-30T11:19:50.799Z",
   "as_of": "2026-09-30T11:19:50.799Z",
-  "count": 113,
+  "count": 112,
   "entries": [
     {
       "name": "@last9/mcp-server",
@@ -2214,53 +2214,6 @@
         "advisories": {
           "status": "clean",
           "checked_at": "2026-09-17"
-        }
-      },
-      "smoke": {
-        "status": "fail",
-        "tools": null,
-        "checked_at": "2026-09-17"
-      }
-    },
-    {
-      "name": "@taazkareem/clickup-mcp-server",
-      "category": "pm",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
-      "trust": "verified",
-      "license": "Proprietary",
-      "health_score": 66.99,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @taazkareem/clickup-mcp-server",
-      "source_url": "https://github.com/taazkareem/clickup-mcp-server",
-      "evidence": {
-        "availability": {
-          "status": "present",
-          "checked_at": "2026-09-30"
-        },
-        "artifact": {
-          "status": "verified",
-          "checked_at": "2026-09-30"
-        },
-        "signature": {
-          "status": "verified",
-          "checked_at": "2026-09-30"
-        },
-        "provenance": {
-          "status": "absent",
-          "checked_at": "2026-09-30"
-        },
-        "source_binding": {
-          "status": "verified",
-          "checked_at": "2026-09-30"
-        },
-        "registry": {
-          "status": "unlisted",
-          "checked_at": "2026-09-30"
-        },
-        "advisories": {
-          "status": "clean",
-          "checked_at": "2026-09-30"
         }
       },
       "smoke": {
