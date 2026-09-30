@@ -209,62 +209,37 @@ function policyToFlags(policy = DEFAULTS) {
  * Returns findings the *policy* adds, on top of what the gate already said —
  * license and trust rules, plus the "allow" downgrades the gate has no opinion
  * about. Each has a level of 'fail' or 'warn'.
+ *
+ * The rules themselves live in lib/policy_rules.cjs, which is what `decide()`
+ * runs; this is the legacy view of the same rows, kept so that nothing that
+ * called it has to change and so that the two cannot disagree.
  */
 function evaluateEntry(entry, policy = DEFAULTS, dbEntry = null) {
-  const out = [];
-  const tags = new Set((entry.findings || []).map((f) => f.tag));
-  const add = (level, rule, message) => out.push({ level, rule, message });
-
-  if (policy.installHooks === 'fail' && tags.has('HOOK')) {
-    add('fail', 'policy/install-hooks', 'package runs install-time scripts, which this policy does not allow');
-  }
-  if (policy.dependencyHooks === 'fail' && tags.has('DEPHOOK')) {
-    add('fail', 'policy/dependency-hooks', 'a dependency runs install-time scripts, which this policy does not allow');
-  }
-  if (policy.dependencyAdvisories === 'fail' && tags.has('DEPCVE')) {
-    add('fail', 'policy/dependency-advisories', 'an advisory affects a package in the dependency tree');
-  }
-  if (policy.signatures === 'require' && !tags.has('SIG') && (entry.install_cmd || '').startsWith('npx')) {
-    add('fail', 'policy/signatures', 'no verifiable registry signature');
-  }
-  if (policy.provenance === 'require' && !tags.has('PROV') && (entry.install_cmd || '').startsWith('npx')) {
-    add('fail', 'policy/provenance', 'no provenance attestation');
-  }
-  if (policy.docker === 'digest' && /^docker\s+run/.test(entry.install_cmd || '') && tags.has('DIGEST')) {
-    add('fail', 'policy/docker-digest', 'container image is not pinned by digest');
-  }
-  if (policy.unverified === 'fail' && entry.status === 'UNVERIFIED') {
-    add('fail', 'policy/unverified', 'nothing about this entry could be verified');
-  }
-
-  const source = dbEntry || entry;
-  if (policy.licenses) {
-    const license = source.license || null;
-    if (!license) {
-      add('warn', 'policy/license', 'no license recorded for this entry');
-    } else {
-      if (policy.licenses.deny && policy.licenses.deny.includes(license)) {
-        add('fail', 'policy/license', `license ${license} is on this policy's deny list`);
-      } else if (policy.licenses.allow && !policy.licenses.allow.includes(license)) {
-        add('fail', 'policy/license', `license ${license} is not on this policy's allow list`);
-      }
-    }
-  }
-  if (policy.minHealthScore !== null) {
-    const score = Number(source.health_score);
-    if (!Number.isFinite(score)) add('warn', 'policy/health', 'no health score recorded for this entry');
-    else if (score < policy.minHealthScore) {
-      add('fail', 'policy/health', `health score ${score} is below the policy minimum of ${policy.minHealthScore}`);
-    }
-  }
-  if (policy.trust) {
-    const trust = source.trust || null;
-    if (!trust || !policy.trust.includes(trust)) {
-      add('fail', 'policy/trust', `trust tier ${trust || '(none)'} is not accepted by this policy (accepts: ${policy.trust.join(', ')})`);
-    }
-  }
-
-  return out;
+  // Required lazily: lib/policy_rules.cjs loads this module the same way.
+  const { entryRuleOutcomes } = require('./policy_rules.cjs');
+  const { modelForLine } = require('./legacy_tags.cjs');
+  const source = dbEntry || entry || {};
+  const findings = ((entry && entry.findings) || [])
+    .map((f) => modelForLine([f.tag, f.message]))
+    .filter(Boolean)
+    .map((m, i) => ({ id: `legacy:${i}`, rule: m.rule, state: m.state, severity: m.severity }));
+  const ctx = {
+    findings,
+    policy: { ...DEFAULTS, ...(policy || {}) },
+    facts: {
+      entry: {
+        install_cmd:  (entry && entry.install_cmd) || source.install_cmd || '',
+        license:      source.license,
+        health_score: source.health_score,
+        trust:        source.trust,
+      },
+      legacy_status: entry && entry.status,
+    },
+    mode: 'gate',
+  };
+  return entryRuleOutcomes(ctx)
+    .filter((o) => o.effect === 'deny' || o.effect === 'warn')
+    .map((o) => ({ level: o.effect === 'deny' ? 'fail' : 'warn', rule: o.rule, message: o.detail }));
 }
 
 module.exports = {

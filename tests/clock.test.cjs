@@ -52,6 +52,8 @@ test('every library function that judges time refuses to guess it', async () => 
   const sig = require(`${S}/lib/npm_signatures.cjs`);
   const rep = require(`${S}/lib/report.cjs`);
   const lf  = require(`${S}/lib/lockfile.cjs`);
+  const fi  = require(`${S}/lib/finding.cjs`);
+  const pr  = require(`${S}/lib/policy_rules.cjs`);
   const orch = require(`${S}/orchestrate.cjs`);
   const drift = require(`${S}/check_license_drift.cjs`);
   const evidence = { artifact_id: 'npm:p@1', dimensions: { artifact: { status: 'verified', checked_at: '2026-09-17' } } };
@@ -68,6 +70,8 @@ test('every library function that judges time refuses to guess it', async () => 
     lockEntry:        () => lf.lockEntry({ tool }),
     emptyLock:        () => lf.emptyLock(),
     matchDB:          () => orch.matchDB({ tools: [tool] }, { dbs: new Set(), infra: new Set() }, null),
+    decide:           () => fi.decide([], pr.effectivePolicy(null)),
+    findingsDocument: () => fi.findingsDocument({}),
   };
   for (const [name, fn] of Object.entries(cases)) {
     assert.throws(fn, (e) => e instanceof TypeError && /asOf is required/.test(e.message), `${name} accepted a missing asOf`);

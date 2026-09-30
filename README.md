@@ -325,6 +325,15 @@ a hash 90), overridable with `maxEvidenceAgeDays`; evidence past it is reported
 as `UNVERIFIED` — "verified, eight months ago" is a different claim from
 "verified".
 
+Because the answer depends on the date, the date is an input: `--as-of
+2026-09-24` (or a full ISO-8601 instant) judges the same stored evidence as of
+that day, on `verify`, `status`, `explain`, `audit`, `list` and `scan`, and every
+`--json` document carries the `as_of` it used. The same DB and policy at the
+same `--as-of` print the same bytes — which is what a test, a doc example or
+"what did the gate say last Tuesday" needs. Without it, the instant is now.
+`--record-evidence` and `install` refuse it: a replayed date may judge old
+evidence, never date a new observation or approve an install.
+
 The weekly refresh job records evidence as part of its run. The eight
 dimensions it fills for this DB today:
 
@@ -898,6 +907,7 @@ Everything in this table is scripted and tested; the column says where it lives.
 | One command instead of six | [`status.cjs`](./mcp-ecosystem-intelligence/scripts/status.cjs) |
 | The documented numbers checked against the data | [`tests/docs_numbers.test.cjs`](./tests/docs_numbers.test.cjs) |
 | What will not change without a major bump | [`docs/COMPATIBILITY.md`](./docs/COMPATIBILITY.md) |
+| One findings model and one place that decides; time as an explicit input (`--as-of`) | [`docs/adr/0001`](./docs/adr/0001-findings-and-time.md), [`lib/finding.cjs`](./mcp-ecosystem-intelligence/scripts/lib/finding.cjs), [`lib/policy_rules.cjs`](./mcp-ecosystem-intelligence/scripts/lib/policy_rules.cjs), [`lib/clock.cjs`](./mcp-ecosystem-intelligence/scripts/lib/clock.cjs) |
 
 **Not shipping the next feature until three people have used this and said
 something about it.** 33 npm downloads a month, 0 stars, 0 referrers, 41 clones

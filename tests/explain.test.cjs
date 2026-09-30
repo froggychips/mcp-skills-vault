@@ -15,6 +15,9 @@ const assert = require('node:assert/strict');
 const e = require('../mcp-ecosystem-intelligence/scripts/explain.cjs');
 const { DEFAULTS } = require('../mcp-ecosystem-intelligence/scripts/lib/policy.cjs');
 
+// A decision is made at an explicit instant (lib/clock.cjs), never "today".
+const NOW = Date.parse('2026-09-17T12:00:00Z');
+
 const tool = (over = {}) => ({
   name: 'x', install_cmd: 'npx -y pkg@1.0.0', version: '1.0.0',
   license: 'MIT', health_score: 80, trust: 'verified', ...over,
@@ -29,7 +32,7 @@ const block = {
 const starts = { state: 'starts', reason: 'starts and lists 12 tools', tools: 12 };
 
 test('a blocked trust gate is a denial, and names the dimension that blocked', () => {
-  const d = e.decide({ tool: tool(), policy: DEFAULTS, gateEntry: null, trust: block, behav: starts, budget: null });
+  const d = e.decide({ asOf: NOW,  tool: tool(), policy: DEFAULTS, gateEntry: null, trust: block, behav: starts, budget: null });
   assert.equal(d.decision, 'deny');
   // Named, not generic. `reasons[0]` used to supply this text, and for an entry
   // with a known CVE and a good hash it printed "artifact: verified" as the
@@ -47,12 +50,12 @@ test('every blocking dimension gets its own rule', () => {
     ],
     reasons: [],
   };
-  const d = e.decide({ tool: tool(), policy: DEFAULTS, gateEntry: null, trust: twoBlockers, behav: starts, budget: null });
+  const d = e.decide({ asOf: NOW,  tool: tool(), policy: DEFAULTS, gateEntry: null, trust: twoBlockers, behav: starts, budget: null });
   assert.deepEqual(d.blocking, ['trust/advisories', 'trust/availability']);
 });
 
 test('thin trust warns rather than denies — unknown is not the same as wrong', () => {
-  const d = e.decide({ tool: tool(), policy: DEFAULTS, gateEntry: null, trust: thin, behav: starts, budget: null });
+  const d = e.decide({ asOf: NOW,  tool: tool(), policy: DEFAULTS, gateEntry: null, trust: thin, behav: starts, budget: null });
   assert.equal(d.decision, 'allow');
   assert.equal(d.rules[0].outcome, 'warn');
 });
@@ -60,7 +63,7 @@ test('thin trust warns rather than denies — unknown is not the same as wrong',
 test('a policy that fails closed on unverified turns the same evidence into a denial', () => {
   const policy = { ...DEFAULTS, unverified: 'fail' };
   const gateEntry = { name: 'x', status: 'UNVERIFIED', findings: [], install_cmd: 'npx -y pkg@1.0.0' };
-  const d = e.decide({ tool: tool(), policy, gateEntry, trust: thin, behav: starts, budget: null });
+  const d = e.decide({ asOf: NOW,  tool: tool(), policy, gateEntry, trust: thin, behav: starts, budget: null });
   assert.equal(d.decision, 'deny');
   assert.ok(d.blocking.includes('policy/unverified') || d.blocking.includes('gate/unverified'),
     `expected an unverified rule to block, got ${d.blocking.join(', ')}`);
@@ -68,14 +71,14 @@ test('a policy that fails closed on unverified turns the same evidence into a de
 
 test('a failing gate denies on its own, whatever the stored evidence says', () => {
   const gateEntry = { name: 'x', status: 'FAIL', findings: [{ tag: 'FAIL' }], install_cmd: 'npx -y pkg@1.0.0' };
-  const d = e.decide({ tool: tool(), policy: DEFAULTS, gateEntry, trust: ok, behav: starts, budget: null });
+  const d = e.decide({ asOf: NOW,  tool: tool(), policy: DEFAULTS, gateEntry, trust: ok, behav: starts, budget: null });
   assert.equal(d.decision, 'deny');
   assert.ok(d.blocking.includes('gate/fail'));
 });
 
 test('behaviour warns and never denies: not starting is not a security refusal', () => {
   for (const state of ['never-started', 'needs-credentials', 'needs-arguments']) {
-    const d = e.decide({
+    const d = e.decide({ asOf: NOW, 
       tool: tool(), policy: DEFAULTS, gateEntry: null, trust: ok,
       behav: { state, reason: `${state} reason` }, budget: null,
     });
@@ -88,25 +91,25 @@ test('behaviour warns and never denies: not starting is not a security refusal',
 
 test('the context ceiling denies only when the policy says fail', () => {
   const budget = { over: true, after: 120000, limit: 100000, limit_source: 'maxContextTokens' };
-  const warn = e.decide({ tool: tool(), policy: { ...DEFAULTS, contextBudget: 'warn' }, gateEntry: null, trust: ok, behav: starts, budget });
+  const warn = e.decide({ asOf: NOW,  tool: tool(), policy: { ...DEFAULTS, contextBudget: 'warn' }, gateEntry: null, trust: ok, behav: starts, budget });
   assert.equal(warn.decision, 'allow');
   assert.equal(warn.rules.find((r) => r.rule === 'budget/over').outcome, 'warn');
 
-  const fail = e.decide({ tool: tool(), policy: { ...DEFAULTS, contextBudget: 'fail' }, gateEntry: null, trust: ok, behav: starts, budget });
+  const fail = e.decide({ asOf: NOW,  tool: tool(), policy: { ...DEFAULTS, contextBudget: 'fail' }, gateEntry: null, trust: ok, behav: starts, budget });
   assert.equal(fail.decision, 'deny');
   assert.ok(fail.blocking.includes('budget/over'));
 });
 
 test('a licence deny list denies, and says which licence', () => {
   const policy = { ...DEFAULTS, licenses: { allow: null, deny: ['BUSL-1.1'] } };
-  const d = e.decide({ tool: tool({ license: 'BUSL-1.1' }), policy, gateEntry: null, trust: ok, behav: starts, budget: null });
+  const d = e.decide({ asOf: NOW,  tool: tool({ license: 'BUSL-1.1' }), policy, gateEntry: null, trust: ok, behav: starts, budget: null });
   assert.equal(d.decision, 'deny');
   const rule = d.rules.find((r) => r.rule === 'policy/license');
   assert.match(rule.detail, /BUSL-1\.1/);
 });
 
 test('every rule carries an outcome from a closed set, so a record stays machine-readable', () => {
-  const d = e.decide({
+  const d = e.decide({ asOf: NOW, 
     tool: tool({ license: 'Unknown' }),
     policy: { ...DEFAULTS, licenses: { allow: ['MIT'], deny: null }, contextBudget: 'fail' },
     gateEntry: { name: 'x', status: 'WARN', findings: [{ tag: 'HOOK' }], install_cmd: 'npx -y pkg@1.0.0' },
@@ -198,7 +201,7 @@ test('a docker digest can be judged from the launch command alone', () => {
 });
 
 test('an unknown never blocks, and is reported separately', () => {
-  const d = e.decide({
+  const d = e.decide({ asOf: NOW, 
     tool: tool(), policy: { ...DEFAULTS, signatures: 'require', installHooks: 'fail' },
     gateEntry: null, trust: ok, behav: starts, budget: null,
     evidence: ev({ artifact: dim('verified') }),
@@ -213,7 +216,7 @@ test('with a live gate, the gate findings are what get judged', () => {
   // Unchanged behaviour: when a scan has actually run, the absence of a SIG
   // finding *is* evidence that there was no signature.
   const gateEntry = { name: 'x', status: 'OK', findings: [], install_cmd: 'npx -y pkg@1.0.0' };
-  const d = e.decide({
+  const d = e.decide({ asOf: NOW, 
     tool: tool(), policy: { ...DEFAULTS, signatures: 'require' },
     gateEntry, trust: ok, behav: starts, budget: null,
     evidence: ev({ signature: dim('verified') }),

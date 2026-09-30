@@ -65,7 +65,9 @@ const { readInstalledServers } = require('./lib/installed.cjs');
 const {
   resolveNpmTreeCached, pypiDirectDependencies, summarizeTree,
 } = require('./lib/deps.cjs');
-const { loadPolicy, evaluateEntry } = require('./lib/policy.cjs');
+const { loadEffectivePolicy, flagsFromArgv, rowFor } = require('./lib/policy_rules.cjs');
+const { decide, exitCode, findingsDocument, toJson } = require('./lib/finding.cjs');
+const { fromVerifyResults } = require('./lib/findings_from.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const {
   buildEvidence, mergeEvidence, staleDimensions, deriveTrust, requiredFor, DEFAULT_MAX_AGE_DAYS,
@@ -108,9 +110,16 @@ const NO_POLICY = process.argv.includes('--no-policy');
 // per dimension. Trust then becomes a derived value instead of a word someone
 // typed once.
 const RECORD_EVIDENCE = process.argv.includes('--record-evidence');
-const POLICY = NO_POLICY
-  ? { ok: true, policy: null, path: null, errors: [], found: false }
-  : loadPolicy(CWD);
+// The bar this run holds entries to: the policy file(s) for --cwd, tightened
+// by the flags, normalised and frozen — built by the one function that builds
+// it for every command (lib/policy_rules.cjs). The switches below are read off
+// it rather than re-derived, and `decide()` receives the same object.
+const EFFECTIVE = loadEffectivePolicy(CWD, { flags: flagsFromArgv(process.argv), noPolicy: NO_POLICY });
+const EP = EFFECTIVE.policy;
+const POLICY = {
+  ok: EFFECTIVE.ok, policy: EFFECTIVE.file_policy, path: EFFECTIVE.path,
+  errors: EFFECTIVE.errors, found: EFFECTIVE.found,
+};
 
 // Per-dimension age limits: the policy's number overrides every dimension,
 // otherwise each dimension keeps its own default (advisories perish fastest).
@@ -127,9 +136,6 @@ function evidenceMaxAge() {
   return merged;
 }
 
-function policySays(predicate) {
-  return Boolean(POLICY.ok && POLICY.policy && predicate(POLICY.policy));
-}
 // --entry NAME: check one DB entry instead of all 100+. `orchestrate --install`
 // uses it so a single install doesn't drag the whole registry over the wire.
 const ENTRY     = (() => {
@@ -141,14 +147,14 @@ const ENTRY     = (() => {
 //   --fail-unverified  "we could not check this at all" is a failure
 // --strict implies --fail-unverified; an install gate wants the latter without
 // necessarily refusing every entry that ships a postinstall hook.
-const FAIL_UNVERIFIED = STRICT || process.argv.includes('--fail-unverified') || policySays((p) => p.unverified === 'fail');
+const FAIL_UNVERIFIED = EP.gate.fail_unverified;
 // Machine-readable output. --sarif is SARIF 2.1.0 for GitHub code scanning,
 // which puts each finding on the tools_database.json line that caused it.
 const AS_JSON  = process.argv.includes('--json');
 const AS_SARIF = process.argv.includes('--sarif');
 // --deep: download the artifact and hash it here, instead of comparing the DB
 // pin against metadata served by the same registry that serves the tarball.
-const DEEP = process.argv.includes('--deep') || policySays((p) => p.deep);
+const DEEP = EP.gate.deep;
 // Artifact downloads are heavier than metadata requests, so they get their own
 // (smaller) pool.
 const DEEP_CONCURRENCY = Math.max(1, Number(process.env.MCP_VAULT_DEEP_CONCURRENCY || 4));
@@ -156,21 +162,18 @@ const DEEP_MAX_BYTES   = Math.max(1, Number(process.env.MCP_VAULT_DEEP_MAX_BYTES
 // A package the registry never signed, or that ships no provenance, is common
 // enough that flagging it by default would bury the real findings. These turn
 // "absent" into a failure for anyone who wants that bar.
-const REQUIRE_SIGNATURES = process.argv.includes('--require-signatures') || policySays((p) => p.signatures === 'require');
+const REQUIRE_SIGNATURES = EP.gate.require_signatures;
 // The stricter bar: an attestation whose in-toto subject digest *is* the
 // artifact we verified, signed by the source repository's own workflow. A
 // readable attestation that merely names the right repo does not clear it.
-const REQUIRE_PROVENANCE_BINDING = process.argv.includes('--require-provenance-binding')
-  || policySays((p) => p.provenance === 'bound');
+const REQUIRE_PROVENANCE_BINDING = EP.gate.require_provenance_binding;
 // Asking for a *bound* attestation is asking for an attestation. Without this
 // implication, `--require-provenance-binding` on its own enforced the binding
 // only for attestations that were readable in the first place: a package with
 // no attestation at all, or one we could not parse, sailed through the stricter
 // flag while a package that published a readable one was held to it. Exactly
 // backwards.
-const REQUIRE_PROVENANCE = process.argv.includes('--require-provenance')
-  || REQUIRE_PROVENANCE_BINDING
-  || policySays((p) => p.provenance === 'require' || p.provenance === 'bound');
+const REQUIRE_PROVENANCE = EP.gate.require_provenance;
 // --installed: verify what the local hosts are configured to launch, instead of
 // what the DB says. The DB is still consulted — for a pin to compare against —
 // but the subjects are the configured servers.
@@ -181,11 +184,10 @@ const INSTALLED = process.argv.includes('--installed');
 // A policy that forbids dependency hooks or advisories cannot be judged
 // without the tree, so requiring either implies resolving it. Otherwise the
 // rule silently checked nothing.
-const DEPS = process.argv.includes('--deps')
-  || policySays((p) => p.deps || p.dependencyHooks === 'fail' || p.dependencyAdvisories === 'fail');
+const DEPS = EP.gate.deps;
 // A hard failure on a transitive advisory is a policy choice, not a fact about
 // the artifact: most trees carry something. Off unless asked for.
-const FAIL_DEP_ADVISORIES = process.argv.includes('--fail-dep-advisories') || policySays((p) => p.dependencyAdvisories === 'fail');
+const FAIL_DEP_ADVISORIES = EP.gate.fail_dep_advisories;
 const DEPS_CONCURRENCY = Math.max(1, Number(process.env.MCP_VAULT_DEPS_CONCURRENCY || 4));
 
 
@@ -792,7 +794,7 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
     // No stored hash means nothing was compared. That is UNVERIFIED, not a
     // cosmetic MISS: an install used to sail through on an entry with a
     // version and no hash at all.
-    lines.push(['UNVERIFIED', `${missingPinAdvice(tool)}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+    lines.push(['UNVERIFIED', `${missingPinAdvice(tool)}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`, { rule: 'pin/missing', state: 'no-data' }]);
     checks.artifact = { state: 'unverified', method: 'none' };
     if (FAIL_UNVERIFIED) failures++;
   } else if (tool.pkg_integrity !== npmIntegrity) {
@@ -892,7 +894,7 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
         lines.push(['NOTE', 'provenance attestation present but unreadable']);
       }
     } else if (prov.state === 'mismatch') {
-      lines.push(['WARN', `provenance does not describe this artifact\n        ${prov.findings.join('\n        ')}`]);
+      lines.push(['WARN', `provenance does not describe this artifact\n        ${prov.findings.join('\n        ')}`, { rule: 'provenance/mismatch' }]);
       checks.provenance = { state: 'mismatch', repository: prov.repository };
       if (STRICT || REQUIRE_PROVENANCE || REQUIRE_PROVENANCE_BINDING) failures++;
     } else if (prov.state === 'bound') {
@@ -1003,7 +1005,8 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
         if (hits.length) {
           const worst = hard.length ? hard : hits;
           const shown = worst.slice(0, 5).map((h) => `${h.dep} ${h.id} [${h.sev}]`).join(', ');
-          lines.push(['DEPCVE', `${hits.length} advisor${hits.length === 1 ? 'y' : 'ies'} in the tree (${hard.length} high/critical): ${shown}${worst.length > 5 ? ', …' : ''}`]);
+          lines.push(['DEPCVE', `${hits.length} advisor${hits.length === 1 ? 'y' : 'ies'} in the tree (${hard.length} high/critical): ${shown}${worst.length > 5 ? ', …' : ''}`,
+            { rule: hard.length ? 'dependencies/high-advisory' : 'dependencies/advisory' }]);
           if (hard.length && FAIL_DEP_ADVISORIES) failures += 1;
         }
       }
@@ -1026,12 +1029,14 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
   // License — NOTE when npm omits it but DB has a value (e.g. sourced from GitHub)
   const npmLicense = meta.license || null;
   if (!npmLicense && tool.license) {
-    lines.push(['NOTE', `npm declares no license; DB uses "${tool.license}" (verify against GitHub repo)`]);
+    lines.push(['NOTE', `npm declares no license; DB uses "${tool.license}" (verify against GitHub repo)`, { rule: 'license/undeclared', severity: 'medium' }]);
   }
 
   // Advisories (merged: npm + OSV + GHSA + Snyk)
   for (const a of advisoriesForTool) {
-    lines.push(['CVE', `[${a.severity}] (${a.source}) ${a.title || a.url || a.id}`]);
+    // The third element is read by the findings model only (lib/report.cjs):
+    // only a high/critical advisory fails the gate, and the model says so.
+    lines.push(['CVE', `[${a.severity}] (${a.source}) ${a.title || a.url || a.id}`, { severity: severityIsHard(a.severity) ? 'high' : 'low' }]);
   }
   if (advisoriesForTool.some((a) => severityIsHard(a.severity))) failures++;
   // An advisory whose severity we could not read is not a mild advisory.
@@ -1062,7 +1067,7 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
   // Unreachable advisory feeds: we cannot assert "no known CVEs" when a feed was
   // down. Surface it loudly; hard-fail under --strict (never silently pass).
   if (degraded.length) {
-    lines.push(['UNVERIFIED', `advisory feeds unreachable: ${degraded.join(', ')} — cannot assert "no known CVEs"${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+    lines.push(['UNVERIFIED', `advisory feeds unreachable: ${degraded.join(', ')} — cannot assert "no known CVEs"${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`, { rule: 'advisories/feed-unreachable', state: 'not-run' }]);
     if (FAIL_UNVERIFIED) failures++;
   }
 
@@ -1116,7 +1121,7 @@ async function processPypi(tool, pkg, meta, advisoriesForTool, degraded, results
   // Two independent conditions, not a chain: an entry with no stored hash AND a
   // wheel-only release used to report only the first and still come back OK.
   if (!tool.pkg_integrity) {
-    lines.push(['UNVERIFIED', `${missingPinAdvice(tool)}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+    lines.push(['UNVERIFIED', `${missingPinAdvice(tool)}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`, { rule: 'pin/missing', state: 'no-data' }]);
     checks.artifact = { state: 'unverified', method: 'none' };
     if (FAIL_UNVERIFIED) failures++;
   }
@@ -1178,12 +1183,14 @@ async function processPypi(tool, pkg, meta, advisoriesForTool, degraded, results
   // License — NOTE when PyPI omits it but DB has a value (e.g. sourced from GitHub)
   const pyLicense = meta.info.license;
   if ((!pyLicense || pyLicense === 'UNKNOWN' || pyLicense === '') && tool.license) {
-    lines.push(['NOTE', `PyPI declares no license; DB uses "${tool.license}" (verify against GitHub repo)`]);
+    lines.push(['NOTE', `PyPI declares no license; DB uses "${tool.license}" (verify against GitHub repo)`, { rule: 'license/undeclared', severity: 'medium' }]);
   }
 
   // Advisories (merged: OSV + GHSA + Snyk; npm bulk doesn't cover PyPI)
   for (const a of advisoriesForTool) {
-    lines.push(['CVE', `[${a.severity}] (${a.source}) ${a.title || a.url || a.id}`]);
+    // The third element is read by the findings model only (lib/report.cjs):
+    // only a high/critical advisory fails the gate, and the model says so.
+    lines.push(['CVE', `[${a.severity}] (${a.source}) ${a.title || a.url || a.id}`, { severity: severityIsHard(a.severity) ? 'high' : 'low' }]);
   }
   if (advisoriesForTool.some((a) => severityIsHard(a.severity))) failures++;
   // An advisory whose severity we could not read is not a mild advisory.
@@ -1214,7 +1221,7 @@ async function processPypi(tool, pkg, meta, advisoriesForTool, degraded, results
   // Unreachable advisory feeds: we cannot assert "no known CVEs" when a feed was
   // down. Surface it loudly; hard-fail under --strict (never silently pass).
   if (degraded.length) {
-    lines.push(['UNVERIFIED', `advisory feeds unreachable: ${degraded.join(', ')} — cannot assert "no known CVEs"${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+    lines.push(['UNVERIFIED', `advisory feeds unreachable: ${degraded.join(', ')} — cannot assert "no known CVEs"${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`, { rule: 'advisories/feed-unreachable', state: 'not-run' }]);
     if (FAIL_UNVERIFIED) failures++;
   }
 
@@ -1320,11 +1327,11 @@ function processOfflinePackage(tool, pkg, ecosystem, results) {
   // Offline, the pins *are* the evidence. A missing one means this entry was
   // never verified — the same verdict the online path now gives.
   if (!tool.version) {
-    lines.push(['UNVERIFIED', `no pinned version in DB${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+    lines.push(['UNVERIFIED', `no pinned version in DB${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`, { rule: 'pin/missing', state: 'no-data' }]);
     if (FAIL_UNVERIFIED) failures++;
   }
   if (!tool.pkg_integrity) {
-    lines.push(['UNVERIFIED', `no stored pkg_integrity — cannot compare without network${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+    lines.push(['UNVERIFIED', `no stored pkg_integrity — cannot compare without network${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`, { rule: 'pin/missing', state: 'no-data' }]);
     if (FAIL_UNVERIFIED) failures++;
   }
   if (!tool.source_url) {
@@ -1371,6 +1378,8 @@ async function main() {
       policy_file: POLICY.path,
       found:       POLICY.found,
       effective:   POLICY.policy || null,
+      // Additive: the frozen policy `decide()` actually receives, flags applied.
+      decision_policy: EP,
       switches: {
         fail_unverified: FAIL_UNVERIFIED, deep: DEEP, deps: DEPS,
         require_signatures: REQUIRE_SIGNATURES, require_provenance: REQUIRE_PROVENANCE,
@@ -1714,7 +1723,7 @@ async function main() {
     r.lines = r.lines || [];
     const worst = stale.sort((a, b) => b.age_days - a.age_days).slice(0, 3)
       .map((sd) => `${sd.dimension} ${sd.age_days}d old (max ${sd.max_age_days})`).join(', ');
-    r.lines.push(['UNVERIFIED', `stored evidence has aged out: ${worst}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`]);
+    r.lines.push(['UNVERIFIED', `stored evidence has aged out: ${worst}${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`, { rule: 'evidence/stale', state: 'stale' }]);
     if (FAIL_UNVERIFIED) {
       r.failures = (r.failures || 0) + 1;
       r.status = 'FAIL';
@@ -1723,40 +1732,79 @@ async function main() {
     }
   }
 
-  if (POLICY.ok && POLICY.policy) {
-    // Judge the policy on what this run established, merged over what was
-    // stored — not on a `trust` field that only moves when --record-evidence
-    // is passed. Otherwise an entry that just passed every check still failed
-    // `trust: ["verified"]`, and the only way to satisfy the policy was to
-    // write to the DB during a verification.
-    for (const r of results) {
-      if (!r.tool) continue;
-      const typed = toTypedEntry(r.tool);
-      const fresh = buildEvidence(r.checks, { artifactId: typed ? artifactId(typed.artifact) : null, now: AS_OF });
-      if (!Object.keys(fresh.dimensions).length) continue;
-      const effective = mergeEvidence(r.tool.trust_evidence, fresh);
-      r.effective_trust = deriveTrust(effective, {
-        now: AS_OF,
-        maxAgeDays: evidenceMaxAge(),
-        require: requiredFor(typed ? typed.artifact.ecosystem : null),
-      });
-    }
-    const draft = toJsonReport({ results, asOf: AS_OF });
+  // Judge the policy on what this run established, merged over what was
+  // stored — not on a `trust` field that only moves when --record-evidence is
+  // passed. Otherwise an entry that just passed every check still failed
+  // `trust: ["verified"]`, and the only way to satisfy the policy was to write
+  // to the DB during a verification.
+  for (const r of results) {
+    if (!r.tool) continue;
+    const typed = toTypedEntry(r.tool);
+    const fresh = buildEvidence(r.checks, { artifactId: typed ? artifactId(typed.artifact) : null, now: AS_OF });
+    if (!Object.keys(fresh.dimensions).length) continue;
+    const effective = mergeEvidence(r.tool.trust_evidence, fresh);
+    r.effective_trust = deriveTrust(effective, {
+      now: AS_OF,
+      maxAgeDays: evidenceMaxAge(),
+      require: requiredFor(typed ? typed.artifact.ecosystem : null),
+    });
+  }
+
+  // The decision, made in one place (lib/finding.cjs decide over the rules in
+  // lib/policy_rules.cjs). What this run saw becomes findings; the entry's
+  // own fields — licence, health, the trust this run derived — are facts.
+  const model = fromVerifyResults(results, { asOf: AS_OF, maxAgeDays: evidenceMaxAge(), scope: INSTALLED ? 'installed' : 'database' });
+  const facts = {};
+  results.forEach((r, i) => {
+    const s = model.subjects[i];
+    if (!s || !r.tool) return;
+    facts[s.id] = {
+      mode: 'gate',
+      legacy_status: r.status,
+      entry: {
+        install_cmd:  r.tool.install_cmd || '',
+        license:      r.tool.license ?? null,
+        health_score: r.tool.health_score ?? null,
+        trust:        r.effective_trust || r.tool.trust || null,
+      },
+    };
+  });
+  const decisions = decide(model.findings, EP, AS_OF, { subjects: model.subjects.filter(Boolean), facts });
+  const decisionOf = new Map(decisions.map((d) => [d.subject.id, d]));
+
+  // The policy file's verdicts, rendered as the POLICY-FAIL / POLICY-WARN
+  // lines this report has always carried. They are the decision's own rule
+  // outcomes: nothing here judges anything.
+  if (EP.policy_rules) {
     for (let i = 0; i < results.length; i++) {
-      // The policy sees the effective trust, not the stored word.
-      const subject = results[i].effective_trust
-        ? { ...results[i].tool, trust: results[i].effective_trust }
-        : results[i].tool;
-      const verdicts = evaluateEntry(draft.entries[i], POLICY.policy, subject);
+      const s = model.subjects[i];
+      const d = s && decisionOf.get(s.id);
+      if (!d) continue;
+      const verdicts = d.rules.filter((o) => {
+        const row = rowFor(o.rule);
+        return row && row.views.includes('policy-line') && (o.effect === 'deny' || o.effect === 'warn');
+      });
       if (!verdicts.length) continue;
       results[i].lines = results[i].lines || [];
       for (const v of verdicts) {
-        results[i].lines.push([v.level === 'fail' ? 'POLICY-FAIL' : 'POLICY-WARN', `${v.rule}: ${v.message}`]);
-        if (v.level === 'fail') results[i].failures = (results[i].failures || 0) + 1;
+        results[i].lines.push([v.effect === 'deny' ? 'POLICY-FAIL' : 'POLICY-WARN', `${v.rule}: ${v.detail}`, { decided_by: v.rule }]);
+        if (v.effect === 'deny') results[i].failures = (results[i].failures || 0) + 1;
       }
       if (results[i].failures > 0) results[i].status = 'FAIL';
     }
   }
+
+  // The exit code is the decisions'. The per-entry `failures` counters are the
+  // frozen verify-report@1 view and are still kept by the processors; until
+  // they are retired (docs/adr/0001, migration step 2) the two are compared,
+  // and a disagreement fails closed and says so rather than picking one.
+  const exitFor = (legacyCode) => {
+    const modelCode = exitCode(decisions);
+    if (modelCode !== legacyCode) {
+      process.stderr.write(`verify: internal: the decision (${modelCode}) and the gate's counters (${legacyCode}) disagree — failing closed; please report this\n`);
+    }
+    return (modelCode === 1 || legacyCode === 1) ? 1 : ((modelCode === 2 || legacyCode === 2) ? 2 : 0);
+  };
 
   // Machine-readable modes: one document on stdout, nothing else. Everything
   // human-facing has gone to stderr already, so `--json` stays pipeable.
@@ -1775,6 +1823,12 @@ async function main() {
         feeds: (UPDATE || NO_AUDIT || OFFLINE) ? null : summarizeFeedSources(health),
       },
     });
+    // Additive: the same run as observations → findings → decisions
+    // (mcp-vault/findings@1), with the policy and facts it was decided on.
+    report.findings = toJson(findingsDocument({
+      asOf: AS_OF, observations: model.observations, findings: model.findings, decisions,
+      scope: INSTALLED ? 'installed' : 'database', policy: EP, facts,
+    }));
     if (AS_SARIF) {
       const raw = fs.readFileSync(DB_PATH, 'utf8');
       process.stdout.write(JSON.stringify(toSarif(report, {
@@ -1785,7 +1839,7 @@ async function main() {
       process.stdout.write(JSON.stringify(report, null, 2) + '\n');
     }
     if (UPDATE && results.some((r) => r.status === 'UPD')) writeDb(DB_PATH, db);
-    return exitAfterFlush(totalFails > 0 ? 1 : (INSTALLED && installedNotes.length ? 2 : 0));
+    return exitAfterFlush(exitFor(totalFails > 0 ? 1 : (INSTALLED && installedNotes.length ? 2 : 0)));
   }
 
   // Print results, grouped per tool.
@@ -1823,7 +1877,7 @@ async function main() {
   // A host config we could not read leaves the question unanswered, and the
   // CLI reserves 2 for that: a hard failure still outranks it, because a real
   // finding is more actionable than an incomplete scope.
-  exitAfterFlush(totalFails > 0 ? 1 : (INSTALLED && installedNotes.length ? 2 : 0));
+  exitAfterFlush(exitFor(totalFails > 0 ? 1 : (INSTALLED && installedNotes.length ? 2 : 0)));
 }
 
 if (require.main === module) {

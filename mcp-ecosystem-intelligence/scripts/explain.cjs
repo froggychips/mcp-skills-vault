@@ -41,10 +41,13 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { readDb } = require('./lib/db_io.cjs');
-const { loadPolicy, evaluateEntry } = require('./lib/policy.cjs');
+const { DEFAULTS } = require('./lib/policy.cjs');
+const { effectivePolicy, loadEffectivePolicy, evidenceRuleOutcomes, rowFor } = require('./lib/policy_rules.cjs');
+const { decide: decideFindings, findingsDocument, toJson, explainTrace, renderTrace } = require('./lib/finding.cjs');
+const { subjectForTool, fromEvidence, fromReportEntry } = require('./lib/findings_from.cjs');
 const { trustScore, fitScore, behaviour, recommend } = require('./lib/scores.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
-const { staleDimensions, DIMENSIONS, DEFAULT_MAX_AGE_DAYS, POSITIVE_STATUSES } = require('./lib/evidence.cjs');
+const { staleDimensions, DIMENSIONS, DEFAULT_MAX_AGE_DAYS, POSITIVE_STATUSES, requiredFor } = require('./lib/evidence.cjs');
 const { estimateServer, matchDbEntry, wouldExceed, DEFAULT_CONTEXT } = require('./lib/budget.cjs');
 const { readInstalledServers } = require('./lib/installed.cjs');
 const { asOfFromArgv } = require('./lib/clock.cjs');
@@ -127,162 +130,89 @@ function runGate(name, cwd, asOfIso = null) {
  * The middle one is the reason this function exists. `evaluateEntry` decides
  * from the *absence* of a finding, which is correct when a gate has just run
  * and wrong when no gate ran at all.
+ *
+ * The rules are rows in lib/policy_rules.cjs (evidence mode); this returns
+ * their outcomes in the shape explain has always printed.
  */
 function policyFromEvidence(policy, tool, evidence) {
-  const dims = (evidence && evidence.dimensions) || {};
-  const out = [];
-  const isNpm = /^npx\s/.test(tool.install_cmd || '');
-  const isDocker = /^docker\s+run/.test(tool.install_cmd || '');
+  const ep = asEffective(policy);
+  return evidenceRuleOutcomes({
+    subject: null, findings: [], policy: ep, mode: 'evidence',
+    facts: { entry: { install_cmd: tool.install_cmd || '' }, evidence },
+  }).map((o) => ({ rule: o.rule, outcome: o.effect, detail: o.detail }));
+}
 
-  const three = (rule, dim, { ok, bad, require: required, message }) => {
-    const value = dims[dim];
-    if (!value) {
-      if (!required) return;
-      out.push({ rule, outcome: 'unknown', detail: `${dim} has never been checked — run with --verify` });
-      return;
-    }
-    if (ok.includes(value.status)) {
-      out.push({ rule, outcome: 'allow', detail: `${dim}: ${value.status} (as of ${value.verified_at || value.checked_at})` });
-      return;
-    }
-    if (bad.includes(value.status)) {
-      out.push({ rule, outcome: required ? 'deny' : 'warn', detail: message(value) });
-      return;
-    }
-    out.push({ rule, outcome: 'unknown', detail: `${dim} is "${value.status}", which this rule cannot judge — run with --verify` });
-  };
-
-  if (isNpm) {
-    three('policy/signatures', 'signature', {
-      ok: ['verified'], bad: ['absent', 'mismatch'],
-      require: policy.signatures === 'require',
-      message: (v) => (v.status === 'mismatch'
-        ? 'the registry signature does not verify'
-        : 'the registry published no signature for this version'),
-    });
-    three('policy/provenance', 'provenance', {
-      ok: ['bound', 'claimed'], bad: ['absent', 'unreadable', 'mismatch'],
-      require: policy.provenance === 'require' || policy.provenance === 'bound',
-      message: (v) => `provenance is ${v.status}`,
-    });
-    // The stricter bar asks for a binding, so a mere claim does not clear it.
-    if (policy.provenance === 'bound' && dims.provenance && dims.provenance.status === 'claimed') {
-      out.push({ rule: 'policy/provenance', outcome: 'deny', detail: 'policy requires provenance bound to the artifact digest; this one is only claimed' });
-    }
-  }
-
-  three('policy/dependency-hooks', 'dependencies', {
-    ok: ['clean'], bad: ['hooks'],
-    require: policy.dependencyHooks === 'fail',
-    message: () => 'a dependency runs install-time scripts',
-  });
-  three('policy/dependency-advisories', 'dependencies', {
-    ok: ['clean', 'hooks'], bad: ['advisories-present'],
-    require: policy.dependencyAdvisories === 'fail',
-    message: () => 'an advisory affects a package in the dependency tree',
-  });
-  three('policy/unverified', 'artifact', {
-    ok: ['verified'], bad: ['unverified', 'mismatch'],
-    require: policy.unverified === 'fail',
-    message: (v) => (v.status === 'mismatch'
-      ? 'the artifact does not match its pin'
-      : 'nothing about this artifact could be verified'),
-  });
-
-  // The package's own install hooks are not an evidence dimension: only a gate
-  // run sees them. Saying so beats guessing either way.
-  if (policy.installHooks === 'fail') {
-    out.push({ rule: 'policy/install-hooks', outcome: 'unknown', detail: 'whether this package runs install-time scripts is only visible to a gate run — use --verify' });
-  }
-  if (isDocker && policy.docker === 'digest') {
-    const pinned = /@sha256:[a-f0-9]{64}(\s|$)/.test(tool.install_cmd || '');
-    out.push(pinned
-      ? { rule: 'policy/docker-digest', outcome: 'allow', detail: 'the image is pinned by @sha256 digest' }
-      : { rule: 'policy/docker-digest', outcome: 'deny', detail: 'container image is not pinned by digest' });
-  }
-  return out;
+// A policy object that did not come through `loadEffectivePolicy` (a test's
+// literal, the DEFAULTS) is normalised the same way before anything reads it.
+function asEffective(policy) {
+  return policy && Object.isFrozen(policy) && policy.gate ? policy : effectivePolicy(policy, {}, { defaults: DEFAULTS });
 }
 
 /**
- * The decision.
- *
- * Trust gates, policy rules refuse, behaviour and budget advise. Kept as an
- * ordered list of *rules with outcomes* rather than a single boolean, because
- * the useful part of a denial is which rule denied it.
+ * The model for one entry: observations from the stored evidence, findings
+ * from the evidence and — with `--verify` — from the live gate, and the one
+ * Decision `decide()` makes over them. explain renders it; it decides nothing.
  */
-function decide({ tool, policy, gateEntry, trust, behav, budget, evidence = null }) {
-  const rules = [];
-  const add = (rule, outcome, detail) => rules.push({ rule, outcome, detail });
+function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, behav, budget, evidence = null, asOf, maxAgeDays = DEFAULT_MAX_AGE_DAYS }) {
+  const ep = asEffective(policy);
+  const s = subjectForTool(tool);
+  let typed = null;
+  try { typed = toTypedEntry(tool); } catch { typed = null; }
+  const ev = fromEvidence(evidence, {
+    subject: s, asOf, maxAgeDays, required: evidence ? requiredFor(typed ? typed.artifact.ecosystem : null) : [],
+  });
+  // The gate's own findings, typed, when its report carries them; its tags
+  // otherwise.
+  const gateFindings = gateEntry
+    ? ((gateDoc && Array.isArray(gateDoc.findings)) ? gateDoc.findings.filter((f) => f.subject && f.subject.id === s.id)
+      : fromReportEntry(gateEntry, { subject: s }).findings)
+    : [];
+  const findings = [...ev.findings, ...gateFindings];
+  const facts = {
+    [s.id]: {
+      mode: gateEntry ? 'gate' : 'evidence',
+      legacy_status: gateEntry ? gateEntry.status : null,
+      gate_status: gateEntry ? gateEntry.status : null,
+      entry: {
+        install_cmd:  (gateEntry && gateEntry.install_cmd) || tool.install_cmd || '',
+        license:      tool.license ?? null,
+        health_score: tool.health_score ?? null,
+        trust:        tool.trust ?? null,
+      },
+      evidence: evidence || null,
+      trust: trust ? { score: trust.score, gate: trust.gate, blocking: trust.blocking || [], reasons: trust.reasons || [] } : null,
+      behaviour: behav ? { state: behav.state, reason: behav.reason } : null,
+      budget: budget || null,
+    },
+  };
+  // explain answers "is this denied?" — its exit code has never been the
+  // gate's threshold, so it asks decide() that question explicitly.
+  const [decision] = decideFindings(findings, ep, asOf, { subjects: [s], facts, failOn: 'deny' });
+  return { subject: s, observations: ev.observations, findings, decision, facts, policy: ep };
+}
 
-  // 1. Trust is the gate.
-  if (trust.gate === 'block') {
-    // One rule per blocking dimension, named. "trust/blocked: artifact:
-    // verified" was what this printed when `reasons[0]` happened to be a
-    // positive finding.
-    const blockers = trust.blocking && trust.blocking.length
-      ? trust.blocking
-      : [{ dimension: 'trust', status: 'blocked', checked_at: null }];
-    for (const b of blockers) {
-      add(`trust/${b.dimension}`, 'deny', `${b.dimension} is ${b.status}${b.checked_at ? ` (as of ${b.checked_at})` : ''}`);
-    }
-  }
-  else if (trust.gate === 'thin') add('trust/thin', 'warn', trust.reasons[0] || `only ${trust.score}/100 of the trust evidence is established`);
-  else add('trust/ok', 'allow', `artifact verified and nothing contradicts it (${trust.score}/100)`);
-
-  // 2. Policy rules, from the file that applies to this directory.
-  //
-  // Without a live gate there are no *findings* to judge, and handing
-  // `evaluateEntry` an empty list made it read "no SIG finding" as "no
-  // signature": `explain gitlab-mcp` denied on `policy/signatures` while the
-  // stored evidence said `signature: verified`, and the same command with
-  // `--verify` did not. A check that did not run had produced a finding — the
-  // usual bug, pointing the other way.
-  //
-  // So the rules that depend on gate findings are answered from the evidence
-  // when it exists, and reported as `unknown` when it does not. `unknown` never
-  // blocks: it is an invitation to run `--verify`, not a verdict.
-  if (gateEntry) {
-    for (const f of evaluateEntry(gateEntry, policy, tool)) {
-      add(f.rule, f.level === 'fail' ? 'deny' : 'warn', f.message);
-    }
-  } else {
-    for (const r of policyFromEvidence(policy, tool, evidence)) add(r.rule, r.outcome, r.detail);
-    // The rules that are properties of the entry rather than of a scan —
-    // licence lists, a health floor, accepted trust tiers — need no gate and
-    // are judged the same way in both paths.
-    const entryOnly = new Set(['policy/license', 'policy/health', 'policy/trust']);
-    for (const f of evaluateEntry({ status: 'SKIP', findings: [], install_cmd: tool.install_cmd }, policy, tool)) {
-      if (!entryOnly.has(f.rule)) continue;
-      add(f.rule, f.level === 'fail' ? 'deny' : 'warn', f.message);
-    }
-  }
-
-  // 3. The live gate's own exit code, when we ran it.
-  if (gateEntry && gateEntry.status === 'FAIL') add('gate/fail', 'deny', 'the integrity gate failed this entry');
-  if (gateEntry && gateEntry.status === 'UNVERIFIED' && policy.unverified === 'fail') {
-    add('gate/unverified', 'deny', 'nothing about this entry could be verified, and the policy fails closed');
-  }
-
-  // 4. Behaviour and budget: advisory. A server that does not start is not a
-  //    security refusal, and neither is a context ceiling — both change what a
-  //    reader should do, not whether they are permitted to.
-  if (behav.state === 'never-started')     add('behaviour/never-started', 'warn', behav.reason);
-  if (behav.state === 'needs-credentials') add('behaviour/needs-credentials', 'warn', behav.reason);
-  if (behav.state === 'needs-arguments')   add('behaviour/needs-arguments', 'warn', behav.reason);
-  if (budget && budget.over) {
-    add('budget/over', policy.contextBudget === 'fail' ? 'deny' : 'warn',
-      `this config would inject ≈${budget.after.toLocaleString('en-US')} tokens per request, over the ceiling of ${budget.limit.toLocaleString('en-US')}`);
-  }
-
-  const denials = rules.filter((r) => r.outcome === 'deny');
-  const unknowns = rules.filter((r) => r.outcome === 'unknown');
+/**
+ * The decision, as explain has always reported it.
+ *
+ * Trust gates, policy rules refuse, behaviour and budget advise — those are
+ * rows in lib/policy_rules.cjs now, and `decide()` evaluates them. This is
+ * the legacy view of the Decision: its rules in table order, with the outcome
+ * words explain has always used, because the useful part of a denial is
+ * which rule denied it.
+ */
+function decide({ tool, policy, gateEntry, gateDoc = null, trust, behav, budget, evidence = null, asOf, maxAgeDays }) {
+  const m = explainModel({ tool, policy, gateEntry, gateDoc, trust, behav, budget, evidence, asOf, maxAgeDays });
+  const rules = m.decision.rules
+    .filter((r) => { const row = rowFor(r.rule); return row && row.views.includes('explain'); })
+    .map((r) => ({ rule: r.rule, outcome: r.effect, detail: r.detail }));
   return {
-    decision: denials.length ? 'deny' : 'allow',
-    blocking: denials.map((r) => r.rule),
+    decision: m.decision.effect === 'deny' ? 'deny' : 'allow',
+    blocking: rules.filter((r) => r.outcome === 'deny').map((r) => r.rule),
     // Named separately so a caller can tell "allowed" from "allowed as far as
     // anyone has looked".
-    unevaluated: unknowns.map((r) => r.rule),
+    unevaluated: rules.filter((r) => r.outcome === 'unknown').map((r) => r.rule),
     rules,
+    model: m,
   };
 }
 
@@ -299,8 +229,11 @@ function main(argv) {
     return 2;
   }
 
-  const loaded = loadPolicy(opts.cwd);
-  const policy = loaded.policy;
+  // The same loader every command uses (lib/policy_rules.cjs): `policy` is
+  // the file as written, for the record; `loaded.policy` is the frozen
+  // effective policy decide() receives.
+  const loaded = loadEffectivePolicy(opts.cwd);
+  const policy = loaded.file_policy;
   const typed  = toTypedEntry(tool);
   const currentId = typed ? artifactId(typed.artifact) : null;
 
@@ -343,7 +276,15 @@ function main(argv) {
     ? (gate.report.entries || []).find((e) => e.name === tool.name) || null
     : null;
 
-  const verdict = decide({ tool, policy, gateEntry, trust, behav, budget, evidence });
+  const verdict = decide({
+    tool, policy: loaded.policy, gateEntry, gateDoc: gate && gate.ok ? gate.report.findings : null,
+    trust, behav, budget, evidence, asOf: opts.asOf, maxAgeDays: maxAge,
+  });
+  const m = verdict.model;
+  const trace = toJson(findingsDocument({
+    asOf: opts.asOf, observations: m.observations, findings: m.findings, decisions: [m.decision],
+    scope: 'database', policy: m.policy, facts: m.facts,
+  }));
   const fit = null;   // fit is about a project's stack; `scan` is where that question lives
 
   const record = {
@@ -400,6 +341,10 @@ function main(argv) {
     live_gate: gate && gate.ok
       ? { ran: true, exit: gate.exit, status: gateEntry ? gateEntry.status : null, findings: gateEntry ? gateEntry.findings : [] }
       : { ran: false, reason: opts.verify ? (gate && gate.error) || 'unavailable' : 'not requested (--verify runs it)' },
+    // Additive (mcp-vault/findings@1): observation → finding → decision for
+    // this entry, with the policy and facts it was decided on. The legacy
+    // `decision` and `rules` above are a view of `findings.decisions[0]`.
+    findings: trace,
   };
 
   if (opts.record) {
@@ -415,7 +360,7 @@ function main(argv) {
 
   if (opts.json) {
     process.stdout.write(`${JSON.stringify(record, null, 2)}\n`);
-    return verdict.decision === 'deny' ? 1 : 0;
+    return m.decision.fails ? 1 : 0;
   }
 
   // ── human form ──
@@ -455,16 +400,22 @@ function main(argv) {
   if (verdict.unevaluated.length) {
     process.stdout.write(`${DM}Not evaluated without a gate run: ${verdict.unevaluated.join(', ')}${RS}\n`);
   }
+  // The chain behind the decision: which rule decided, on which findings, and
+  // the dated observations those rest on — current or past their shelf life
+  // at the instant above.
+  process.stdout.write(`\n${DM}Trace:${RS}\n`);
+  for (const line of renderTrace(explainTrace(trace))) process.stdout.write(`  ${DM}${line}${RS}\n`);
+
   if (!record.live_gate.ran) {
     process.stdout.write(`\n${DM}This is the stored evidence, with the date each claim was established.\n`
       + `Add --verify for a decision about the artifact as it is right now.${RS}\n`);
   }
 
-  return verdict.decision === 'deny' ? 1 : 0;
+  return m.decision.fails ? 1 : 0;
 }
 
 if (require.main === module) {
   exitAfterFlush(main(process.argv.slice(2)));
 }
 
-module.exports = { parseArgs, decide, runGate, policyFromEvidence };
+module.exports = { parseArgs, decide, explainModel, runGate, policyFromEvidence };
