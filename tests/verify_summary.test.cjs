@@ -113,6 +113,13 @@ test('a pipe in a finding cannot break the table', () => {
   assert.match(markdown, /a \\\| b/);
 });
 
+test('a trailing backslash cannot un-escape the pipe after it', () => {
+  const e = fail('x');
+  e.findings[1].message = 'a \\| b';
+  const { markdown } = s.renderMarkdown(report([e]), { rc: 1, now: NOW });
+  assert.ok(markdown.includes('a \\\\\\| b'), 'expected the backslash and the pipe each escaped');
+});
+
 test('an unusable run renders a warning, not a findings table', () => {
   const { markdown, verdict } = s.renderMarkdown(null, { rc: 1, now: NOW });
   assert.equal(verdict.ok, false);

@@ -50,7 +50,9 @@ const MAX_CHARS = 40000;
 const STALE_RE = /stored evidence has aged out/;
 
 function cell(s, max = 160) {
-  const t = String(s == null ? '' : s).replace(/\s+/g, ' ').replace(/\|/g, '\\|').trim();
+  // Backslash first: escaping only `|` would let a value ending in `\` turn
+  // the added `\|` into an escaped backslash followed by a live column break.
+  const t = String(s == null ? '' : s).replace(/\s+/g, ' ').replace(/\\/g, '\\\\').replace(/\|/g, '\\|').trim();
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
 
