@@ -51,7 +51,19 @@ const count   = (fn) => db.filter(fn).length;
 // copy that goes stale.
 const { classifyEntry, evalIndex } = require('../mcp-ecosystem-intelligence/scripts/lib/tiers.cjs');
 const evalByName = evalIndex(evals);
-const tierOf  = (t) => classifyEntry(t, evalByName.get(t.name) || null).classification;
+// Staleness makes the tier a function of today, and the README states the
+// distribution of the committed evidence — not of whatever day CI happens to
+// run. Classified against the wall clock, this test went red on its own a week
+// after the last evidence refresh (availability and advisories expire in 7
+// days) and 98 entries "moved" from Recommended to Experimental with no commit
+// touching them. So the clock is the snapshot's own: the newest `checked_at`
+// in the DB. Refreshing the evidence moves it forward, and a real change in the
+// distribution still fails here.
+const SNAPSHOT_NOW = Math.max(0, ...db.flatMap((t) =>
+  Object.values(t.trust_evidence?.dimensions || {})
+    .map((d) => Date.parse(d.checked_at))
+    .filter(Number.isFinite)));
+const tierOf  = (t) => classifyEntry(t, evalByName.get(t.name) || null, { now: SNAPSHOT_NOW }).classification;
 const tier    = (name) => count((t) => tierOf(t) === name);
 const withTools = db.filter((t) => Number.isFinite(t.est_tools_count));
 const heaviest  = withTools.reduce((m, t) => (t.est_tools_count > m.est_tools_count ? t : m), withTools[0]);
