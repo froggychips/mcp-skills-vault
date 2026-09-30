@@ -54,6 +54,11 @@ Three consequences that are easy to get wrong, so they are written down:
   contradicts" is a statement about a comparison, and that comparison did not
   happen.
 - A usage error is `2`, including from `health`, which used to exit `1`.
+- `explain <name>` exits as `verify --entry <name>` does over the same DB,
+  policy, flags (`--strict`, `--fail-unverified`) and `--as-of`: both hold the
+  decision to the effective policy's `fail_on`. This was a pre-1.0 breaking change:
+  explain used to answer only "is it denied", so under `unverified: fail`
+  stale evidence exited `0` from explain and `1` from verify.
 
 Which *conditions* produce a `1` can become stricter only behind a flag
 (`--strict`, `--fail-*`). Making a default stricter — something that exited `0`

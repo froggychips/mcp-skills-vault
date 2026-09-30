@@ -66,8 +66,9 @@ bytes; every `--json` document says which `asOf` it used.
   `secrets/*`) so each lands as a row, not as a branch in a command.
 - **`--strict` and friends are parameters, not command logic.** Flags tighten
   the effective policy; the exit threshold `fail_on` (`deny` → `unknown` with
-  `--fail-unverified` → `warn` with `--strict`) is part of it. A caller may
-  narrow the question (`explain` asks `failOn: 'deny'`, as it always has).
+  `--fail-unverified` → `warn` with `--strict`) is part of it. Every command
+  that decides one entry takes it from there — `explain` exits as `verify`
+  does for the same inputs, rather than asking the narrower "is it denied".
 - **Loading policy is one function**, `loadEffectivePolicy(startDir, { flags,
   noPolicy })`: the file(s), then flags, normalised and deep-frozen. `decide`
   refuses a policy that is not frozen.

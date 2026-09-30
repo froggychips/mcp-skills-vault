@@ -517,6 +517,11 @@ line — "allowed on this date, under that policy, on this evidence" is what a
 policy engine gets asked for six months later and otherwise cannot
 reconstruct.
 
+The exit code is the gate's for this entry: `explain` holds the decision to
+the same `fail_on` as `verify` — from the policy file and `--strict` /
+`--fail-unverified` — so under `unverified: fail` stale evidence exits `1`
+from both, not "allowed" from one and "failed" from the other.
+
 ### What actually runs (`lock`)
 
 The gate verifies `server@1.2.3` down to its transitive tree. Then `.mcp.json`
