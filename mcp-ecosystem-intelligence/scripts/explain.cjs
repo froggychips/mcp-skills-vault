@@ -332,7 +332,8 @@ function lookalikeModel(name, tools, { policy, asOf }) {
   if (!f) return null;
   const ep = asEffective(policy);
   const facts = { [f.subject.id]: lookalike.factsFor(hit, { intent: 'requested' }) };
-  const [decision] = decideFindings([f], ep, asOf, { subjects: [f.subject], facts, failOn: 'deny' });
+  // The threshold is the policy's fail_on, as for an entry (#131).
+  const [decision] = decideFindings([f], ep, asOf, { subjects: [f.subject], facts });
   const document = toJson(findingsDocument({ asOf, findings: [f], decisions: [decision], scope: 'database', policy: ep, facts }));
   return { hit, finding: f, decision, document };
 }

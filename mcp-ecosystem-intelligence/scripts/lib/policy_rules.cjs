@@ -516,6 +516,10 @@ const orgRules = [
     doc: 'every tool the server offers approved in mcp.lock.json, for the artifact it launches',
     evaluate(ctx) {
       if (!ctx.policy.policy_rules || ctx.policy.toolApproval !== 'require') return [];
+      // A bare name (#125: a lookalike nobody launched from the vault) has no
+      // server behind it whose tools could be approved; the question is not
+      // asked of it, as no other org/* row reads facts it does not have.
+      if (ctx.subject && ctx.subject.type === 'name') return [];
       const ta = ctx.facts && ctx.facts.org && ctx.facts.org.tool_approval;
       const fs = ctx.findings.filter((f) => f.rule === 'org/tool-approval');
       // `toolApproval: require` asks for an approved surface to be on record:
