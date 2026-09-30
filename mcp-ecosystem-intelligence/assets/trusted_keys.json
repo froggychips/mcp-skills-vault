@@ -1,0 +1,5 @@
+{
+  "$schema": "mcp-vault/trusted-keys@1",
+  "comment": "Ed25519 public keys allowed to sign the published DB. Empty until the maintainer generates one: see SECURITY.md, 'Signed DB'. Rotation: add the new key with valid_from, give the old one valid_until; set revoked: true for a key that must verify nothing.",
+  "keys": []
+}

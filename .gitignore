@@ -11,3 +11,8 @@ __pycache__/
 # `mcp-vault lock --vendor` installs locked trees here. Committing them is a
 # deliberate choice (a vendored tree is reproducible but large), not a default.
 .mcp-vault/
+
+# The DB signature is made at release time (release.yml → sign_db.cjs) and
+# ships in the npm tarball. A copy committed here would go stale on the next DB
+# change and read as tampering.
+mcp-ecosystem-intelligence/assets/*.sig

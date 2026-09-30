@@ -164,6 +164,21 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
       - name: Tests must pass before publish
         run: node --test tests/*.test.cjs
+      # Sign the DB that goes into the tarball (tools_database.json.sig, listed
+      # in package.json "files"). The client checks it before every command
+      # that reads the DB — see SECURITY.md, "Signed DB".
+      #
+      # `--release` fails closed once assets/trusted_keys.json lists a key: no
+      # secret, or a secret whose key the keyring does not list, stops the job
+      # here, before anything is public. While the keyring is empty it warns and
+      # publishes unsigned, which is what every version before this did.
+      #
+      # MCP_VAULT_SIGNING_KEY is an Ed25519 PKCS#8 PEM (or its base64), a
+      # repository secret the maintainer adds; it is given to this step only.
+      - name: Sign the DB
+        env:
+          MCP_VAULT_SIGNING_KEY: ${{ secrets.MCP_VAULT_SIGNING_KEY }}
+        run: node mcp-ecosystem-intelligence/scripts/sign_db.cjs --release
       # `npm publish` answers E404 — not 401 — when the token is missing,
       # expired or lacks publish rights on the scope. That is how v0.13.0 ended
       # up with a git tag and a GitHub release but no package on npm: the run

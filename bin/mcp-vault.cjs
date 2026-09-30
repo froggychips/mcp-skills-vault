@@ -6,6 +6,10 @@
 
 const path = require("path");
 const { spawnSync } = require("child_process");
+const { loadTrustedKeys } = require("../mcp-ecosystem-intelligence/scripts/lib/signing.cjs");
+const {
+  checkDb, allowUnsignedFromEnv, ALLOW_FLAG,
+} = require("../mcp-ecosystem-intelligence/scripts/lib/db_signature.cjs");
 
 const SCRIPTS_DIR = path.join(
   __dirname, "..", "mcp-ecosystem-intelligence", "scripts"
@@ -53,7 +57,13 @@ const COMMANDS = {
   lock:            "lock.cjs",
   approve:         "approve.cjs",
   sbom:            "sbom.cjs",
+  signature:       "check_signature.cjs",
+  audits:          "audits.cjs",
 };
+
+// Commands that never read the DB, so its signature is not their business.
+// `signature` reports on it itself, and must be reachable when it is broken.
+const DB_FREE = new Set(["wrap", "health", "doctor", "signature"]);
 
 const HELP = `mcp-vault — make MCP supply-chain boring.
 
@@ -90,6 +100,8 @@ COMMANDS
                     (--check: diff a fresh resolve against it; --vendor: install it)
   approve <server>  Approve a server's tools in mcp.lock.json (policy toolApproval)
                     (--tool X: one tool; shows what changed in descriptions/schemas)
+  signature         Check the DB against its Ed25519 signature and the shipped keyring
+  audits <sub>      Your audits and imported ones (list | add | export | fetch | check)
 
 COMMON OPTIONS
   --json            Machine-readable output
@@ -115,6 +127,8 @@ COMMON OPTIONS
                     stored evidence only, so verify needs --offline
   --host <id>       Which host config to write (install; --list-hosts to see them)
   --scope <s>       project or user (install; --global means --scope user)
+  --allow-unsigned-db   Run on a DB whose signature does not verify (development,
+                        forks). Loud on every run; also MCP_VAULT_ALLOW_UNSIGNED_DB=1
 
   Each command also accepts its own flags — run with --help for details.
 
@@ -136,7 +150,39 @@ function showVersion() {
   process.stdout.write(`mcp-vault ${pkg.version}\n`);
 }
 
-function main(argv) {
+/**
+ * Check the bundled DB — and a DB handed over with `--db` — before the command
+ * reads it. Returns an exit code to stop with, or null to carry on.
+ *
+ * A keyring that cannot be read is a refusal, not "no keys": the difference
+ * between those two is the difference between "this build does not sign" and
+ * "someone broke the thing that says who signs".
+ */
+function dbSignatureRefusal(passArgs, allowUnsigned) {
+  const keyring = loadTrustedKeys();
+  if (!keyring.ok) {
+    process.stderr.write(`mcp-vault: the shipped keyring is unreadable (${keyring.errors.join("; ")}); refusing to trust the DB\n`);
+    return 1;
+  }
+  const dbs = [DB_PATH];
+  const i = passArgs.indexOf("--db");
+  if (i !== -1 && passArgs[i + 1]) dbs.push(path.resolve(passArgs[i + 1]));
+  for (const dbPath of dbs) {
+    const check = checkDb({ dbPath, keys: keyring.keys, allowUnsigned });
+    if (!check.proceed) {
+      process.stderr.write(`${check.message}\n`);
+      return 1;
+    }
+    if (check.state === "unsigned-allowed") process.stderr.write(`${check.message}\n`);
+  }
+  return null;
+}
+
+function main(rawArgv) {
+  // Stripped here, in any position: it is a statement about the DB this
+  // wrapper checks, not an option of the script behind it.
+  const allowUnsigned = rawArgv.includes(ALLOW_FLAG) || allowUnsignedFromEnv(process.env);
+  const argv = rawArgv.filter((a) => a !== ALLOW_FLAG);
   const cmd = argv[0];
 
   if (!cmd || cmd === "-h" || cmd === "--help" || cmd === "help") {
@@ -157,6 +203,11 @@ function main(argv) {
   }
 
   let passArgs = argv.slice(1);
+
+  if (!DB_FREE.has(cmd)) {
+    const refusal = dbSignatureRefusal(passArgs, allowUnsigned);
+    if (refusal !== null) process.exit(refusal);
+  }
 
   // `mcp-vault install <pkg> [--global]` → `orchestrate.cjs --install <pkg> [--global]`
   if (cmd === "install") {
