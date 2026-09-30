@@ -47,10 +47,10 @@ const { readDb } = require('./lib/db_io.cjs');
 const { DEFAULTS } = require('./lib/policy.cjs');
 const { effectivePolicy, loadEffectivePolicy, flagsFromArgv, evidenceRuleOutcomes, rowFor } = require('./lib/policy_rules.cjs');
 const { decide: decideFindings, findingsDocument, toJson, explainTrace, renderTrace } = require('./lib/finding.cjs');
-const { subjectForTool, fromEvidence, fromReportEntry } = require('./lib/findings_from.cjs');
+const { subjectForTool, fromStoredEvidence, storedEvidenceFor, fromReportEntry } = require('./lib/findings_from.cjs');
 const { trustScore, fitScore, behaviour, recommend } = require('./lib/scores.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
-const { staleDimensions, DIMENSIONS, DEFAULT_MAX_AGE_DAYS, POSITIVE_STATUSES, requiredFor, dbAsOf, evalResultsAsOf } = require('./lib/evidence.cjs');
+const { staleDimensions, DIMENSIONS, DEFAULT_MAX_AGE_DAYS, POSITIVE_STATUSES, maxAgeForPolicy, dbAsOf, evalResultsAsOf } = require('./lib/evidence.cjs');
 const { estimateServer, matchDbEntry, wouldExceed, DEFAULT_CONTEXT } = require('./lib/budget.cjs');
 const { readInstalledServers } = require('./lib/installed.cjs');
 const { asOfFromArgv } = require('./lib/clock.cjs');
@@ -173,11 +173,9 @@ function asEffective(policy) {
 function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, behav, budget, evidence = null, asOf, maxAgeDays = DEFAULT_MAX_AGE_DAYS }) {
   const ep = asEffective(policy);
   const s = subjectForTool(tool);
-  let typed = null;
-  try { typed = toTypedEntry(tool); } catch { typed = null; }
-  const ev = fromEvidence(evidence, {
-    subject: s, asOf, maxAgeDays, required: evidence ? requiredFor(typed ? typed.artifact.ecosystem : null) : [],
-  });
+  // The stored part of the decision, from the one producer verify --offline
+  // uses too (lib/findings_from.cjs fromStoredEvidence).
+  const ev = fromStoredEvidence(tool, { subject: s, asOf, maxAgeDays, evidence, trust: trust === undefined ? null : trust });
   // The gate's own findings, typed, when its report carries them; its tags
   // otherwise.
   const gateFindings = gateEntry
@@ -196,8 +194,7 @@ function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, b
         health_score: tool.health_score ?? null,
         trust:        tool.trust ?? null,
       },
-      evidence: evidence || null,
-      trust: trust ? { score: trust.score, gate: trust.gate, blocking: trust.blocking || [], reasons: trust.reasons || [] } : null,
+      ...ev.facts,
       behaviour: behav ? { state: behav.state, reason: behav.reason } : null,
       budget: budget || null,
     },
@@ -256,13 +253,10 @@ function main(argv) {
   const currentId = typed ? artifactId(typed.artifact) : null;
 
   // Evidence only counts for the artifact it was collected on.
-  const evidence = tool.trust_evidence
-    && (!tool.trust_evidence.artifact_id || !currentId || tool.trust_evidence.artifact_id === currentId)
-    ? tool.trust_evidence
-    : null;
-  const evidenceIsForAnotherVersion = Boolean(tool.trust_evidence && !evidence);
+  const { evidence, forAnotherVersion: evidenceIsForAnotherVersion } = storedEvidenceFor(tool);
 
-  const maxAge = policy.maxEvidenceAgeDays || DEFAULT_MAX_AGE_DAYS;
+  // The same shelf lives verify holds this evidence to (lib/evidence.cjs).
+  const maxAge = maxAgeForPolicy(policy);
   const trust  = trustScore(evidence, { maxAgeDays: maxAge, now: opts.asOf });
   const stale  = new Map(staleDimensions(evidence, maxAge, opts.asOf).map((s) => [s.dimension, s]));
 

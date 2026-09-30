@@ -171,10 +171,7 @@ test('explain exits as verify does: same policy, flags and --as-of, same exit an
       assert.ok(vd, `${label}: verify made no decision for ${ed.subject.id}`);
       assert.equal(ed.fail_on, vd.fail_on, `${label}: explain and verify hold the entry to different thresholds`);
       assert.equal(er.status, vr.status, `${label}: explain exits ${er.status}, verify ${vr.status}`);
-      // Stored evidence can also *deny* (a recorded advisory, a vanished
-      // package), which an offline verify does not re-read: there explain
-      // is stricter, and both still exit 1. The case this test is about is
-      // the other one — nothing denies, and the threshold decides.
+      // The case this test is about: nothing denies, and the threshold decides.
       if (vd.fails && vd.effect === 'unknown' && ed.effect !== 'deny') {
         stale++;
         assert.equal(ed.decided_by, vd.decided_by, `${label}: decided by ${ed.decided_by} here, ${vd.decided_by} in verify`);
@@ -183,6 +180,121 @@ test('explain exits as verify does: same policy, flags and --as-of, same exit an
     }
   }
   assert.ok(stale >= 3, `the fixtures must exercise stale evidence failing at fail_on (got ${stale})`);
+});
+
+// ── stored evidence: verify --offline and explain are one decision ─────────
+//
+// `verify --offline` used to check pins only, while `explain` applied the
+// stored evidence: on the shipped DB nine entries were denied by one and
+// passed by the other. Both now read the record through one producer
+// (lib/findings_from.cjs fromStoredEvidence). And time is applied the same
+// way (docs/adr/0001, "Positive findings do not age"): a found problem
+// stays a finding at any age; only a claim of absence — "clean", "present"
+// — goes stale, and stale is `unknown`, which fails only at fail_on unknown.
+
+const FIX_AS_OF = '2026-09-30T12:00:00.000Z';
+const FRESH = '2026-09-28';   // inside every shelf life at FIX_AS_OF
+const OLD   = '2026-08-01';   // past the 7-day advisories/availability shelf life
+const dim = (status, at) => ({ status, checked_at: at, ...(['present', 'verified', 'clean'].includes(status) ? { verified_at: at } : {}) });
+const fixtureEntry = (name, dims) => ({
+  name, category: 'utility', install_cmd: `npx -y ${name}`, source_url: `https://github.com/example/${name}`,
+  version: '1.0.0', pkg_integrity: 'sha512-' + Buffer.from(name.padEnd(64, '.')).toString('base64'),
+  trust: 'candidate', license: 'MIT', health_score: 80,
+  trust_evidence: { artifact_id: `npm:${name}@1.0.0`, dimensions: {
+    availability: dim('present', FRESH), artifact: dim('verified', FRESH), advisories: dim('clean', FRESH), ...dims,
+  } },
+});
+// name -> [fixture, expected effect, expected decided_by, exit (no flags), exit (--fail-unverified)]
+const FIXTURES = {
+  'fx-advisory-fresh': [{ advisories: dim('vulnerable', FRESH) }, 'deny', 'trust/advisories', 1, 1],
+  // Older than the advisories shelf life, and still a deny: a known advisory
+  // against the pinned version does not stop being true by ageing.
+  'fx-advisory-old':   [{ advisories: dim('vulnerable', OLD) }, 'deny', 'trust/advisories', 1, 1],
+  // "No advisories" older than its shelf life: nobody knows any more.
+  'fx-clean-old':      [{ advisories: dim('clean', OLD) }, 'unknown', 'finding/incomplete', 0, 1],
+  'fx-yanked':         [{ availability: dim('yanked', OLD) }, 'deny', 'trust/availability', 1, 1],
+};
+
+function fixtureTree(t) {
+  // DB_PATH is resolved next to the scripts, so the CLIs run on a copy.
+  const root = fs.mkdtempSync(path.join(TMP, 'stored-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.cpSync(path.join(ROOT, 'mcp-ecosystem-intelligence'), path.join(root, 'mcp-ecosystem-intelligence'), { recursive: true });
+  const dbFile = path.join(root, 'mcp-ecosystem-intelligence', 'assets', 'tools_database.json');
+  const db = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
+  db.tools = Object.entries(FIXTURES).map(([name, [dims]]) => fixtureEntry(name, dims));
+  fs.writeFileSync(dbFile, JSON.stringify(db, null, 2));
+  const scripts = path.join(root, 'mcp-ecosystem-intelligence', 'scripts');
+  return (script, args) => spawnSync(process.execPath, [path.join(scripts, script), ...args], {
+    encoding: 'utf8', env: ENV, cwd: TMP, maxBuffer: 64 * 1024 * 1024,
+  });
+}
+
+test('verify --offline applies stored evidence as explain does: same effect, decided_by and exit', (t) => {
+  const runIn = fixtureTree(t);
+  const dir = DIRS.none;
+  for (const [flags, col] of [[[], 3], [['--fail-unverified'], 4]]) {
+    for (const [name, spec] of Object.entries(FIXTURES)) {
+      const label = `${name} ${flags.join(' ') || '(no flags)'}`;
+      const vr = runIn('verify_integrity.cjs', ['--offline', '--json', '--entry', name, '--cwd', dir, '--as-of', FIX_AS_OF, ...flags]);
+      const er = runIn('explain.cjs', [name, '--json', '--cwd', dir, '--as-of', FIX_AS_OF, ...flags]);
+      assert.doesNotMatch(vr.stderr, /internal:/, `${label}: the decision and the gate's counters disagree`);
+      const vd = JSON.parse(vr.stdout).findings.decisions[0];
+      assert.equal(vd.effect, spec[1], `${label}: verify effect`);
+      assert.equal(vd.decided_by, spec[2], `${label}: verify decided_by`);
+      assert.equal(vr.status, spec[col], `${label}: verify exit`);
+      const ed = JSON.parse(er.stdout).findings.decisions[0];
+      assert.equal(ed.subject.id, vd.subject.id, label);
+      assert.equal(ed.effect, vd.effect, `${label}: explain says ${ed.effect}, verify ${vd.effect}`);
+      assert.equal(ed.decided_by, vd.decided_by, `${label}: decided by ${ed.decided_by} here, ${vd.decided_by} in verify`);
+      assert.equal(er.status, vr.status, `${label}: explain exits ${er.status}, verify ${vr.status}`);
+    }
+  }
+  // The deny on an old advisory is a finding about the artifact, observed
+  // then — not a stale claim — and it says when it was observed.
+  const doc = JSON.parse(runIn('verify_integrity.cjs', ['--offline', '--json', '--entry', 'fx-advisory-old', '--cwd', dir, '--as-of', FIX_AS_OF]).stdout);
+  const adv = doc.findings.findings.find((f) => f.rule === 'evidence/advisories');
+  assert.ok(adv, 'the stored advisory is a finding');
+  assert.equal(adv.state, 'observed');
+  assert.equal(adv.severity, 'high');
+  assert.match(adv.message, new RegExp(`observed ${OLD}`));
+  assert.ok(!doc.findings.findings.some((f) => f.state === 'stale' && /advisories: vulnerable/.test(f.message)), 'a found advisory never reads as stale');
+  const entry = doc.entries.find((e) => e.name === 'fx-advisory-old');
+  assert.ok(entry.findings.some((f) => f.tag === 'CVE' && /stored evidence: advisories: vulnerable/.test(f.message)), 'rendered as a CVE line');
+  assert.ok(!entry.findings.some((f) => /aged out: advisories/.test(f.message)), 'and not as evidence that aged out');
+});
+
+test('--fail-families narrows what fails the run, not what is decided', (t) => {
+  const runIn = fixtureTree(t);
+  const smoke = ['--fail-families', 'integrity,pin,oci,verify,policy'];
+  const all = runIn('verify_integrity.cjs', ['--offline', '--json', '--cwd', DIRS.none, '--as-of', FIX_AS_OF, ...smoke]);
+  assert.equal(all.status, 0, all.stderr);
+  const doc = JSON.parse(all.stdout);
+  assert.deepEqual(doc.findings.policy.fail_families, ['integrity', 'oci', 'pin', 'policy', 'verify']);
+  // Still denied and still reported; only the exit code's question changed.
+  assert.equal(doc.findings.decisions.filter((d) => d.effect === 'deny').length, 3);
+  assert.ok(doc.findings.decisions.every((d) => !d.fails));
+  assert.deepEqual(recompute(doc.findings), doc.findings.decisions, 'decide() of the document reproduces it');
+  assert.ok(doc.entries.every((e) => e.failures === 0));
+  // A family that is in scope still fails it.
+  const adv = runIn('verify_integrity.cjs', ['--offline', '--json', '--cwd', DIRS.none, '--as-of', FIX_AS_OF, '--fail-families=evidence']);
+  assert.equal(adv.status, 1);
+  assert.doesNotMatch(adv.stderr, /internal:/);
+});
+
+test('outcomeFails: the family filter, by the outcome\'s rule or a finding it rests on', () => {
+  const ruleOf = new Map([['f:1', 'integrity/docker-pin-mismatch'], ['f:2', 'evidence/advisories']]);
+  const deny = (rule, findings) => ({ rule, effect: 'deny', findings, thresholded: true });
+  assert.equal(F.outcomeFails(deny('finding/severity', ['f:2']), { families: ['integrity'], ruleOf }), false);
+  assert.equal(F.outcomeFails(deny('finding/severity', ['f:1']), { families: ['integrity'], ruleOf }), true);
+  assert.equal(F.outcomeFails(deny('policy/docker-digest', []), { families: ['policy'], ruleOf }), true);
+  assert.equal(F.outcomeFails(deny('trust/advisories', []), { families: ['integrity'], ruleOf }), false);
+  assert.equal(F.outcomeFails(deny('trust/advisories', []), { families: null, ruleOf }), true);
+  const unknown = { rule: 'finding/incomplete', effect: 'unknown', findings: ['f:1'], thresholded: true };
+  assert.equal(F.outcomeFails(unknown, { threshold: 'deny', ruleOf }), false);
+  assert.equal(F.outcomeFails(unknown, { threshold: 'unknown', families: ['integrity'], ruleOf }), true);
+  assert.deepEqual(PR.flagsFromArgv(['--fail-families', 'integrity/*, pin']).failFamilies, ['integrity', 'pin']);
+  assert.equal(PR.flagsFromArgv([]).failFamilies, null);
 });
 
 // ── who decides ────────────────────────────────────────────────────────────

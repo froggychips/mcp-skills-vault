@@ -11,6 +11,10 @@
  *                       --verify` gets back from the live gate
  *   fromEvidence        stored, dated evidence alone — what `explain` has
  *                       when no gate ran
+ *   fromStoredEvidence  one DB entry's stored evidence as a decision reads it:
+ *                       findings plus the `evidence` and `trust` facts. The
+ *                       one producer both `explain` and `verify --offline`
+ *                       call, so the two cannot read the record differently
  *
  * Each returns `{ observations, findings }` over typed subjects. None of them
  * decides anything: that is `decide()`, over the table in lib/policy_rules.cjs.
@@ -21,13 +25,17 @@
  *        -> { observations, findings, subjects: [Subject per result] }
  *   fromReportEntry(entry, { subject, scope })            -> { observations: [], findings }
  *   fromEvidence(evidence, { subject, asOf, maxAgeDays, required, scope })
+ *   storedEvidenceFor(tool)                               -> { evidence, forAnotherVersion }
+ *   fromStoredEvidence(tool, { asOf, maxAgeDays, subject, scope, evidence, trust })
+ *        -> { subject, evidence, observations, findings, facts: { evidence, trust } }
+ *   foundProblem(dimension, status)                       -> boolean  (does not age)
  */
 
 const { subject, observationsFromEvidence, observationState, finding } = require('./finding.cjs');
 const { modelForLine, TAG_MODEL } = require('./legacy_tags.cjs');
-const { buildEvidence, mergeEvidence, isPositive, POSITIVE_STATUSES } = require('./evidence.cjs');
+const { buildEvidence, mergeEvidence, isPositive, POSITIVE_STATUSES, requiredFor } = require('./evidence.cjs');
 const { toTypedEntry, artifactId } = require('./entry_model.cjs');
-const { blocks } = require('./scores.cjs');
+const { blocks, trustScore } = require('./scores.cjs');
 const { requireAsOf } = require('./clock.cjs');
 
 /** A DB entry or an installed server, as a typed subject. */
@@ -126,13 +134,32 @@ function fromReportEntry(entry, { subject: s, scope = 'database' } = {}) {
   return { observations: [], findings };
 }
 
+// A negative status that is not a blocking one, but still a thing that was
+// *found*: the bytes, the repo or the build disagreed, the server failed, an
+// earlier claim was withdrawn.
+const FOUND_STATUSES = new Set(['mismatch', 'fail', 'contradicted', 'withdrawn']);
+
+/**
+ * Whether a stored status is a problem that was found — as opposed to the
+ * absence of one. docs/adr/0001 "Positive findings do not age": a known
+ * advisory against the pinned version, a yanked or unpublished release, a hash
+ * that did not match, stays true of that artifact however long ago it was
+ * seen. What ages is the negative claim — "no advisories", "still published",
+ * "it matched" — because the world can make it false tomorrow without the
+ * artifact changing.
+ */
+function foundProblem(dimension, status) {
+  return blocks(dimension, status) || FOUND_STATUSES.has(status);
+}
+
 /**
  * Stored evidence alone → observations and one finding per dimension that
  * says something a decision can use. A blocking status is high; any other
- * negative status is medium; a claim past its shelf life is `stale`; a
- * required dimension never checked is `no-data`. Affirmative, current
- * dimensions produce no finding — they are observations, and the trace shows
- * them where a rule cites them.
+ * found problem is medium — both `observed`, at any age, with the date they
+ * were observed in the message. An affirmative (or inconclusive) claim past
+ * its shelf life is `stale`; a required dimension never checked is `no-data`.
+ * Affirmative, current dimensions produce no finding — they are observations,
+ * and the trace shows them where a rule cites them.
  */
 function fromEvidence(evidence, { subject: s, asOf, maxAgeDays = {}, required = [], scope = 'database' } = {}) {
   const at = requireAsOf(asOf, 'fromEvidence');
@@ -141,13 +168,15 @@ function fromEvidence(evidence, { subject: s, asOf, maxAgeDays = {}, required = 
     : [];
   const findings = [];
   for (const o of observations) {
-    const stale = observationState(o, at) === 'stale';
-    if (blocks(o.dimension, o.status)) {
-      findings.push(finding({ rule: `evidence/${o.dimension.replace(/_/g, '-')}`, subject: s, scope, severity: 'high', state: 'observed', refs: [o.id], message: `${o.dimension}: ${o.status} (as of ${o.observed_at})` }));
-    } else if (stale) {
+    const rule = `evidence/${o.dimension.replace(/_/g, '-')}`;
+    if (foundProblem(o.dimension, o.status)) {
+      // Checked before staleness, on purpose: a found problem does not age.
+      findings.push(finding({
+        rule, subject: s, scope, severity: blocks(o.dimension, o.status) ? 'high' : 'medium', state: 'observed',
+        refs: [o.id], message: `${o.dimension}: ${o.status} (observed ${o.observed_at})`,
+      }));
+    } else if (observationState(o, at) === 'stale') {
       findings.push(finding({ rule: 'evidence/stale', subject: s, scope, severity: 'medium', state: 'stale', refs: [o.id], message: `${o.dimension}: ${o.status}, established ${o.confirmed_at || o.observed_at}, past its shelf life since ${o.expires_at.slice(0, 10)}` }));
-    } else if (['mismatch', 'fail', 'contradicted', 'withdrawn'].includes(o.status)) {
-      findings.push(finding({ rule: `evidence/${o.dimension.replace(/_/g, '-')}`, subject: s, scope, severity: 'medium', state: 'observed', refs: [o.id], message: `${o.dimension}: ${o.status} (as of ${o.observed_at})` }));
     }
   }
   const have = new Set(observations.map((o) => o.dimension));
@@ -159,4 +188,54 @@ function fromEvidence(evidence, { subject: s, asOf, maxAgeDays = {}, required = 
   return { observations, findings };
 }
 
-module.exports = { subjectForTool, fromVerifyResults, fromReportEntry, fromEvidence, TAG_DIMENSIONS };
+/**
+ * The entry's stored evidence, if it describes the artifact the entry pins:
+ * what was learned about 1.2.3 says nothing about 1.2.4.
+ */
+function storedEvidenceFor(tool) {
+  const stored = tool && tool.trust_evidence;
+  if (!stored) return { evidence: null, forAnotherVersion: false };
+  let currentId = null;
+  try { const t = toTypedEntry(tool); currentId = t ? artifactId(t.artifact) : null; } catch { currentId = null; }
+  const matches = !stored.artifact_id || !currentId || stored.artifact_id === currentId;
+  return { evidence: matches ? stored : null, forAnotherVersion: !matches };
+}
+
+/**
+ * One DB entry's stored evidence, as everything a decision reads from it: the
+ * findings (`fromEvidence`) and the `evidence` / `trust` facts the `trust/*`
+ * and evidence-mode `policy/*` rows read. `explain` and `verify --offline`
+ * both call this, and nothing else, for the stored part of their decision —
+ * which is what makes them one decision with one answer.
+ *
+ * `evidence` / `trust` may be given when the caller already holds them
+ * (explain prints both); otherwise they are derived here, at `asOf`, over
+ * `maxAgeDays` (lib/evidence.cjs maxAgeForPolicy).
+ */
+function fromStoredEvidence(tool, { asOf, maxAgeDays, subject: s = null, scope = 'database', evidence, trust } = {}) {
+  const at = requireAsOf(asOf, 'fromStoredEvidence');
+  const subj = s || subjectForTool(tool);
+  const ev = evidence === undefined ? storedEvidenceFor(tool).evidence : evidence;
+  let typed = null;
+  try { typed = toTypedEntry(tool); } catch { typed = null; }
+  const model = fromEvidence(ev, {
+    subject: subj, asOf: at, maxAgeDays, scope,
+    required: ev ? requiredFor(typed ? typed.artifact.ecosystem : null) : [],
+  });
+  const t = trust === undefined ? trustScore(ev, { now: at, maxAgeDays }) : trust;
+  return {
+    subject: subj,
+    evidence: ev || null,
+    observations: model.observations,
+    findings: model.findings,
+    facts: {
+      evidence: ev || null,
+      trust: t ? { score: t.score, gate: t.gate, blocking: t.blocking || [], reasons: t.reasons || [] } : null,
+    },
+  };
+}
+
+module.exports = {
+  subjectForTool, fromVerifyResults, fromReportEntry, fromEvidence, fromStoredEvidence, storedEvidenceFor,
+  foundProblem, FOUND_STATUSES, TAG_DIMENSIONS,
+};

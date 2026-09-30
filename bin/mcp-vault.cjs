@@ -93,8 +93,11 @@ COMMON OPTIONS
   --sarif           SARIF 2.1.0 for code scanning (verify)
   --strict          Treat warnings as failures (exit 1)
   --no-audit        Skip advisory APIs; verify still checks live registries
-  --offline         True offline verify mode; validate stored DB pins only
+  --offline         True offline verify mode: stored DB pins and stored evidence
+                    (a recorded advisory or yanked release fails), no network
   --fail-unverified Treat "could not check" as a failure (verify)
+  --fail-families <a,b>  Only these rule families fail the run (verify), e.g.
+                    integrity,pin,oci,verify,policy for "is the DB consistent"
   --deep            Download artifacts and hash them locally (verify)
   --deps            Resolve and check dependency trees (verify)
   --show-policy     Print the .mcp-vault.policy.json in force (verify)

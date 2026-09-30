@@ -39,6 +39,7 @@
  *   finding({ rule, subject, scope, severity, confidence, state, refs, message })
  *   decision({ subject, effect, decided_by, as_of, findings, rules, fails })
  *   decide(findings, policy, asOf, { subjects, facts })    -> [Decision]   (the only effect computation)
+ *   outcomeFails(outcome, { threshold, families, ruleOf }) -> does this rule outcome fail the run
  *   exitCode(decisions)                                    -> 0 | 1 | 2
  *   findingsDocument({ asOf, observations, findings, decisions }) -> mcp-vault/findings@1
  *   toJson(doc) / canonicalJson(value) / sortFindings(list)
@@ -258,7 +259,8 @@ function decision({
     decided_by,
     as_of: isoInstant(requireAsOf(typeof as_of === 'string' ? Date.parse(as_of) : as_of, 'decision')),
     // Whether this decision fails the run at the policy's threshold. `deny`
-    // always does; `unknown` and `warn` do when `fail_on` reaches them.
+    // always does; `unknown` and `warn` do when `fail_on` reaches them — in
+    // both cases only among the policy's `fail_families`, when it names any.
     fails: Boolean(fails),
     fail_on,
     // A question this run could not answer (an unreadable config): exit 2
@@ -277,6 +279,21 @@ function decision({
 const failsAt = (effect, failOn) => effect === 'deny'
   || (failOn === 'unknown' && effect === 'unknown')
   || (failOn === 'warn' && (effect === 'unknown' || effect === 'warn'));
+
+/**
+ * Whether one rule outcome fails the run: `deny` always, `unknown` / `warn`
+ * from a thresholded row when `threshold` (fail_on) reaches them — and, when
+ * the policy names `fail_families`, only an outcome of one of them: by its
+ * own rule id, or by a finding it rests on (`ruleOf`: finding id -> rule).
+ * decide() computes `fails` with this; a renderer that must say *which*
+ * outcome failed (verify's report lines) asks the same function.
+ */
+function outcomeFails(o, { threshold = 'deny', families = null, ruleOf = new Map(), thresholded = o.thresholded } = {}) {
+  const fam = Array.isArray(families) && families.length ? families : null;
+  const inFamily = (rule) => fam.some((f) => rule === f || String(rule).startsWith(`${f}/`));
+  if (fam && !inFamily(o.rule) && !(o.findings || []).some((id) => ruleOf.has(id) && inFamily(ruleOf.get(id)))) return false;
+  return o.effect === 'deny' || Boolean(thresholded && failsAt(o.effect, threshold));
+}
 
 /**
  * policy × findings → one Decision per subject. The only function in the
@@ -334,6 +351,7 @@ function decide(findings, policy, asOf, { subjects = [], facts = {}, mode = 'gat
         outcomes.push({ rule: o.rule || row.id, effect: o.effect, detail: o.detail, findings: o.findings || [], thresholded: row.thresholded });
       }
     }
+    const ruleOf = new Map(fs.map((f) => [f.id, f.rule]));
     let worst = null;
     for (const o of outcomes) if (!worst || EFFECT_RANK[o.effect] < EFFECT_RANK[worst.effect]) worst = o;
     const effect = worst ? worst.effect : 'allow';
@@ -344,7 +362,7 @@ function decide(findings, policy, asOf, { subjects = [], facts = {}, mode = 'gat
       as_of: at,
       findings: outcomes.filter((o) => o.effect === effect).flatMap((o) => o.findings),
       rules: outcomes,
-      fails: outcomes.some((o) => o.effect === 'deny' || (o.thresholded && failsAt(o.effect, threshold))),
+      fails: outcomes.some((o) => outcomeFails(o, { threshold, families: policy.fail_families, ruleOf })),
       fail_on: threshold,
       unanswered: fs.some((f) => f.rule.startsWith('scope/')),
     }));
@@ -540,6 +558,7 @@ function renderTrace(trace) {
 }
 
 module.exports = {
+  failsAt, outcomeFails,
   SCHEMA, RULES_VERSION, SUBJECT_TYPES, SEVERITIES, CONFIDENCES, STATES, EFFECTS, EFFECT_RANK,
   subject, validateSubject,
   observation, observationState, observationsFromEvidence,
