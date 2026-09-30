@@ -179,8 +179,8 @@ Both paths use the same `release` workflow; see `.github/workflows/release.yml`.
 `MCP_VAULT_SIGNING_KEY` secret (`sign_db.cjs --release`). Once
 `assets/trusted_keys.json` lists a key, a release without that secret stops
 before publishing. Key generation and rotation:
-[SECURITY.md → Signed DB](./SECURITY.md#signed-db). Running
-`bin/mcp-vault.cjs` from a clone, which has no `.sig`, needs
-`--allow-unsigned-db` once a key is listed.
+[SECURITY.md → Signed DB](./SECURITY.md#signed-db). A clone has no `.sig`
+and does not need one: the signature is required only in an installed package
+(no `.git` at the package root). A `.sig` you made locally must still verify.
 
 If anything here looks wrong or out of date, open a PR — the doc itself follows the same review process.

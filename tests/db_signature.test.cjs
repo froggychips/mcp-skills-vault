@@ -26,43 +26,91 @@ function dbIn(dir, value = { tools: [{ name: 'x', version: '1.0.0' }] }) {
 }
 const ring = (pair) => [s.keyringEntry(pair.publicKey, { validFrom: '2020-01-01' })];
 
-test('checkDb: an empty keyring is "not-configured", never "verified"', () => {
-  const r = ds.checkDb({ dbPath: dbIn(tmp()), keys: [] });
+const NOW = Date.parse('2026-09-30T12:00:00Z');
+const PKG = { required: true, context: 'package', reason: 'test: no .git' };
+const DEV = { required: false, context: 'git checkout', reason: 'test: .git' };
+const check = (over) => ds.checkDb({ asOf: NOW, context: PKG, ...over });
+
+test('checkDb: an empty keyring is "not-configured" (unknown), never "verified"', () => {
+  const r = check({ dbPath: dbIn(tmp()), keys: [] });
   assert.equal(r.proceed, true);
   assert.equal(r.state, 'not-configured');
+  assert.equal(r.decision.effect, 'unknown');
+  assert.equal(r.decision.decided_by, 'db/signature');
 });
 
-test('checkDb: a keyring and no .sig refuses', () => {
+test('checkDb: in a package, a keyring and no .sig refuses', () => {
   const pair = s.generateKeyPair();
-  const r = ds.checkDb({ dbPath: dbIn(tmp()), keys: ring(pair) });
+  const r = check({ dbPath: dbIn(tmp()), keys: ring(pair) });
   assert.equal(r.proceed, false);
   assert.equal(r.state, 'refused');
-  assert.equal(r.result.code, 'no-signature');
+  assert.equal(r.decision.effect, 'deny');
+  assert.match(r.message, /no-signature/);
   assert.match(r.message, /--allow-unsigned-db/);
+});
+
+test('checkDb: in a git checkout a missing .sig is allowed — a bad one is not', () => {
+  const pair = s.generateKeyPair();
+  const file = dbIn(tmp());
+  let r = check({ dbPath: file, keys: ring(pair), context: DEV });
+  assert.equal(r.proceed, true);
+  assert.equal(r.state, 'not-required');
+  assert.equal(r.decision.effect, 'allow');
+
+  fs.writeFileSync(`${file}.sig`, '{"format":"nope"}');
+  r = check({ dbPath: file, keys: ring(pair), context: DEV });
+  assert.equal(r.proceed, false);
+  assert.match(r.message, /malformed/);
 });
 
 test('checkDb: signed file verifies; reformatting it does not break that; editing it does', () => {
   const pair = s.generateKeyPair();
   const file = dbIn(tmp());
-  ds.signFile(file, { privateKeyPem: pair.privateKeyPem });
-  assert.equal(ds.checkDb({ dbPath: file, keys: ring(pair) }).state, 'verified');
+  ds.signFile(file, { privateKeyPem: pair.privateKeyPem, now: NOW });
+  assert.equal(check({ dbPath: file, keys: ring(pair) }).state, 'verified');
 
   // CRLF and a different indent: same canonical bytes.
   fs.writeFileSync(file, JSON.stringify(JSON.parse(fs.readFileSync(file, 'utf8')), null, 4).replace(/\n/g, '\r\n'));
-  assert.equal(ds.checkDb({ dbPath: file, keys: ring(pair) }).state, 'verified');
+  assert.equal(check({ dbPath: file, keys: ring(pair) }).state, 'verified');
 
   fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('1.0.0', '6.6.6'));
-  const r = ds.checkDb({ dbPath: file, keys: ring(pair) });
+  const r = check({ dbPath: file, keys: ring(pair) });
   assert.equal(r.proceed, false);
-  assert.equal(r.result.code, 'digest-mismatch');
+  assert.match(r.message, /digest-mismatch/);
 });
 
 test('checkDb: the development override proceeds, and says so loudly', () => {
   const pair = s.generateKeyPair();
-  const r = ds.checkDb({ dbPath: dbIn(tmp()), keys: ring(pair), allowUnsigned: true });
+  const r = check({ dbPath: dbIn(tmp()), keys: ring(pair), allowUnsigned: true });
   assert.equal(r.proceed, true);
   assert.equal(r.state, 'unsigned-allowed');
+  assert.equal(r.decision.effect, 'warn');
   assert.match(r.message, /DB SIGNATURE NOT VERIFIED/);
+});
+
+test('checkDb: an unreadable keyring refuses, override or not', () => {
+  const r = check({ dbPath: dbIn(tmp()), keys: [], keyringOk: false, keyringErrors: ['bad'], allowUnsigned: true, context: DEV });
+  assert.equal(r.proceed, false);
+  assert.match(r.message, /keyring is unreadable/);
+});
+
+test('signatureContext: .git at the package root (dir or worktree file) is a checkout; anything else is a package', () => {
+  const pkg = tmp();
+  assert.deepEqual([ds.signatureContext({ root: pkg, env: {} }).required, ds.signatureContext({ root: pkg, env: {} }).context], [true, 'package']);
+  const dev = tmp();
+  fs.mkdirSync(path.join(dev, '.git'));
+  assert.equal(ds.signatureContext({ root: dev, env: {} }).required, false);
+  const worktree = tmp();
+  fs.writeFileSync(path.join(worktree, '.git'), 'gitdir: /elsewhere\n');
+  assert.equal(ds.signatureContext({ root: worktree, env: {} }).required, false);
+  // A .git further up (a package installed inside somebody's repo) does not count.
+  const nested = path.join(dev, 'node_modules', 'pkg');
+  fs.mkdirSync(nested, { recursive: true });
+  assert.equal(ds.signatureContext({ root: nested, env: {} }).required, true);
+  // The env switch only tightens.
+  assert.equal(ds.signatureContext({ root: dev, env: { [ds.REQUIRE_ENV]: '1' } }).required, true);
+  // This test runs from a checkout.
+  assert.equal(ds.signatureContext({ env: {} }).context, 'git checkout');
 });
 
 test('the env override needs an explicit yes', () => {
@@ -136,7 +184,7 @@ function packageCopy(keys) {
   return { dir, db: path.join(assets, 'tools_database.json') };
 }
 const run = (dir, args, env = {}) => spawnSync(process.execPath, [path.join(dir, 'bin', 'mcp-vault.cjs'), ...args], {
-  encoding: 'utf8', env: { ...process.env, MCP_VAULT_ALLOW_UNSIGNED_DB: '', ...env },
+  encoding: 'utf8', env: { ...process.env, MCP_VAULT_ALLOW_UNSIGNED_DB: '', MCP_VAULT_REQUIRE_SIGNED_DB: '', ...env },
 });
 
 test('bin: refuses an unsigned DB, runs with the override, runs when signed, refuses when tampered', () => {
@@ -156,7 +204,7 @@ test('bin: refuses an unsigned DB, runs with the override, runs when signed, ref
   r = run(pkg.dir, ['list', '--json'], { MCP_VAULT_ALLOW_UNSIGNED_DB: '1' });
   assert.equal(r.status, 0, r.stderr);
 
-  ds.signFile(pkg.db, { privateKeyPem: pair.privateKeyPem });
+  ds.signFile(pkg.db, { privateKeyPem: pair.privateKeyPem, now: NOW });
   r = run(pkg.dir, ['list', '--json']);
   assert.equal(r.status, 0, r.stderr);
   assert.doesNotMatch(r.stderr, /SIGNATURE/);
@@ -171,13 +219,56 @@ test('bin: refuses an unsigned DB, runs with the override, runs when signed, ref
   // `signature` is reachable when the DB is broken, and says why.
   r = run(pkg.dir, ['signature', '--json']);
   assert.equal(r.status, 1);
-  assert.equal(JSON.parse(r.stdout).files[0].code, 'digest-mismatch');
+  const doc = JSON.parse(r.stdout);
+  assert.equal(doc.schema, 'mcp-vault/findings@1');
+  assert.equal(doc.findings[0].rule, 'db/signature-invalid');
+  assert.match(doc.findings[0].message, /digest-mismatch/);
+  assert.equal(doc.decisions[0].effect, 'deny');
+  assert.equal(doc.decisions[0].decided_by, 'db/signature');
+});
+
+test('bin: every --db is checked, not just the first (--db a --db b, --db=b)', () => {
+  const pair = s.generateKeyPair();
+  const pkg = packageCopy(ring(pair));
+  ds.signFile(pkg.db, { privateKeyPem: pair.privateKeyPem, now: NOW });
+  const signed = dbIn(tmp());
+  ds.signFile(signed, { privateKeyPem: pair.privateKeyPem, now: NOW });
+  const unsigned = dbIn(tmp());
+  for (const args of [['--db', signed, '--db', unsigned], [`--db=${unsigned}`], ['--db', unsigned, '--db', signed]]) {
+    const r = run(pkg.dir, ['audit', ...args, '--json']);
+    assert.equal(r.status, 1, args.join(' '));
+    assert.match(r.stderr, /refusing to use the DB/);
+  }
+});
+
+test('bin: a git checkout runs without a .sig even with a key listed; the env switch makes it a package again', () => {
+  const pair = s.generateKeyPair();
+  const pkg = packageCopy(ring(pair));
+  fs.mkdirSync(path.join(pkg.dir, '.git'));
+  let r = run(pkg.dir, ['list', '--json']);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stderr, '');
+  r = run(pkg.dir, ['list', '--json'], { MCP_VAULT_REQUIRE_SIGNED_DB: '1' });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /refusing to use the DB/);
+  // A present-but-wrong signature refuses in a checkout too.
+  fs.writeFileSync(`${pkg.db}.sig`, '{}');
+  r = run(pkg.dir, ['list', '--json']);
+  assert.equal(r.status, 1);
+});
+
+test('bin: this repository (a checkout, with the release key listed) runs without a .sig', () => {
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'bin', 'mcp-vault.cjs'), 'verify', '--offline', '--json'], {
+    encoding: 'utf8', env: { ...process.env, MCP_VAULT_ALLOW_UNSIGNED_DB: '', MCP_VAULT_REQUIRE_SIGNED_DB: '' }, maxBuffer: 64 * 1024 * 1024,
+  });
+  assert.doesNotMatch(r.stderr, /refusing to use the DB|no signature file/);
+  assert.equal(JSON.parse(r.stdout).schema, 'mcp-vault/verify-report@1');
 });
 
 test('bin: a DB passed with --db is held to the same bar', () => {
   const pair = s.generateKeyPair();
   const pkg = packageCopy(ring(pair));
-  ds.signFile(pkg.db, { privateKeyPem: pair.privateKeyPem });
+  ds.signFile(pkg.db, { privateKeyPem: pair.privateKeyPem, now: NOW });
   const other = dbIn(tmp());
   const r = run(pkg.dir, ['audit', '--db', other, '--json']);
   assert.equal(r.status, 1);

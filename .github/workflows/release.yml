@@ -179,6 +179,19 @@ jobs:
         env:
           MCP_VAULT_SIGNING_KEY: ${{ secrets.MCP_VAULT_SIGNING_KEY }}
         run: node mcp-ecosystem-intelligence/scripts/sign_db.cjs --release
+      # The package is where the signature is *required* (a checkout needs none:
+      # SECURITY.md, "Signed DB"), so check it where a user will meet it: packed,
+      # unpacked somewhere without .git, run from there. --strict accepts only
+      # "verified" — not "no key", not the unsigned override.
+      - name: The packed CLI accepts its own DB
+        run: |
+          set -euo pipefail
+          dir="$(mktemp -d)"
+          npm pack --pack-destination "$dir" >/dev/null
+          tar -xzf "$dir"/*.tgz -C "$dir"
+          test ! -e "$dir/package/.git"
+          test -f "$dir/package/mcp-ecosystem-intelligence/assets/tools_database.json.sig"
+          MCP_VAULT_ALLOW_UNSIGNED_DB= node "$dir/package/bin/mcp-vault.cjs" signature --strict
       # `npm publish` answers E404 — not 401 — when the token is missing,
       # expired or lacks publish rights on the scope. That is how v0.13.0 ended
       # up with a git tag and a GitHub release but no package on npm: the run

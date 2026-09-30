@@ -147,17 +147,38 @@ now checks an Ed25519 signature before any command that reads it
   `valid_until`; a signature must fall inside its key's window. `revoked: true`
   verifies nothing whatever date is claimed — a window stops a retired key used
   by mistake, not a stolen one backdating.
-- **Fail closed**: no `.sig`, a malformed one, an unknown or revoked key, or
-  changed content → the command does not run and says which. A DB passed with
-  `--db <file>` is held to the same bar.
-- **Development / forks**: `--allow-unsigned-db` or
-  `MCP_VAULT_ALLOW_UNSIGNED_DB=1`, with a warning on every run. A clone has no
-  `.sig` (signing happens at release), so `bin/` from a clone needs it;
-  `npm test` does not — the tests generate keys on the fly.
-- **Until a key exists**: while `trusted_keys.json` is empty the check reports
-  `not-configured` (never `verified`) and lets commands run, as every earlier
-  version did. That is a property of the build, not something a tampered DB can
-  cause: once the package ships a key, removing the `.sig` is a refusal.
+- **Fail closed, in the installed package**: no `.sig`, a malformed one, an
+  unknown or revoked key, a key outside its window, or changed content → the
+  command does not run and says which. Every DB passed with `--db` (each
+  occurrence, `--db=` too) is held to the same bar.
+- **Required only where it can exist.** Signing happens at release, so a git
+  checkout — development, CI, every PR that touches the DB — never has a
+  `.sig`. The check therefore asks where it runs (`signatureContext` in
+  `lib/db_signature.cjs`): a `.git` entry (directory, or a worktree's file)
+  **at the package root itself** means a checkout, where a *missing* `.sig`
+  is allowed. Anything else is a package and requires one. Why that signal:
+  npm never packs `.git` (npm-packlist drops it unconditionally), so no
+  tarball and no `npm install` / `npx` can produce it; it is read at the
+  package root, not found by walking up, so a package inside somebody's
+  repository is still a package; the default is the strict answer — a copy, a
+  source zip or an image without `.git` requires a signature; and creating
+  `.git` inside an installed package takes write access to the very code that
+  runs this check. A `.sig` that *is* present must verify in a checkout too,
+  and an unreadable keyring refuses everywhere. `MCP_VAULT_REQUIRE_SIGNED_DB=1`
+  makes a checkout behave like a package (it only tightens).
+- **Development / forks without `.git`**: `--allow-unsigned-db` or
+  `MCP_VAULT_ALLOW_UNSIGNED_DB=1` turn the refusal into a warning, printed on
+  every run. `npm test` needs neither — the tests generate keys on the fly.
+- **One place decides.** The check is findings (`db/signature-verified`,
+  `-absent`, `-invalid`, `-not-configured`, `-keyring-invalid`) on the DB file,
+  and the `db/signature` row of `lib/policy_rules.cjs` decides them through
+  `decide()` ([ADR 0001](docs/adr/0001-findings-and-time.md),
+  [addendum](docs/adr/0001-addendum-121-signed-db.md)). `mcp-vault signature
+  --json` prints that `mcp-vault/findings@1` document.
+- **An empty keyring** (a build made without a key, or a fork) reports
+  `not-configured` — `unknown`, never `verified` — and lets commands run;
+  `signature --fail-unverified` fails on it. The shipped keyring lists the
+  release key `92cf62804f86a312` from 2026-09-30.
 
 What it does not cover: the keyring ships inside the same tarball as the code,
 so an attacker who can rewrite the package can rewrite the keyring too. The
@@ -179,7 +200,9 @@ gh secret set MCP_VAULT_SIGNING_KEY < ~/mcp-vault-release.pem
 Paste the printed entry into `assets/trusted_keys.json` and merge that PR. From
 then on `release.yml` runs `sign_db.cjs --release`, which refuses to publish
 without the secret, or with a secret whose key the keyring does not list, and
-verifies the result the way a client will before `npm publish`. Keep an
+verifies the result the way a client will; then it packs the tarball, unpacks
+it where there is no `.git`, and runs `mcp-vault signature --strict` from
+there, before `npm publish`. Keep an
 offline copy of the private key; never commit it.
 
 Optional, as a second and independent statement: `cosign sign-blob
@@ -194,9 +217,12 @@ their public key and the criteria accepted from them, fetched only by
 `audits fetch`, and re-verified from `.mcp-vault.imports.lock.json` on every
 read against the key in the *config* — so an edited lock contributes nothing.
 Imports are not transitive: an export carries its author's own audits only, and
-a bundle carrying anything else is refused. An audit is shown in `explain` with
-its source and is not an evidence dimension, so it cannot raise `trust`:
-someone else having looked at a package is not a hash match.
+a bundle carrying anything else is refused. An audit is an Observation with
+its source (`audit:local`, `audit:<key id>`), shown in `explain`'s trace
+through an `audits/recorded` finding; it is not an evidence dimension, so it
+cannot raise `trust`, and the `audits/recorded` row can only say `allow`, so it
+cannot lift a decision either: someone else having looked at a package is not
+a hash match.
 
 ## Static analysis (CodeQL)
 

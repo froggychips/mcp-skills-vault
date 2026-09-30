@@ -16,7 +16,10 @@ const A  = require('../mcp-ecosystem-intelligence/scripts/lib/audits.cjs');
 const s  = require('../mcp-ecosystem-intelligence/scripts/lib/signing.cjs');
 const ev = require('../mcp-ecosystem-intelligence/scripts/lib/evidence.cjs');
 const { trustScore } = require('../mcp-ecosystem-intelligence/scripts/lib/scores.cjs');
+const F  = require('../mcp-ecosystem-intelligence/scripts/lib/finding.cjs');
+const PR = require('../mcp-ecosystem-intelligence/scripts/lib/policy_rules.cjs');
 
+const NOW = Date.parse('2026-09-30T00:00:00Z');
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-vault-audits-'));
 const tool = {
   name: 'demo', install_cmd: 'npx -y @demo/server@1.2.3', version: '1.2.3',
@@ -64,7 +67,7 @@ test('export is deterministic apart from the signature date, and verifies', () =
 test('a bundle under the wrong key, or with an edited record, is refused', () => {
   const pair = s.generateKeyPair();
   const other = s.generateKeyPair();
-  const bundle = A.exportBundle([audit()], { privateKeyPem: pair.privateKeyPem });
+  const bundle = A.exportBundle([audit()], { privateKeyPem: pair.privateKeyPem, now: NOW });
   assert.equal(A.verifyBundle(bundle, { publicKey: other.publicKey }).code, 'unknown-key');
   const edited = JSON.parse(JSON.stringify(bundle));
   edited.payload.audits[0].criteria = 'safe-to-deploy';
@@ -79,8 +82,8 @@ test('fetch: a source with a bad signature is rejected and nothing is written', 
     alice: { url: 'https://alice.example/audits.json', public_key: alice.publicKey, criteria: ['safe-to-run'] },
   });
   // Served by someone else, signed with their key.
-  const forged = A.exportBundle([audit()], { privateKeyPem: mallory.privateKeyPem });
-  const res = await A.fetchImports(config, { fetchText: async () => JSON.stringify(forged) });
+  const forged = A.exportBundle([audit()], { privateKeyPem: mallory.privateKeyPem, now: NOW });
+  const res = await A.fetchImports(config, { now: NOW, fetchText: async () => JSON.stringify(forged) });
   assert.equal(res.ok, false);
   assert.equal(res.report[0].code, 'unknown-key');
   assert.deepEqual(res.lock.sources, {});
@@ -97,10 +100,10 @@ test('import is not transitive: a bundle carrying imports is refused, and only c
   const payload = { audits: [audit()], imports: { bob: { url: 'https://bob.example/audits.json' } } };
   const sneaky = {
     $schema: A.EXPORT_SCHEMA, payload,
-    signature: s.signCanonical(s.canonicalBytes(payload), { privateKeyPem: alice.privateKeyPem, artifact: A.EXPORT_ARTIFACT }),
+    signature: s.signCanonical(s.canonicalBytes(payload), { privateKeyPem: alice.privateKeyPem, artifact: A.EXPORT_ARTIFACT, now: NOW }),
   };
   const requested = [];
-  const res = await A.fetchImports(config, { fetchText: async (url) => { requested.push(url); return JSON.stringify(sneaky); } });
+  const res = await A.fetchImports(config, { now: NOW, fetchText: async (url) => { requested.push(url); return JSON.stringify(sneaky); } });
   assert.deepEqual(requested, ['https://alice.example/audits.json']);
   assert.equal(res.ok, false);
   assert.equal(res.report[0].code, 'transitive');
@@ -111,16 +114,16 @@ test('import is not transitive: what Alice imported is not in what Alice exports
   const alice = s.generateKeyPair();
   const bob = s.generateKeyPair();
   // Alice imports Bob's audit of @demo/server …
-  const bobBundle = A.exportBundle([audit({ who: 'Bob' })], { privateKeyPem: bob.privateKeyPem });
+  const bobBundle = A.exportBundle([audit({ who: 'Bob' })], { privateKeyPem: bob.privateKeyPem, now: NOW });
   const cfg = writeConfig(aliceDir, { bob: { url: 'https://bob.example/a.json', public_key: bob.publicKey, criteria: ['safe-to-run'] } });
-  const fetched = await A.fetchImports(cfg, { fetchText: async () => JSON.stringify(bobBundle) });
+  const fetched = await A.fetchImports(cfg, { now: NOW, fetchText: async () => JSON.stringify(bobBundle) });
   assert.equal(fetched.ok, true);
   A.writeLock(aliceDir, fetched.lock);
   assert.equal(A.loadImportedAudits(aliceDir).audits.length, 1);
   // … and has one of her own, of another package.
   A.addLocalAudit(aliceDir, audit({ who: 'Alice', package: '@other/pkg' }));
 
-  const exported = A.exportBundle(A.readLocalAudits(aliceDir).audits, { privateKeyPem: alice.privateKeyPem });
+  const exported = A.exportBundle(A.readLocalAudits(aliceDir).audits, { privateKeyPem: alice.privateKeyPem, now: NOW });
   assert.deepEqual(exported.payload.audits.map((a) => a.who), ['Alice']);
 });
 
@@ -133,11 +136,11 @@ test('criteria: only what the source is trusted for, with implication', () => {
 async function importedFixture({ criteria = ['safe-to-run'], audits = [audit()] } = {}) {
   const dir = tmp();
   const alice = s.generateKeyPair();
-  const bundle = A.exportBundle(audits, { privateKeyPem: alice.privateKeyPem });
+  const bundle = A.exportBundle(audits, { privateKeyPem: alice.privateKeyPem, now: NOW });
   const exportFile = path.join(dir, 'alice.json');
   fs.writeFileSync(exportFile, JSON.stringify(bundle));
   const config = writeConfig(dir, { alice: { path: 'alice.json', public_key: alice.publicKey, criteria } });
-  const res = await A.fetchImports(config, {});
+  const res = await A.fetchImports(config, { now: NOW });
   assert.equal(res.ok, true, JSON.stringify(res.report));
   A.writeLock(dir, res.lock);
   return { dir, alice, bundle };
@@ -193,32 +196,43 @@ test('the imports config refuses what it does not understand', () => {
   assert.match(c.errors[0], /criteria/);
 });
 
-test('an audit is evidence with a source, and never moves trust', async () => {
-  const { dir } = await importedFixture();
+test('an audit is an observation with a source, and never moves trust', async () => {
+  const { dir, alice } = await importedFixture();
   const evidence = {
     artifact_id: 'npm:@demo/server@1.2.3',
     dimensions: { artifact: { status: 'unverified', checked_at: '2026-09-30' } },
   };
-  const before = { trust: ev.deriveTrust(evidence, { require: ['artifact', 'advisories'] }), score: trustScore(evidence) };
+  const before = { trust: ev.deriveTrust(evidence, { require: ['artifact', 'advisories'], now: NOW }), score: trustScore(evidence, { now: NOW }) };
 
   const matched = A.auditsFor(tool, { imported: A.loadImportedAudits(dir).audits });
   assert.equal(matched.length, 1);
-  const e = ev.auditEvidence(matched[0]);
-  assert.equal(e.source, 'alice');
-  assert.equal(e.affects_trust, false);
-  assert.deepEqual(e.criteria, ['safe-to-run']);
+  const subj = F.subject.artifact({ entry: tool.name, version: tool.version });
+  const { observations, findings } = A.auditObservations(matched, subj);
+  assert.equal(observations[0].source, `audit:${alice.keyId}`);
+  assert.equal(observations[0].status, 'safe-to-run');
+  assert.equal(findings[0].rule, 'audits/recorded');
+  assert.deepEqual(findings[0].refs, [observations[0].id]);
+  assert.equal('effect' in findings[0], false);
 
   // Nothing about the dimensions — or what is derived from them — changed.
   assert.equal(ev.DIMENSIONS.includes('audit'), false);
-  assert.deepEqual({ trust: ev.deriveTrust(evidence, { require: ['artifact', 'advisories'] }), score: trustScore(evidence) }, before);
+  assert.deepEqual({ trust: ev.deriveTrust(evidence, { require: ['artifact', 'advisories'], now: NOW }), score: trustScore(evidence, { now: NOW }) }, before);
+
+  // And the table can only allow on it: next to a denial, the denial stands.
+  const policy = PR.effectivePolicy(null, {}, { policyRules: false });
+  const deny = F.finding({ rule: 'advisories/known-vulnerability', subject: subj, severity: 'high', message: 'CVE' });
+  const [d] = F.decide([deny, ...findings], policy, NOW, { subjects: [subj] });
+  assert.equal(d.effect, 'deny');
+  assert.equal(d.decided_by, 'finding/severity');
+  assert.ok(d.rules.some((r) => r.rule === 'audits/recorded' && r.effect === 'allow'));
 });
 
-test('explain shows an audit with its source, and the trust score does not move', () => {
+test('explain shows an audit in its trace, with its source, and neither trust nor the decision moves', () => {
   const db = JSON.parse(fs.readFileSync(path.join(ROOT, 'mcp-ecosystem-intelligence/assets/tools_database.json'), 'utf8'));
   const entry = db.tools.find((t) => A.subjectOf(t));
-  const explain = (cwd) => {
-    const r = spawnSync(process.execPath, [path.join(ROOT, 'mcp-ecosystem-intelligence/scripts/explain.cjs'), entry.name, '--json', '--cwd', cwd], { encoding: 'utf8' });
-    return JSON.parse(r.stdout);
+  const explain = (cwd, json = true) => {
+    const r = spawnSync(process.execPath, [path.join(ROOT, 'mcp-ecosystem-intelligence/scripts/explain.cjs'), entry.name, ...(json ? ['--json'] : []), '--cwd', cwd, '--as-of', '2026-09-30'], { encoding: 'utf8' });
+    return json ? JSON.parse(r.stdout) : r.stdout;
   };
   const empty = tmp();
   const withAudit = tmp();
@@ -226,11 +240,17 @@ test('explain shows an audit with its source, and the trust score does not move'
 
   const a = explain(empty);
   const b = explain(withAudit);
-  assert.deepEqual(a.evidence.audits, []);
-  assert.equal(b.evidence.audits.length, 1);
-  assert.equal(b.evidence.audits[0].source, 'local');
+  const audObs = (x) => x.findings.observations.filter((o) => o.source.startsWith('audit:'));
+  assert.deepEqual(audObs(a), []);
+  assert.equal(audObs(b).length, 1);
+  assert.equal(audObs(b)[0].source, 'audit:local');
   assert.deepEqual(b.scores.trust, a.scores.trust);
   assert.equal(b.decision, a.decision);
+  assert.equal(b.findings.decisions[0].effect, a.findings.decisions[0].effect);
+  assert.equal(b.findings.decisions[0].decided_by, a.findings.decisions[0].decided_by);
+  assert.deepEqual(b.rules, a.rules, 'the legacy rules view is unchanged');
+  // In the trace: rule → finding → the dated observation it rests on.
+  assert.match(explain(withAudit, false), /audits\/recorded[\s\S]*audit\/local\/Me: safe-to-run \(audit:local, observed 2026-09-30/);
 });
 
 test('CLI: keygen → add → export → fetch → check → list, the last three offline', () => {
@@ -259,7 +279,11 @@ test('CLI: keygen → add → export → fetch → check → list, the last thre
   assert.equal(run(['check', '--cwd', theirs]).status, 1, 'configured but not fetched');
   r = run(['fetch', '--cwd', theirs, '--json']);
   assert.equal(r.status, 0, r.stderr);
-  assert.equal(run(['check', '--cwd', theirs]).status, 0);
+  r = run(['check', '--cwd', theirs, '--json']);
+  assert.equal(r.status, 0, r.stderr);
+  const doc = JSON.parse(r.stdout);
+  assert.equal(doc.schema, 'mcp-vault/findings@1');
+  assert.deepEqual(doc.decisions.map((d) => [d.subject.id, d.effect, d.decided_by]), [['audit-source:me', 'allow', 'audits/import']]);
   r = run(['list', entry.name, '--cwd', theirs, '--json']);
   assert.equal(r.status, 0, r.stderr);
   const listed = JSON.parse(r.stdout).entries[0].audits;

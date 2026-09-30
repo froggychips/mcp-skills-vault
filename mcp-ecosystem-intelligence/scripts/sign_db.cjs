@@ -41,6 +41,7 @@ const path = require('path');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { generateKeyPair, publicKeyFromPrivate, keyringEntry, loadTrustedKeys } = require('./lib/signing.cjs');
 const { signFile, verifyFile, sigPathFor } = require('./lib/db_signature.cjs');
+const { readWallClock, isoDay } = require('./lib/clock.cjs');
 
 const DB_PATH = path.resolve(__dirname, '../assets/tools_database.json');
 const KEY_ENV = 'MCP_VAULT_SIGNING_KEY';
@@ -82,15 +83,21 @@ function readKey(opts, env = process.env) {
   return text;
 }
 
-function keygen(target, out) {
-  if (fs.existsSync(target)) {
-    out.err(`sign_db: ${target} exists — refusing to overwrite a key`);
-    return 1;
-  }
+/**
+ * Write a private key to a path that must not exist yet. `wx` is the whole
+ * check: one open(O_CREAT|O_EXCL) decides, so nothing can appear — or be
+ * swapped for a symlink — between a check and the write.
+ */
+function writeNewKey(target, pem) {
+  try { fs.writeFileSync(target, pem, { mode: 0o600, flag: 'wx' }); return null; }
+  catch (e) { return e.code === 'EEXIST' ? `${target} exists — refusing to overwrite a key` : e.message; }
+}
+
+function keygen(target, out, now) {
   const pair = generateKeyPair();
-  // `wx`: fail rather than follow a file that appeared in the meantime.
-  fs.writeFileSync(target, pair.privateKeyPem, { mode: 0o600, flag: 'wx' });
-  const entry = keyringEntry(pair.publicKey, { comment: 'release key' });
+  const refused = writeNewKey(target, pair.privateKeyPem);
+  if (refused) { out.err(`sign_db: ${refused}`); return 1; }
+  const entry = keyringEntry(pair.publicKey, { validFrom: isoDay(now), comment: 'release key' });
   out.result({ schema: 'mcp-vault/keygen@1', private_key_file: target, key_id: pair.keyId, public_key: pair.publicKey, keyring_entry: entry },
     `Private key written to ${target} (mode 0600). Keep it out of the repository.\n\n`
     + 'Add this to mcp-ecosystem-intelligence/assets/trusted_keys.json "keys":\n\n'
@@ -106,7 +113,10 @@ function main(argv, { env = process.env, keyringPath } = {}) {
   };
   if (opts.error) { process.stderr.write(`sign_db: ${opts.error}\n\n${HELP}`); return 2; }
   if (opts.help)  { process.stdout.write(HELP); return 0; }
-  if (opts.keygen) return keygen(opts.keygen, out);
+  // An observation time, not a decision: when the key was made, when the DB
+  // was signed (lib/clock.cjs).
+  const now = readWallClock();
+  if (opts.keygen) return keygen(opts.keygen, out, now);
 
   let pem = null;
   try { pem = readKey(opts, env); }
@@ -115,7 +125,7 @@ function main(argv, { env = process.env, keyringPath } = {}) {
   if (opts.publicEntry) {
     if (!pem) { out.err(`sign_db: no key — set ${KEY_ENV} or pass --key-file`); return 1; }
     const { publicKey } = publicKeyFromPrivate(pem);
-    const entry = keyringEntry(publicKey);
+    const entry = keyringEntry(publicKey, { validFrom: isoDay(now) });
     out.result({ schema: 'mcp-vault/keygen@1', key_id: entry.key_id, public_key: entry.public_key, keyring_entry: entry }, `${JSON.stringify(entry, null, 2)}\n`);
     return 0;
   }
@@ -138,7 +148,7 @@ function main(argv, { env = process.env, keyringPath } = {}) {
   const signed = [];
   for (const file of files) {
     let envelope;
-    try { envelope = signFile(file, { privateKeyPem: pem }); }
+    try { envelope = signFile(file, { privateKeyPem: pem, now }); }
     catch (e) { out.err(`sign_db: ${e.message}`); return 1; }
     const row = { file, signature: sigPathFor(file), key_id: envelope.key_id, sha256: envelope.sha256, signed_at: envelope.signed_at };
     if (opts.release) {
@@ -160,4 +170,4 @@ if (require.main === module) {
   exitAfterFlush(main(process.argv.slice(2)));
 }
 
-module.exports = { main, parseArgs, readKey };
+module.exports = { main, parseArgs, readKey, writeNewKey };

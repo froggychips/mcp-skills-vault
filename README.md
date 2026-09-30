@@ -561,10 +561,12 @@ The DB decides what `install` writes, so the CLI checks it before any command
 reads it: an Ed25519 signature over the DB's canonical JSON
 (`tools_database.json.sig`, made at release), against the keys shipped in
 [`assets/trusted_keys.json`](./mcp-ecosystem-intelligence/assets/trusted_keys.json).
-Missing, tampered, unknown or revoked key → the command does not run. Offline,
-no dependencies. A checkout or a fork runs on its own DB with
-`--allow-unsigned-db` (or `MCP_VAULT_ALLOW_UNSIGNED_DB=1`), which warns on every
-run. `mcp-vault signature --json` shows the check on its own.
+In the installed package, a missing, tampered, unknown-key or revoked-key
+signature → the command does not run. A git checkout (development, CI) needs no
+`.sig`, though one that is present must verify. Offline, no dependencies. A fork
+without `.git` runs on its own DB with `--allow-unsigned-db` (or
+`MCP_VAULT_ALLOW_UNSIGNED_DB=1`), which warns on every run.
+`mcp-vault signature --json` shows the check on its own, as `mcp-vault/findings@1`.
 
 ```bash
 mcp-vault audits add <entry> --criteria safe-to-run --who "Me <me@example.org>"
@@ -578,8 +580,8 @@ who checked which package, version **and integrity**, against which criterion.
 Imports are listed in `.mcp-vault.imports.json` (URL or path, the source's
 public key, the criteria you accept from it), fetched only on request, kept in
 `.mcp-vault.imports.lock.json`, and not transitive. Every bundle must verify
-under the key in your config. An imported audit shows in `explain` with its
-source, and never changes `trust`.
+under the key in your config. An imported audit shows in `explain`'s trace as
+an observation with its source, and never changes `trust` or the decision.
 
 ### Policy file
 

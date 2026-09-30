@@ -55,6 +55,7 @@ const { staleDimensions, DIMENSIONS, DEFAULT_MAX_AGE_DAYS, POSITIVE_STATUSES, ma
 const { estimateServer, matchDbEntry, wouldExceed, DEFAULT_CONTEXT } = require('./lib/budget.cjs');
 const { readInstalledServers } = require('./lib/installed.cjs');
 const { asOfFromArgv } = require('./lib/clock.cjs');
+const { readLocalAudits, loadImportedAudits, auditsFor, auditObservations } = require('./lib/audits.cjs');
 
 const DB_PATH    = path.resolve(__dirname, '../assets/tools_database.json');
 const EVAL_PATH  = path.resolve(__dirname, '../assets/eval_results.json');
@@ -171,7 +172,7 @@ function asEffective(policy) {
  * from the evidence and — with `--verify` — from the live gate, and the one
  * Decision `decide()` makes over them. explain renders it; it decides nothing.
  */
-function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, behav, budget, evidence = null, asOf, maxAgeDays = DEFAULT_MAX_AGE_DAYS, org = null }) {
+function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, behav, budget, evidence = null, asOf, maxAgeDays = DEFAULT_MAX_AGE_DAYS, org = null, audits = [] }) {
   const ep = asEffective(policy);
   const s = subjectForTool(tool);
   // The stored part of the decision, from the one producer verify --offline
@@ -187,7 +188,11 @@ function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, b
   // Organisation rules read their own facts (lib/org_policy.cjs orgModel);
   // tool approvals arrive as findings on this subject.
   const orgPart = org ? orgModel(tool, ep, org, { subject: s, asOf, evidence }) : null;
-  const findings = [...ev.findings, ...gateFindings, ...(orgPart ? orgPart.findings : [])];
+  // Who else looked (lib/audits.cjs): observations with their source, and
+  // `audits/recorded` findings the table can only ever allow — visible in the
+  // trace, never a lift (#121).
+  const aud = auditObservations(audits, s);
+  const findings = [...ev.findings, ...gateFindings, ...(orgPart ? orgPart.findings : []), ...aud.findings];
   const facts = {
     [s.id]: {
       mode: gateEntry ? 'gate' : 'evidence',
@@ -208,7 +213,7 @@ function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, b
   // The threshold is the effective policy's fail_on — the one verify uses —
   // so one decision cannot pass here and fail there.
   const [decision] = decideFindings(findings, ep, asOf, { subjects: [s], facts });
-  return { subject: s, observations: ev.observations, findings, decision, facts, policy: ep };
+  return { subject: s, observations: [...ev.observations, ...aud.observations], findings, decision, facts, policy: ep };
 }
 
 /**
@@ -220,8 +225,8 @@ function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, b
  * words explain has always used, because the useful part of a denial is
  * which rule denied it.
  */
-function decide({ tool, policy, gateEntry, gateDoc = null, trust, behav, budget, evidence = null, asOf, maxAgeDays, org = null }) {
-  const m = explainModel({ tool, policy, gateEntry, gateDoc, trust, behav, budget, evidence, asOf, maxAgeDays, org });
+function decide({ tool, policy, gateEntry, gateDoc = null, trust, behav, budget, evidence = null, asOf, maxAgeDays, org = null, audits = [] }) {
+  const m = explainModel({ tool, policy, gateEntry, gateDoc, trust, behav, budget, evidence, asOf, maxAgeDays, org, audits });
   const rules = m.decision.rules
     .filter((r) => { const row = rowFor(r.rule); return row && row.views.includes('explain'); })
     .map((r) => ({ rule: r.rule, outcome: r.effect, detail: r.detail }));
@@ -305,9 +310,18 @@ function main(argv) {
     ? loadOrgContext({ cwd: opts.cwd, dbTools: db.tools || [], asOf: opts.asOf })
     : null;
 
+  // Offline: the lock is what `audits fetch` verified; it is re-verified here.
+  const localAudits = readLocalAudits(opts.cwd);
+  const importedAudits = loadImportedAudits(opts.cwd);
+  const audits = auditsFor(tool, { local: localAudits.audits, imported: importedAudits.audits });
+  const auditErrors = [
+    ...localAudits.errors.map((e) => ({ source: 'local', code: 'local', error: e })),
+    ...importedAudits.errors,
+  ];
+
   const verdict = decide({
     tool, policy: loaded.policy, gateEntry, gateDoc: gate && gate.ok ? gate.report.findings : null,
-    trust, behav, budget, evidence, asOf: opts.asOf, maxAgeDays: maxAge, org,
+    trust, behav, budget, evidence, asOf: opts.asOf, maxAgeDays: maxAge, org, audits,
   });
   const m = verdict.model;
   const trace = toJson(findingsDocument({
@@ -362,6 +376,10 @@ function main(argv) {
         };
       }),
       missing: DIMENSIONS.filter((d) => !evidence || !evidence.dimensions[d]),
+      // Additive (#121). The audits themselves are observations in
+      // `findings` (source `audit:…`); this says which sources could not be
+      // read, so "no audit shown" is not mistaken for "nobody audited".
+      audit_errors: auditErrors,
     },
     scores: {
       trust:     { score: trust.score, gate: trust.gate, reasons: trust.reasons },
@@ -411,6 +429,12 @@ function main(argv) {
   }
   for (const d of record.evidence.missing) {
     process.stdout.write(`  ${DM}· ${d.padEnd(15)} never checked${RS}\n`);
+  }
+  for (const o of m.observations.filter((x) => x.source.startsWith('audit:'))) {
+    process.stdout.write(`  ${GN}✓${RS} ${'audit'.padEnd(15)} ${o.status} — ${o.dimension.split('/').slice(2).join('/')} ${DM}(${o.observed_at}, ${o.source}; does not change trust)${RS}\n`);
+  }
+  for (const e of auditErrors) {
+    process.stdout.write(`  ${YL}! ${'audit'.padEnd(15)} [${e.source || 'imports'}] ${e.error}${RS}\n`);
   }
   if (evidenceIsForAnotherVersion) {
     process.stdout.write(`\n${YL}The stored evidence describes ${tool.trust_evidence.artifact_id}, not ${currentId} — ignored.${RS}\n`);

@@ -63,7 +63,9 @@
  *   keyIdFor(publicKeyB64)                 -> 16-hex key id
  *   generateKeyPair()                      -> { privateKeyPem, publicKey, keyId }
  *   publicKeyFromPrivate(pem)              -> { publicKey, keyId }
- *   signCanonical(bytes, opts)             -> envelope
+ *   signCanonical(bytes, { privateKeyPem, artifact, now }) -> envelope
+ *                                          (`now` is required: signed_at is an
+ *                                          observation — readWallClock() at the CLI)
  *   verifyCanonical(bytes, envelope, keys, opts) -> { ok, code, error?, key_id? }
  *   loadTrustedKeys(file?)                 -> { ok, keys, errors }
  */
@@ -71,6 +73,7 @@
 const crypto = require('crypto');
 const fs     = require('fs');
 const path   = require('path');
+const { requireAsOf } = require('./clock.cjs');
 
 const SIGNATURE_FORMAT = 'mcp-vault-signature/1';
 const CANONICALIZATION = 'mcp-vault-jcs/1';
@@ -166,7 +169,8 @@ function signedMessage(envelope) {
   return Buffer.from(canonicalize(rest), 'utf8');
 }
 
-function signCanonical(bytes, { privateKeyPem, artifact, now = Date.now() } = {}) {
+function signCanonical(bytes, { privateKeyPem, artifact, now } = {}) {
+  requireAsOf(now, 'signCanonical');
   const key = privateKeyObject(privateKeyPem);
   const { keyId } = publicKeyFromPrivate(privateKeyPem);
   const envelope = {
@@ -183,6 +187,15 @@ function signCanonical(bytes, { privateKeyPem, artifact, now = Date.now() } = {}
 }
 
 const dateOnly = (s) => String(s || '').slice(0, 10);
+
+// Key windows are compared as strings, so they have to *be* canonical dates:
+// "2026-6-30" sorts before "2026-10-01" and would leave a retired key usable.
+const CANONICAL_DAY = /^\d{4}-\d{2}-\d{2}$/;
+const isCanonicalDay = (s) => typeof s === 'string' && CANONICAL_DAY.test(s)
+  && new Date(`${s}T00:00:00Z`).toISOString().slice(0, 10) === s;
+// signed_at is inside the signed message, but the signer chooses it; it still
+// has to be an ISO-8601 instant for the window comparison to mean anything.
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
 
 /**
  * Check `bytes` (already canonical) against `envelope` with a keyring.
@@ -201,7 +214,9 @@ function verifyCanonical(bytes, envelope, keys, { artifact = null } = {}) {
   for (const f of ['key_id', 'sha256', 'signed_at', 'signature']) {
     if (typeof envelope[f] !== 'string' || !envelope[f]) return fail('malformed', `signature has no ${f}`);
   }
-  if (Number.isNaN(Date.parse(envelope.signed_at))) return fail('malformed', 'signed_at is not a date');
+  if (!ISO_INSTANT.test(envelope.signed_at) || Number.isNaN(Date.parse(envelope.signed_at))) {
+    return fail('malformed', 'signed_at is not an ISO-8601 UTC instant');
+  }
   if (artifact !== null && envelope.artifact !== artifact) {
     // A valid signature over a *different* artifact, renamed into place.
     return fail('artifact-mismatch', `signature is for ${JSON.stringify(envelope.artifact)}, not ${JSON.stringify(artifact)}`);
@@ -247,6 +262,11 @@ function normalizeKeys(doc) {
     try { id = keyIdFor(k.public_key); }
     catch (e) { errors.push(`key #${i}: ${e.message}`); continue; }
     if (k.key_id !== id) { errors.push(`key #${i}: key_id ${k.key_id} does not match its public key (${id})`); continue; }
+    const bad = ['valid_from', 'valid_until'].filter((f) => k[f] !== undefined && k[f] !== null && !isCanonicalDay(k[f]));
+    if (bad.length) { errors.push(`key #${i}: ${bad.join(', ')} must be a calendar date YYYY-MM-DD or null`); continue; }
+    if (k.valid_from && k.valid_until && k.valid_until < k.valid_from) {
+      errors.push(`key #${i}: valid_until ${k.valid_until} is before valid_from ${k.valid_from}`); continue;
+    }
     keys.push({
       key_id: id, algorithm: ALGORITHM, public_key: k.public_key,
       valid_from: k.valid_from || null, valid_until: k.valid_until || null,
@@ -263,8 +283,13 @@ function loadTrustedKeys(file = TRUSTED_KEYS_PATH) {
   return normalizeKeys(doc);
 }
 
-/** The keyring entry for a public key, ready to paste into trusted_keys.json. */
-function keyringEntry(publicKey, { validFrom = new Date().toISOString().slice(0, 10), comment = null } = {}) {
+/**
+ * The keyring entry for a public key, ready to paste into trusted_keys.json.
+ * `validFrom` is required (YYYY-MM-DD): the CLI passes today's date from
+ * lib/clock.cjs, a test passes a fixed one.
+ */
+function keyringEntry(publicKey, { validFrom, comment = null } = {}) {
+  if (!isCanonicalDay(validFrom)) throw new TypeError(`keyringEntry: validFrom must be YYYY-MM-DD (got ${JSON.stringify(validFrom)})`);
   return {
     key_id: keyIdFor(publicKey), algorithm: ALGORITHM, public_key: publicKey,
     valid_from: validFrom, valid_until: null, revoked: false, comment,

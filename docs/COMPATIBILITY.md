@@ -89,13 +89,11 @@ Every JSON document this tool writes carries a schema identifier of the form
 | `mcp-vault/audit@1` | `mcp-vault audit --json` |
 | `mcp-vault/audit-add@1` | `mcp-vault audits add --json` |
 | `mcp-vault/audit-export@1` | `mcp-vault audits export` (the signed bundle) |
-| `mcp-vault/audit-imports@1` | `mcp-vault audits fetch --json`, `audits check --json` |
 | `mcp-vault/audit-list@1` | `mcp-vault audits list --json` |
 | `mcp-vault/audits@1` | `.mcp-vault.audits.json` |
 | `mcp-vault/imports-lock@1` | `.mcp-vault.imports.lock.json` |
 | `mcp-vault/keygen@1` | `mcp-vault audits keygen --json`, `sign_db.cjs --keygen / --public-entry --json` |
 | `mcp-vault/sign@1` | `sign_db.cjs --json` |
-| `mcp-vault/signature-check@1` | `mcp-vault signature --json` |
 | `mcp-vault/availability@1` | `mcp-vault availability --json` |
 | `mcp-vault/capabilities@1` | `assets/capabilities.json` (the stored scan) |
 | `mcp-vault/candidates@1` | `assets/discovery/candidates.json` |
@@ -161,6 +159,8 @@ Two things every decision-bearing document now carries, both additive:
   on, so a consumer can recompute the decisions from the document. Rule ids in
   `decided_by` are part of the contract: a rule keeps its id and its meaning.
   New commands report through this schema rather than a new one.
+  `mcp-vault signature --json` and `mcp-vault audits fetch|check --json`
+  print a findings@1 document as their whole output (#121).
 
 Removing a field, changing its type, or changing what an existing value means
 bumps the schema to `@2`. When that happens, `@1` keeps being written for at

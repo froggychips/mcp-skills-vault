@@ -35,7 +35,10 @@ const path  = require('path');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { readDb } = require('./lib/db_io.cjs');
 const { generateKeyPair, keyringEntry } = require('./lib/signing.cjs');
-const { readKey } = require('./sign_db.cjs');
+const { readKey, writeNewKey } = require('./sign_db.cjs');
+const { readWallClock, isoDay } = require('./lib/clock.cjs');
+const { decide, findingsDocument, toJson, exitCode } = require('./lib/finding.cjs');
+const { effectivePolicy } = require('./lib/policy_rules.cjs');
 const A = require('./lib/audits.cjs');
 
 const DB_PATH = path.resolve(__dirname, '../assets/tools_database.json');
@@ -150,7 +153,8 @@ function cmdAdd(opts) {
   if (!subject) { process.stderr.write(`audits add: ${name} has no pinned artifact with an integrity value — there is nothing definite to audit\n`); return 1; }
   const audit = {
     who: opts.who, ...subject, criteria: opts.criteria,
-    date: new Date().toISOString().slice(0, 10),
+    // When you looked: an observation, so the wall clock (lib/clock.cjs).
+    date: isoDay(readWallClock()),
     ...(opts.notes ? { notes: opts.notes } : {}),
   };
   let res;
@@ -169,7 +173,7 @@ function cmdExport(opts) {
   catch (e) { process.stderr.write(`audits export: could not read the key: ${e.message}\n`); return 1; }
   if (!pem) { process.stderr.write(`audits export: no key — set ${KEY_ENV} or pass --key-file (make one with \`mcp-vault audits keygen <path>\`)\n`); return 1; }
   let bundle;
-  try { bundle = A.exportBundle(local.audits, { privateKeyPem: pem }); }
+  try { bundle = A.exportBundle(local.audits, { privateKeyPem: pem, now: readWallClock() }); }
   catch (e) { process.stderr.write(`audits export: ${e.message}\n`); return 1; }
   const text = `${JSON.stringify(bundle, null, 2)}\n`;
   if (opts.out) {
@@ -181,46 +185,72 @@ function cmdExport(opts) {
   return 0;
 }
 
+/**
+ * The import check's verdict: findings per source, decided by the
+ * `audits/import` row (lib/policy_rules.cjs). `--json` is the findings@1
+ * document; the lock path and what was ignored ride along as facts.
+ */
+function importDecision({ rows, global = [], configPath, facts }) {
+  // The decision does not depend on the instant; the document says when.
+  const asOf = readWallClock();
+  const policy = effectivePolicy(null, {}, { policyRules: false });
+  const { subjects, findings, facts: f } = A.importFindings({ rows, global, configPath, facts });
+  const decisions = decide(findings, policy, asOf, { subjects, facts: f });
+  const doc = toJson(findingsDocument({ asOf, findings, decisions, scope: 'audit-imports', policy, facts: f }));
+  return { doc, decisions, exit: exitCode(decisions) };
+}
+
+const mark = (d) => (d.fails ? '✗' : '✓');
+const lineOf = (doc, d) => {
+  const byId = new Map(doc.findings.map((x) => [x.id, x]));
+  return d.findings.map((id) => byId.get(id)).filter(Boolean).map((x) => x.message).join('; ');
+};
+
 async function cmdFetch(opts) {
   const config = A.readImportsConfig(opts.cwd);
   if (!config.ok) { process.stderr.write(`audits fetch: ${config.errors.join('; ')}\n`); return 1; }
   if (!config.found) { process.stderr.write(`audits fetch: no ${A.IMPORTS_FILE} in ${opts.cwd}\n`); return 1; }
-  const res = await A.fetchImports(config, { fetchText });
+  const res = await A.fetchImports(config, { fetchText, now: readWallClock() });
   let lockPath = null;
   if (res.ok) lockPath = A.writeLock(opts.cwd, res.lock);
-  out(opts, { schema: 'mcp-vault/audit-imports@1', ok: res.ok, lock: lockPath, sources: res.report },
-    res.report.map((r) => (r.ok
-      ? `✓ ${r.source}  ${r.audits} audit(s), signed by ${r.key_id}${r.rejected.length ? ` (${r.rejected.length} malformed record(s) dropped)` : ''}\n`
-      : `✗ ${r.source}  ${r.error} [${r.code}]\n`)).join('')
+  const facts = Object.fromEntries(res.report.map((r) => [r.source, { lock: lockPath, rejected: r.rejected || [] }]));
+  const { doc, decisions, exit } = importDecision({ rows: res.report, configPath: config.path, facts });
+  out(opts, doc,
+    decisions.map((d) => `${mark(d)} ${lineOf(doc, d)}\n`).join('')
     + (res.ok ? `\nLock written: ${lockPath}\n` : '\nNothing written: the lock is updated all at once or not at all.\n'));
-  return res.ok ? 0 : 1;
+  return exit;
 }
 
 function cmdCheck(opts) {
   const config = A.readImportsConfig(opts.cwd);
   const imported = A.loadImportedAudits(opts.cwd, { config });
-  const sources = Object.keys(config.sources).sort().map((name) => {
-    const errs = imported.errors.filter((e) => e.source === name);
-    return { source: name, ok: !errs.length, audits: imported.audits.filter((a) => a.source === name).length, errors: errs };
+  const rows = Object.keys(config.sources).sort().map((name) => {
+    const err = imported.errors.find((e) => e.source === name);
+    const mine = imported.audits.filter((a) => a.source === name);
+    return err
+      ? { source: name, ok: false, code: err.code, error: err.error }
+      : { source: name, ok: true, audits: mine.length, key_id: config.sources[name].key_id };
   });
   const global = imported.errors.filter((e) => !e.source);
-  const ok = !global.length && sources.every((s) => s.ok);
-  out(opts, { schema: 'mcp-vault/audit-imports@1', ok, sources, errors: global, ignored: imported.ignored },
+  const facts = Object.fromEntries(rows.map((r) => [r.source, {
+    ignored: imported.ignored.filter((i) => i.source === r.source).map((i) => i.reason),
+  }]));
+  const { doc, decisions, exit } = importDecision({ rows, global, configPath: config.path, facts });
+  out(opts, doc,
     [
-      ...global.map((e) => `✗ ${e.error}\n`),
-      ...sources.map((s) => (s.ok ? `✓ ${s.source}  ${s.audits} audit(s) in force\n` : `✗ ${s.source}  ${s.errors.map((e) => `${e.error} [${e.code}]`).join('; ')}\n`)),
+      ...decisions.map((d) => `${mark(d)} ${lineOf(doc, d)}\n`),
       imported.ignored.length ? `${imported.ignored.map((i) => `  · [${i.source}] ${i.reason}\n`).join('')}` : '',
     ].join('') || `No imports configured (${A.IMPORTS_FILE}).\n`);
-  return ok ? 0 : 1;
+  return exit;
 }
 
 function cmdKeygen(opts) {
   const target = opts.args[0] ? path.resolve(opts.args[0]) : null;
   if (!target) { process.stderr.write('audits keygen: <path> for the private key is required\n'); return 2; }
-  if (fs.existsSync(target)) { process.stderr.write(`audits keygen: ${target} exists — refusing to overwrite a key\n`); return 1; }
   const pair = generateKeyPair();
-  fs.writeFileSync(target, pair.privateKeyPem, { mode: 0o600, flag: 'wx' });
-  const entry = keyringEntry(pair.publicKey);
+  const refused = writeNewKey(target, pair.privateKeyPem);
+  if (refused) { process.stderr.write(`audits keygen: ${refused}\n`); return 1; }
+  const entry = keyringEntry(pair.publicKey, { validFrom: isoDay(readWallClock()) });
   out(opts, { schema: 'mcp-vault/keygen@1', private_key_file: target, key_id: pair.keyId, public_key: pair.publicKey, keyring_entry: entry },
     `Private key written to ${target} (mode 0600).\n\nPublish this public key; importers put it in their ${A.IMPORTS_FILE}:\n\n  "public_key": "${entry.public_key}"   (key id ${entry.key_id})\n`);
   return 0;

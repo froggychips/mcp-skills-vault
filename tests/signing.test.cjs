@@ -12,6 +12,7 @@ const s = require('../mcp-ecosystem-intelligence/scripts/lib/signing.cjs');
 
 const doc = { tools: [{ name: 'a', version: '1.0.0', notes: 'café' }], meta: { n: 1 } };
 const bytes = s.canonicalBytes(doc);
+const NOW = Date.parse('2026-09-30T00:00:00Z');
 const keyring = (pair, over = {}) => [{ ...s.keyringEntry(pair.publicKey, { validFrom: '2026-01-01' }), ...over }];
 
 test('canonical form ignores key order, whitespace and escaping', () => {
@@ -31,14 +32,14 @@ test('sign then verify', () => {
   const env = s.signCanonical(bytes, { privateKeyPem: pair.privateKeyPem, artifact: 'db.json', now: Date.parse('2026-09-30T00:00:00Z') });
   assert.equal(env.key_id, pair.keyId);
   assert.equal(env.sha256, s.sha256Hex(bytes));
-  const r = s.verifyCanonical(bytes, env, keyring(pair), { artifact: 'db.json' });
+  const r = s.verifyCanonical(bytes, env, keyring(pair), { artifact: 'db.json', now: NOW });
   assert.equal(r.ok, true, r.error);
   assert.equal(r.code, 'verified');
 });
 
 test('one changed byte of content is a digest mismatch', () => {
   const pair = s.generateKeyPair();
-  const env = s.signCanonical(bytes, { privateKeyPem: pair.privateKeyPem, artifact: 'db.json' });
+  const env = s.signCanonical(bytes, { privateKeyPem: pair.privateKeyPem, artifact: 'db.json', now: NOW });
   const tampered = Buffer.from(bytes);
   tampered[tampered.indexOf('1.0.0') + 4] = '1'.charCodeAt(0);   // 1.0.0 → 1.0.1
   const r = s.verifyCanonical(tampered, env, keyring(pair));
@@ -48,7 +49,7 @@ test('one changed byte of content is a digest mismatch', () => {
 
 test('a digest updated to match tampered content still fails the signature', () => {
   const pair = s.generateKeyPair();
-  const env = s.signCanonical(bytes, { privateKeyPem: pair.privateKeyPem, artifact: 'db.json' });
+  const env = s.signCanonical(bytes, { privateKeyPem: pair.privateKeyPem, artifact: 'db.json', now: NOW });
   const tampered = s.canonicalBytes({ ...doc, meta: { n: 2 } });
   const r = s.verifyCanonical(tampered, { ...env, sha256: s.sha256Hex(tampered) }, keyring(pair));
   assert.equal(r.code, 'bad-signature');
@@ -67,7 +68,7 @@ test('the date and artifact name are signed, not decoration', () => {
 test('a signature by a key not in the keyring is refused', () => {
   const trusted = s.generateKeyPair();
   const stranger = s.generateKeyPair();
-  const env = s.signCanonical(bytes, { privateKeyPem: stranger.privateKeyPem, artifact: 'db.json' });
+  const env = s.signCanonical(bytes, { privateKeyPem: stranger.privateKeyPem, artifact: 'db.json', now: NOW });
   const r = s.verifyCanonical(bytes, env, keyring(trusted));
   assert.equal(r.code, 'unknown-key');
   assert.equal(r.key_id, stranger.keyId);
@@ -78,7 +79,7 @@ test('a signature by a key not in the keyring is refused', () => {
 test('a key id swapped to a trusted one does not make a stranger\'s signature good', () => {
   const trusted = s.generateKeyPair();
   const stranger = s.generateKeyPair();
-  const env = s.signCanonical(bytes, { privateKeyPem: stranger.privateKeyPem, artifact: 'db.json' });
+  const env = s.signCanonical(bytes, { privateKeyPem: stranger.privateKeyPem, artifact: 'db.json', now: NOW });
   assert.equal(s.verifyCanonical(bytes, { ...env, key_id: trusted.keyId }, keyring(trusted)).code, 'bad-signature');
 });
 
@@ -103,7 +104,7 @@ test('rotation: each key verifies inside its window, a revoked key verifies noth
 
 test('a malformed envelope is refused, not half-checked', () => {
   const pair = s.generateKeyPair();
-  const env = s.signCanonical(bytes, { privateKeyPem: pair.privateKeyPem, artifact: 'db.json' });
+  const env = s.signCanonical(bytes, { privateKeyPem: pair.privateKeyPem, artifact: 'db.json', now: NOW });
   assert.equal(s.verifyCanonical(bytes, null, keyring(pair)).code, 'no-signature');
   assert.equal(s.verifyCanonical(bytes, { ...env, algorithm: 'rsa' }, keyring(pair)).code, 'malformed');
   const { signature, ...unsigned } = env; // eslint-disable-line no-unused-vars
@@ -112,14 +113,32 @@ test('a malformed envelope is refused, not half-checked', () => {
 
 test('a keyring entry whose id does not match its key is an error', () => {
   const pair = s.generateKeyPair();
-  const r = s.normalizeKeys({ keys: [{ ...s.keyringEntry(pair.publicKey), key_id: '0000000000000000' }] });
+  const r = s.normalizeKeys({ keys: [{ ...s.keyringEntry(pair.publicKey, { validFrom: '2026-01-01' }), key_id: '0000000000000000' }] });
   assert.equal(r.ok, false);
   assert.match(r.errors[0], /does not match its public key/);
 });
 
-test('the shipped keyring is well-formed', () => {
+test('the shipped keyring is well-formed, and holds the release key', () => {
   const r = s.loadTrustedKeys();
   assert.equal(r.ok, true, r.errors.join('; '));
+  assert.ok(r.keys.some((k) => k.key_id === '92cf62804f86a312' && !k.revoked), 'the release key is listed');
+});
+
+test('key windows must be calendar dates, in order (a non-padded date would compare wrong)', () => {
+  const pair = s.generateKeyPair();
+  const base = s.keyringEntry(pair.publicKey, { validFrom: '2026-01-01' });
+  for (const bad of [{ valid_until: '2026-6-30' }, { valid_from: '2026-02-30' }, { valid_from: 'soon' }]) {
+    const r = s.normalizeKeys({ keys: [{ ...base, ...bad }] });
+    assert.equal(r.ok, false, JSON.stringify(bad));
+    assert.match(r.errors[0], /calendar date/);
+  }
+  const reversed = s.normalizeKeys({ keys: [{ ...base, valid_from: '2026-07-01', valid_until: '2026-06-30' }] });
+  assert.match(reversed.errors[0], /before valid_from/);
+  assert.throws(() => s.keyringEntry(pair.publicKey), /validFrom/);
+  assert.throws(() => s.signCanonical(bytes, { privateKeyPem: pair.privateKeyPem, artifact: 'db.json' }), /asOf is required/);
+  // signed_at must be an ISO instant for the window comparison to hold.
+  const env = s.signCanonical(bytes, { privateKeyPem: pair.privateKeyPem, artifact: 'db.json', now: NOW });
+  assert.equal(s.verifyCanonical(bytes, { ...env, signed_at: 'Sep 30 2026' }, [base]).code, 'malformed');
 });
 
 test('a private key round-trips to its public key and id', () => {

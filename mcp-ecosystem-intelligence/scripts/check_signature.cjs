@@ -8,17 +8,26 @@
  * Offline: the keyring ships in the package, the signature sits next to the
  * file, and nothing is fetched.
  *
+ * It decides nothing itself: each file is a set of `db/signature-*` findings
+ * (lib/db_signature.cjs), `decide()` applies the `db/signature` row, and this
+ * prints the Decision. `--json` is an `mcp-vault/findings@1` document.
+ *
  * Usage:
- *   node scripts/check_signature.cjs [file ...] [--json]
+ *   node scripts/check_signature.cjs [file ...] [--json] [--allow-unsigned-db]
+ *                                    [--strict | --fail-unverified] [--as-of <date>]
  *     default file: the bundled assets/tools_database.json
  *     any other JSON artifact is checked against `<file>.sig` the same way
  *     (the site's registry.json, a DB passed around with --db)
  *
- * Exit codes:
- *   0  every file verified — or the shipped keyring is empty, which is
- *      reported as `not-configured`, never as `verified`
- *   1  at least one file did not verify
- *   2  bad arguments / unreadable keyring
+ * Where it runs matters for one case only — a missing `.sig`: an installed
+ * package requires one, a git checkout does not (lib/db_signature.cjs
+ * `signatureContext`). A signature that is present must verify everywhere.
+ *
+ * Exit codes (the decisions', lib/finding.cjs exitCode):
+ *   0  nothing fails: verified, not required here, or the keyring is empty
+ *      (`unknown`, never `verified`; --fail-unverified makes it fail)
+ *   1  at least one file is refused (--strict: or only allowed by the override)
+ *   2  bad arguments
  */
 
 'use strict';
@@ -26,54 +35,54 @@
 const path = require('path');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { loadTrustedKeys, TRUSTED_KEYS_PATH } = require('./lib/signing.cjs');
-const { verifyFile } = require('./lib/db_signature.cjs');
+const { signatureDocument, signatureContext, signaturePolicy, allowUnsignedFromEnv, ALLOW_FLAG } = require('./lib/db_signature.cjs');
+const { flagsFromArgv } = require('./lib/policy_rules.cjs');
+const { asOfFromArgv, stripAsOf } = require('./lib/clock.cjs');
 
 const DB_PATH = path.resolve(__dirname, '../assets/tools_database.json');
+const KNOWN = new Set(['--json', ALLOW_FLAG, '--strict', '--fail-unverified']);
 
-function main(argv, { keyringPath = TRUSTED_KEYS_PATH } = {}) {
+const HELP = `signature — check published JSON against its .sig and the shipped keyring
+
+  mcp-vault signature [file ...] [--json] [--allow-unsigned-db] [--strict | --fail-unverified]
+`;
+
+function main(argv, { keyringPath = TRUSTED_KEYS_PATH, env = process.env } = {}) {
+  const clock = asOfFromArgv(argv);
+  if (clock.error) { process.stderr.write(`signature: ${clock.error}\n`); return 2; }
+  const rest = stripAsOf(argv);
   const files = [];
-  let json = false;
-  for (const a of argv) {
-    if (a === '--json') json = true;
-    else if (a === '-h' || a === '--help') {
-      process.stdout.write('signature — check published JSON against its .sig and the shipped keyring\n\n  mcp-vault signature [file ...] [--json]\n');
-      return 0;
-    } else if (a.startsWith('--')) { process.stderr.write(`signature: unknown flag ${a}\n`); return 2; }
-    else files.push(path.resolve(a));
+  for (const a of rest) {
+    if (a === '-h' || a === '--help') { process.stdout.write(HELP); return 0; }
+    if (KNOWN.has(a)) continue;
+    if (a.startsWith('--')) { process.stderr.write(`signature: unknown flag ${a}\n`); return 2; }
+    files.push(path.resolve(a));
   }
   if (!files.length) files.push(DB_PATH);
+  const json = rest.includes('--json');
+  const allowUnsigned = rest.includes(ALLOW_FLAG) || allowUnsignedFromEnv(env);
+  const context = signatureContext({ env });
 
   const keyring = loadTrustedKeys(keyringPath);
-  if (!keyring.ok) {
-    process.stderr.write(`signature: the keyring is invalid: ${keyring.errors.join('; ')}\n`);
-    return 2;
-  }
-
-  const rows = files.map((file) => {
-    if (!keyring.keys.length) return { file, state: 'not-configured', ok: null, detail: 'the shipped keyring has no key; nothing is checked' };
-    const r = verifyFile(file, { keys: keyring.keys });
-    return r.ok
-      ? { file, state: 'verified', ok: true, key_id: r.key_id, signed_at: r.signed_at, sha256: r.sha256 }
-      : { file, state: 'refused', ok: false, code: r.code, detail: r.error, key_id: r.key_id || null };
+  const { doc, decisions, exit } = signatureDocument(files, {
+    keyring, keyringPath, context, allowUnsigned, asOf: clock.asOf, policy: signaturePolicy(flagsFromArgv(rest)),
   });
-  const failed = rows.some((r) => r.ok === false);
 
   if (json) {
-    process.stdout.write(`${JSON.stringify({
-      schema: 'mcp-vault/signature-check@1',
-      keyring: { path: keyringPath, keys: keyring.keys.map((k) => ({ key_id: k.key_id, valid_from: k.valid_from, valid_until: k.valid_until, revoked: k.revoked })) },
-      files: rows,
-      ok: !failed,
-    }, null, 2)}\n`);
-  } else {
-    for (const r of rows) {
-      const name = path.basename(r.file);
-      if (r.state === 'verified') process.stdout.write(`✓ ${name}  signed by ${r.key_id} at ${r.signed_at}\n`);
-      else if (r.state === 'not-configured') process.stdout.write(`· ${name}  not checked — ${r.detail}\n`);
-      else process.stdout.write(`✗ ${name}  ${r.detail} [${r.code}]\n`);
-    }
+    process.stdout.write(`${JSON.stringify(doc, null, 2)}\n`);
+    return exit;
   }
-  return failed ? 1 : 0;
+  const byId = new Map(doc.findings.map((f) => [f.id, f]));
+  for (const d of decisions) {
+    const facts = doc.facts[d.subject.id] || {};
+    const name = path.basename(facts.file || d.subject.path);
+    const mark = d.fails ? '✗' : (d.effect === 'allow' ? '✓' : (d.effect === 'warn' ? '!' : '·'));
+    const detail = d.rules.map((r) => r.detail).find(Boolean)
+      || d.findings.map((id) => byId.get(id)).filter(Boolean).map((f) => f.message)[0] || '';
+    process.stdout.write(`${mark} ${name}  ${d.effect}${d.fails ? ' (fails)' : ''} — ${detail}  [${d.decided_by}]\n`);
+  }
+  process.stdout.write(`  context: ${context.context} — ${context.reason}${context.required ? '; a signature is required' : '; a missing signature is allowed, a bad one is not'}\n`);
+  return exit;
 }
 
 if (require.main === module) {

@@ -35,6 +35,8 @@
  *   views       legacy renderings that show this rule: 'explain' (explain's
  *               `rules` list), 'policy-line' (verify's POLICY-FAIL/WARN)
  *   evaluate    (ctx) -> [{ rule?, effect, detail, findings? }]
+ *   claims      optional: a finding-rule prefix only this row decides; the
+ *               generic finding/* rows skip those findings (#121)
  *
  * ctx: { subject, findings, policy, facts, mode, asOf }
  *   findings  this subject's findings (lib/finding.cjs)
@@ -86,6 +88,9 @@ const entryOf = (ctx) => (ctx.facts && ctx.facts.entry) || {};
 const isNpx = (ctx) => String(entryOf(ctx).install_cmd || '').startsWith('npx');
 const isDocker = (ctx) => /^docker\s+run/.test(entryOf(ctx).install_cmd || '');
 const out = (effect, detail, findings = [], rule = undefined) => ({ rule, effect, detail, findings });
+// A finding family whose own row decides it (#121: `db/signature-*`,
+// `audits/import-*`). Read at call time: RULES is defined below.
+const claimed = (f) => RULES.some((r) => r.claims && r.status === 'active' && f.rule.startsWith(r.claims));
 
 // ── rules over findings (any command) ──────────────────────────────────────
 
@@ -96,7 +101,7 @@ const findingRules = [
     evaluate(ctx) {
       const res = [];
       for (const f of ctx.findings) {
-        if (f.state !== 'observed') continue;
+        if (f.state !== 'observed' || claimed(f)) continue;
         if (f.severity === 'critical' || f.severity === 'high') res.push(out('deny', f.message, [f.id]));
         else if (f.severity === 'medium') res.push(out('warn', f.message, [f.id]));
       }
@@ -107,7 +112,7 @@ const findingRules = [
     id: 'finding/incomplete', status: 'active', thresholded: true, views: [],
     doc: 'A check that did not run, had nothing to look at, or aged out is unknown — never allow.',
     evaluate(ctx) {
-      return ctx.findings.filter((f) => f.state !== 'observed').map((f) => out('unknown', f.message, [f.id]));
+      return ctx.findings.filter((f) => f.state !== 'observed' && !claimed(f)).map((f) => out('unknown', f.message, [f.id]));
     },
   },
   {
@@ -521,7 +526,56 @@ const reservedRules = [
   reserved('secrets/*', '#122', 'plain-text secrets in host configs'),
 ];
 
-const RULES = Object.freeze([...explainRules, ...policyRules, ...findingRules, ...orgRules, ...reservedRules].map((r) => Object.freeze(r)));
+// ── #121: the DB signature and audits ─────────────────────────────────────
+//
+// Three rows. The signature and import rows *claim* their finding family
+// (`claims`): the generic finding/* rows skip a claimed finding, so the row
+// that knows the context is the only one that decides it — the dev escape
+// hatch turns a refusal into a warning, and `finding/severity` would turn it
+// straight back. `audits/recorded` can only ever say `allow`: worst effect
+// wins, so an audit is visible in the trace and cannot lift a decision
+// anywhere (docs/adr/0001-addendum-121-signed-db.md).
+
+const signatureRules = [
+  {
+    id: 'db/signature', status: 'active', thresholded: true, views: [], claims: 'db/signature-',
+    doc: 'The DB must verify against the shipped keyring. A missing signature refuses only where one is required (an installed package, not a git checkout).',
+    evaluate(ctx) {
+      const f = ctx.facts || {};
+      const res = [];
+      for (const x of ctx.findings) {
+        if (!x.rule.startsWith('db/signature-')) continue;
+        if (x.rule === 'db/signature-verified') res.push(out('allow', x.message, [x.id]));
+        // A keyring nobody can read is "someone broke the thing that says
+        // who signs": no escape hatch reaches it.
+        else if (x.rule === 'db/signature-keyring-invalid') res.push(out('deny', x.message, [x.id]));
+        else if (x.state !== 'observed') res.push(out('unknown', x.message, [x.id]));
+        else if (x.rule === 'db/signature-absent' && !f.required) res.push(out('allow', `${x.message} — not required in a ${f.context || 'git checkout'}`, [x.id]));
+        else if (f.allow_unsigned) res.push(out('warn', `${x.message} — accepted because --allow-unsigned-db / MCP_VAULT_ALLOW_UNSIGNED_DB is set`, [x.id]));
+        else res.push(out('deny', x.message, [x.id]));
+      }
+      return res;
+    },
+  },
+  {
+    id: 'audits/import', status: 'active', thresholded: true, views: [], claims: 'audits/import-',
+    doc: 'Every configured audit source verifies against the key in the config; one that does not, or was never fetched, refuses.',
+    evaluate(ctx) {
+      return ctx.findings.filter((x) => x.rule.startsWith('audits/import-'))
+        .map((x) => out(x.rule === 'audits/import-verified' ? 'allow' : 'deny', x.message, [x.id]));
+    },
+  },
+  {
+    id: 'audits/recorded', status: 'active', thresholded: false, views: [],
+    doc: 'An audit (local or imported) is shown with its source; it never changes the effect.',
+    evaluate(ctx) {
+      return ctx.findings.filter((x) => x.rule === 'audits/recorded')
+        .map((x) => out('allow', `${x.message} — does not change trust`, [x.id]));
+    },
+  },
+];
+
+const RULES = Object.freeze([...explainRules, ...policyRules, ...findingRules, ...orgRules, ...reservedRules, ...signatureRules].map((r) => Object.freeze(r)));
 const RULE_BY_ID = new Map(RULES.map((r) => [r.id, r]));
 
 // Evaluation order, per mode. It is the order the legacy views have always
@@ -537,6 +591,8 @@ const ORDER = Object.freeze({
     'policy/license', 'policy/health', 'policy/trust',
     'gate/fail', 'gate/unverified', 'behaviour/*', 'budget/over',
     'gate/require-provenance', 'gate/fail-dep-advisories', 'finding/severity', 'finding/incomplete',
+    'audits/recorded',
+    'db/signature', 'audits/import',
   ]),
   evidence: Object.freeze([
     'org/denylist', 'org/allowlist', 'org/min-tier', 'org/evidence/*', 'org/capabilities', 'org/capability/*', 'org/tool-approval',
@@ -546,6 +602,8 @@ const ORDER = Object.freeze({
     'policy/license', 'policy/health', 'policy/trust',
     'gate/fail', 'gate/unverified', 'behaviour/*', 'budget/over',
     'gate/require-provenance', 'gate/fail-dep-advisories', 'finding/severity', 'finding/incomplete',
+    'audits/recorded',
+    'db/signature', 'audits/import',
   ]),
   // `approve` and `lock --check` ask one question — has somebody approved
   // what this server offers, and is it what was locked — so only these rows

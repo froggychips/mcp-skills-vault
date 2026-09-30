@@ -8,8 +8,9 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 const { loadTrustedKeys } = require("../mcp-ecosystem-intelligence/scripts/lib/signing.cjs");
 const {
-  checkDb, allowUnsignedFromEnv, ALLOW_FLAG,
+  checkDb, allowUnsignedFromEnv, signatureContext, ALLOW_FLAG,
 } = require("../mcp-ecosystem-intelligence/scripts/lib/db_signature.cjs");
+const { readWallClock } = require("../mcp-ecosystem-intelligence/scripts/lib/clock.cjs");
 
 const SCRIPTS_DIR = path.join(
   __dirname, "..", "mcp-ecosystem-intelligence", "scripts"
@@ -151,24 +152,41 @@ function showVersion() {
 }
 
 /**
- * Check the bundled DB — and a DB handed over with `--db` — before the command
- * reads it. Returns an exit code to stop with, or null to carry on.
+ * Every DB this command will read: the bundled one, and each `--db` value
+ * (`--db x` and `--db=x`, every occurrence). All of them, because the scripts
+ * behind this wrapper disagree about which occurrence wins — most take the
+ * last — and checking one while the script reads another is no check at all.
+ */
+function dbPathsOf(passArgs) {
+  const dbs = [DB_PATH];
+  for (let i = 0; i < passArgs.length; i++) {
+    const a = passArgs[i];
+    if (a === "--db" && passArgs[i + 1] !== undefined) dbs.push(path.resolve(passArgs[++i]));
+    else if (a.startsWith("--db=")) dbs.push(path.resolve(a.slice("--db=".length)));
+  }
+  return [...new Set(dbs)];
+}
+
+/**
+ * Check those DBs before the command reads them. Returns an exit code to stop
+ * with, or null to carry on. The verdict is the `db/signature` row's, via
+ * decide() (lib/db_signature.cjs); this only prints it.
  *
- * A keyring that cannot be read is a refusal, not "no keys": the difference
- * between those two is the difference between "this build does not sign" and
- * "someone broke the thing that says who signs".
+ * Where the CLI runs decides one thing: whether a *missing* signature refuses.
+ * An installed package requires one; a git checkout (development, CI) does
+ * not. A signature that is present must verify, everywhere.
  */
 function dbSignatureRefusal(passArgs, allowUnsigned) {
   const keyring = loadTrustedKeys();
-  if (!keyring.ok) {
-    process.stderr.write(`mcp-vault: the shipped keyring is unreadable (${keyring.errors.join("; ")}); refusing to trust the DB\n`);
-    return 1;
-  }
-  const dbs = [DB_PATH];
-  const i = passArgs.indexOf("--db");
-  if (i !== -1 && passArgs[i + 1]) dbs.push(path.resolve(passArgs[i + 1]));
-  for (const dbPath of dbs) {
-    const check = checkDb({ dbPath, keys: keyring.keys, allowUnsigned });
+  const context = signatureContext();
+  // The decision does not depend on the instant (key windows are checked
+  // against the signed date); the document still says when it was made.
+  const asOf = readWallClock();
+  for (const dbPath of dbPathsOf(passArgs)) {
+    const check = checkDb({
+      dbPath, keys: keyring.keys, keyringOk: keyring.ok, keyringErrors: keyring.errors,
+      allowUnsigned, context, asOf,
+    });
     if (!check.proceed) {
       process.stderr.write(`${check.message}\n`);
       return 1;
@@ -181,8 +199,9 @@ function dbSignatureRefusal(passArgs, allowUnsigned) {
 function main(rawArgv) {
   // Stripped here, in any position: it is a statement about the DB this
   // wrapper checks, not an option of the script behind it.
+  // (`signature` keeps it: reporting on the override is part of its job.)
   const allowUnsigned = rawArgv.includes(ALLOW_FLAG) || allowUnsignedFromEnv(process.env);
-  const argv = rawArgv.filter((a) => a !== ALLOW_FLAG);
+  const argv = rawArgv[0] === "signature" ? rawArgv : rawArgv.filter((a) => a !== ALLOW_FLAG);
   const cmd = argv[0];
 
   if (!cmd || cmd === "-h" || cmd === "--help" || cmd === "help") {

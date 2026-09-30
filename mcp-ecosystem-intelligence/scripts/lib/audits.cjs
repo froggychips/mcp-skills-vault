@@ -24,10 +24,19 @@
  * re-verified on every read against the key in the *config*, so editing the
  * lock cannot swap a key or a record in.
  *
- * What an audit is not: trust. Imported audits are evidence shown in `explain`,
- * with their source; they do not enter `trust_evidence.dimensions`, and
- * neither `deriveTrust` nor `trustScore` reads them. Someone else having looked
- * at a package does not make its hash match or its advisories go away.
+ * What an audit is not: trust. An audit is an *Observation* with its source
+ * (`audit:local`, or `audit:<key id>` for an import) and an `audits/recorded`
+ * finding that rests on it (docs/adr/0001, "#121"), shown in `explain`'s
+ * trace. It does not enter `trust_evidence.dimensions`, neither `deriveTrust`
+ * nor `trustScore` reads it, and the `audits/recorded` row can only say
+ * `allow` — worst effect wins, so it never lifts a decision. Someone else
+ * having looked at a package does not make its hash match or its advisories
+ * go away.
+ *
+ * The import check (`audits fetch` / `audits check`) is findings too, one set
+ * per configured source (a `name` subject, `audit-source:<name>`):
+ * `audits/import-verified`, `audits/import-unverified`, `audits/import-not-fetched`,
+ * decided by the `audits/import` row.
  *
  * Files, in the project (`--cwd`), beside `.mcp-vault.policy.json`:
  *
@@ -47,6 +56,8 @@ const fs   = require('fs');
 const path = require('path');
 const { canonicalBytes, sha256Hex, signCanonical, verifyCanonical, keyIdFor } = require('./signing.cjs');
 const { toTypedEntry } = require('./entry_model.cjs');
+const { requireAsOf } = require('./clock.cjs');
+const F = require('./finding.cjs');
 
 const AUDITS_FILE  = '.mcp-vault.audits.json';
 const IMPORTS_FILE = '.mcp-vault.imports.json';
@@ -162,7 +173,7 @@ function addLocalAudit(cwd, audit) {
  * A signed bundle of *your* audits. Only local audits are ever exported: the
  * export is what makes imports non-transitive from this side.
  */
-function exportBundle(audits, { privateKeyPem, now = Date.now() } = {}) {
+function exportBundle(audits, { privateKeyPem, now } = {}) {
   for (const [i, a] of audits.entries()) {
     const v = validateAudit(a);
     if (!v.ok) throw new Error(`audit #${i}: ${v.errors.join('; ')}`);
@@ -260,7 +271,8 @@ function acceptedCriteria(criterion, trusted) {
  * `fetchText(url)` and `readText(path)` are injected so this is testable
  * without a network; the only URLs ever requested are the configured ones.
  */
-async function fetchImports(config, { fetchText, readText = (p) => fs.readFileSync(p, 'utf8'), now = Date.now() } = {}) {
+async function fetchImports(config, { fetchText, readText = (p) => fs.readFileSync(p, 'utf8'), now } = {}) {
+  requireAsOf(now, 'fetchImports');
   const lock = { $schema: 'mcp-vault/imports-lock@1', sources: {} };
   const report = [];
   let failed = false;
@@ -363,7 +375,80 @@ function auditsFor(tool, { local = [], imported = [] } = {}) {
   ];
 }
 
+// ── as the findings model sees it ─────────────────────────────────────────
+
+const auditSource = (a) => (a.source === 'local' ? 'audit:local' : `audit:${a.key_id}`);
+
+/**
+ * Audits of one subject (auditsFor's output) as Observations and the
+ * `audits/recorded` findings resting on them. Info, observed: a statement that
+ * somebody looked, which the policy table shows and never counts.
+ */
+function auditObservations(audits, subj) {
+  const observations = [];
+  const findings = [];
+  for (const a of audits || []) {
+    const crit = (a.accepted_criteria || [a.criteria]).join(', ');
+    const obs = F.observation({
+      subject: subj, dimension: `audit/${a.source}/${a.who}`, status: crit,
+      observed_at: a.date, source: auditSource(a), detail: a.notes || null,
+    });
+    observations.push(obs);
+    findings.push(F.finding({
+      rule: 'audits/recorded', subject: subj, severity: 'info',
+      confidence: a.source === 'local' ? 'high' : 'medium',
+      refs: [obs.id],
+      message: `${crit} by ${a.who} on ${a.date} (${a.source === 'local' ? 'your audit' : `imported from ${a.source}, key ${a.key_id}`})`,
+    }));
+  }
+  return { observations, findings };
+}
+
+const sourceSubject = (name) => F.subject.name({ name, ecosystem: 'audit-source' });
+
+/**
+ * The import check as findings: one set per configured source, plus a file
+ * subject for a config or lock that could not be read at all.
+ *
+ *   rows      [{ source, ok, code?, error?, audits?, key_id? }] — fetchImports'
+ *             report, or the per-source view of loadImportedAudits
+ *   global    errors not tied to a source (unreadable config / lock)
+ */
+function importFindings({ rows = [], global = [], configPath = null, facts: extra = {} } = {}) {
+  const subjects = [];
+  const findings = [];
+  const facts = {};
+  for (const r of rows) {
+    const s = sourceSubject(r.source);
+    subjects.push(s);
+    facts[s.id] = { source: r.source, ...(extra[r.source] || {}) };
+    if (r.ok) {
+      findings.push(F.finding({
+        rule: 'audits/import-verified', subject: s, severity: 'info',
+        message: `${r.source}: ${r.audits} audit(s) in force, signed by ${r.key_id}`,
+      }));
+    } else if (r.code === 'not-fetched') {
+      findings.push(F.finding({
+        rule: 'audits/import-not-fetched', subject: s, severity: 'medium', state: 'not-run',
+        message: `${r.source}: ${r.error}`,
+      }));
+    } else {
+      findings.push(F.finding({
+        rule: 'audits/import-unverified', subject: s, severity: 'high',
+        message: `${r.source}: ${r.error} [${r.code}]`,
+      }));
+    }
+  }
+  for (const e of global) {
+    const s = F.subject.hostConfig({ path: configPath || IMPORTS_FILE, scope: 'audits' });
+    if (!subjects.some((x) => x.id === s.id)) subjects.push(s);
+    findings.push(F.finding({ rule: 'audits/import-unverified', subject: s, severity: 'high', message: `${e.error} [${e.code}]` }));
+  }
+  return { subjects, findings, facts };
+}
+
 module.exports = {
+  auditSource, auditObservations, importFindings, sourceSubject,
   AUDITS_FILE, IMPORTS_FILE, LOCK_FILE, EXPORT_SCHEMA, EXPORT_ARTIFACT, CRITERIA,
   validateAudit, sortAudits, subjectOf, auditMatches,
   readLocalAudits, addLocalAudit,
