@@ -271,11 +271,32 @@ test('install still runs: the integrity gate is reachable', () => {
   // `installTool` and `checkBudget` with it, and every `install` died with
   // `ReferenceError: installTool is not defined` *before* the gate ran. No
   // test covered the one path that writes to a user's config.
+  //
+  // What this test asks is "is the gate reachable", not "is the committed
+  // evidence younger than a week". Run against the real DB it answered the
+  // second question too: seven days after the last evidence refresh the gate
+  // (correctly) refused mcp-server-fetch as stale and the test went red with no
+  // commit behind it. So it runs a throwaway copy of the skill whose entry
+  // carries evidence dated today — the gate itself is untouched, and still has
+  // to clear the entry for real.
   const os = require('os');
   const dir  = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-install-'));
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-install-home-'));
+  const skill = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'vault-install-skill-')), 'mcp-ecosystem-intelligence');
+  fs.cpSync(path.resolve(__dirname, '../mcp-ecosystem-intelligence'), skill, { recursive: true });
+  const dbPath = path.join(skill, 'assets/tools_database.json');
+  const dbJson = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+  const entry  = dbJson.tools.find((t) => t.name === 'mcp-server-fetch');
+  assert.ok(entry && entry.trust_evidence, 'mcp-server-fetch is no longer in the DB with evidence; pick another entry');
+  const today = new Date().toISOString().slice(0, 10);
+  for (const d of Object.values(entry.trust_evidence.dimensions || {})) {
+    if (d.checked_at)  d.checked_at  = today;
+    if (d.verified_at) d.verified_at = today;
+  }
+  fs.writeFileSync(dbPath, JSON.stringify(dbJson, null, 2));
+
   const r = spawnSync(process.execPath, [
-    path.resolve(__dirname, '../mcp-ecosystem-intelligence/scripts/orchestrate.cjs'),
+    path.join(skill, 'scripts/orchestrate.cjs'),
     '--install', 'mcp-server-fetch', '--offline', '--cwd', dir,
   ], { encoding: 'utf8', env: { ...process.env, HOME: home, NO_COLOR: '1' } });
 
