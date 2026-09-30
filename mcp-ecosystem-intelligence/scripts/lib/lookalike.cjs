@@ -440,7 +440,10 @@ function checkName(value, kind, index, { limit = 3 } = {}) {
 
 /** The package a launch command names, as { kind, value }, or null. */
 function packageOf(installCmd) {
-  const cmd = typeof installCmd === 'string' ? installCmd.trim() : '';
+  // `npx --yes pkg` is `npx -y pkg`; toInstallCmd keeps the long form, and the
+  // gate's parser reads only the short one. Read here as the same command, or
+  // a vault-named key launching `npx --yes other` would pass as unreadable.
+  const cmd = (typeof installCmd === 'string' ? installCmd.trim() : '').replace(/^npx\s+--yes(?=\s)/, 'npx -y');
   const kind = /^npx\s/.test(cmd) ? 'npm' : (/^uvx\s/.test(cmd) ? 'pypi' : (/^docker\s+run/.test(cmd) ? 'oci' : null));
   const value = kind === 'npm' ? npmPkgName(cmd)
     : kind === 'pypi' ? pypiPkgName(cmd)
@@ -456,10 +459,13 @@ function packageOf(installCmd) {
  * The package is what runs, so it is checked first; a vault package under any
  * key is fine. The key is checked only when the package told us nothing.
  *
- * `dbName` is the vault entry the key already matched by name, if any. A key
- * that *is* a vault name launching a package that is not that entry's is the
- * sharpest form of the attack — the config reads as the vetted server — and it
- * is reported even when the package resembles nothing.
+ * `dbName` is the vault entry the key already matched by name, if any; a key
+ * that is a vault name up to case and separators (`MCP_Server_Memory`) is
+ * found here too, because it reads as that entry just as well. A key that is
+ * a vault name launching a package that is not that entry's is the sharpest
+ * form of the attack — the config reads as the vetted server — and it is
+ * reported even when the package resembles nothing, or cannot be read at all
+ * (`npx -y --registry=… pkg`): an unreadable launch is not the entry's.
  *
  * Names the user has said are theirs (`--allow-lookalike`) are not looked at
  * here: the match is still a match, and excusing it is a policy input
@@ -468,33 +474,45 @@ function packageOf(installCmd) {
 function checkServer(server, index, { dbName = null } = {}) {
   if (!server || !index) return null;
   const done = (r) => ({ ...r, server: server.name || null });
-  const pkg = packageOf(server.install_cmd);
+  let keyEntry = dbName;
+  if (!keyEntry && server.name) {
+    const k = checkName(server.name, 'name', index);
+    if (k.known) keyEntry = k.known;
+  }
+  const impersonation = (r, launched) => {
+    const target = index.identities.find((t) => t.db_name === keyEntry && t.kind !== 'name');
+    if (!target) return null;
+    return done({
+      ...r,
+      lookalike: true,
+      matches: [{
+        db_name:     keyEntry,
+        target:      target.display,
+        target_kind: target.kind,
+        package:     index.packageOf.get(keyEntry) || null,
+        technique:   'vault-name-on-other-package',
+        confidence:  'high',
+        distance:    null,
+        detail:      `configured as "${server.name}", the vault's name for ${target.display}, but launches ${launched}`,
+      }],
+    });
+  };
+  const cmd = typeof server.install_cmd === 'string' ? server.install_cmd.trim() : '';
+  const pkg = packageOf(cmd);
   if (pkg) {
     const r = checkName(pkg.value, pkg.kind, index);
     if (r.lookalike) return done(r);
-    if (r.known && (!dbName || r.known === dbName)) return null;
-    if (dbName) {
-      const target = index.identities.find((t) => t.db_name === dbName && t.kind !== 'name');
-      if (target) {
-        return done({
-          ...r,
-          lookalike: true,
-          matches: [{
-            db_name:     dbName,
-            target:      target.display,
-            target_kind: target.kind,
-            package:     index.packageOf.get(dbName) || null,
-            technique:   'vault-name-on-other-package',
-            confidence:  'high',
-            distance:    null,
-            detail:      `configured as "${server.name}", the vault's name for ${target.display}, but launches ${pkg.value}`,
-          }],
-        });
-      }
+    if (r.known && (!keyEntry || r.known === keyEntry)) return null;
+    if (keyEntry) {
+      const hit = impersonation(r, pkg.value);
+      if (hit) return hit;
     }
     if (r.known) return null;
+  } else if (keyEntry && /^(npx|uvx|docker)\s/.test(cmd)) {
+    return impersonation({ candidate: String(server.name), kind: 'name', known: null, lookalike: false, matches: [] },
+      `a command whose package cannot be read (${cmd})`);
   }
-  if (!dbName && server.name) {
+  if (!keyEntry && server.name) {
     const r = checkName(server.name, 'name', index);
     if (r.lookalike) return done(r);
   }

