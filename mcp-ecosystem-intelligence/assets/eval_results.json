@@ -1199,23 +1199,6 @@
       "surface_drift": null
     },
     {
-      "name": "@diskd-ai/email-mcp",
-      "status": "fail",
-      "failure_class": "CRASH",
-      "error_code": "exit 1",
-      "tool_count": null,
-      "tool_count_db": null,
-      "tool_count_drift": false,
-      "tools_payload_bytes": null,
-      "boot_ms": null,
-      "schema_errors": [],
-      "schema_error_count": 0,
-      "sandboxed": true,
-      "checked_at": "2026-09-17T10:55:16.068Z",
-      "surface": null,
-      "surface_drift": null
-    },
-    {
       "name": "@drawio/mcp",
       "status": "pass",
       "failure_class": null,

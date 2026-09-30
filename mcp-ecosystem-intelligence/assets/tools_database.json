@@ -4663,42 +4663,6 @@
       }
     },
     {
-      "name": "@diskd-ai/email-mcp",
-      "category": "communication",
-      "install_cmd": "npx -y @diskd-ai/email-mcp",
-      "source_url": "https://github.com/codefuturist/email-mcp",
-      "version": "0.3.8",
-      "pkg_integrity": "sha512-LLGiI9Silqacj4uvhjxp6pXqg7woouzNvH9Kkh+SpB4xIFRyBZ1lFemFd5+jc51eGqZjyx/fbOtN8adqi01y+Q==",
-      "trust": "unverified",
-      "license": "LGPL-3.0",
-      "health_score": 59.4,
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": "Email MCP server with IMAP + SMTP support\n\n[TRIAGE 2026-05-14 \u2014 revert] prepare: `lefthook install || true` \u2014 git-hooks runner. Audit.\n\n[HOLD 2026-05-22] npm view 2026-05-22 confirms `prepare: lefthook install || true` unchanged.",
-      "stars": 86,
-      "last_commit_days": 71,
-      "open_issues": 29,
-      "trust_evidence": {
-        "artifact_id": "npm:@diskd-ai/email-mcp@0.3.8",
-        "dimensions": {
-          "availability": {
-            "status": "gone",
-            "checked_at": "2026-09-17",
-            "detail": "@diskd-ai/email-mcp returns 404 from the npm registry \u2014 unpublished, renamed or taken down; the name is claimable"
-          },
-          "artifact": {
-            "status": "unverified",
-            "checked_at": "2026-09-17",
-            "method": "registry-404"
-          },
-          "registry": {
-            "status": "unlisted",
-            "checked_at": "2026-09-17"
-          }
-        }
-      }
-    },
-    {
       "name": "@contextlint/mcp-server",
       "category": "utility",
       "install_cmd": "npx -y @contextlint/mcp-server",
