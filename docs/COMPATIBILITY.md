@@ -81,7 +81,7 @@ findings are decided and reported, only the listed families fail the run.
 ### 3. `--json` payloads
 
 Every JSON document this tool writes carries a schema identifier of the form
-`mcp-vault/<name>@<major>` — with two stated exceptions below:
+`mcp-vault/<name>@<major>` — with three stated exceptions below:
 
 | Identifier | Written by |
 |---|---|
@@ -95,6 +95,8 @@ Every JSON document this tool writes carries a schema identifier of the form
 | `mcp-vault/keygen@1` | `mcp-vault audits keygen --json`, `sign_db.cjs --keygen / --public-entry --json` |
 | `mcp-vault/sign@1` | `sign_db.cjs --json` |
 | `mcp-vault/availability@1` | `mcp-vault availability --json` |
+| `mcp-vault/badge@1` | `mcp-vault badge <name> --json` |
+| `mcp-vault/badges@1` | `badges/index.json` under the site root, `mcp-vault badge --write --json` |
 | `mcp-vault/capabilities@1` | `assets/capabilities.json` (the stored scan) |
 | `mcp-vault/candidates@1` | `assets/discovery/candidates.json` |
 | `mcp-vault/capability-scan@1` | `mcp-vault capabilities --json` |
@@ -121,8 +123,12 @@ Every JSON document this tool writes carries a schema identifier of the form
 | `mcp-vault/upgrade-plan@1` | `mcp-vault upgrade --json` |
 | `mcp-vault/verify-report@1` | `mcp-vault verify --json` |
 
-Two documents are deliberately not in that list, because they answer to
+Three documents are deliberately not in that list, because they answer to
 someone else's schema:
+
+- **`badges/<entry>.json`** (under the site root) is a shields.io
+  [endpoint badge](https://shields.io/badges/endpoint-badge), governed by its
+  own `schemaVersion`.
 
 - **`mcp-vault sbom`** emits [CycloneDX 1.6](https://cyclonedx.org/), whose own
   `$schema` and `specVersion` govern it. Everything this project adds lives

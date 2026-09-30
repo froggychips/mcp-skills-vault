@@ -56,6 +56,7 @@ const COMMANDS = {
   refresh:         "refresh_scores.cjs",
   wrap:            "generate_wrapper.cjs",
   "site-registry": "generate_registry_page.cjs",
+  badge:           "badge.cjs",
   budget:          "token_budget.cjs",
   lock:            "lock.cjs",
   approve:         "approve.cjs",
@@ -100,7 +101,9 @@ COMMANDS
   health <args>     Score a candidate by stars / recency / license / registry
   refresh           Refresh pinned versions + integrity hashes from registries
   wrap              Generate MCP wrapper boilerplate for a CLI / API tool
-  site-registry     Generate docs/site/registry.html from tools_database.json
+  site-registry     Generate registry.html from tools_database.json, and every
+                    entry's badge + evidence page (--out <dir>, --base-url <url>)
+  badge <name>      README snippet for a "vetted by mcp-vault" badge, and what it says today
   budget            What your configured servers cost in context tokens
   sbom              CycloneDX bill of materials (--installed / --deps)
   lock              Freeze the verified dependency tree + tool surface (mcp.lock.json)

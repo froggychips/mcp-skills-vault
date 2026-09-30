@@ -16,3 +16,9 @@ __pycache__/
 # ships in the npm tarball. A copy committed here would go stale on the next DB
 # change and read as tampering.
 mcp-ecosystem-intelligence/assets/*.sig
+
+# Built by `mcp-vault site-registry` / `mcp-vault badge --write`. The public
+# site is assembled in froggychips/mcp-site from the npm release; the vault
+# does not commit its own generated output.
+docs/site/badges/
+docs/site/entry/

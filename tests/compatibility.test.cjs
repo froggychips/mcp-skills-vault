@@ -88,6 +88,7 @@ test('every offline --json command actually emits a listed schema', () => {
     ['status.cjs',           ['--json', '--cwd', cwd]],
     ['check_secrets.cjs',    ['--json', '--cwd', cwd]],
     ['orchestrate.cjs',      ['--json', '--cwd', cwd]],
+    ['badge.cjs',            ['playwright-mcp', '--json']],
     // `health` has no --json: its only output is the document.
     ['calculate_health.cjs', ['100', '30', 'true', '1', 'MIT']],
   ];
