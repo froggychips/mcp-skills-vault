@@ -72,6 +72,24 @@ function recompute(doc) {
   }));
 }
 
+/**
+ * explain's document without the inputs only explain weighs: what the
+ * configured set would do with the entry (#123: findings flows/*,
+ * shadowing/*) and the tool-description scan of its eval row (#124: fact
+ * tool_scan). What is left is the artifact part verify and the export share.
+ */
+const SETUP_RULE = (rule) => /^(flows|shadowing)\//.test(rule);
+function artifactPart(edoc) {
+  const facts = Object.fromEntries(Object.entries(edoc.facts || {}).map(([id, x]) => {
+    const { tool_scan, ...rest } = x || {};
+    return [id, rest];
+  }));
+  return { ...edoc, findings: edoc.findings.filter((f) => !SETUP_RULE(f.rule)), facts };
+}
+function hasExplainOnlyInputs(edoc) {
+  return edoc.findings.some((f) => SETUP_RULE(f.rule)) || Object.values(edoc.facts || {}).some((x) => x && x.tool_scan);
+}
+
 // A spread of entries: npm, PyPI, docker, a blocked one, an unroutable one.
 const SAMPLE = (() => {
   const pick = (pred) => DB.find(pred);
@@ -224,24 +242,14 @@ test('explain exits as verify does: same policy, flags and --as-of, same exit an
       const label = `${path.basename(dir)} ${flags.join(' ') || '(no flags)'} ${name}`;
       const vr = run('verify_integrity.cjs', ['--offline', '--json', '--entry', name, '--cwd', dir, '--as-of', STALE, ...flags]);
       const er = run('explain.cjs', [name, '--json', '--cwd', dir, '--as-of', STALE, ...flags]);
-      // explain also weighs inputs `verify --entry` does not read: what the
-      // configured set would do with the entry (#123: rows flows/*,
-      // shadowing/*) and the tool-description scan of its eval row (#124:
-      // fact tool_scan, row tool-scan/*). The artifact part is what the two
-      // share: explain's document without those, re-decided, must be
-      // verify's decision; the exit code is explain's whole decision.
+      // explain also weighs inputs `verify --entry` does not read (the
+      // configured set, #123; the tool-description scan, #124). The artifact
+      // part is what the two share: explain's document without those,
+      // re-decided, must be verify's decision; the exit code is explain's
+      // whole decision.
       const edoc = JSON.parse(er.stdout).findings;
-      const setupRule = (rule) => /^(flows|shadowing)\//.test(rule);
-      const setupPart = edoc.findings.filter((f) => setupRule(f.rule));
-      const scanned = Object.values(edoc.facts || {}).some((x) => x && x.tool_scan);
-      const explainOnly = setupPart.length > 0 || scanned;
-      const artifactFacts = Object.fromEntries(Object.entries(edoc.facts || {}).map(([id, x]) => {
-        const { tool_scan, ...rest } = x || {};
-        return [id, rest];
-      }));
-      const [ed] = explainOnly
-        ? recompute({ ...edoc, findings: edoc.findings.filter((f) => !setupRule(f.rule)), facts: artifactFacts })
-        : edoc.decisions;
+      const explainOnly = hasExplainOnlyInputs(edoc);
+      const [ed] = explainOnly ? recompute(artifactPart(edoc)) : edoc.decisions;
       const vd = byId.get(ed.subject.id);
       assert.ok(vd, `${label}: verify made no decision for ${ed.subject.id}`);
       assert.equal(ed.fail_on, vd.fail_on, `${label}: explain and verify hold the entry to different thresholds`);
@@ -622,17 +630,27 @@ test('tool-scan: its decisions are decide() of its own document, and its exit co
 
 // ── #126: export-registry and registry-ingest ──────────────────────────────
 
-test('export-registry: _meta verdicts and skips are views of decide(), and agree with explain', () => {
+// The export is the vault's public statement, like a badge: it is judged
+// under the vault's own rules, whatever `.mcp-vault.policy.json` sits in the
+// directory it is run from.
+test('export-registry: _meta verdicts and skips are views of decide(), under no project policy, and agree with explain', () => {
   const sub = require(path.join(S, 'lib', 'subregistry.cjs'));
+  let first = null;
   for (const [pname, dir] of Object.entries(DIRS)) {
     const out = fs.mkdtempSync(path.join(TMP, `export-${pname}-`));
-    const r = run('export_subregistry.cjs', ['--out', out, '--json', '--cwd', dir, '--as-of', AS_OF]);
+    // Run from inside the policy's directory: the file there must not apply.
+    const r = spawnSync(process.execPath, [path.join(S, 'export_subregistry.cjs'), '--out', out, '--json', '--as-of', AS_OF], {
+      encoding: 'utf8', env: ENV, cwd: dir, maxBuffer: 64 * 1024 * 1024,
+    });
     assert.equal(r.status, 0, `${pname}: ${r.stderr}`);
     const man = JSON.parse(r.stdout);
     const doc = man.findings;
     assert.equal(doc.schema, 'mcp-vault/findings@1');
     assert.equal(doc.as_of, AS_OF);
+    assert.equal(doc.policy.policy_rules, false, `${pname}: the export read a policy file`);
     assert.deepEqual(recompute(doc), doc.decisions, `${pname}: the export's decisions are not decide()'s`);
+    if (first === null) first = doc;
+    else assert.deepEqual(doc, first, `${pname}: the policy file in the working directory changed the export`);
     const byEntry = new Map(doc.decisions.map((d) => [d.subject.entry, d]));
     const list = JSON.parse(fs.readFileSync(path.join(out, 'v0.1/servers.json'), 'utf8'));
     for (const { server } of list.servers) {
@@ -646,14 +664,19 @@ test('export-registry: _meta verdicts and skips are views of decide(), and agree
       const skip = man.skipped.find((x) => x.name === d.subject.entry);
       assert.ok(skip && skip.reason.startsWith(`denied by ${d.decided_by}`), `${pname} ${d.subject.entry}: denied, but not skipped as denied`);
     }
-    // One subject, one answer: explain over the same entry, policy and instant.
-    for (const name of SAMPLE) {
-      const x = JSON.parse(run('explain.cjs', [name, '--json', '--cwd', dir, '--as-of', AS_OF]).stdout).findings.decisions[0];
-      const d = byEntry.get(name);
-      assert.ok(d, `${pname} ${name}: no decision in the export`);
-      assert.deepEqual([d.subject.id, d.effect, d.decided_by, d.rules], [x.subject.id, x.effect, x.decided_by, x.rules],
-        `${pname} ${name}: export and explain decide the same entry differently`);
-    }
+  }
+  // One subject, one answer: explain's model of the same entry at the same
+  // instant, re-decided under the export's policy, is the export's decision.
+  // explain also weighs inputs the export does not (the configured set, #123;
+  // the tool-description scan, #124), so those are left out of the comparison.
+  const byEntry = new Map(first.decisions.map((d) => [d.subject.entry, d]));
+  for (const name of SAMPLE) {
+    const edoc = JSON.parse(run('explain.cjs', [name, '--json', '--cwd', DIRS.none, '--as-of', AS_OF]).stdout).findings;
+    const [x] = recompute({ ...artifactPart(edoc), policy: first.policy });
+    const d = byEntry.get(name);
+    assert.ok(d, `${name}: no decision in the export`);
+    assert.deepEqual([d.subject.id, d.effect, d.decided_by, d.rules], [x.subject.id, x.effect, x.decided_by, x.rules],
+      `${name}: export and explain decide the same entry differently`);
   }
 });
 

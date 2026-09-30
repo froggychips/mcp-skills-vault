@@ -943,14 +943,16 @@ Each entry is a valid `server.json` (validated in the tests against the vendored
 integrity, the date of each check, and how to ask `explain`. The `verdict`
 there is the entry's Decision — effect, the rule that decided it, why, as of
 when — made by `decide()` over the stored evidence exactly as `explain` makes
-it, under the policy that applies to `--cwd`; `tier_holds_until` is the first
+it, under the vault's own rules only — like a badge, the export is the vault's
+public statement, so a `.mcp-vault.policy.json` in the directory it runs from
+is not applied; `tier_holds_until` is the first
 instant a piece of that evidence ages out. The name is the official one only
 when `identity` recorded it; everything else is published under
 `xyz.froggychips.mcp/…`, never under a namespace nobody proved. A denied entry,
 a Deprecated tier, or nothing pinned is not exported — a host that ignores
 `_meta` would offer it. Everything is judged as of one instant: now, or
 `--as-of` (`--check` replays the instant the export on disk was made at), and
-the same DB, policy and instant give the same bytes; the manifest
+the same DB and instant give the same bytes; the manifest
 (`export.json`) hashes every file, and `--json` adds the findings@1 document.
 
 Both defaults are one constant each in

@@ -31,14 +31,19 @@
  *     twin served as `application/json` — see jsonTwin in lib/subregistry.cjs.
  *
  * Offline: no network. Each entry's verdict is the Decision `decide()` makes
- * over its stored evidence (the model `explain` renders), under the policy
- * that applies to --cwd, as of one instant: the clock read once here, or
- * --as-of (lib/clock.cjs, docs/adr/0001). Same DB, policy and instant: same
- * bytes.
+ * over its stored evidence (the model `explain` renders), under the vault's
+ * own rules only, as of one instant: the clock read once here, or --as-of
+ * (lib/clock.cjs, docs/adr/0001). Same DB and instant: same bytes.
+ *
+ * The export is the vault's public statement about its entries, like a badge
+ * (lib/badge.cjs BADGE_POLICY): a `.mcp-vault.policy.json` in whatever
+ * directory it is run from is one project's bar, not the vault's, and must
+ * not change what is published. So no policy file is read (the gate's rules,
+ * `policyRules: false`) and there is no --cwd.
  *
  * Usage:
  *   node scripts/export_subregistry.cjs [--out <dir>] [--base-url <url>]
- *                                       [--as-of <date|instant>] [--cwd <dir>]
+ *                                       [--as-of <date|instant>]
  *                                       [--min-tier Core|Recommended|Experimental]
  *                                       [--check] [--json]
  *
@@ -47,7 +52,6 @@
  *               from it (default: https://mcp.froggychips.xyz)
  *   --as-of     judge as of YYYY-MM-DD or an ISO-8601 instant (default: now;
  *               with --check, the instant the export on disk was made at)
- *   --cwd       the project whose policy applies (default: the working directory)
  *   --check     write nothing; exit 1 if the files on disk differ from a fresh export
  *   --json      print the manifest (schema mcp-vault/subregistry-export@1),
  *               with every entry's findings and Decision under `findings`
@@ -66,7 +70,11 @@ const path = require('path');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { buildExport, normalizeBaseUrl, jsonTwin, API_PREFIX, NAMESPACE, DEFAULT_BASE_URL } = require('./lib/subregistry.cjs');
 const { asOfFromArgv, parseAsOf } = require('./lib/clock.cjs');
-const { loadEffectivePolicy } = require('./lib/policy_rules.cjs');
+const { effectivePolicy } = require('./lib/policy_rules.cjs');
+
+// The gate's own rules, no policy file (`--no-policy`), frozen once: as for
+// the badges (lib/badge.cjs BADGE_POLICY).
+const EXPORT_POLICY = effectivePolicy(null, {}, { policyRules: false });
 
 const ROOT      = path.resolve(__dirname, '..', '..');
 const DB_PATH   = path.join(ROOT, 'mcp-ecosystem-intelligence', 'assets', 'tools_database.json');
@@ -79,14 +87,13 @@ const HELP = `export-registry — the vault as a static MCP sub-registry (API v0
   --base-url <url>   where that root is served (default: ${DEFAULT_BASE_URL})
   --as-of <date>     judge as of YYYY-MM-DD or an ISO-8601 instant (default: now;
                      with --check, the instant the export on disk was made at)
-  --cwd <dir>        the project whose policy applies (default: .)
   --min-tier <t>     Core | Recommended | Experimental (default: Experimental)
   --check            write nothing; exit 1 if the on-disk export is stale
   --json             print the manifest, with findings and decisions (findings@1)
 `;
 
 function parseArgs(argv) {
-  const opts = { out: DEFAULT_OUT, baseUrl: DEFAULT_BASE_URL, cwd: process.cwd(), minTier: 'Experimental', check: false, json: false };
+  const opts = { out: DEFAULT_OUT, baseUrl: DEFAULT_BASE_URL, minTier: 'Experimental', check: false, json: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const val = () => {
@@ -98,7 +105,6 @@ function parseArgs(argv) {
     else if (a === '--base-url') opts.baseUrl = val();
     else if (a === '--as-of') val();                 // read by asOfFromArgv
     else if (a.startsWith('--as-of=')) { /* read by asOfFromArgv */ }
-    else if (a === '--cwd') opts.cwd = path.resolve(val());
     else if (a === '--min-tier') opts.minTier = val();
     else if (a === '--check') opts.check = true;
     else if (a === '--json') opts.json = true;
@@ -179,13 +185,10 @@ function run(argv, { dbPath = DB_PATH, evalPath = EVAL_PATH } = {}) {
   let evals = { results: [] };
   try { evals = JSON.parse(fs.readFileSync(evalPath, 'utf8')); } catch { /* none shipped */ }
 
-  // The same loader every command uses; the effective policy is recorded in
-  // the findings document, so the verdicts can be recomputed from it.
-  const loaded = loadEffectivePolicy(opts.cwd);
-  if (!loaded.ok) {
-    process.stderr.write(`export-registry: policy ${loaded.path}: ${(loaded.errors || []).join('; ')}\n`);
-    return 2;
-  }
+  // The vault's own rules, no policy file — the same policy a badge is judged
+  // under (see the header). It is recorded in the findings document, so the
+  // verdicts can be recomputed from it.
+  const policy = EXPORT_POLICY;
 
   // --check without --as-of replays the instant the export on disk was made
   // at: "is it stale" means "does the data still produce these files", not
@@ -199,7 +202,7 @@ function run(argv, { dbPath = DB_PATH, evalPath = EVAL_PATH } = {}) {
   }
 
   let built;
-  try { built = buildExport(db, evals, { asOf, policy: loaded.policy, minTier: opts.minTier, baseUrl: opts.baseUrl }); } catch (e) {
+  try { built = buildExport(db, evals, { asOf, policy, minTier: opts.minTier, baseUrl: opts.baseUrl }); } catch (e) {
     process.stderr.write(`export-registry: ${e.message}\n`);
     return 2;
   }
