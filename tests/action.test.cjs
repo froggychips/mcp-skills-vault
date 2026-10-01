@@ -162,8 +162,11 @@ test('action: a clean config passes and says so in the job summary', { skip: !HA
   // Nothing fails. The one warning is what the configured set does together
   // (flows/*, a warning that only --strict fails), not a pin.
   assert.match(r.summary, /\*\*WARN\*\* — 3 servers checked, 0 failing, 0 unverified \(fail on: unknown, mode: offline,/);
-  assert.match(r.summary, /\| playwright-mcp \| allow \| trust\/ok \| \.mcp\.json:3 \| — \|/);
-  assert.match(r.summary, /\| mongodb-mcp-server \| allow \| trust\/ok \| \.vscode\/mcp\.json:3 \| — \|/);
+  // "Why" is empty, or — once the shipped record is past its shelf life (a
+  // matter of the wall clock) — the record's age, as context only.
+  const why = '(— |evidence\\/vault-age: vault evidence for \\S+ is \\d+ days old [^|]*)';
+  assert.match(r.summary, new RegExp(`\\| playwright-mcp \\| allow \\| trust\\/ok \\| \\.mcp\\.json:3 \\| ${why}\\|`));
+  assert.match(r.summary, new RegExp(`\\| mongodb-mcp-server \\| allow \\| trust\\/ok \\| \\.vscode\\/mcp\\.json:3 \\| ${why}\\|`));
   const report = JSON.parse(fs.readFileSync(r.outputs.report, 'utf8'));
   assert.equal(report.schema, 'mcp-vault/findings@1');
   assert.equal(report.scope, 'config');

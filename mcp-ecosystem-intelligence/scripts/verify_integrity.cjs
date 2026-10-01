@@ -83,7 +83,7 @@ const {
 const { loadEffectivePolicy, flagsFromArgv, rowFor, RANK } = require('./lib/policy_rules.cjs');
 const { hasOrgRules, loadOrgContext, orgModel } = require('./lib/org_policy.cjs');
 const {
-  decide, exitCode, outcomeFails, findingsDocument, toJson, toSarif: findingsToSarif, finding,
+  decide, exitCode, outcomeFails, findingsDocument, toJson, toSarif: findingsToSarif, finding, observationState,
 } = require('./lib/finding.cjs');
 const { fromVerifyResults, fromStoredEvidence, foundProblem } = require('./lib/findings_from.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
@@ -1457,6 +1457,38 @@ function configRef(file, base = process.cwd()) {
   return (rel && !rel.startsWith('..') && !path.isAbsolute(rel) ? rel : file).split(path.sep).join('/');
 }
 
+/**
+ * The vault record's age, for a config line: one context finding saying which
+ * claims of absence aged out (and which were never made), or null when none.
+ * `stored` is fromStoredEvidence's result for the vault entry `source`.
+ */
+function vaultAgeFinding(source, stored, s) {
+  const DAY = 86400000;
+  const stale = stored.observations.filter((o) => observationState(o, AS_OF) === 'stale' && !foundProblem(o.dimension, o.status));
+  const missing = stored.findings.filter((f) => f.rule === 'evidence/missing').map((f) => f.message.split(' ')[0]).sort();
+  if (!stale.length && !missing.length) return null;
+  let what = source.name;
+  try {
+    const t = toTypedEntry(source);
+    const id = t ? artifactId(t.artifact) : null;
+    if (id) what = id.replace(/^[a-z]+:/, '');
+  } catch { /* keep the entry name */ }
+  const parts = [];
+  if (stale.length) {
+    const days = Math.max(...stale.map((o) => Math.floor((AS_OF - Date.parse(o.confirmed_at || o.observed_at)) / DAY)));
+    const dims = [...new Set(stale.map((o) => o.dimension))].sort();
+    parts.push(`vault evidence for ${what} is ${days} days old (${dims.join(', ')})`);
+    if (missing.length) parts.push(`and never checked: ${missing.join(', ')}`);
+  } else {
+    parts.push(`vault evidence for ${what} never checked: ${missing.join(', ')}`);
+  }
+  return finding({
+    rule: 'evidence/vault-age', subject: s, scope: 'installed', severity: 'info', state: 'stale',
+    refs: stale.map((o) => o.id),
+    message: `${parts.join(' ')} — the result above uses what was last seen`,
+  });
+}
+
 // ── main ───────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -2091,13 +2123,19 @@ async function main() {
     for (const o of stored.observations) if (!seen.has(o.id)) model.observations.push(o);
     // On a config line, what the record *found* (a yanked release, a known
     // advisory, a hash or repo that disagreed — observed, never ageing,
-    // docs/adr/0001 §5). Not the record's own age: a claim of absence past
-    // its shelf life, or a dimension never checked, is about the vault
-    // release the config's tooling is pinned to, not about the config, and
-    // `check --online` re-observes it. Reporting it here turned every vault
-    // server into `unknown` a week after each release, which the pre-commit
-    // hook and the Action (fail-on unknown) fail on.
-    const kept = INSTALLED ? stored.findings.filter((f) => f.state === 'observed') : stored.findings;
+    // docs/adr/0001 §5) is decided. The record's own age is not: a claim of
+    // absence past its shelf life, or a dimension never checked, is about the
+    // vault release the hook or Action is pinned to, not about the config,
+    // and deciding it turned every vault server into `unknown` a week after
+    // each release, which fail-on unknown fails. It is still said — no data
+    // is not clean — as one context finding per line (evidence/vault-age,
+    // never part of the answer); `check --online` re-observes it.
+    let kept = stored.findings;
+    if (INSTALLED) {
+      kept = stored.findings.filter((f) => f.state === 'observed');
+      const age = vaultAgeFinding(source, stored, s);
+      if (age && !model.findings.some((f) => f.id === age.id)) kept.push(age);
+    }
     model.findings.push(...kept);
     storedFindings[i] = kept;
   });
@@ -2123,11 +2161,12 @@ async function main() {
     });
     for (const f of fs_) {
       if (f.rule === 'evidence/stale') continue;
-      const tag = f.state !== 'observed' ? 'UNVERIFIED'
+      const tag = f.rule === 'evidence/vault-age' ? 'NOTE'
+        : f.state !== 'observed' ? 'UNVERIFIED'
         : f.severity === 'high' ? (f.rule === 'evidence/advisories' ? 'CVE' : 'FAIL')
         : 'WARN';
       r.lines = r.lines || [];
-      r.lines.push([tag, `stored evidence: ${f.message}`, { rule: f.rule, severity: f.severity, state: f.state }]);
+      r.lines.push([tag, tag === 'NOTE' ? f.message : `stored evidence: ${f.message}`, { rule: f.rule, severity: f.severity, state: f.state }]);
       if (d.rules.some((o) => o.findings.includes(f.id) && fails(o))) failed = true;
       if (tag === 'UNVERIFIED') unverified = true;
     }

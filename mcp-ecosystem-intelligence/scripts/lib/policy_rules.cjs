@@ -725,6 +725,16 @@ const configRules = [
 
 const commandRules = [
   {
+    id: 'evidence/vault-age', status: 'active', thresholded: false, views: [], claims: 'evidence/vault-age',
+    doc: 'On a config line (check, verify --config): the vault\'s record of the launched release is past its shelf '
+      + 'life. Context, never part of the answer: the age is the vault release\'s, not the config\'s, and a claim of '
+      + 'absence that aged out would otherwise fail every config a week after each release. Shown so that no data is '
+      + 'not read as clean; what the record *found* is still decided (evidence/*, observed at any age).',
+    evaluate(ctx) {
+      return ctx.findings.filter((f) => f.rule === 'evidence/vault-age').map((f) => context(out('unknown', f.message, [f.id], f.rule)));
+    },
+  },
+  {
     id: 'scope/unanswered', status: 'active', thresholded: false, views: [], claims: 'scope/unanswered',
     doc: 'A question the run could not answer — a config that would not parse, a vault entry that names no artifact, '
       + 'a source that answered for nothing. Unknown, never a failure at any threshold: the decision is `unanswered` '
@@ -848,7 +858,7 @@ const ORDER = Object.freeze({
     'policy/license', 'policy/health', 'policy/trust',
     'gate/fail', 'gate/unverified', 'tool-scan/*', 'behaviour/*', 'budget/over', ...SETUP_ORDER,
     'secrets/*',
-    'gate/require-provenance', 'gate/fail-dep-advisories', 'finding/severity', 'finding/incomplete',
+    'gate/require-provenance', 'gate/fail-dep-advisories', 'finding/severity', 'finding/incomplete', 'evidence/vault-age',
     'lookalike/*', 'config/unpinned-launch', 'config/launch-source-override',
     'audits/recorded',
     'db/signature', 'audits/import',
@@ -863,7 +873,7 @@ const ORDER = Object.freeze({
     'policy/license', 'policy/health', 'policy/trust',
     'gate/fail', 'gate/unverified', 'tool-scan/*', 'behaviour/*', 'budget/over', ...SETUP_ORDER,
     'secrets/*',
-    'gate/require-provenance', 'gate/fail-dep-advisories', 'finding/severity', 'finding/incomplete',
+    'gate/require-provenance', 'gate/fail-dep-advisories', 'finding/severity', 'finding/incomplete', 'evidence/vault-age',
     'lookalike/*', 'config/unpinned-launch', 'config/launch-source-override',
     'audits/recorded',
     'db/signature', 'audits/import',

@@ -536,7 +536,14 @@ function render(m, { opts, policyPath, cwd, color }) {
       fix: fixFor(o, f, { m, srv, policyPath, dbTools }),
     });
   }
-  items.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0) || ((a.line || 0) - (b.line || 0)) || (a.rule < b.rule ? -1 : a.rule > b.rule ? 1 : 0));
+  // Context: how old the vault's record of each launched release is. Never
+  // part of the answer (evidence/vault-age, role context), never counted —
+  // but said, because no data is not clean.
+  for (const f of doc.findings) {
+    if (f.rule !== 'evidence/vault-age') continue;
+    items.push({ ...locate(f.subject, doc, m.servers, cwd), cls: 'context', fails: false, effect: 'context', rule: f.rule, tag: null, what: secrets.redact(f.message), fix: null });
+  }
+  items.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0) || ((a.line || 0) - (b.line || 0)) || ((a.cls === 'context') - (b.cls === 'context')) || (a.rule < b.rule ? -1 : a.rule > b.rule ? 1 : 0));
 
   let lastFile = null; let lastLine = null;
   for (const it of items) {
@@ -545,6 +552,7 @@ function render(m, { opts, policyPath, cwd, color }) {
       out.push(`  ${it.line ? `${DM}:${it.line}${RS} ` : ''}${it.server ? `${B}${it.server}${RS}` : `${DM}(the config as a whole)${RS}`}`);
       lastLine = it.line;
     }
+    if (it.cls === 'context') { out.push(`    ${DM}i ${it.what}${RS}`); continue; }
     const mark = it.fails ? `${RD}✗${RS}` : it.cls === 'unanswered' ? `${YL}?${RS}` : `${YL}!${RS}`;
     out.push(`    ${mark} ${it.what} ${DM}[${it.tag}${it.fails ? ', fails' : ''}]${RS}`);
     out.push(`      ${DM}fix:${RS} ${it.fix}`);
@@ -552,7 +560,7 @@ function render(m, { opts, policyPath, cwd, color }) {
 
   const failing = items.filter((i) => i.fails).length;
   const open = items.filter((i) => !i.fails && i.cls === 'unanswered').length;
-  const notes = items.length - failing - open;
+  const notes = items.filter((i) => i.cls !== 'context').length - failing - open;
   const n = m.servers.length;
   const scope = `${n} server${n === 1 ? '' : 's'} in ${m.configs.length} config${m.configs.length === 1 ? '' : 's'}`;
   const tail = `${DM}fail on ${doc.policy ? doc.policy.fail_on : 'deny'} · ${opts.online ? 'online' : 'offline'}${RS}`;

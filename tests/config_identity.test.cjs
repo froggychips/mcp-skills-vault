@@ -195,3 +195,45 @@ test('entry_match: one matcher — status, flows, budget, audit and org rules al
   assert.equal(auditSetup.matchDbEntry({ tools: db }, 'mcp-server-aws', { command: 'npx', args: ['-y', '@playwright/mcp@0.0.75'] }).name, 'playwright-mcp');
   assert.equal(budget.matchDbEntry({ name: 'mcp-server-aws', command: 'node', args: ['./innocent.js'] }, db), null);
 });
+
+test('check: an aged-out vault record is one context line per server — said, in text, JSON and SARIF, and never the answer', (t) => {
+  const tree = skillTree();
+  const LATE = '2026-10-20T12:00:00Z';   // every claim of absence past its shelf life
+  const dir = project({ pw: launch(tree.versions['playwright-mcp']), jira: launch(tree.versions['mcp-atlassian']) });
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  for (const failOn of ['deny', 'unknown', 'warn']) {
+    // pw: only its age is new, so the exit is what it was without it; jira:
+    // an advisory on record still fails at every threshold.
+    const solo = project({ pw: launch(tree.versions['playwright-mcp']) });
+    t.after(() => fs.rmSync(solo, { recursive: true, force: true }));
+    const fresh = tree.run('check_configs.cjs', ['--json', '--as-of', AS_OF, '--fail-on', failOn], solo);
+    const late = tree.run('check_configs.cjs', ['--json', '--as-of', LATE, '--fail-on', failOn], solo);
+    assert.equal(late.status, fresh.status, `fail-on ${failOn}: an aged record changed the exit (${fresh.status} → ${late.status})`);
+    assert.equal(tree.run('check_configs.cjs', ['--as-of', LATE, '--fail-on', failOn], dir).status, 1, `fail-on ${failOn}`);
+  }
+
+  const text = tree.run('check_configs.cjs', ['--as-of', LATE], dir).stdout;
+  const lines = text.split('\n').filter((l) => /^\s+i vault evidence for /.test(l));
+  assert.equal(lines.length, 2, `one context line per server:\n${text}`);
+  assert.match(lines.join('\n'), /@playwright\/mcp@[\d.]+ is \d+ days old \([a-z_, ]+\) — the result above uses what was last seen/);
+
+  const doc = JSON.parse(tree.run('check_configs.cjs', ['--json', '--as-of', LATE], dir).stdout);
+  const age = doc.findings.filter((f) => f.rule === 'evidence/vault-age');
+  assert.equal(age.length, 2);
+  for (const f of age) {
+    assert.equal(f.state, 'stale');
+    const d = doc.decisions.find((x) => x.subject.id === f.subject.id);
+    const o = d.rules.find((x) => x.findings.includes(f.id));
+    assert.equal(o.role, 'context', 'the age is context, not part of the answer');
+    assert.equal(o.rule, 'evidence/vault-age');
+  }
+  const pwLine = age.find((f) => /playwright/.test(f.message)).subject.id;
+  assert.equal(doc.decisions.find((x) => x.subject.id === pwLine).effect, 'allow');
+  assert.ok(doc.findings.some((f) => f.rule === 'evidence/advisories' && f.state === 'observed'), 'the advisory is still decided');
+
+  const sarif = JSON.parse(tree.run('check_configs.cjs', ['--sarif', '--as-of', LATE], dir).stdout);
+  const notes = sarif.runs[0].results.filter((r) => r.ruleId === 'evidence/vault-age');
+  assert.equal(notes.length, 2);
+  assert.ok(notes.every((r) => r.level === 'note'));
+});
