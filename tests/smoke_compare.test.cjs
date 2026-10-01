@@ -8,6 +8,9 @@ const path     = require('node:path');
 
 const s = require('../mcp-ecosystem-intelligence/scripts/smoke_compare.cjs');
 
+// The CI unit-test container has no git; the CLI test builds a throwaway repo.
+const HAS_GIT = cp.spawnSync('git', ['--version']).status === 0;
+
 const pass = (name, n) => ({ name, status: 'pass', failure_class: n === 0 ? 'NO_TOOLS' : null, error_code: null, tool_count: n, sandboxed: true });
 const fail = (name, cls, extra = {}) => ({ name, status: 'fail', failure_class: cls, error_code: cls === 'TIMEOUT' ? 'timeout' : 'exit 1', tool_count: null, sandboxed: true, ...extra });
 
@@ -112,7 +115,7 @@ test('parseRuns: concatenated pretty-printed mcp_eval documents', () => {
   assert.deepEqual(s.parseRuns(text).map((r) => r.name), ['a', 'b']);
 });
 
-test('CLI: gate fails only on breaking, against eval_results.json at the base ref', () => {
+test('CLI: gate fails only on breaking, against eval_results.json at the base ref', { skip: !HAS_GIT && 'no git' }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'smoke-compare-'));
   const git = (...a) => cp.execFileSync('git', a, { cwd: dir, stdio: 'pipe' });
   git('init', '-q');
