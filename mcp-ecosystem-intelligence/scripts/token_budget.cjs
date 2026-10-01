@@ -24,10 +24,10 @@
  *   node scripts/token_budget.cjs [--cwd <path>] [--json] [--context <n>]
  *                                 [--all] [--budget <pct>]
  *
- * Exit codes:
+ * Exit codes (a Decision, docs/adr/0001 — row budget/over, mode budget):
  *   0  under budget (or no budget given)
  *   1  --budget exceeded
- *   2  bad arguments
+ *   2  bad arguments, or a host config could not be read (unless over budget)
  */
 
 'use strict';
@@ -37,6 +37,9 @@ const path = require('path');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { readWallClock } = require('./lib/clock.cjs');
 const { readInstalledServers } = require('./lib/installed.cjs');
+const { subject } = require('./lib/finding.cjs');
+const { subjectPath } = require('./lib/secrets.cjs');
+const { commandPolicy, decideRun, unanswered } = require('./lib/run_decision.cjs');
 const {
   estimateServer, matchDbEntry, summarise,
   TOKENS_PER_TOOL_LOW, TOKENS_PER_TOOL_HIGH, TOKENS_PER_TOOL_MID, BYTES_PER_TOKEN,
@@ -80,6 +83,36 @@ const HELP = `token_budget — what your MCP servers cost in context
   --json             machine-readable
 `;
 
+// What the ceiling is about: every server configured for this project, across
+// hosts — one context per request.
+const CONFIGURED = subject.setup({ host: 'configured', scope: 'budget' });
+
+/**
+ * The budget as a Decision. `--budget <pct>` is the ceiling (a policy of
+ * `maxContextPercent` with `contextBudget: fail`), the measured total is the
+ * fact the row budget/over reads, and a config that could not be read is
+ * scope/unanswered: a total of an unknown fraction is not "under budget".
+ */
+function budgetDecision({ totals, context, budget = null, unreadable = [], cwd = null, asOf }) {
+  const limit = budget === null ? null : Math.round((budget / 100) * context);
+  const facts = budget === null ? {} : {
+    [CONFIGURED.id]: {
+      budget: {
+        after: totals.tokens, limit, limit_source: 'maxContextPercent', context,
+        percent: totals.percent_of_context, over: (totals.tokens / context) * 100 > budget,
+      },
+    },
+  };
+  const findings = unreadable.map((u) => unanswered({
+    subject: subject.hostConfig({ path: subjectPath(u.path, cwd), host: u.host || null, scope: u.scope || null }),
+    scope: 'budget', message: `${subjectPath(u.path, cwd)}: ${u.error} — its servers are not in this total`,
+  }));
+  return decideRun({
+    findings, subjects: [CONFIGURED], facts, mode: 'budget', scope: 'budget', asOf,
+    policy: commandPolicy({}, budget === null ? null : { contextBudget: 'fail', maxContextPercent: budget }),
+  });
+}
+
 function readJson(file, fallback) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
 }
@@ -116,17 +149,19 @@ function main(argv) {
   const total     = totals.tokens;
   const totalLow  = totals.tokens_low;
   const totalHigh = totals.tokens_high;
-  const pct       = (total / opts.context) * 100;
 
   // Servers the DB says can be narrowed, that are installed at full width.
   const trimmable = rows
     .filter((r) => r.toolsets && (r.tools === null || r.tools > 10))
     .map((r) => ({ name: r.name, tools: r.tools, hint: r.toolsets }));
 
+  // When this run looked; the decision is made at the same instant.
+  const at = readWallClock();
+  const run = budgetDecision({ totals, context: opts.context, budget: opts.budget, unreadable, cwd: opts.cwd, asOf: at });
   const report = {
     schema: 'mcp-vault/token-budget@1',
     unreadable,
-    generated_at: new Date(readWallClock()).toISOString(),
+    generated_at: new Date(at).toISOString(),
     cwd: opts.cwd,
     context_window: opts.context,
     servers: rows.sort((a, b) => (b.tokens || 0) - (a.tokens || 0)),
@@ -137,6 +172,8 @@ function main(argv) {
       tokens_per_tool: { low: TOKENS_PER_TOOL_LOW, high: TOKENS_PER_TOOL_HIGH, used: TOKENS_PER_TOOL_MID },
       note: 'measured = tools/list payload bytes ÷ 4 (from mcp_eval); eval/db = tool count × per-tool midpoint',
     },
+    // Additive (mcp-vault/findings@1): the ceiling as a Decision.
+    findings: run.document,
   };
 
   if (opts.all) {
@@ -184,17 +221,14 @@ function main(argv) {
     }
   }
 
-  if (opts.budget !== null && pct > opts.budget) {
+  // The exit code is the Decision's: over the ceiling fails (and outranks an
+  // unreadable config); a total that silently omits a config we could not
+  // read is not "under budget" — it is unanswered.
+  if (run.decisions.some((d) => d.fails)) {
     process.stderr.write(`\nTool surface is ${report.totals.percent_of_context}% of the context window, over the ${opts.budget}% budget.\n`);
-    return 1;
   }
-  // A total that silently omits a config we could not read is not "under
-  // budget"; it is a total of an unknown fraction of the servers.
-  if (unreadable.length) {
-    for (const u of unreadable) process.stderr.write(`token_budget: ${u.path}: ${u.error}\n`);
-    return 2;
-  }
-  return 0;
+  for (const u of unreadable) process.stderr.write(`token_budget: ${u.path}: ${u.error}\n`);
+  return run.exit;
 }
 
 if (require.main === module) {
@@ -204,4 +238,4 @@ if (require.main === module) {
 // estimateServer / matchDbEntry are re-exported so the existing tests (and
 // anything else importing them from here) keep working after the move to
 // lib/budget.cjs.
-module.exports = { estimateServer, matchDbEntry, parseArgs, TOKENS_PER_TOOL_LOW, TOKENS_PER_TOOL_HIGH, BYTES_PER_TOKEN };
+module.exports = { estimateServer, matchDbEntry, parseArgs, budgetDecision, TOKENS_PER_TOOL_LOW, TOKENS_PER_TOOL_HIGH, BYTES_PER_TOKEN };
