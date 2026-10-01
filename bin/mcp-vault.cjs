@@ -33,6 +33,7 @@ function dbEntryCount() {
 
 const COMMANDS = {
   status:          "status.cjs",
+  check:           "check_configs.cjs",
   audit:           "audit_setup.cjs",
   secrets:         "check_secrets.cjs",
   verify:          "verify_integrity.cjs",
@@ -78,6 +79,9 @@ USAGE
 
 COMMANDS
   status            One screen: what is installed, what is wrong, what is missing
+  check [paths…]    This repo's MCP configs in one pass, one exit code (CI, pre-commit):
+                    pins, advisories, unpinned launches, secrets, lookalikes, flows
+                    (offline by default; --online, --json, --sarif, --strict, --fail-on)
   scan              Detect project stack and recommend MCP servers
   list (ls)         Show every server in the vault DB (filters: --category, --tier, --query)
   doctor            Check local Node / gh / Docker / uvx / Claude MCP config readiness

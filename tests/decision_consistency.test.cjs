@@ -1021,6 +1021,9 @@ const DECIDES_VIA_MODEL = {
   // `setup`; the verdict and the category lists are views of it.
   status:  'status.cjs',
   audit:   'audit_setup.cjs',
+  // The repo's configs in one pass: verify --config, secrets, flows and the
+  // stored tool scans as findings, one decideRun() (tests/check_configs.test.cjs).
+  check:   'check_configs.cjs',
   // This machine (mode `environment`, row environment/*) and the context
   // ceiling (mode `budget`, row budget/over).
   doctor:  'doctor.cjs',
