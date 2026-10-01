@@ -27,10 +27,13 @@
  * Usage:
  *   node scripts/explain.cjs <name> [--json] [--verify] [--cwd <path>]
  *                                   [--record <file>] [--installed] [--as-of <date>]
+ *                                   [--strict] [--fail-unverified]
  *
- * Exit codes:
- *   0  allow
- *   1  deny
+ * Exit codes — the gate's, for this entry (`verify` with the same policy,
+ * flags and --as-of exits the same way):
+ *   0  the decision does not fail at the policy's fail_on
+ *   1  it does (deny always; unknown under `unverified: fail` /
+ *      --fail-unverified; warn under --strict)
  *   2  the entry could not be found / bad arguments
  */
 
@@ -42,7 +45,7 @@ const { spawnSync } = require('child_process');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { readDb } = require('./lib/db_io.cjs');
 const { DEFAULTS } = require('./lib/policy.cjs');
-const { effectivePolicy, loadEffectivePolicy, evidenceRuleOutcomes, rowFor } = require('./lib/policy_rules.cjs');
+const { effectivePolicy, loadEffectivePolicy, flagsFromArgv, evidenceRuleOutcomes, rowFor } = require('./lib/policy_rules.cjs');
 const { decide: decideFindings, findingsDocument, toJson, explainTrace, renderTrace } = require('./lib/finding.cjs');
 const { subjectForTool, fromEvidence, fromReportEntry } = require('./lib/findings_from.cjs');
 const { trustScore, fitScore, behaviour, recommend } = require('./lib/scores.cjs');
@@ -65,7 +68,7 @@ const DM = T ? '\x1b[2m'  : '';
 const RS = T ? '\x1b[0m'  : '';
 
 function parseArgs(argv) {
-  const opts = { name: null, json: false, verify: false, cwd: process.cwd(), record: null, help: false, asOf: null };
+  const opts = { name: null, json: false, verify: false, cwd: process.cwd(), record: null, help: false, asOf: null, flags: {} };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--json') opts.json = true;
@@ -74,6 +77,7 @@ function parseArgs(argv) {
     else if (a === '--cwd') opts.cwd = argv[++i] || opts.cwd;
     else if (a === '--record') opts.record = argv[++i] || null;
     else if (a === '--as-of') i++;
+    else if (a === '--strict' || a === '--fail-unverified') { /* read below */ }
     else if (a.startsWith('--as-of=')) { /* read below */ }
     else if (a.startsWith('--')) return { ...opts, error: `unknown flag ${a}` };
     else if (!opts.name) opts.name = a;
@@ -86,12 +90,15 @@ function parseArgs(argv) {
   // --verify runs the live gate, which observes today; a replayed instant
   // would date those answers in the past (verify refuses the same pair).
   if (opts.verify && clock.source === 'as-of') return { ...opts, error: '--as-of replays stored evidence and cannot be combined with --verify (a live gate run observes today)' };
-  return { ...opts, asOf: clock.asOf, asOfIso: clock.iso, asOfSource: clock.source };
+  // The bar-raising switches verify takes, read by the same function, so the
+  // threshold (fail_on) is the one verify would hold this entry to.
+  return { ...opts, asOf: clock.asOf, asOfIso: clock.iso, asOfSource: clock.source, flags: flagsFromArgv(argv) };
 }
 
 const HELP = `explain — why this entry is allowed, or why it is not
 
   node scripts/explain.cjs <name> [--json] [--verify] [--record <file>]
+                            [--strict] [--fail-unverified]
 
   --verify        run the live integrity gate first (network); otherwise the
                   answer comes from stored, dated evidence
@@ -99,6 +106,11 @@ const HELP = `explain — why this entry is allowed, or why it is not
   --cwd <path>    the project whose policy and configured servers apply
   --as-of <date>  judge the stored evidence as of this date (YYYY-MM-DD or an
                   ISO-8601 instant) instead of now
+  --strict        warnings fail too (as for verify)
+  --fail-unverified  "could not check" fails too (as for verify)
+
+  Exit: 0 passes, 1 fails at the policy's fail_on — the same threshold and
+  flags verify uses, so both exit alike for this entry; 2 bad arguments.
 `;
 
 function readJson(file, fallback) {
@@ -106,11 +118,13 @@ function readJson(file, fallback) {
 }
 
 /** The live gate's own verdict for one entry, when --verify is given. */
-function runGate(name, cwd, asOfIso = null) {
+function runGate(name, cwd, asOfIso = null, flags = {}) {
   // The gate judges at the same instant this decision does, or the two halves
   // of one record would be about different days.
   const args = [VERIFY_CJS, '--entry', name, '--json', '--cwd', cwd];
   if (asOfIso) args.push('--as-of', asOfIso);
+  if (flags.strict) args.push('--strict');
+  if (flags.failUnverified) args.push('--fail-unverified');
   const res = spawnSync(process.execPath, args, {
     encoding: 'utf8', maxBuffer: 32 * 1024 * 1024,
   });
@@ -188,9 +202,9 @@ function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, b
       budget: budget || null,
     },
   };
-  // explain answers "is this denied?" — its exit code has never been the
-  // gate's threshold, so it asks decide() that question explicitly.
-  const [decision] = decideFindings(findings, ep, asOf, { subjects: [s], facts, failOn: 'deny' });
+  // The threshold is the effective policy's fail_on — the one verify uses —
+  // so one decision cannot pass here and fail there.
+  const [decision] = decideFindings(findings, ep, asOf, { subjects: [s], facts });
   return { subject: s, observations: ev.observations, findings, decision, facts, policy: ep };
 }
 
@@ -236,7 +250,7 @@ function main(argv) {
   // The same loader every command uses (lib/policy_rules.cjs): `policy` is
   // the file as written, for the record; `loaded.policy` is the frozen
   // effective policy decide() receives.
-  const loaded = loadEffectivePolicy(opts.cwd);
+  const loaded = loadEffectivePolicy(opts.cwd, { flags: opts.flags });
   const policy = loaded.file_policy;
   const typed  = toTypedEntry(tool);
   const currentId = typed ? artifactId(typed.artifact) : null;
@@ -273,7 +287,7 @@ function main(argv) {
 
   let gate = null;
   if (opts.verify) {
-    gate = runGate(tool.name, opts.cwd, opts.asOfSource === 'as-of' ? opts.asOfIso : null);
+    gate = runGate(tool.name, opts.cwd, opts.asOfSource === 'as-of' ? opts.asOfIso : null, opts.flags);
     if (!gate.ok) process.stderr.write(`${YL}explain: could not run the live gate (${gate.error}); falling back to stored evidence${RS}\n`);
   }
   const gateEntry = gate && gate.ok

@@ -42,6 +42,7 @@ const POLICIES = {
   strict: { unverified: 'fail', installHooks: 'fail', dependencyHooks: 'fail', dependencyAdvisories: 'fail',
     signatures: 'require', provenance: 'require', docker: 'digest', trust: ['verified'], minHealthScore: 70, maxEvidenceAgeDays: 5 },
   licences: { licenses: { allow: ['MIT', 'Apache-2.0'], deny: ['BUSL-1.1'] }, signatures: 'require', docker: 'tag' },
+  unverified: { unverified: 'fail' },
 };
 const DIRS = {};
 for (const [name, body] of Object.entries(POLICIES)) {
@@ -151,6 +152,39 @@ test('one subject, one answer: the same inputs decide the same way whichever com
   }
 });
 
+test('explain exits as verify does: same policy, flags and --as-of, same exit and decided_by', () => {
+  // Far enough ahead that every stored claim is past its shelf life: the case
+  // where explain used to answer 0 ("not denied") while verify, holding the
+  // same decision to `fail_on: unknown`, answered 1.
+  const STALE = '2027-06-01T00:00:00.000Z';
+  const cases = [[DIRS.unverified, []], [DIRS.none, ['--fail-unverified']], [DIRS.none, ['--strict']]];
+  let stale = 0;
+  for (const [dir, flags] of cases) {
+    const v = JSON.parse(run('verify_integrity.cjs', ['--offline', '--json', '--cwd', dir, '--as-of', STALE, ...flags]).stdout);
+    const byId = new Map(v.findings.decisions.map((d) => [d.subject.id, d]));
+    for (const name of SAMPLE) {
+      const label = `${path.basename(dir)} ${flags.join(' ') || '(no flags)'} ${name}`;
+      const vr = run('verify_integrity.cjs', ['--offline', '--json', '--entry', name, '--cwd', dir, '--as-of', STALE, ...flags]);
+      const er = run('explain.cjs', [name, '--json', '--cwd', dir, '--as-of', STALE, ...flags]);
+      const [ed] = JSON.parse(er.stdout).findings.decisions;
+      const vd = byId.get(ed.subject.id);
+      assert.ok(vd, `${label}: verify made no decision for ${ed.subject.id}`);
+      assert.equal(ed.fail_on, vd.fail_on, `${label}: explain and verify hold the entry to different thresholds`);
+      assert.equal(er.status, vr.status, `${label}: explain exits ${er.status}, verify ${vr.status}`);
+      // Stored evidence can also *deny* (a recorded advisory, a vanished
+      // package), which an offline verify does not re-read: there explain
+      // is stricter, and both still exit 1. The case this test is about is
+      // the other one — nothing denies, and the threshold decides.
+      if (vd.fails && vd.effect === 'unknown' && ed.effect !== 'deny') {
+        stale++;
+        assert.equal(ed.decided_by, vd.decided_by, `${label}: decided by ${ed.decided_by} here, ${vd.decided_by} in verify`);
+        assert.equal(er.status, 1, `${label}: unknown under fail_on=${vd.fail_on} must fail`);
+      }
+    }
+  }
+  assert.ok(stale >= 3, `the fixtures must exercise stale evidence failing at fail_on (got ${stale})`);
+});
+
 // ── who decides ────────────────────────────────────────────────────────────
 
 // Commands whose verdict is a Decision from decide() (and prints findings@1).
@@ -233,7 +267,6 @@ function stringTokens(src) {
 // Rendering a decision needs the word; making one is decide()'s. Each line
 // here is a place that *prints* an effect, with why.
 const DECISION_WORD_ALLOWLIST = [
-  { file: 'explain.cjs', line: /failOn: 'deny'/, reason: 'explain asks decide() the narrower question it has always answered' },
   { file: 'explain.cjs', line: /decision: m\.decision\.effect === 'deny' \? 'deny' : 'allow'/, reason: 'the decision@1 view: its two-word vocabulary, read off the Decision' },
 ];
 

@@ -306,9 +306,9 @@ function decide(findings, policy, asOf, { subjects = [], facts = {}, mode = 'gat
   // Required here rather than at the top: lib/policy_rules.cjs reads this
   // module's constants and must be loadable without it.
   const { rulesFor } = require('./policy_rules.cjs');
-  // The threshold is the policy's, unless the caller asks a narrower
-  // question: explain's exit code has always meant "is this denied", not
-  // "would the gate fail it", and says so by passing failOn: 'deny'.
+  // The threshold is the policy's (flags already applied). `failOn` exists
+  // for a caller that must ask a different question; explain and verify do
+  // not pass it, so one decision exits the same way from both.
   const threshold = failOn || policy.fail_on || 'deny';
 
   const bySubject = new Map();
