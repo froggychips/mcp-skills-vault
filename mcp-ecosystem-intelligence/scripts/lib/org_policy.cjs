@@ -71,6 +71,7 @@ const fs   = require('fs');
 const path = require('path');
 const { toTypedEntry, artifactId, comparableArtifactId, comparableId, packageKey } = require('./entry_model.cjs');
 const { githubOwner } = require('./repo_url.cjs');
+const { entryForLaunch } = require('./entry_match.cjs');
 const { DIMENSIONS, DEFAULT_MAX_AGE_DAYS, evalResultsAsOf } = require('./evidence.cjs');
 const { CAPABILITIES } = require('./capabilities.cjs');
 const { TIERS, TIER_ORDER, classifyEntry } = require('./tiers.cjs');
@@ -430,44 +431,27 @@ function loadOrgContext({ cwd = process.cwd(), evalPath = path.join(ASSETS, 'eva
   capsPath = path.join(ASSETS, 'capabilities.json'), lockFile = null, dbTools = null, asOf } = {}) {
   const at = requireAsOf(asOf, 'loadOrgContext');
   const evals = evalResultsAsOf(readJson(evalPath, { results: [] }).results || [], at);
-  const dbByPackage = new Map();
-  for (const t of dbTools || []) {
-    const typed = safeTyped(t);
-    const key = typed ? packageKey(typed.artifact) : null;
-    if (!key) continue;
-    if (!dbByPackage.has(key)) dbByPackage.set(key, []);
-    dbByPackage.get(key).push(t);
-  }
   return {
     asOf:         at,
     evalByName:   new Map(evals.map((r) => [r.name, r])),
     capabilities: readJson(capsPath, { packages: {} }),
     lock:         readJson(lockFile || path.join(cwd, 'mcp.lock.json'), null),
-    dbByName:     dbTools ? new Map(dbTools.map((t) => [t.name, t])) : null,
-    dbByPackage,
+    dbTools:      dbTools || null,
   };
 }
 
 /**
  * The vault entry a launch *is*. A host config names a server whatever it
- * likes (`"docs": npx context7@…`), so the name is tried first and the
- * package identity decides: an entry of the same name that installs another
+ * likes (`"docs": npx context7@…`), so the name decides nothing: the package
+ * the launch runs does, by the matcher every command uses
+ * (lib/entry_match.cjs) — an entry of the same name that installs another
  * package is not this server, and an entry of another name that installs
  * this one is.
  */
 function vaultEntryFor(shared, tool, explicit) {
   if (explicit !== undefined) return explicit && subjectFacts(tool, explicit).in_vault ? explicit : null;
-  if (!shared || !shared.dbByName) return tool;
-  const byName = shared.dbByName.get(tool.name) || null;
-  if (byName && subjectFacts(tool, byName).in_vault) return byName;
-  const typed = safeTyped(tool);
-  const key = typed ? packageKey(typed.artifact) : null;
-  const same = (key && shared.dbByPackage && shared.dbByPackage.get(key)) || [];
-  if (!same.length) return null;
-  const id = comparableArtifactId(typed.artifact);
-  const exact = same.filter((t) => { const x = safeTyped(t); return x && comparableArtifactId(x.artifact) === id; });
-  const pool = (exact.length ? exact : same).slice().sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-  return pool[0];
+  if (!shared || !shared.dbTools) return tool;
+  return entryForLaunch(shared.dbTools, tool && tool.install_cmd);
 }
 
 /**

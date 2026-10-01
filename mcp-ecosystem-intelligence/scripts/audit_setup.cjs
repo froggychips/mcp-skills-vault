@@ -46,6 +46,7 @@ const { loadEffectivePolicy, flagsFromArgv } = require('./lib/policy_rules.cjs')
 const { subject, finding } = require('./lib/finding.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { toInstallCmd, serverLine } = require('./lib/installed.cjs');
+const { entryForLaunch } = require('./lib/entry_match.cjs');
 const { evalIndex } = require('./lib/tiers.cjs');
 const { evalResultsAsOf } = require('./lib/evidence.cjs');
 const { decideRun, unanswered } = require('./lib/run_decision.cjs');
@@ -269,32 +270,14 @@ function parseDbVersion(installCmd) {
 
 // ── matching ───────────────────────────────────────────────────────────────
 
-// The user's server name (key in mcp.json) is often nicknamed — "github"
-// instead of "github-mcp-server", "atlassian" instead of "mcp-atlassian".
-// So we match on three signals: exact name, exact install_cmd token, or
-// fuzzy substring on the package identifier shared by both sides.
+// The user's server name (key in mcp.json) is a nickname — "github" for
+// "github-mcp-server", or the vault name of a different package. It never
+// selects an entry: the entry is the one whose package the launch runs, by
+// the matcher every command uses (lib/entry_match.cjs). The old rule here —
+// exact name first, then a substring of the package — gave a key that is a
+// vault name the vault entry's drift and trust, whatever the command ran.
 function matchDbEntry(db, serverName, entry) {
-  const byName = db.tools.find(t => t.name === serverName);
-  if (byName) return byName;
-
-  const installedTokens = [entry?.command, ...(Array.isArray(entry?.args) ? entry.args : [])]
-    .filter(t => typeof t === 'string')
-    .map(t => t.toLowerCase());
-
-  for (const tool of db.tools) {
-    const dbCmd = (tool.install_cmd || '').toLowerCase();
-    // Extract the package identifier from the DB install_cmd (between the
-    // installer and the @version), e.g. "@modelcontextprotocol/server-filesystem"
-    // from "npx -y @modelcontextprotocol/server-filesystem@2026.1.14 …"
-    const m = dbCmd.match(/(?:^|\s)(?:npx\s+-y\s+|uvx\s+(?:--from\s+\S+\s+)?)((?:@[\w.-]+\/)?[\w.-]+)(?:[@=]|\s|$)/)
-          || dbCmd.match(/(ghcr\.io\/[\w./-]+|docker\.io\/[\w./-]+)@sha256:/);
-    const pkg = m ? m[1] : null;
-    if (!pkg) continue;
-    if (installedTokens.some(tok => tok === pkg || tok.includes(`${pkg}@`) || tok.includes(`${pkg}==`))) {
-      return tool;
-    }
-  }
-  return null;
+  return entryForLaunch(db.tools, entry && typeof entry === 'object' ? toInstallCmd(entry) : null);
 }
 
 // ── tool-allow scoping check ───────────────────────────────────────────────
@@ -382,12 +365,9 @@ function audit({ project, global, settings, db, evals = null }) {
         continue;
       }
 
-      // Matched — but is it launching the entry's package? Two ways it may
-      // not be: the key is the vault's name and the command runs something
-      // else, or the match came from matchDbEntry's substring rule, which
-      // reads `@evil/mongodb-mcp-server@1.0` as containing `mongodb-mcp-server@`.
-      // Either way the server is not that entry, so its other findings (drift,
-      // trust) would describe the wrong thing and are not reported.
+      // Matched by package, so it runs the entry's package. The key can still
+      // be a claim: the vault's name for *another* entry on this package's
+      // line is impersonation, reported instead of this entry's drift/trust.
       {
         const look = lookalikeFinding(name, entry, scope, tool.name === name ? tool.name : null);
         if (look) { findings.push(look); continue; }

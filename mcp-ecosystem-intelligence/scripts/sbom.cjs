@@ -49,6 +49,7 @@ const crypto = require('crypto');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { classifyEntry } = require('./lib/tiers.cjs');
 const { readInstalledServers, toInstallCmd } = require('./lib/installed.cjs');
+const { sameArtifactEntry } = require('./lib/entry_match.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { resolveNpmTreeCached, summarizeTree } = require('./lib/deps.cjs');
 const { purlFor } = require('./lib/npm_signatures.cjs');
@@ -282,8 +283,10 @@ async function main(argv) {
   // Collected so the caller can say so instead of quietly describing a subset.
     subjects = readInstalledServers({ cwd: opts.cwd, onUnreadable: (loc) => unreadableConfigs.push(loc) }).map((srv) => {
       const install_cmd = srv.install_cmd || toInstallCmd(srv);
-      const entry = db.find((t) => t.name === srv.name)
-        || db.find((t) => t.install_cmd && install_cmd && t.install_cmd === install_cmd);
+      // The vault entry for exactly this artifact, by package — never by the
+      // config key (lib/entry_match.cjs). Another version's record is not
+      // this component's.
+      const entry = sameArtifactEntry(db, install_cmd);
       return entry
         ? { ...entry, _scope: srv.scope, _host: srv.host }
         : {

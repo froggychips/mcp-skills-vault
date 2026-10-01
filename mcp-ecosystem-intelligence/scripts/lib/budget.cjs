@@ -24,12 +24,13 @@
  *
  * API:
  *   estimateServer({ name, dbEntry, evalEntry })  -> { tools, tokens, low, high, source }
- *   matchDbEntry(server, db)                      -> entry | null
+ *   matchDbEntry(server, db)                      -> entry | null  (by package, lib/entry_match.cjs)
  *   summarise(rows, contextWindow)                -> { tokens, percent_of_context, … }
  *   wouldExceed({ rows, adding, policy, context }) -> { over, … } | null
  */
 
-const { npmPkgName, pypiPkgName } = require('./install_cmd.cjs');
+const { toInstallCmd } = require('./installed.cjs');
+const { entryForLaunch } = require('./entry_match.cjs');
 
 // The per-tool range this repo documents. Used when all we have is a count.
 const TOKENS_PER_TOOL_LOW  = 200;
@@ -82,18 +83,13 @@ function estimateServer({ name, dbEntry, evalEntry }) {
   };
 }
 
-/** Match a configured server to a DB entry by name, then by package name. */
+/**
+ * The DB entry a configured server runs: by package identity, never by the
+ * config key (lib/entry_match.cjs — the matcher every command uses).
+ */
 function matchDbEntry(server, db) {
-  const byName = db.find((t) => t.name === server.name);
-  if (byName) return byName;
-  const pkg = server.install_cmd
-    ? (npmPkgName(server.install_cmd) || pypiPkgName(server.install_cmd))
-    : null;
-  if (!pkg) return null;
-  return db.find((t) => {
-    const other = t.install_cmd ? (npmPkgName(t.install_cmd) || pypiPkgName(t.install_cmd)) : null;
-    return other && other === pkg;
-  }) || null;
+  const cmd = server && (server.install_cmd || toInstallCmd(server));
+  return entryForLaunch(db, cmd || null);
 }
 
 /** Totals for a set of per-server estimates. */

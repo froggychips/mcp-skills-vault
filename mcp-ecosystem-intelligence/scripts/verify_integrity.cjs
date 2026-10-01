@@ -75,6 +75,7 @@ const {
   verifyRegistrySignature, provenanceClaim, checkProvenance, keysUrl,
 } = require('./lib/npm_signatures.cjs');
 const { readInstalledServers, explicitConfigPaths, unpinnedLaunch } = require('./lib/installed.cjs');
+const { matchLaunch } = require('./lib/entry_match.cjs');
 const lookalike = require('./lib/lookalike.cjs');
 const {
   resolveNpmTreeCached, pypiDirectDependencies, summarizeTree,
@@ -1578,23 +1579,25 @@ async function main() {
       }
       return exitAfterFlush(0);
     }
-    const byName = new Map(allTools.map((t) => [t.name, t]));
     const lookalikeIndex = lookalike.buildIndex(allTools);
-    // The vault entry for an npm package, by package (for the extra `-p`
-    // packages, which have no config key of their own).
-    const byNpmPackage = new Map();
-    for (const t of allTools) {
-      const p = typeof t.install_cmd === 'string' ? npmPkgName(t.install_cmd) : null;
-      if (p && !byNpmPackage.has(p)) byNpmPackage.set(p, t);
-    }
     scope = servers.flatMap((srv) => {
-      const known = byName.get(srv.name) || null;
+      // The entry this launch runs, by package identity — the config key is a
+      // label (lib/entry_match.cjs, the matcher `status` uses). A launch whose
+      // package source is overridden is not the registry's package, whatever
+      // its name says, so it matches nothing.
+      const match = srv.source_override ? matchLaunch([], null) : matchLaunch(allTools, srv.install_cmd);
+      const known = match.entry;
       // Registry checks answer "is this the artifact it claims to be". A
       // typosquat is exactly that — a real, signed, unvulnerable package — so
       // the gate passed it. What it is not is the package the user meant.
-      const look = lookalike.checkServer(srv, lookalikeIndex, { dbName: known ? known.name : null });
+      // Here, and only here, the config key is read as a claim: a key that is
+      // a vault name on another package is impersonation (checkServer finds
+      // the entry the key names itself; `known` is what actually runs).
+      const look = lookalike.checkServer(srv, lookalikeIndex);
       const pinnedVersion = versionFromInstallCmd(srv.install_cmd);
-      const sameVersion = known && pinnedVersion && known.version === pinnedVersion;
+      // Only the same artifact (version compared as `status` compares it):
+      // what the vault stored about x@1 says nothing about x@2.
+      const sameVersion = match.version_match === 'same';
       const main = {
         name:          srv.name,
         install_cmd:   srv.install_cmd || `(${srv.remote ? `remote: ${srv.remote}` : srv.command || 'no command'})`,
@@ -1631,17 +1634,19 @@ async function main() {
         ? (srv.launch.packages || []).filter((x) => x.name !== srv.launch.package) : [])
         .map((x) => {
           const cmd = `npx -y ${x.name}${x.version ? `@${x.version}` : ''}`;
-          const k = byNpmPackage.get(x.name) || null;
+          const xm = matchLaunch(allTools, cmd);
+          const k = xm.entry;
           const v = versionFromInstallCmd(cmd);
+          const same = xm.version_match === 'same';
           return {
             name:          `${srv.name} (-p ${x.name})`,
             install_cmd:   cmd,
             version:       v,
-            pkg_integrity: k && v && k.version === v ? k.pkg_integrity : null,
+            pkg_integrity: same ? k.pkg_integrity : null,
             source_url:    k ? k.source_url : null,
             trust:         k ? k.trust : 'not-in-vault',
             license:       k ? k.license : null,
-            _installed: { ...main._installed, in_vault: !!k, extra_of: srv.name },
+            _installed: { ...main._installed, in_vault: !!k, extra_of: srv.name, vault_entry: same ? k.name : null },
             _lookalike: lookalike.checkServer({ name: null, install_cmd: cmd }, lookalikeIndex),
             _unpinned: unpinnedLaunch(srv, { dbTools: allTools, only: x.name }),
           };
