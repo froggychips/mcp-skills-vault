@@ -224,8 +224,11 @@ runs:
         args+=(--config "${configs[@]}")
 
         echo "mcp-vault ${args[*]}"
-        node "$VAULT_CLI" "${args[@]}" --json > "$report"
-        code=$?
+        # The step runs under `bash -e` (GitHub's default for shell: bash), so
+        # the CLI's exit 1 on a failing config must not end the step before the
+        # exit code, the report and the summary are written.
+        code=0
+        node "$VAULT_CLI" "${args[@]}" --json > "$report" || code=$?
         echo "exit-code=$code" >> "$GITHUB_OUTPUT"
         echo "report=$report" >> "$GITHUB_OUTPUT"
 

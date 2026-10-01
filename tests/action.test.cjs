@@ -73,7 +73,10 @@ function runStep(key, { cwd, env = {} }) {
   const summary = path.join(tmp, 'summary');
   fs.writeFileSync(outputs, '');
   fs.writeFileSync(summary, '');
-  const r = spawnSync('bash', ['-c', runBlock(ACTION, key)], {
+  // Exactly how GitHub runs a composite step with `shell: bash`:
+  // `bash --noprofile --norc -eo pipefail {0}`. Without -e here a step that
+  // dies on the CLI's exit 1 looked fine in the test and broke in CI.
+  const r = spawnSync('bash', ['--noprofile', '--norc', '-eo', 'pipefail', '-c', runBlock(ACTION, key)], {
     cwd,
     encoding: 'utf8',
     env: {
