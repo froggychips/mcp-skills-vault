@@ -615,18 +615,8 @@ function verdict({ lines = [], decisions = [], exit = 0 }) {
 
 const label = (s) => `${B}${String(s).padEnd(16)}${RS}`;
 
-const FEEDBACK_URL = 'https://github.com/froggychips/mcp-skills-vault/issues/new';
-
-/**
- * One line pointing at the issue tracker, for a person at a terminal. It is
- * only printed: nothing is collected, nothing is sent, no network. Not in
- * --json, not when stdout is a pipe, not in CI (`CI` set, as every CI sets
- * it) — there it is noise in a log nobody asked to read.
- */
-function feedbackLine({ isTTY = process.stdout.isTTY, env = process.env } = {}) {
-  const ci = env.CI !== undefined && env.CI !== '' && env.CI !== 'false' && env.CI !== '0';
-  return isTTY && !ci ? `Something wrong, or did this help? → ${FEEDBACK_URL}` : null;
-}
+// The feedback line, under the same conditions as `check` (lib/feedback.cjs).
+const { FEEDBACK_URL, feedbackLine } = require('./lib/feedback.cjs');
 
 function printReport(r, { feedback = feedbackLine() } = {}) {
   const out = (s) => process.stdout.write(s);

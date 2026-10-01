@@ -1,7 +1,7 @@
 'use strict';
 /**
- * The GitHub Action (action.yml), the pre-commit hook, and the `verify
- * --config` / `--policy` flags they are built on.
+ * The GitHub Action (action.yml), the pre-commit hook — both run `mcp-vault
+ * check` — and the `verify --config` / `--policy` flags check is built on.
  *
  * The action's shell steps are pulled out of action.yml and run here with
  * bash, against the fixtures the self-test workflow uses. That workflow only
@@ -106,13 +106,13 @@ test('action.yml: every action it uses is pinned to a full commit SHA', () => {
 test('action.yml: no expression is pasted into a script body', () => {
   // `${{ inputs.x }}` inside run: is substituted into the script text before
   // bash parses it — an input would be code. Inputs go through env.
-  for (const key of ['cli', 'verify', 'Enforce']) {
+  for (const key of ['cli', 'check', 'Enforce']) {
     assert.doesNotMatch(runBlock(ACTION, key), /\$\{\{/, `step ${key} interpolates an expression into its script`);
   }
 });
 
 test('action.yml: the CLI is never installed or run through npx', () => {
-  const scripts = ['cli', 'verify', 'Enforce'].map((k) => runBlock(ACTION, k)).join('\n');
+  const scripts = ['cli', 'check', 'Enforce'].map((k) => runBlock(ACTION, k)).join('\n');
   assert.doesNotMatch(scripts, /\bnpx\b/);
   assert.doesNotMatch(scripts, /npm (install|i|ci|exec)\b/);
   assert.match(scripts, /npm pack [^\n]*--ignore-scripts/);
@@ -156,30 +156,34 @@ test('fixtures: the clean config pins the versions the DB has hashes for', () =>
 // ── the action's shell, run ────────────────────────────────────────────────
 
 test('action: a clean config passes and says so in the job summary', { skip: !HAS_BASH && 'no bash' }, () => {
-  const r = runStep('verify', { cwd: path.join(FIXTURES, 'clean') });
+  const r = runStep('check', { cwd: path.join(FIXTURES, 'clean') });
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.outputs['exit-code'], '0', r.stdout + r.stderr);
-  assert.match(r.summary, /\*\*OK\*\* — 2 servers checked, 0 failing, 0 unverified \(fail on: unknown,/);
+  // Nothing fails. The one warning is what the configured set does together
+  // (flows/*, a warning that only --strict fails), not a pin.
+  assert.match(r.summary, /\*\*WARN\*\* — 3 servers checked, 0 failing, 0 unverified \(fail on: unknown, mode: offline,/);
   assert.match(r.summary, /\| playwright-mcp \| allow \| finding\/none \| \.mcp\.json:3 \| — \|/);
   assert.match(r.summary, /\| mongodb-mcp-server \| allow \| finding\/none \| \.vscode\/mcp\.json:3 \| — \|/);
   const report = JSON.parse(fs.readFileSync(r.outputs.report, 'utf8'));
-  assert.equal(report.subject, 'installed');
-  assert.equal(report.mode, 'offline');
+  assert.equal(report.schema, 'mcp-vault/findings@1');
+  assert.equal(report.scope, 'config');
+  assert.deepEqual(report.decisions.filter((d) => d.subject.type === 'host-config').map((d) => [d.subject.id, d.effect]),
+    [['.mcp.json:3', 'allow'], ['.vscode/mcp.json:3', 'allow']]);
 });
 
 test('action: an unpinned server fails at the default fail-on, passes at fail-on: error', { skip: !HAS_BASH && 'no bash' }, () => {
   const cwd = path.join(FIXTURES, 'bad');
-  const strict = runStep('verify', { cwd });
+  const strict = runStep('check', { cwd });
   assert.equal(strict.outputs['exit-code'], '1', strict.stdout + strict.stderr);
   assert.match(strict.summary, /\*\*FAIL\*\*/);
   assert.match(strict.summary, /\| playwright-mcp \| unknown \(fails\) \| finding\/incomplete \| \.mcp\.json:3 \|/);
-  const lenient = runStep('verify', { cwd, env: { VAULT_FAIL_ON: 'error' } });
+  const lenient = runStep('check', { cwd, env: { VAULT_FAIL_ON: 'error' } });
   assert.equal(lenient.outputs['exit-code'], '0');
   assert.match(lenient.summary, /\*\*UNVERIFIED\*\*/);
   // fail-on is the decision's fail_on, whichever spelling the input used.
   for (const [input, failOn] of [['error', 'deny'], ['deny', 'deny'], ['unverified', 'unknown'], ['unknown', 'unknown'], ['warning', 'warn'], ['warn', 'warn']]) {
-    const run = runStep('verify', { cwd, env: { VAULT_FAIL_ON: input } });
-    const doc = JSON.parse(fs.readFileSync(run.outputs.report, 'utf8')).findings;
+    const run = runStep('check', { cwd, env: { VAULT_FAIL_ON: input } });
+    const doc = JSON.parse(fs.readFileSync(run.outputs.report, 'utf8'));
     assert.equal(doc.decisions[0].fail_on, failOn, `fail-on: ${input}`);
     assert.equal(run.outputs['exit-code'], failOn === 'deny' ? '0' : '1', `fail-on: ${input}`);
   }
@@ -187,7 +191,7 @@ test('action: an unpinned server fails at the default fail-on, passes at fail-on
 
 test('action: no config in the repo is a pass with a note, not a crash', { skip: !HAS_BASH && 'no bash' }, () => {
   const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-vault-empty-'));
-  const r = runStep('verify', { cwd: empty });
+  const r = runStep('check', { cwd: empty });
   assert.equal(r.outputs['exit-code'], '0');
   assert.match(r.summary, /No MCP config found/);
   // No report was written, so no `report` output points at one.
@@ -195,14 +199,14 @@ test('action: no config in the repo is a pass with a note, not a crash', { skip:
 });
 
 test('action: globs are expanded and duplicates collapse', { skip: !HAS_BASH && 'no bash' }, () => {
-  const r = runStep('verify', { cwd: path.join(FIXTURES, 'clean'), env: { VAULT_PATHS: '.mcp.json **/mcp.json .mcp.json' } });
+  const r = runStep('check', { cwd: path.join(FIXTURES, 'clean'), env: { VAULT_PATHS: '.mcp.json **/mcp.json .mcp.json' } });
   assert.equal(r.outputs['exit-code'], '0', r.stdout + r.stderr);
   const report = JSON.parse(fs.readFileSync(r.outputs.report, 'utf8'));
-  assert.equal(report.checked, 2);
+  assert.equal(report.decisions.filter((d) => d.subject.type === 'host-config').length, 2);
 });
 
 test('action: an invalid input is exit 2, and Enforce fails the job on it', { skip: !HAS_BASH && 'no bash' }, () => {
-  const r = runStep('verify', { cwd: path.join(FIXTURES, 'clean'), env: { VAULT_FAIL_ON: 'nope' } });
+  const r = runStep('check', { cwd: path.join(FIXTURES, 'clean'), env: { VAULT_FAIL_ON: 'nope' } });
   assert.equal(r.outputs['exit-code'], '2');
   for (const [code, status] of [['0', 0], ['1', 1], ['2', 2], ['', 2]]) {
     const e = runStep('Enforce', { cwd: REPO, env: { VAULT_EXIT: code } });
@@ -211,9 +215,11 @@ test('action: an invalid input is exit 2, and Enforce fails the job on it', { sk
 });
 
 test('action: sarif puts the finding on the config line that launches the server', { skip: !HAS_BASH && 'no bash' }, () => {
-  const r = runStep('verify', { cwd: path.join(FIXTURES, 'bad'), env: { VAULT_SARIF: 'true' } });
+  const r = runStep('check', { cwd: path.join(FIXTURES, 'bad'), env: { VAULT_SARIF: 'true' } });
   const sarif = JSON.parse(fs.readFileSync(r.outputs['sarif-file'], 'utf8'));
-  const results = sarif.runs[0].results;
+  // The config line's results; the set's own (flows/*, on the config as a
+  // whole) has no line to sit on.
+  const results = sarif.runs[0].results.filter((x) => !x.ruleId.startsWith('flows/'));
   for (const result of results) {
     assert.equal(result.locations[0].physicalLocation.artifactLocation.uri, '.mcp.json');
     assert.equal(result.locations[0].physicalLocation.region.startLine, 3);
@@ -252,17 +258,17 @@ function unpackedAction() {
 test('action: its own checkout without .git (uses: @sha) runs, integrity pinned by the SHA', { skip: !HAS_BASH && 'no bash' }, () => {
   const dir = unpackedAction();
   const sha = 'a'.repeat(40);
-  const r = runStep('verify', {
+  const r = runStep('check', {
     cwd: path.join(FIXTURES, 'clean'),
     env: { GITHUB_ACTION_PATH: dir, VAULT_CLI: path.join(dir, 'bin', 'mcp-vault.cjs'), VAULT_MODE: 'checkout', VAULT_ACTION_REF: sha },
   });
   assert.equal(r.outputs['exit-code'], '0', r.stdout + r.stderr);
-  assert.match(r.summary, /\*\*OK\*\*/);
+  assert.match(r.summary, /\*\*WARN\*\* — 3 servers checked, 0 failing/);
   assert.ok(r.summary.includes(`DB integrity: pinned by action SHA ${sha}`), r.summary);
   // The allowance is this step's alone, and only for a missing signature: a
   // .sig that is present still has to verify.
   fs.writeFileSync(path.join(dir, 'mcp-ecosystem-intelligence', 'assets', 'tools_database.json.sig'), '{"not":"a signature"}');
-  const tampered = runStep('verify', {
+  const tampered = runStep('check', {
     cwd: path.join(FIXTURES, 'clean'),
     env: { GITHUB_ACTION_PATH: dir, VAULT_CLI: path.join(dir, 'bin', 'mcp-vault.cjs'), VAULT_MODE: 'checkout', VAULT_ACTION_REF: sha },
   });
@@ -272,7 +278,7 @@ test('action: its own checkout without .git (uses: @sha) runs, integrity pinned 
 
 test('action: the npm package (version:) without a .sig is refused — the tarball must carry one', { skip: !HAS_BASH && 'no bash' }, () => {
   const pkg = unpackedAction();
-  const r = runStep('verify', {
+  const r = runStep('check', {
     cwd: path.join(FIXTURES, 'clean'),
     // An allowance in the caller's env does not reach the package mode.
     env: { VAULT_CLI: path.join(pkg, 'bin', 'mcp-vault.cjs'), VAULT_MODE: 'package', MCP_VAULT_ALLOW_UNSIGNED_DB: '1' },
@@ -282,6 +288,22 @@ test('action: the npm package (version:) without a .sig is refused — the tarba
   assert.match(r.summary, /DB integrity: Ed25519 signature, checked by the CLI/);
 });
 
+test('action: a version: that predates `check` is refused with exit 2 and says why', { skip: !HAS_BASH && 'no bash' }, () => {
+  // An unpacked release from before `check` existed: the same files, minus it.
+  const old = unpackedAction();
+  fs.rmSync(path.join(old, 'mcp-ecosystem-intelligence', 'scripts', 'check_configs.cjs'));
+  const r = runStep('check', {
+    cwd: path.join(FIXTURES, 'clean'),
+    env: { GITHUB_ACTION_PATH: REPO, VAULT_CLI: path.join(old, 'bin', 'mcp-vault.cjs'), VAULT_MODE: 'package', VAULT_VERSION: '0.15.2' },
+  });
+  // The step itself ends cleanly under bash -eo pipefail; Enforce turns the 2 red.
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.outputs['exit-code'], '2');
+  assert.equal(r.outputs.report, undefined, 'nothing ran, so there is no report');
+  assert.match(r.stdout, /::error::mcp-vault: version 0\.15\.2 predates `check`; use >= 0\.16\.0 or omit version/);
+  assert.equal(runStep('Enforce', { cwd: REPO, env: { VAULT_EXIT: r.outputs['exit-code'] } }).status, 2);
+});
+
 test('action: the resolve step says which mode it picked', { skip: !HAS_BASH && 'no bash' }, () => {
   const own = runStep('cli', { cwd: REPO, env: { VAULT_VERSION: '', VAULT_INTEGRITY: '' } });
   assert.equal(own.outputs.mode, 'checkout');
@@ -289,11 +311,12 @@ test('action: the resolve step says which mode it picked', { skip: !HAS_BASH && 
 
 // ── pre-commit hook ────────────────────────────────────────────────────────
 
-test('.pre-commit-hooks.yaml: hook mcp-vault ends in --config and matches every host config', () => {
+test('.pre-commit-hooks.yaml: hook mcp-vault runs check and matches every host config', () => {
   const src = fs.readFileSync(path.join(REPO, '.pre-commit-hooks.yaml'), 'utf8');
   assert.match(src, /^- id: mcp-vault$/m);
-  // pre-commit appends the staged file names; --config takes them all.
-  assert.match(src, /^\s+entry: mcp-vault verify [^\n]*--config$/m);
+  // pre-commit appends the hook's args, then the staged file names; check
+  // takes every bare argument as a config.
+  assert.match(src, /^\s+entry: mcp-vault check --fail-on unknown$/m);
   // YAML single quotes keep backslashes literal, so the text is the regex.
   const files = new RegExp(src.match(/^\s+files: '(.*)'$/m)[1]);
   for (const p of ['.mcp.json', '.vscode/mcp.json', '.cursor/mcp.json', 'pkg/a/.mcp.json']) {

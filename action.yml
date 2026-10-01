@@ -15,13 +15,18 @@
 # tar. It is never `npm install`ed and never run through npx, so there is no
 # lifecycle script anywhere in the path — `--ignore-scripts` is passed anyway.
 #
+# It runs `mcp-vault check` over the configs: one pass, one decision, one exit
+# code — pins and hashes of known packages, stored advisories, launches with no
+# exact version, overridden package sources, lookalike names, plain-text
+# secrets (never printed), and what the servers of one config do together.
+#
 # Offline (the default) means the gate makes no network call at all: it checks
 # the configs against the pins in the vault DB shipped with this version. No
 # token is read. `offline: false` adds live registry and advisory checks
 # (GITHUB_TOKEN is used for the GHSA feed if you pass it in `env`).
 
 name: mcp-vault
-description: Install-time gate for MCP servers — verify the servers in your repo's .mcp.json / .vscode/mcp.json / .cursor/mcp.json against pinned, hashed versions.
+description: Check the MCP configs in your repo (.mcp.json / .vscode/mcp.json / .cursor/mcp.json) — pins, hashes, advisories, secrets, lookalikes — before anyone's editor launches them.
 author: froggychips
 branding:
   icon: shield
@@ -45,12 +50,13 @@ inputs:
     default: ''
   fail-on:
     description: >-
-      Which decision effects fail the job — `verify --fail-on`, i.e. the
+      Which decision effects fail the job — `check --fail-on`, i.e. the
       `fail_on` of the decision (docs/adr/0001). `error` (or `deny`) = only a
       deny: integrity mismatch, advisory, policy violation. `unverified` (or
       `unknown`) = also anything the gate could not check (unpinned, not in
       the vault, local command). `warning` (or `warn`) = also warnings
-      (install hooks, repo mismatch) — the same as --strict. A policy file can
+      (an unpinned launch, a lookalike name, a risky combination of servers)
+      — the same as --strict. A policy file can
       only raise this, never lower it.
     required: false
     default: unverified
@@ -65,7 +71,8 @@ inputs:
   version:
     description: >-
       Exact @froggychips/mcp-vault version to run instead of this action's own
-      checkout (e.g. 0.16.0). Ranges, tags and `latest` are refused. Needs
+      checkout (e.g. 0.16.0, the first with `check`; an older one is refused
+      with exit 2). Ranges, tags and `latest` are refused. Needs
       network to registry.npmjs.org.
     required: false
     default: ''
@@ -81,13 +88,13 @@ inputs:
 outputs:
   exit-code:
     description: mcp-vault's exit code — 0 clean, 1 failures, 2 a config or policy could not be read.
-    value: ${{ steps.verify.outputs.exit-code }}
+    value: ${{ steps.check.outputs.exit-code }}
   report:
-    description: Path to the JSON report (mcp-vault/verify-report@1, its decisions in `findings`, mcp-vault/findings@1). Unset when no config was found.
-    value: ${{ steps.verify.outputs.report }}
+    description: Path to the JSON report — `mcp-vault check --json`, an mcp-vault/findings@1 document (findings, decisions, and the policy and facts they were decided on). Unset when no config was found.
+    value: ${{ steps.check.outputs.report }}
   sarif-file:
     description: Path to the SARIF file, when `sarif` is true.
-    value: ${{ steps.verify.outputs.sarif-file }}
+    value: ${{ steps.check.outputs.sarif-file }}
 
 runs:
   using: composite
@@ -135,12 +142,13 @@ runs:
         echo "cli=$dir/package/bin/mcp-vault.cjs" >> "$GITHUB_OUTPUT"
         echo "mode=package" >> "$GITHUB_OUTPUT"
 
-    - name: Verify MCP configs
-      id: verify
+    - name: Check MCP configs
+      id: check
       shell: bash
       env:
         VAULT_CLI: ${{ steps.cli.outputs.cli }}
         VAULT_MODE: ${{ steps.cli.outputs.mode }}
+        VAULT_VERSION: ${{ inputs.version }}
         VAULT_ACTION_REF: ${{ github.action_ref }}
         VAULT_PATHS: ${{ inputs.paths }}
         VAULT_POLICY: ${{ inputs.policy }}
@@ -185,6 +193,16 @@ runs:
         fi
         echo "mcp-vault: DB integrity: $db_integrity"
 
+        # `check` is what this step runs, and it first shipped in 0.16.0. An
+        # older `version:` is refused here, plainly, rather than run as
+        # `verify --config`: that would be a different gate (no secrets, no
+        # flows) under the same green check, chosen by a version number.
+        if [ ! -f "$cli_root/mcp-ecosystem-intelligence/scripts/check_configs.cjs" ]; then
+          echo "::error::mcp-vault: version ${VAULT_VERSION:-(this checkout)} predates \`check\`; use >= 0.16.0 or omit version"
+          echo "exit-code=2" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
         configs=()
         for match in $VAULT_PATHS; do
           [ -f "$match" ] || continue
@@ -194,10 +212,10 @@ runs:
         done
         listed="$(printf '%s' "$VAULT_PATHS" | tr '\n' ' ')"
 
-        args=(verify)
+        args=(check)
         case "$VAULT_OFFLINE" in
-          true) args+=(--offline) ;;
-          false) ;;
+          true) ;;
+          false) args+=(--online) ;;
           *) echo "::error::mcp-vault: offline must be true or false, got '$VAULT_OFFLINE'"; echo "exit-code=2" >> "$GITHUB_OUTPUT"; exit 0 ;;
         esac
         # fail-on is the decision's threshold (fail_on), passed as such.
@@ -221,21 +239,20 @@ runs:
           echo "exit-code=0" >> "$GITHUB_OUTPUT"
           exit 0
         fi
-        args+=(--config "${configs[@]}")
 
-        echo "mcp-vault ${args[*]}"
+        echo "mcp-vault ${args[*]} ${configs[*]}"
         # The step runs under `bash -e` (GitHub's default for shell: bash), so
         # the CLI's exit 1 on a failing config must not end the step before the
         # exit code, the report and the summary are written.
         code=0
-        node "$VAULT_CLI" "${args[@]}" --json > "$report" || code=$?
+        node "$VAULT_CLI" "${args[@]}" --json -- "${configs[@]}" > "$report" || code=$?
         echo "exit-code=$code" >> "$GITHUB_OUTPUT"
         echo "report=$report" >> "$GITHUB_OUTPUT"
 
         if [ "$VAULT_SARIF" = "true" ]; then
           # A second run in the other format. Offline it is the same
           # deterministic answer; online it repeats the registry calls.
-          node "$VAULT_CLI" "${args[@]}" --sarif > "$out/results.sarif" || true
+          node "$VAULT_CLI" "${args[@]}" --sarif -- "${configs[@]}" > "$out/results.sarif" || true
           echo "sarif-file=$out/results.sarif" >> "$GITHUB_OUTPUT"
         fi
 
@@ -244,14 +261,15 @@ runs:
         if ! node -e "
           const r = require(process.env.GITHUB_ACTION_PATH + '/mcp-ecosystem-intelligence/scripts/lib/job_summary.cjs');
           const doc = JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'));
-          process.stdout.write(r.toMarkdown(doc, { base: process.cwd() }) + '\n');
+          const mode = process.env.VAULT_OFFLINE === 'true' ? 'offline' : 'online';
+          process.stdout.write(r.toMarkdown({ mode, findings: doc }, { base: process.cwd() }) + '\n');
         " "$report" >> "$GITHUB_STEP_SUMMARY"; then
           echo "mcp-vault: no readable JSON report (exit $code)" >> "$GITHUB_STEP_SUMMARY"
         fi
         printf '\nDB integrity: %s\n' "$db_integrity" >> "$GITHUB_STEP_SUMMARY"
         node -e "
           const doc = JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'));
-          for (const d of (doc.findings && doc.findings.decisions) || []) {
+          for (const d of doc.decisions || []) {
             console.log(d.effect.padEnd(8), d.subject.id, '— decided by', d.decided_by + (d.fails ? ' (fails)' : ''));
             for (const o of d.rules) if (o.effect !== 'allow') console.log('          [' + o.rule + '] ' + (o.detail || o.effect));
           }
@@ -259,10 +277,10 @@ runs:
         exit 0
 
     - name: Upload SARIF
-      if: inputs.sarif == 'true' && steps.verify.outputs.sarif-file != ''
+      if: inputs.sarif == 'true' && steps.check.outputs.sarif-file != ''
       uses: github/codeql-action/upload-sarif@1c5b675653bb5c22dbe9b12b556ec555138e09fd   # v4.38.1
       with:
-        sarif_file: ${{ steps.verify.outputs.sarif-file }}
+        sarif_file: ${{ steps.check.outputs.sarif-file }}
         category: mcp-vault
 
     # Last, so the summary and the SARIF upload happen on a failing run too —
@@ -270,7 +288,7 @@ runs:
     - name: Enforce
       shell: bash
       env:
-        VAULT_EXIT: ${{ steps.verify.outputs.exit-code }}
+        VAULT_EXIT: ${{ steps.check.outputs.exit-code }}
       run: |
         case "$VAULT_EXIT" in
           0) echo "mcp-vault: clean" ;;

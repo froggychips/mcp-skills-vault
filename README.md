@@ -127,6 +127,7 @@ life.
 The commands it summarises are all still there, and the footer names them:
 
 ```bash
+npx -y @froggychips/mcp-vault check                  # this repo's MCP configs, one answer (CI, pre-commit)
 npx -y @froggychips/mcp-vault verify --installed     # re-hash what your hosts launch, live
 npx -y @froggychips/mcp-vault scan --cwd ./my-project
 npx -y @froggychips/mcp-vault audit --strict
