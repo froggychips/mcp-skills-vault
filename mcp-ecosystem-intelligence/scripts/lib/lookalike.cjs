@@ -98,6 +98,37 @@ const MIN_CORE = 3;
 
 const CONFIDENCE_RANK = { high: 0, medium: 1 };
 
+// Unscoped npm packages published by the same publisher as an npm scope the
+// vault knows. Dropping a scope is the attack `scope-dropped` / `affix`
+// describe — unless the unscoped name is that publisher's own package, which
+// the registry says nothing about offline: npm does not tie the scope
+// `@playwright` to the name `playwright`. Without this, `npx playwright
+// run-test-mcp-server` (Microsoft's own package, the documented way to start
+// Playwright's test MCP server) was reported as an impersonation of
+// `@playwright/mcp` in a public config.
+//
+// A row is a fact checked by hand against the registry (`npm view <name>
+// maintainers` and the publishing repository), not a heuristic: an attacker
+// cannot get onto it by choosing a name. Keep it small; add a row only with
+// its source.
+const PUBLISHER_UNSCOPED = Object.freeze({
+  // github.com/microsoft/playwright publishes these from packages/* alongside
+  // @playwright/test; @playwright/mcp is github.com/microsoft/playwright-mcp.
+  playwright: Object.freeze(['playwright', 'playwright-core', 'playwright-chromium', 'playwright-firefox', 'playwright-webkit']),
+  // github.com/supabase/cli publishes the CLI as `supabase`.
+  supabase:   Object.freeze(['supabase']),
+  // github.com/stripe/stripe-node publishes `stripe`; @stripe is Stripe's scope.
+  stripe:     Object.freeze(['stripe']),
+  // github.com/eslint/eslint publishes `eslint`; @eslint is the ESLint team's scope.
+  eslint:     Object.freeze(['eslint']),
+});
+
+/** The npm scopes whose publisher also publishes this unscoped name. */
+function publisherScopesOf(name) {
+  const n = String(name).toLowerCase();
+  return new Set(Object.keys(PUBLISHER_UNSCOPED).filter((scope) => PUBLISHER_UNSCOPED[scope].includes(n)));
+}
+
 // ── normalisation ──────────────────────────────────────────────────────────
 
 /** Lowercase, NFKC, and every run of `-`, `_`, `.`, space as one `-` (PEP 503). */
@@ -411,6 +442,11 @@ function checkName(value, kind, index, { limit = 3 } = {}) {
   if (exact) { result.known = exact.db_name; return result; }
 
   const cand = splitName(value, kind);
+  // A publisher's own unscoped package (`playwright`, next to the vault's
+  // `@playwright/mcp`) is a known, legitimate registry name: it resembles that
+  // publisher's entries by construction, and it cannot be a squat of anything
+  // else, because the name is taken — by the publisher. Not a lookalike.
+  if (kind === 'npm' && !cand.scope && publisherScopesOf(cand.base).size) return result;
   const best = new Map();
   for (const t of index.identities) {
     const m = compare(cand, kind, t);
@@ -606,6 +642,8 @@ function factsFor(result, { intent = 'configured', allow = [] } = {}) {
 }
 
 module.exports = {
+  PUBLISHER_UNSCOPED,
+  publisherScopesOf,
   ruleFor,
   subjectFor,
   toFinding,

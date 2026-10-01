@@ -934,6 +934,12 @@ host config *launches* (`audit`, `verify --installed`, including a config key th
 is a vault name but launches another package) warns, which fails under `--strict`.
 `--allow-lookalike <name>` is an input to that row: still reported, allowed.
 
+A publisher's own unscoped package is not a dropped-scope copy: `playwright`
+next to the vault's `@playwright/mcp` is Microsoft's. npm does not tie a scope to
+the unscoped name, so a short table in `lib/lookalike.cjs` (`PUBLISHER_UNSCOPED`,
+each row with its source) says which ones are; `@evil/playwright-mcp` and
+`@playwrigth/mcp` are still flagged.
+
 ### Public registry page
 
 [`scripts/generate_registry_page.cjs`](./mcp-ecosystem-intelligence/scripts/generate_registry_page.cjs) renders the DB into `docs/site/registry.html` plus `docs/site/registry.json`:
