@@ -64,8 +64,8 @@ test('check: a clean config is 0, decided line by line', () => {
   assert.equal(status, 0);
   assert.equal(doc.schema, 'mcp-vault/findings@1');
   assert.deepEqual(doc.decisions.filter((d) => d.subject.type === 'host-config').map((d) => [d.subject.id, d.effect, d.decided_by]), [
-    ['.mcp.json:3', 'allow', 'finding/none'],
-    ['.vscode/mcp.json:3', 'allow', 'finding/none'],
+    ['.mcp.json:3', 'allow', 'trust/ok'],
+    ['.vscode/mcp.json:3', 'allow', 'trust/ok'],
   ]);
   assert.ok(!doc.decisions.some((d) => d.fails));
   assert.deepEqual(recompute(doc), doc.decisions);

@@ -162,8 +162,8 @@ test('action: a clean config passes and says so in the job summary', { skip: !HA
   // Nothing fails. The one warning is what the configured set does together
   // (flows/*, a warning that only --strict fails), not a pin.
   assert.match(r.summary, /\*\*WARN\*\* — 3 servers checked, 0 failing, 0 unverified \(fail on: unknown, mode: offline,/);
-  assert.match(r.summary, /\| playwright-mcp \| allow \| finding\/none \| \.mcp\.json:3 \| — \|/);
-  assert.match(r.summary, /\| mongodb-mcp-server \| allow \| finding\/none \| \.vscode\/mcp\.json:3 \| — \|/);
+  assert.match(r.summary, /\| playwright-mcp \| allow \| trust\/ok \| \.mcp\.json:3 \| — \|/);
+  assert.match(r.summary, /\| mongodb-mcp-server \| allow \| trust\/ok \| \.vscode\/mcp\.json:3 \| — \|/);
   const report = JSON.parse(fs.readFileSync(r.outputs.report, 'utf8'));
   assert.equal(report.schema, 'mcp-vault/findings@1');
   assert.equal(report.scope, 'config');

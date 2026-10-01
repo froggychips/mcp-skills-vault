@@ -1621,6 +1621,9 @@ async function main() {
           // option or environment variable): never checked as if it did.
           override: srv.source_override || null,
           launch: srv.launch || null,
+          // The vault entry, when it pins exactly this artifact: its stored
+          // evidence is then about these bytes (applied offline, below).
+          vault_entry: sameVersion ? known.name : null,
         },
         _lookalike: look,
         // The config launches a registry package with no exact version: a
@@ -2038,8 +2041,12 @@ async function main() {
   // advisory against the pinned version, a yanked release, a claim past its
   // shelf life. The same producer explain uses (lib/findings_from.cjs
   // fromStoredEvidence), so `verify --offline` and `explain` are one decision
-  // with one exit code. Not for --installed: a configured server's version
-  // need not be the one the DB's evidence describes.
+  // with one exit code. For --installed / --config the same, on the config
+  // line, when the server launches exactly the artifact a vault entry pins
+  // (`_installed.vault_entry`, lib/entry_match.cjs): a configured server's
+  // version need not be the one the DB's evidence describes, and when it is
+  // not, nothing stored applies. `check` runs this, so a yanked or advised
+  // release fails it as it fails `verify --offline` and `status`.
   const storedFindings = [];
   let orgShared = null;
   results.forEach((r, i) => {
@@ -2066,8 +2073,13 @@ async function main() {
       facts[s.id].org = org.facts;
       model.findings.push(...org.findings);
     }
-    if (!OFFLINE || INSTALLED || s.type !== 'artifact' || r.status === 'UPD') return;
-    const stored = fromStoredEvidence(r.tool, { asOf: AS_OF, maxAgeDays: evidenceMaxAge(), subject: s, scope: 'database' });
+    if (!OFFLINE || r.status === 'UPD') return;
+    const inst = r.tool._installed;
+    const source = INSTALLED
+      ? (inst && inst.vault_entry && s.type === 'host-config' ? allTools.find((t) => t.name === inst.vault_entry) || null : null)
+      : (s.type === 'artifact' ? r.tool : null);
+    if (!source) return;
+    const stored = fromStoredEvidence(source, { asOf: AS_OF, maxAgeDays: evidenceMaxAge(), subject: s, scope: INSTALLED ? 'installed' : 'database' });
     Object.assign(facts[s.id], stored.facts);
     // Offline the stored record is all there is to judge a policy
     // requirement by, so the policy/* rows read it (evidence mode) as they do
@@ -2077,8 +2089,17 @@ async function main() {
     facts[s.id].mode = 'evidence';
     const seen = new Set(model.observations.map((o) => o.id));
     for (const o of stored.observations) if (!seen.has(o.id)) model.observations.push(o);
-    model.findings.push(...stored.findings);
-    storedFindings[i] = stored.findings;
+    // On a config line, what the record *found* (a yanked release, a known
+    // advisory, a hash or repo that disagreed — observed, never ageing,
+    // docs/adr/0001 §5). Not the record's own age: a claim of absence past
+    // its shelf life, or a dimension never checked, is about the vault
+    // release the config's tooling is pinned to, not about the config, and
+    // `check --online` re-observes it. Reporting it here turned every vault
+    // server into `unknown` a week after each release, which the pre-commit
+    // hook and the Action (fail-on unknown) fail on.
+    const kept = INSTALLED ? stored.findings.filter((f) => f.state === 'observed') : stored.findings;
+    model.findings.push(...kept);
+    storedFindings[i] = kept;
   });
   const decisions = decide(model.findings, EP, AS_OF, {
     subjects: [...model.subjects.filter(Boolean), ...lookalikeRun.findings.map((f) => f.subject)], facts,

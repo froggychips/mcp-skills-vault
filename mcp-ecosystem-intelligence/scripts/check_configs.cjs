@@ -62,6 +62,7 @@ const { evalResultsAsOf, dbAsOf } = require('./lib/evidence.cjs');
 const { evalIndex } = require('./lib/tiers.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { feedbackLine } = require('./lib/feedback.cjs');
+const { entryForLaunch } = require('./lib/entry_match.cjs');
 
 const VERIFY    = path.join(__dirname, 'verify_integrity.cjs');
 const DB_PATH   = path.resolve(__dirname, '../assets/tools_database.json');
@@ -456,6 +457,13 @@ function fixFor(o, f, { m, srv, policyPath, dbTools }) {
   if (srv && srv.install_cmd) {
     const u = unpinnedLaunch(srv, { dbTools });
     if (u) return secrets.redact(u.advice);
+  }
+  // What the vault stored about the release this line launches (verify's
+  // fromStoredEvidence, on the config line).
+  if (rule === 'evidence/stale') return 'the vault\'s record of this release is past its shelf life: re-check it live (mcp-vault check --online), or accept it as unverified';
+  if (rule.startsWith('evidence/') || rule.startsWith('trust/')) {
+    const entry = srv && srv.install_cmd ? entryForLaunch(dbTools, srv.install_cmd) : null;
+    return `the vault recorded this against the exact release launched here: move to a release without it${entry ? ` (mcp-vault explain ${entry.name})` : ''}`;
   }
   if (/not in the vault/.test(msg)) return 'not in the vault, so there is no hash to compare: use a vetted server (mcp-vault list), or accept it as unverified';
   if (/source install|git URL|VCS/.test(msg)) return 'launch a published release from the registry, or verify that source yourself';
