@@ -555,6 +555,34 @@ which dimensions have aged out, the behavioural status, the tool-surface hash,
 and for transitive packages the one property that matters most — it runs code
 at install time.
 
+### Signed DB and shared audits (`signature`, `audits`)
+
+The DB decides what `install` writes, so the CLI checks it before any command
+reads it: an Ed25519 signature over the DB's canonical JSON
+(`tools_database.json.sig`, made at release), against the keys shipped in
+[`assets/trusted_keys.json`](./mcp-ecosystem-intelligence/assets/trusted_keys.json).
+In the installed package, a missing, tampered, unknown-key or revoked-key
+signature → the command does not run. A git checkout (development, CI) needs no
+`.sig`, though one that is present must verify. Offline, no dependencies. A fork
+without `.git` runs on its own DB with `--allow-unsigned-db` (or
+`MCP_VAULT_ALLOW_UNSIGNED_DB=1`), which warns on every run.
+`mcp-vault signature --json` shows the check on its own, as `mcp-vault/findings@1`.
+
+```bash
+mcp-vault audits add <entry> --criteria safe-to-run --who "Me <me@example.org>"
+mcp-vault audits export --out audits.json   # signed with $MCP_VAULT_AUDIT_KEY
+mcp-vault audits fetch                      # the only network step
+mcp-vault audits check                      # offline, re-verifies the lock
+```
+
+Audits follow [cargo-vet](https://mozilla.github.io/cargo-vet/importing-audits.html):
+who checked which package, version **and integrity**, against which criterion.
+Imports are listed in `.mcp-vault.imports.json` (URL or path, the source's
+public key, the criteria you accept from it), fetched only on request, kept in
+`.mcp-vault.imports.lock.json`, and not transitive. Every bundle must verify
+under the key in your config. An imported audit shows in `explain`'s trace as
+an observation with its source, and never changes `trust` or the decision.
+
 ### Policy file
 
 The flags above answer one question each. A project usually wants the same
@@ -940,6 +968,7 @@ Everything in this table is scripted and tested; the column says where it lives.
 | Shortest safe upgrade for anything with an advisory | [`suggest_upgrade.cjs`](./mcp-ecosystem-intelligence/scripts/suggest_upgrade.cjs), [`lib/versions.cjs`](./mcp-ecosystem-intelligence/scripts/lib/versions.cjs) |
 | A decision, with the rule that made it, as an audit record | [`explain.cjs`](./mcp-ecosystem-intelligence/scripts/explain.cjs) |
 | CycloneDX SBOM | [`sbom.cjs`](./mcp-ecosystem-intelligence/scripts/sbom.cjs) |
+| Signed DB checked before use; signed, non-transitive audit imports | [`lib/signing.cjs`](./mcp-ecosystem-intelligence/scripts/lib/signing.cjs), [`lib/audits.cjs`](./mcp-ecosystem-intelligence/scripts/lib/audits.cjs) |
 | Context ceiling enforced where the set changes | [`lib/budget.cjs`](./mcp-ecosystem-intelligence/scripts/lib/budget.cjs) |
 | Tier derived from evidence, not from a score | [`lib/tiers.cjs`](./mcp-ecosystem-intelligence/scripts/lib/tiers.cjs) |
 | One command instead of six | [`status.cjs`](./mcp-ecosystem-intelligence/scripts/status.cjs) |

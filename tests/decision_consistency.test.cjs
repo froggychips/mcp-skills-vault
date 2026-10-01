@@ -344,6 +344,83 @@ test('lock --check and approve: the decision is decide() of the document, and th
   assert.equal(c.doc.decisions[0].effect, 'allow');
 });
 
+// ── #121: signature and audit imports ─────────────────────────────────────
+
+test('signature: the decision is decide() of its document, the exit code is the decisions\', across contexts and flags', () => {
+  const s = require(path.join(S, 'lib', 'signing.cjs'));
+  const ds = require(path.join(S, 'lib', 'db_signature.cjs'));
+  const dir = fs.mkdtempSync(path.join(TMP, 'sig-'));
+  const db = (name) => { const f = path.join(dir, name); fs.writeFileSync(f, JSON.stringify({ tools: [{ name }] })); return f; };
+  const stranger = s.generateKeyPair();
+  const byStranger = db('stranger.json');
+  ds.signFile(byStranger, { privateKeyPem: stranger.privateKeyPem, now: Date.parse(AS_OF) });
+  const malformed = db('malformed.json');
+  fs.writeFileSync(`${malformed}.sig`, '{"format":"nope"}');
+  const unsigned = db('unsigned.json');
+  // The bundled DB (no .sig in a checkout), a DB without one, one signed by a
+  // key the keyring does not list, one with a broken envelope.
+  const FILES = [[], [unsigned], [byStranger], [malformed], [unsigned, byStranger]];
+  const CONTEXTS = { checkout: {}, package: { MCP_VAULT_REQUIRE_SIGNED_DB: '1' } };
+  const SFLAGS = [[], ['--strict'], ['--fail-unverified'], ['--allow-unsigned-db'], ['--allow-unsigned-db', '--strict']];
+  const seen = new Set();
+  for (const [cname, cenv] of Object.entries(CONTEXTS)) {
+    for (const files of FILES) {
+      for (const flags of SFLAGS) {
+        const label = `${cname} ${files.map((f) => path.basename(f)).join(',') || '(bundled)'} ${flags.join(' ')}`;
+        const r = spawnSync(process.execPath, [path.join(S, 'check_signature.cjs'), ...files, '--json', '--as-of', AS_OF, ...flags], {
+          encoding: 'utf8', env: { ...ENV, MCP_VAULT_ALLOW_UNSIGNED_DB: '', MCP_VAULT_REQUIRE_SIGNED_DB: '', ...cenv }, cwd: TMP,
+        });
+        const doc = JSON.parse(r.stdout);
+        assert.equal(doc.schema, 'mcp-vault/findings@1', label);
+        assert.equal(doc.as_of, AS_OF, label);
+        assert.deepEqual(recompute(doc), doc.decisions, `${label}: the printed decisions are not decide()'s`);
+        assert.equal(r.status, F.exitCode(doc.decisions), `${label}: exit ${r.status}`);
+        for (const d of doc.decisions) { assert.equal(d.decided_by, 'db/signature', label); seen.add(d.effect); }
+      }
+    }
+  }
+  // The fixtures reach every effect the row can give.
+  assert.deepEqual([...seen].sort(), ['allow', 'deny', 'warn']);
+});
+
+test('audits check / fetch: the decision is decide() of its document, the exit code is the decisions\'', () => {
+  const s = require(path.join(S, 'lib', 'signing.cjs'));
+  const A = require(path.join(S, 'lib', 'audits.cjs'));
+  const dir = fs.mkdtempSync(path.join(TMP, 'audits-'));
+  const alice = s.generateKeyPair();
+  const tool = DB.find((t) => A.subjectOf(t));
+  const bundle = A.exportBundle([{ who: 'Alice', ...A.subjectOf(tool), criteria: 'safe-to-run', date: '2026-09-24' }],
+    { privateKeyPem: alice.privateKeyPem, now: Date.parse(AS_OF) });
+  fs.writeFileSync(path.join(dir, 'alice.json'), JSON.stringify(bundle));
+  fs.writeFileSync(path.join(dir, A.IMPORTS_FILE), JSON.stringify({ sources: {
+    alice: { path: 'alice.json', public_key: alice.publicKey, criteria: ['safe-to-run'] },
+    bob:   { path: 'bob.json', public_key: s.generateKeyPair().publicKey, criteria: ['safe-to-run'] },
+  } }));
+  const audits = (...args) => {
+    const r = spawnSync(process.execPath, [path.join(S, 'audits.cjs'), ...args, '--cwd', dir, '--json'], { encoding: 'utf8', env: ENV, cwd: TMP });
+    const doc = JSON.parse(r.stdout);
+    assert.equal(doc.schema, 'mcp-vault/findings@1', args.join(' '));
+    assert.deepEqual(recompute(doc), doc.decisions, `${args.join(' ')}: the printed decisions are not decide()'s`);
+    assert.equal(r.status, F.exitCode(doc.decisions), `${args.join(' ')}: exit ${r.status}`);
+    return Object.fromEntries(doc.decisions.map((d) => [d.subject.id, [d.effect, d.decided_by]]));
+  };
+  // Nothing fetched yet; then bob's file is missing, so fetch fails for him
+  // and writes nothing; with bob gone, fetch and check both pass.
+  assert.deepEqual(audits('check'), { 'audit-source:alice': ['deny', 'audits/import'], 'audit-source:bob': ['deny', 'audits/import'] });
+  assert.deepEqual(audits('fetch'), { 'audit-source:alice': ['allow', 'audits/import'], 'audit-source:bob': ['deny', 'audits/import'] });
+  const cfg = JSON.parse(fs.readFileSync(path.join(dir, A.IMPORTS_FILE), 'utf8'));
+  delete cfg.sources.bob;
+  fs.writeFileSync(path.join(dir, A.IMPORTS_FILE), JSON.stringify(cfg));
+  assert.deepEqual(audits('fetch'), { 'audit-source:alice': ['allow', 'audits/import'] });
+  assert.deepEqual(audits('check'), { 'audit-source:alice': ['allow', 'audits/import'] });
+  // A hand-edited lock is refused on the next check.
+  const lockFile = path.join(dir, A.LOCK_FILE);
+  const lock = JSON.parse(fs.readFileSync(lockFile, 'utf8'));
+  lock.sources.alice.bundle.payload.audits[0].who = 'Mallory';
+  fs.writeFileSync(lockFile, JSON.stringify(lock));
+  assert.deepEqual(audits('check'), { 'audit-source:alice': ['deny', 'audits/import'] });
+});
+
 // ── who decides ────────────────────────────────────────────────────────────
 
 // Commands whose verdict is a Decision from decide() (and prints findings@1).
@@ -356,6 +433,10 @@ const DECIDES_VIA_MODEL = {
   // decide() (the `approval` rows); --check's differences are findings too.
   approve: 'approve.cjs',
   lock:    'lock.cjs',
+  // #121: the DB signature (row db/signature) and the audit import check
+  // (row audits/import, `audits fetch|check`); `audits list|add|export` are data.
+  signature: 'check_signature.cjs',
+  audits:    'audits.cjs',
 };
 // Commands that still map their own findings to an exit code. Each moves by
 // emitting findings@1 and exiting via decide() — then its line goes.

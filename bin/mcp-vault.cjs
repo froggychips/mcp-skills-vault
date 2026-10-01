@@ -6,6 +6,11 @@
 
 const path = require("path");
 const { spawnSync } = require("child_process");
+const { loadTrustedKeys } = require("../mcp-ecosystem-intelligence/scripts/lib/signing.cjs");
+const {
+  checkDb, allowUnsignedFromEnv, signatureContext, ALLOW_FLAG,
+} = require("../mcp-ecosystem-intelligence/scripts/lib/db_signature.cjs");
+const { readWallClock } = require("../mcp-ecosystem-intelligence/scripts/lib/clock.cjs");
 
 const SCRIPTS_DIR = path.join(
   __dirname, "..", "mcp-ecosystem-intelligence", "scripts"
@@ -53,7 +58,13 @@ const COMMANDS = {
   lock:            "lock.cjs",
   approve:         "approve.cjs",
   sbom:            "sbom.cjs",
+  signature:       "check_signature.cjs",
+  audits:          "audits.cjs",
 };
+
+// Commands that never read the DB, so its signature is not their business.
+// `signature` reports on it itself, and must be reachable when it is broken.
+const DB_FREE = new Set(["wrap", "health", "doctor", "signature"]);
 
 const HELP = `mcp-vault — make MCP supply-chain boring.
 
@@ -90,6 +101,8 @@ COMMANDS
                     (--check: diff a fresh resolve against it; --vendor: install it)
   approve <server>  Approve a server's tools in mcp.lock.json (policy toolApproval)
                     (--tool X: one tool; shows what changed in descriptions/schemas)
+  signature         Check the DB against its Ed25519 signature and the shipped keyring
+  audits <sub>      Your audits and imported ones (list | add | export | fetch | check)
 
 COMMON OPTIONS
   --json            Machine-readable output
@@ -115,6 +128,8 @@ COMMON OPTIONS
                     stored evidence only, so verify needs --offline
   --host <id>       Which host config to write (install; --list-hosts to see them)
   --scope <s>       project or user (install; --global means --scope user)
+  --allow-unsigned-db   Run on a DB whose signature does not verify (development,
+                        forks). Loud on every run; also MCP_VAULT_ALLOW_UNSIGNED_DB=1
 
   Each command also accepts its own flags — run with --help for details.
 
@@ -136,7 +151,57 @@ function showVersion() {
   process.stdout.write(`mcp-vault ${pkg.version}\n`);
 }
 
-function main(argv) {
+/**
+ * Every DB this command will read: the bundled one, and each `--db` value
+ * (`--db x` and `--db=x`, every occurrence). All of them, because the scripts
+ * behind this wrapper disagree about which occurrence wins — most take the
+ * last — and checking one while the script reads another is no check at all.
+ */
+function dbPathsOf(passArgs) {
+  const dbs = [DB_PATH];
+  for (let i = 0; i < passArgs.length; i++) {
+    const a = passArgs[i];
+    if (a === "--db" && passArgs[i + 1] !== undefined) dbs.push(path.resolve(passArgs[++i]));
+    else if (a.startsWith("--db=")) dbs.push(path.resolve(a.slice("--db=".length)));
+  }
+  return [...new Set(dbs)];
+}
+
+/**
+ * Check those DBs before the command reads them. Returns an exit code to stop
+ * with, or null to carry on. The verdict is the `db/signature` row's, via
+ * decide() (lib/db_signature.cjs); this only prints it.
+ *
+ * Where the CLI runs decides one thing: whether a *missing* signature refuses.
+ * An installed package requires one; a git checkout (development, CI) does
+ * not. A signature that is present must verify, everywhere.
+ */
+function dbSignatureRefusal(passArgs, allowUnsigned) {
+  const keyring = loadTrustedKeys();
+  const context = signatureContext();
+  // The decision does not depend on the instant (key windows are checked
+  // against the signed date); the document still says when it was made.
+  const asOf = readWallClock();
+  for (const dbPath of dbPathsOf(passArgs)) {
+    const check = checkDb({
+      dbPath, keys: keyring.keys, keyringOk: keyring.ok, keyringErrors: keyring.errors,
+      allowUnsigned, context, asOf,
+    });
+    if (!check.proceed) {
+      process.stderr.write(`${check.message}\n`);
+      return 1;
+    }
+    if (check.state === "unsigned-allowed") process.stderr.write(`${check.message}\n`);
+  }
+  return null;
+}
+
+function main(rawArgv) {
+  // Stripped here, in any position: it is a statement about the DB this
+  // wrapper checks, not an option of the script behind it.
+  // (`signature` keeps it: reporting on the override is part of its job.)
+  const allowUnsigned = rawArgv.includes(ALLOW_FLAG) || allowUnsignedFromEnv(process.env);
+  const argv = rawArgv[0] === "signature" ? rawArgv : rawArgv.filter((a) => a !== ALLOW_FLAG);
   const cmd = argv[0];
 
   if (!cmd || cmd === "-h" || cmd === "--help" || cmd === "help") {
@@ -157,6 +222,11 @@ function main(argv) {
   }
 
   let passArgs = argv.slice(1);
+
+  if (!DB_FREE.has(cmd)) {
+    const refusal = dbSignatureRefusal(passArgs, allowUnsigned);
+    if (refusal !== null) process.exit(refusal);
+  }
 
   // `mcp-vault install <pkg> [--global]` → `orchestrate.cjs --install <pkg> [--global]`
   if (cmd === "install") {

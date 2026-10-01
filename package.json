@@ -9,6 +9,8 @@
     "bin",
     "mcp-ecosystem-intelligence/scripts",
     "mcp-ecosystem-intelligence/assets/tools_database.json",
+    "mcp-ecosystem-intelligence/assets/tools_database.json.sig",
+    "mcp-ecosystem-intelligence/assets/trusted_keys.json",
     "mcp-ecosystem-intelligence/assets/eval_results.json",
     "mcp-ecosystem-intelligence/assets/capabilities.json",
     "mcp-ecosystem-intelligence/assets/mcp-wrapper-template",

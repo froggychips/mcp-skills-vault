@@ -1,0 +1,15 @@
+{
+  "$schema": "mcp-vault/trusted-keys@1",
+  "comment": "Ed25519 public keys allowed to sign the published DB: see SECURITY.md, 'Signed DB'. Rotation: add the new key with valid_from, give the old one valid_until; set revoked: true for a key that must verify nothing. Dates are YYYY-MM-DD.",
+  "keys": [
+    {
+      "key_id": "92cf62804f86a312",
+      "algorithm": "ed25519",
+      "public_key": "S2k41Y+UvC4NgaDPN5mC05ZXNp38TyH8JRCaT2i5cbU=",
+      "valid_from": "2026-09-30",
+      "valid_until": null,
+      "revoked": false,
+      "comment": "release key"
+    }
+  ]
+}
