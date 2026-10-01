@@ -152,14 +152,39 @@ test('summarizeFeedSources: reports actual outcome, not a static list', () => {
   assert.ok(s.includes('Snyk'), s.join(', '));
 });
 
+// The seeded-DB smoke (.github/workflows/security-scan.yml) asks "is the DB
+// consistent" — pins present and in agreement, digests pinned, the policy
+// met — not "is every entry installable today". Since the offline gate
+// applies stored evidence, a known advisory recorded against a pinned version
+// fails a plain `--offline`; the smoke asks its narrower question with
+// --fail-families, and the advisory is still decided and reported.
+const SMOKE = ['--fail-families', 'integrity,pin,oci,verify,policy'];
+// Whether the shipped DB records a found problem (known advisory, yanked or
+// unpublished release) for the version an entry pins. Found problems do not
+// age, so this does not depend on the day the suite runs.
+const STORED_DENY = (() => {
+  const { storedEvidenceFor } = require('../mcp-ecosystem-intelligence/scripts/lib/findings_from.cjs');
+  const { blocks } = require('../mcp-ecosystem-intelligence/scripts/lib/scores.cjs');
+  const db = require('../mcp-ecosystem-intelligence/assets/tools_database.json').tools;
+  return db.some((t) => {
+    const { evidence } = storedEvidenceFor(t);
+    return Object.entries((evidence && evidence.dimensions) || {}).some(([d, x]) => x && blocks(d, x.status));
+  });
+})();
+
 test('CLI --offline is the network-free smoke path', () => {
-  const r = spawnSync(process.execPath, [
+  const run = (extra) => spawnSync(process.execPath, [
     'mcp-ecosystem-intelligence/scripts/verify_integrity.cjs',
-    '--offline',
+    '--offline', ...extra,
   ], { cwd: require('node:path').resolve(__dirname, '..'), encoding: 'utf8' });
+  const r = run(SMOKE);
   assert.equal(r.status, 0, r.stderr || r.stdout);
   assert.match(r.stdout, /Offline mode: validating stored pins only/);
   assert.match(r.stdout, /entries checked/);
+  // The gate itself applies what the DB knows: a recorded advisory fails it.
+  const gate = run([]);
+  assert.equal(gate.status, STORED_DENY ? 1 : 0, gate.stderr || gate.stdout);
+  if (STORED_DENY) assert.match(gate.stdout, /\[(CVE|FAIL)\] stored evidence: /);
 });
 
 test('CLI --offline rejects --update', () => {
@@ -276,7 +301,7 @@ test('dockerDigestPinned: anchored at the end of the reference', () => {
 const REPO = require('node:path').resolve(__dirname, '..');
 const runVerify = (args) => spawnSync(process.execPath, [
   'mcp-ecosystem-intelligence/scripts/verify_integrity.cjs', ...args,
-], { cwd: REPO, encoding: 'utf8' });
+], { cwd: REPO, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 
 test('CLI --entry: unknown name is a usage error, not a silent pass', () => {
   const r = runVerify(['--offline', '--entry', 'no-such-entry-in-the-db']);
@@ -349,7 +374,7 @@ test('CLI: --json output of the sibling CLIs stays parseable', () => {
 });
 
 test('CLI --json: a single document on stdout, chatter on stderr', () => {
-  const r = runVerify(['--offline', '--json']);
+  const r = runVerify(['--offline', '--json', ...SMOKE]);
   assert.equal(r.status, 0, r.stderr);
   const report = JSON.parse(r.stdout);
   assert.equal(report.schema, 'mcp-vault/verify-report@1');
@@ -362,7 +387,7 @@ test('CLI --json: a single document on stdout, chatter on stderr', () => {
 });
 
 test('CLI --sarif: valid enough for code scanning to ingest', () => {
-  const r = runVerify(['--offline', '--sarif']);
+  const r = runVerify(['--offline', '--sarif', ...SMOKE]);
   assert.equal(r.status, 0, r.stderr);
   const sarif = JSON.parse(r.stdout);
   assert.equal(sarif.version, '2.1.0');
@@ -376,7 +401,8 @@ test('CLI --sarif: valid enough for code scanning to ingest', () => {
 });
 
 test('CLI --json: exit code still reflects the verdict', () => {
-  assert.equal(runVerify(['--offline', '--json']).status, 0);
+  assert.equal(runVerify(['--offline', '--json', ...SMOKE]).status, 0);
+  assert.equal(runVerify(['--offline', '--json']).status, STORED_DENY ? 1 : 0);
   assert.equal(runVerify(['--offline', '--json', '--fail-unverified']).status, 1);
 });
 
@@ -417,7 +443,7 @@ test('CLI --installed: verifies configured servers, not the DB', () => {
   const r = spawnSync(process.execPath, [
     'mcp-ecosystem-intelligence/scripts/verify_integrity.cjs',
     '--installed', '--offline', '--cwd', proj, '--json',
-  ], { cwd: REPO, encoding: 'utf8' });
+  ], { cwd: REPO, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   assert.equal(r.status, 0, r.stderr);
   const report = JSON.parse(r.stdout);
   assert.equal(report.subject, 'installed');

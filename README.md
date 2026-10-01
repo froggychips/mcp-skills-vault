@@ -30,7 +30,10 @@ Needs: database, infra, ci-cd, pm
 
 $ npx -y @froggychips/mcp-vault verify --offline
 …
-114 entries checked — 0 failure(s)
+FAIL  mcp-searxng@1.0.3 (npm offline pin present for mcp-searxng)
+        [CVE] stored evidence: advisories: vulnerable (observed 2026-09-17)
+…
+114 entries checked — 9 failure(s)
 ```
 
 ## Without this vault vs. with it
@@ -55,7 +58,7 @@ $ npx -y @froggychips/mcp-vault verify --offline
 | **Why was it denied?** | read four outputs | `explain` prints the evidence with dates, the policy in force, every rule with its outcome, and the rule that decided it |
 | **What runs, exactly** | `npx` re-resolves the tree at every start | `lock` freezes npm's own lockfile per server; `--vendor` installs it so nothing resolves at launch |
 | **Stack matching** | manual reading of awesome-lists | detects 40+ env-key patterns + 14 file paths + docker-compose images → suggests what to install |
-| **Offline use** | doesn't | `--offline` makes no network calls and validates stored pins; `--no-audit` still checks live registries but skips advisory APIs |
+| **Offline use** | doesn't | `--offline` makes no network calls: it validates stored pins and applies the stored, dated evidence (a recorded advisory fails, as in `explain`); `--no-audit` still checks live registries but skips advisory APIs |
 | **What actually launches** | `npx -y pkg` resolves `latest` at every start — not the artifact anyone reviewed | `install` writes the version the gate hashed (`pkg@1.2.3`, `pkg==1.2.3`, `image@sha256:…`), and refuses to write an unpinned command without `--allow-unpinned` |
 | **Telemetry** | varies | none. Ever. |
 
@@ -202,7 +205,8 @@ Flags:
 | `--record-evidence` | Write what this run established back into the DB, dated per dimension (`trust_evidence`), and recompute `trust` from it |
 | `--no-policy` | Ignore `.mcp-vault.policy.json` |
 | `--show-policy` | Print the policy in force and the switches it implies |
-| `--offline` | True offline mode; no network calls, validates stored DB pins only |
+| `--offline` | True offline mode; no network calls. Validates stored DB pins and applies the stored evidence — see [The offline gate](#the-offline-gate) |
+| `--fail-families <a,b>` | Only outcomes of these rule families fail the run (by the deciding rule or a finding it rests on); everything is still decided and reported |
 | `--fail-unverified` | Treat `UNVERIFIED` (registry unreachable, unparsable install command, wheel-only PyPI release) as a hard failure. Implied by `--strict` |
 | `--entry <name>` | Check a single DB entry instead of all of them |
 | `--installed` | Verify what the local hosts are configured to launch (`.mcp.json`, `~/.claude.json`, Claude Desktop, Cursor, VS Code, Codex) instead of the DB. Unpinned launch commands, servers not in the vault, and remote endpoints are each reported as what they are |
@@ -211,6 +215,34 @@ Flags:
 | `--fail-dep-advisories` | A high/critical advisory anywhere in the tree is a failure |
 | `--require-signatures` | An npm release with no verifiable registry signature is a failure |
 | `--require-provenance` | An npm release with no provenance attestation is a failure |
+
+### The offline gate
+
+`verify --offline` makes no network calls, so it cannot learn anything new
+about an artifact — but the DB already knows things, dated: what the weekly
+refresh recorded per dimension (`trust_evidence`). The offline gate applies
+that record, through the same function `explain` uses, so the two give one
+answer for one entry:
+
+- **A found problem fails, at any age.** A known advisory against the pinned
+  version, a yanked or unpublished release, a hash that did not match: facts
+  about the artifact, which do not become less true with time. The line says
+  when it was observed — `[CVE] stored evidence: advisories: vulnerable
+  (observed 2026-09-17)`.
+- **A claim of absence ages.** "No advisories" and "still published" hold for
+  seven days; past that they are `unknown`, not `allow` and not `deny`. That
+  fails the run under `--fail-unverified` (or `unverified: fail` in the
+  policy) and is reported otherwise.
+- **A narrower question is a flag, not a switched-off gate.** CI's seeded-DB
+  smoke asks whether the DB is *consistent* — pinned, cross-consistent,
+  digest-pinned, within policy — and runs
+  `verify --offline --fail-families integrity,pin,oci,verify,policy`. The
+  stored advisories are still decided, printed and uploaded as SARIF; they are
+  just not that job's exit code.
+
+This was a pre-1.0 tightening of a default (`verify --offline` exits `1` on the
+entries with a recorded advisory); see
+[docs/COMPATIBILITY.md](./docs/COMPATIBILITY.md#2-exit-codes).
 
 This project publishes itself with npm provenance (`npm publish --provenance`,
 signed against a GitHub OIDC token — which works on a self-hosted runner, since
@@ -834,9 +866,11 @@ per step, so a later edit cannot quietly add an unjailed one. See
 
 - **unit-tests** — `node --test tests/*.test.cjs` on every PR / push. Jailed on
   PRs, direct in trusted contexts.
-- **smoke** — `verify_integrity.cjs --offline` on every PR / push, plus a SARIF
-  upload so each finding lands on the `tools_database.json` line that caused it
-  instead of in a log.
+- **smoke** — `verify_integrity.cjs --offline --fail-families
+  integrity,pin,oci,verify,policy` on every PR / push ("is the DB consistent";
+  stored advisories are reported, not this job's exit code — see
+  [The offline gate](#the-offline-gate)), plus a SARIF upload so each finding
+  lands on the `tools_database.json` line that caused it instead of in a log.
 - **refresh-hashes** — Monday cron. The evidence-collecting job: refreshes
   `version` + `pkg_integrity` from live registries, re-verifies with `--deep
   --record-evidence`, then runs `availability`, `identity`, `posture` and
@@ -1027,7 +1061,7 @@ Running the suite locally:
 
 ```bash
 node --test tests/*.test.cjs        # unit tests (offline)
-mcp-vault verify --offline          # DB smoke, no network
+npm run verify                      # DB smoke, no network (verify --offline --fail-families …)
 mcp-vault site-registry             # regenerate docs/site/registry.html
 ```
 

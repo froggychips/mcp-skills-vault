@@ -107,6 +107,49 @@ migration step, and a new command that is not classified fails that test.
 - Default is the wall clock: `verify` answers about now, as before. Snapshot
   semantics are for tests, docs and reproduction.
 
+### 5. Positive findings do not age
+
+A TTL is the shelf life of a *claim of absence*: "no advisories", "still
+published", "the hash matched". The world can make those false tomorrow
+without the artifact changing, so past `expires_at` they are `stale` →
+`unknown` — not `allow`, not `deny` — and `fail_on` decides whether that
+fails the run (`--fail-unverified`, `unverified: fail`).
+
+A *found problem* is the other kind of statement: a known advisory against the
+pinned version, a yanked / unpublished / gone release, a hash, repo or build
+that disagreed, a claim that was withdrawn. It is a fact about that artifact
+and stays one; nothing about the passage of time un-publishes a CVE. So a
+found problem is a finding with `state: observed` at any age — severity from
+the status (blocking → high, otherwise medium), the observation date in its
+message (`advisories: vulnerable (observed 2026-09-17)`) — and it is never
+also reported as evidence that has aged out. `foundProblem(dimension,
+status)` in `lib/findings_from.cjs` is the one definition.
+
+Before this was written down, two places got it wrong. `fromEvidence` checked
+the blocking statuses before staleness but not the others, so a three-week-old
+`source_binding: mismatch` became `stale`/`unknown`. And `verify`'s "stored
+evidence has aged out" line listed every dimension past its TTL, a
+`vulnerable` advisory included — a found advisory rendered as an `evidence/stale`
+`unknown`. Both now go through `foundProblem`.
+
+### 6. One producer for stored evidence
+
+`verify --offline` and `explain` (without `--verify`) decide over the same
+thing: the DB's dated record. Both build that part of the decision with
+`fromStoredEvidence(tool, { asOf, maxAgeDays })` — the findings above, plus the
+`evidence` and `trust` facts the `trust/*` rows read — and the same shelf
+lives (`maxAgeForPolicy`). Before, `verify --offline` checked pins only: on the
+shipped DB nine entries were denied by `explain` and passed by
+`verify --offline`, one decision with two exit codes.
+
+A caller whose question is narrower than "does anything fail" names the rule
+families that may fail it (`--fail-families integrity,pin,…` →
+`fail_families` in the effective policy; `outcomeFails` in
+`lib/finding.cjs`). An outcome belongs to a family by its rule id or by a
+finding it rests on. Everything is still decided and reported; the filter is
+about the exit code only, so it narrows the question without lowering the bar
+for anyone who asks the whole one.
+
 ## Migration
 
 **Compatibility.** Every released schema keeps its bytes. `verify-report@1`,

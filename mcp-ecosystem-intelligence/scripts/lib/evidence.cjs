@@ -34,6 +34,7 @@
  *   buildEvidence(checks, opts)               -> { artifact_id, dimensions }
  *   mergeEvidence(existing, fresh)            -> merged   (per-dimension, newest wins)
  *   staleDimensions(evidence, maxAgeDays, now)-> [names]
+ *   maxAgeForPolicy(filePolicy)               -> per-dimension shelf lives under a policy
  *   deriveTrust(evidence, opts)               -> 'verified' | 'candidate' | 'unverified'
  *   evidenceAsOf / entryAsOf / dbAsOf / evalResultsAsOf (…, asOf)
  *                                             -> the record without looks dated after asOf
@@ -246,6 +247,21 @@ function mergeEvidence(existing, fresh) {
   return { artifact_id: (fresh && fresh.artifact_id) || (existing && existing.artifact_id) || null, dimensions: ordered };
 }
 
+/**
+ * The shelf lives a policy file implies: its `maxEvidenceAgeDays` caps every
+ * dimension, and each keeps its own default below that. A policy raises the
+ * bar; it does not lower it — `maxEvidenceAgeDays: 30` applied flatly would
+ * have *extended* the 7-day advisory window. One function, so that `verify`
+ * and `explain` judge the same evidence against the same dates.
+ */
+function maxAgeForPolicy(filePolicy) {
+  const fromPolicy = filePolicy ? filePolicy.maxEvidenceAgeDays : null;
+  if (!Number.isFinite(fromPolicy)) return DEFAULT_MAX_AGE_DAYS;
+  const merged = {};
+  for (const [dimension, dflt] of Object.entries(DEFAULT_MAX_AGE_DAYS)) merged[dimension] = Math.min(dflt, fromPolicy);
+  return merged;
+}
+
 function daysBetween(fromIso, now) {
   const then = Date.parse(`${String(fromIso).slice(0, 10)}T00:00:00Z`);
   if (Number.isNaN(then)) return Infinity;
@@ -373,7 +389,7 @@ function evalResultsAsOf(results, asOf) {
 
 module.exports = {
   DIMENSIONS, DEFAULT_MAX_AGE_DAYS, POSITIVE_STATUSES, POSITIVE_BY_DIMENSION, isPositive,
-  REQUIRED_BY_ECOSYSTEM, requiredFor, daysBetween,
+  REQUIRED_BY_ECOSYSTEM, requiredFor, daysBetween, maxAgeForPolicy,
   buildEvidence, smokeEvidence, mergeEvidence, staleDimensions, deriveTrust,
   evidenceAsOf, entryAsOf, dbAsOf, evalResultsAsOf,
 };

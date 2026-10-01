@@ -23,7 +23,12 @@
  *   node scripts/verify_integrity.cjs --update     refresh version/integrity from registries
  *   node scripts/verify_integrity.cjs --strict     treat WARNs as hard failures
  *   node scripts/verify_integrity.cjs --no-audit   skip advisory APIs; still checks live registries
- *   node scripts/verify_integrity.cjs --offline    true offline mode; validate DB pins only
+ *   node scripts/verify_integrity.cjs --offline    true offline mode: DB pins, and the stored
+ *                                                  evidence applied (a recorded advisory
+ *                                                  or yanked release fails, as in explain)
+ *   node scripts/verify_integrity.cjs --fail-families integrity,pin
+ *                                                  only these rule families fail the run;
+ *                                                  everything is still decided and reported
  *   node scripts/verify_integrity.cjs --entry NAME  check a single DB entry by name
  *   node scripts/verify_integrity.cjs --installed  check the servers local hosts launch
  *                                                  (.mcp.json, ~/.claude.json, Cursor, …)
@@ -66,11 +71,11 @@ const {
   resolveNpmTreeCached, pypiDirectDependencies, summarizeTree,
 } = require('./lib/deps.cjs');
 const { loadEffectivePolicy, flagsFromArgv, rowFor } = require('./lib/policy_rules.cjs');
-const { decide, exitCode, findingsDocument, toJson } = require('./lib/finding.cjs');
-const { fromVerifyResults } = require('./lib/findings_from.cjs');
+const { decide, exitCode, outcomeFails, findingsDocument, toJson } = require('./lib/finding.cjs');
+const { fromVerifyResults, fromStoredEvidence, foundProblem } = require('./lib/findings_from.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const {
-  buildEvidence, mergeEvidence, staleDimensions, deriveTrust, requiredFor, DEFAULT_MAX_AGE_DAYS, dbAsOf,
+  buildEvidence, mergeEvidence, staleDimensions, deriveTrust, requiredFor, maxAgeForPolicy, dbAsOf,
 } = require('./lib/evidence.cjs');
 const https       = require('https');
 const fs          = require('fs');
@@ -121,19 +126,11 @@ const POLICY = {
   errors: EFFECTIVE.errors, found: EFFECTIVE.found,
 };
 
-// Per-dimension age limits: the policy's number overrides every dimension,
-// otherwise each dimension keeps its own default (advisories perish fastest).
+// Per-dimension age limits: the policy's number caps every dimension, and
+// each keeps its own default below that (lib/evidence.cjs maxAgeForPolicy —
+// the same function explain uses, so both judge the same dates).
 function evidenceMaxAge() {
-  const fromPolicy = POLICY.ok && POLICY.policy ? POLICY.policy.maxEvidenceAgeDays : null;
-  if (!Number.isFinite(fromPolicy)) return DEFAULT_MAX_AGE_DAYS;
-  // A policy raises the bar; it does not lower it. `maxEvidenceAgeDays: 30`
-  // applied flatly would have *extended* the 7-day advisory window, so a
-  // twenty-day-old "clean" became acceptable by adding a policy.
-  const merged = {};
-  for (const [dimension, dflt] of Object.entries(DEFAULT_MAX_AGE_DAYS)) {
-    merged[dimension] = Math.min(dflt, fromPolicy);
-  }
-  return merged;
+  return maxAgeForPolicy(POLICY.ok ? POLICY.policy : null);
 }
 
 // --entry NAME: check one DB entry instead of all 100+. `orchestrate --install`
@@ -1579,7 +1576,7 @@ async function main() {
 
   // Process npm.
   if (OFFLINE) {
-    progress('Offline mode: validating stored pins only; no registry/advisory network calls.\n');
+    progress('Offline mode: validating stored pins only; no registry/advisory network calls. Stored evidence is applied.\n');
   } else if (NO_AUDIT && !UPDATE) {
     progress('No-audit mode: checking live registry metadata; advisory feeds skipped.\n');
   }
@@ -1734,7 +1731,11 @@ async function main() {
     const typed = r.tool ? toTypedEntry(r.tool) : null;
     const fresh = buildEvidence(r.checks, { artifactId: typed ? artifactId(typed.artifact) : null, now: AS_OF });
     const evidence = Object.keys(fresh.dimensions).length ? mergeEvidence(stored, fresh) : stored;
-    const stale = staleDimensions(evidence, evidenceMaxAge(), AS_OF);
+    // A found problem (a known advisory, a yanked release) does not age: it is
+    // judged as a finding, not as a claim past its shelf life (docs/adr/0001).
+    const dims = (evidence && evidence.dimensions) || {};
+    const stale = staleDimensions(evidence, evidenceMaxAge(), AS_OF)
+      .filter((sd) => !(dims[sd.dimension] && foundProblem(sd.dimension, dims[sd.dimension].status)));
     if (!stale.length) continue;
     r.lines = r.lines || [];
     const worst = stale.sort((a, b) => b.age_days - a.age_days).slice(0, 3)
@@ -1771,6 +1772,14 @@ async function main() {
   // own fields — licence, health, the trust this run derived — are facts.
   const model = fromVerifyResults(results, { asOf: AS_OF, maxAgeDays: evidenceMaxAge(), scope: INSTALLED ? 'installed' : 'database' });
   const facts = {};
+  // Offline, nothing is re-checked — so what the DB already knows about each
+  // entry is the rest of the evidence, and the decision applies it: a known
+  // advisory against the pinned version, a yanked release, a claim past its
+  // shelf life. The same producer explain uses (lib/findings_from.cjs
+  // fromStoredEvidence), so `verify --offline` and `explain` are one decision
+  // with one exit code. Not for --installed: a configured server's version
+  // need not be the one the DB's evidence describes.
+  const storedFindings = [];
   results.forEach((r, i) => {
     const s = model.subjects[i];
     if (!s || !r.tool) return;
@@ -1784,9 +1793,49 @@ async function main() {
         trust:        r.effective_trust || r.tool.trust || null,
       },
     };
+    if (!OFFLINE || INSTALLED || s.type !== 'artifact' || r.status === 'UPD') return;
+    const stored = fromStoredEvidence(r.tool, { asOf: AS_OF, maxAgeDays: evidenceMaxAge(), subject: s, scope: 'database' });
+    Object.assign(facts[s.id], stored.facts);
+    const seen = new Set(model.observations.map((o) => o.id));
+    for (const o of stored.observations) if (!seen.has(o.id)) model.observations.push(o);
+    model.findings.push(...stored.findings);
+    storedFindings[i] = stored.findings;
   });
   const decisions = decide(model.findings, EP, AS_OF, { subjects: model.subjects.filter(Boolean), facts });
   const decisionOf = new Map(decisions.map((d) => [d.subject.id, d]));
+
+  // The stored findings, rendered as report lines — a view of the decision,
+  // like the POLICY lines below: counted as a failure exactly when an outcome
+  // resting on them fails the run. The aged-out claims already have their
+  // `stored evidence has aged out` line above.
+  results.forEach((r, i) => {
+    const fs_ = storedFindings[i];
+    const s = model.subjects[i];
+    const d = s && decisionOf.get(s.id);
+    if (!fs_ || !fs_.length || !d) return;
+    let failed = false;
+    let unverified = false;
+    const ruleOf = new Map(fs_.map((f) => [f.id, f.rule]));
+    const fails = (o) => outcomeFails(o, {
+      threshold: d.fail_on, families: EP.fail_families, ruleOf, thresholded: Boolean((rowFor(o.rule) || {}).thresholded),
+    });
+    for (const f of fs_) {
+      if (f.rule === 'evidence/stale') continue;
+      const tag = f.state !== 'observed' ? 'UNVERIFIED'
+        : f.severity === 'high' ? (f.rule === 'evidence/advisories' ? 'CVE' : 'FAIL')
+        : 'WARN';
+      r.lines = r.lines || [];
+      r.lines.push([tag, `stored evidence: ${f.message}`, { rule: f.rule, severity: f.severity, state: f.state }]);
+      if (d.rules.some((o) => o.findings.includes(f.id) && fails(o))) failed = true;
+      if (tag === 'UNVERIFIED') unverified = true;
+    }
+    if (failed) {
+      r.failures = (r.failures || 0) + 1;
+      r.status = 'FAIL';
+    } else if (unverified && r.status === 'OK') {
+      r.status = 'UNVERIFIED';
+    }
+  });
 
   // The policy file's verdicts, rendered as the POLICY-FAIL / POLICY-WARN
   // lines this report has always carried. They are the decision's own rule
@@ -1807,6 +1856,19 @@ async function main() {
         if (v.effect === 'deny') results[i].failures = (results[i].failures || 0) + 1;
       }
       if (results[i].failures > 0) results[i].status = 'FAIL';
+    }
+  }
+
+  // --fail-families: the question is narrower than "does anything fail", and
+  // the counters cannot say which family a failure came from. An entry whose
+  // decision does not fail at that question is not counted as failed.
+  if (EP.fail_families) {
+    for (let i = 0; i < results.length; i++) {
+      const s = model.subjects[i];
+      const d = s && decisionOf.get(s.id);
+      if (!d || d.fails || !(results[i].failures > 0)) continue;
+      results[i].failures = 0;
+      results[i].status = verdictFor(0, results[i].lines);
     }
   }
 

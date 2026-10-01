@@ -413,7 +413,16 @@ function deepFreeze(o) {
  */
 function flagsFromArgv(argv = []) {
   const a = new Set(argv);
+  // --fail-families a,b (or =a,b): the rule families whose outcomes may fail
+  // the run. Absent, every family may.
+  let families = null;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = String(argv[i]);
+    if (arg === '--fail-families') families = String(argv[i + 1] || '');
+    else if (arg.startsWith('--fail-families=')) families = arg.slice('--fail-families='.length);
+  }
   return {
+    failFamilies:             families === null ? null : families.split(',').map((x) => x.trim().replace(/\/\*?$/, '')).filter(Boolean),
     strict:                   a.has('--strict'),
     failUnverified:           a.has('--fail-unverified'),
     requireSignatures:        a.has('--require-signatures'),
@@ -443,6 +452,13 @@ function flagsFromArgv(argv = []) {
  *                     `unverified: fail`) adds unknown; --strict adds warn.
  *                     This threshold *is* what --strict means now: a
  *                     parameter of the decision, not a branch in a command.
+ *   fail_families     null, or the rule families (`integrity`, `pin`, …) whose
+ *                     outcomes may fail the run (`--fail-families`). An outcome
+ *                     belongs to a family by its own rule id or by a finding
+ *                     it rests on. Everything is still decided and reported;
+ *                     this says which part of it the exit code is about — the
+ *                     seeded-DB smoke asks "is the DB consistent", not "is
+ *                     every entry installable today"
  *   policy_rules      false under --no-policy: the file's rules do not apply,
  *                     the gate's still do
  */
@@ -468,7 +484,12 @@ function effectivePolicy(base, flags = {}, { defaults = {}, policyRules = true }
   let failOn = 'deny';
   if (gate.fail_unverified) failOn = stricter('fail_on', failOn, 'unknown');
   if (gate.strict) failOn = stricter('fail_on', failOn, 'warn');
-  return deepFreeze({ ...p, gate, fail_on: failOn, policy_rules: Boolean(policyRules) });
+  // Which rule families may fail the run at all (null: every one). A
+  // narrower *question*, not a lower bar: the findings are still made,
+  // decided and reported; only the exit code is about these families.
+  const families = Array.isArray(flags.failFamilies) && flags.failFamilies.length
+    ? [...new Set(flags.failFamilies)].sort() : null;
+  return deepFreeze({ ...p, gate, fail_on: failOn, fail_families: families, policy_rules: Boolean(policyRules) });
 }
 
 /**
