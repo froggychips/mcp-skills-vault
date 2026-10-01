@@ -19,9 +19,7 @@ const assert   = require('node:assert/strict');
 const fs       = require('node:fs');
 const os       = require('node:os');
 const path     = require('node:path');
-const { spawnSync } = require('node:child_process');
 
-const ROOT = path.resolve(__dirname, '..');
 const match = require('../mcp-ecosystem-intelligence/scripts/lib/entry_match.cjs');
 const budget = require('../mcp-ecosystem-intelligence/scripts/lib/budget.cjs');
 const flows = require('../mcp-ecosystem-intelligence/scripts/lib/flows.cjs');
@@ -32,37 +30,20 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-vault-identity-'));
 const HOME = fs.mkdtempSync(path.join(TMP, 'home-'));
 const ENV = { ...process.env, HOME, NO_COLOR: '1', CI: '', MCP_VAULT_ALLOW_UNSIGNED_DB: '', MCP_VAULT_REQUIRE_SIGNED_DB: '' };
 
-// A day after the stored evidence below was observed: every claim is fresh,
-// so what differs between the commands can only be how they read it.
-const OBSERVED = '2026-09-17';
-const AS_OF = '2026-09-18T12:00:00Z';
+// The DB is a staged copy whose evidence this file controls
+// (tests/lib/fixture_skill.cjs: playwright-mcp clean, mcp-atlassian with an
+// advisory, mcp-server-aws yanked, all observed on OBSERVED), and every run has
+// an explicit --as-of — so what is compared is how the commands read a record,
+// never what the shipped DB says today.
+const { fixtureSkill, AS_OF, LATE } = require('./lib/fixture_skill.cjs');
+const trees = [];
+process.on('exit', () => { for (const t of trees) t.cleanup(); });
 
-/**
- * A copy of the skill (DB_PATH resolves next to the scripts) in which one
- * entry carries an advisory against its pinned version, and one is yanked —
- * as stored evidence bound to exactly that artifact.
- */
-function skillTree() {
-  const root = fs.mkdtempSync(path.join(TMP, 'skill-'));
-  fs.cpSync(path.join(ROOT, 'mcp-ecosystem-intelligence'), path.join(root, 'mcp-ecosystem-intelligence'), { recursive: true });
-  const dbFile = path.join(root, 'mcp-ecosystem-intelligence', 'assets', 'tools_database.json');
-  const db = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
-  const entry = (name) => {
-    const t = db.tools.find((x) => x.name === name);
-    assert.ok(t && t.trust_evidence, `${name} is no longer in the DB with evidence; pick another entry`);
-    return t;
-  };
-  entry('mcp-atlassian').trust_evidence.dimensions.advisories = { status: 'vulnerable', checked_at: OBSERVED };
-  assert.equal(entry('mcp-server-aws').trust_evidence.dimensions.availability.status, 'yanked');
-  fs.writeFileSync(dbFile, JSON.stringify(db, null, 2));
-  const scripts = path.join(root, 'mcp-ecosystem-intelligence', 'scripts');
-  const versions = Object.fromEntries(['playwright-mcp', 'mcp-atlassian', 'mcp-server-aws'].map((n) => [n, entry(n).install_cmd]));
-  return {
-    versions,
-    run: (script, args, cwd) => spawnSync(process.execPath, [path.join(scripts, script), ...args], {
-      cwd, encoding: 'utf8', env: ENV, maxBuffer: 64 * 1024 * 1024,
-    }),
-  };
+function skillTree(opts = {}) {
+  const f = fixtureSkill({ ...opts, env: ENV });
+  trees.push(f);
+  const versions = Object.fromEntries(Object.entries(f.launches).map(([n, l]) => [n, [l.command, ...l.args].join(' ')]));
+  return { versions, run: (script, args, cwd) => f.run(script, args, { cwd, env: ENV }) };
 }
 
 /** `npx -y pkg@v` / `uvx pkg==v` as a config entry. */
@@ -229,7 +210,7 @@ test('one version equality: PEP 440 / PEP 503 spellings of a release are that re
 
 test('check: an aged-out vault record is one context line per server — said, in text, JSON and SARIF, and never the answer', (t) => {
   const tree = skillTree();
-  const LATE = '2026-10-20T12:00:00Z';   // every claim of absence past its shelf life
+  // LATE: every claim of absence past its shelf life.
   const dir = project({ pw: launch(tree.versions['playwright-mcp']), jira: launch(tree.versions['mcp-atlassian']) });
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
@@ -267,4 +248,15 @@ test('check: an aged-out vault record is one context line per server — said, i
   const notes = sarif.runs[0].results.filter((r) => r.ruleId === 'evidence/vault-age');
   assert.equal(notes.length, 2);
   assert.ok(notes.every((r) => r.level === 'note'));
+
+  // One stale entry beside a fresh one, at the same instant: only the stale
+  // one gets the line, and the run is clean at every threshold.
+  const mixed = skillTree({ stale: ['playwright-mcp'] });
+  const both = project({ pw: launch(mixed.versions['playwright-mcp']), db: launch(mixed.versions['mongodb-mcp-server']) });
+  t.after(() => fs.rmSync(both, { recursive: true, force: true }));
+  const m = mixed.run('check_configs.cjs', ['--as-of', AS_OF, '--fail-on', 'unknown'], both);
+  assert.equal(m.status, 0, m.stdout + m.stderr);
+  const ctx = m.stdout.split('\n').filter((l) => /^\s+i vault evidence for /.test(l));
+  assert.equal(ctx.length, 1, m.stdout);
+  assert.match(ctx[0], /@playwright\/mcp@0\.0\.75 is \d+ days old/);
 });

@@ -28,14 +28,44 @@ const ENV = { ...process.env, MCP_VAULT_ALLOW_UNSIGNED_DB: '', MCP_VAULT_REQUIRE
 // Built at runtime so no credential-shaped string is committed to the repo.
 const TOKEN = ['ghp', 'Zq7Xw2Lp9Rt4Vb8Nc3Md6Fk1Hs5Jy0Ug7Ae2Qx'].join('_');
 
+/**
+ * The hook repository pre-commit clones: this package's files, committed, with
+ * a staged DB (tests/lib/fixture_skill.cjs) — so the answer does not depend on
+ * what the shipped DB says today. The hook cannot take --as-of; the staged
+ * record holds no found problem for the server below, and its age is context
+ * only, so the outcome is the same on any day.
+ */
+let hookRepo = null;
+function makeHookRepo() {
+  if (hookRepo) return hookRepo;
+  const { fixtureSkill } = require('./lib/fixture_skill.cjs');
+  const f = fixtureSkill();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-vault-hook-repo-'));
+  for (const p of ['bin', 'package.json', '.pre-commit-hooks.yaml', 'LICENSE', 'README.md']) {
+    fs.cpSync(path.join(REPO, p), path.join(dir, p), { recursive: true });
+  }
+  fs.cpSync(path.join(f.root, 'mcp-ecosystem-intelligence'), path.join(dir, 'mcp-ecosystem-intelligence'), { recursive: true });
+  f.cleanup();
+  fs.rmSync(path.join(dir, 'mcp-ecosystem-intelligence', 'assets', 'tools_database.json.sig'), { force: true });
+  const vcs = (...a) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.invalid', '-c', 'commit.gpgsign=false', ...a], { cwd: dir, encoding: 'utf8', env: ENV });
+  assert.equal(vcs('init', '-q').status, 0);
+  assert.equal(vcs('add', '-A').status, 0);
+  const c = vcs('commit', '-q', '-m', 'hook repo');
+  assert.equal(c.status, 0, c.stderr);
+  hookRepo = dir;
+  process.on('exit', () => fs.rmSync(dir, { recursive: true, force: true }));
+  return dir;
+}
+
 function tryRepo(servers) {
+  const repo = makeHookRepo();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-vault-pre-commit-'));
   try {
     const git = (...a) => spawnSync('git', a, { cwd: dir, encoding: 'utf8', env: ENV });
     assert.equal(git('init', '-q').status, 0);
     fs.writeFileSync(path.join(dir, '.mcp.json'), JSON.stringify({ mcpServers: servers }, null, 2));
     assert.equal(git('add', '.mcp.json').status, 0);
-    const r = spawnSync('pre-commit', ['try-repo', REPO, 'mcp-vault', '--files', '.mcp.json', '--verbose'], {
+    const r = spawnSync('pre-commit', ['try-repo', repo, 'mcp-vault', '--files', '.mcp.json', '--verbose'], {
       cwd: dir, encoding: 'utf8', env: ENV, timeout: 300000,
     });
     return { status: r.status, out: `${r.stdout}${r.stderr}` };

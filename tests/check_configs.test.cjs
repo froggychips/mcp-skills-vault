@@ -12,9 +12,14 @@ const fs       = require('node:fs');
 const os       = require('node:os');
 const path     = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { fixtureSkill, AS_OF: FIXTURE_AS_OF } = require('./lib/fixture_skill.cjs');
 
 const REPO    = path.resolve(__dirname, '..');
-const S       = path.join(REPO, 'mcp-ecosystem-intelligence', 'scripts');
+// The commands under test run on a copy of the skill whose DB evidence the
+// test controls (tests/lib/fixture_skill.cjs), at an explicit instant: what a
+// known server decides must not depend on when the shipped DB was refreshed.
+const FIXTURE = fixtureSkill();
+const S       = FIXTURE.scripts;
 const CHECK   = path.join(S, 'check_configs.cjs');
 const VERIFY  = path.join(S, 'verify_integrity.cjs');
 const SECRETS = path.join(S, 'check_secrets.cjs');
@@ -24,7 +29,7 @@ const ACTION  = path.join(REPO, 'tests', 'fixtures', 'action');
 const F = require('../mcp-ecosystem-intelligence/scripts/lib/finding.cjs');
 const { deepFreeze } = require('../mcp-ecosystem-intelligence/scripts/lib/policy_rules.cjs');
 
-const AS_OF = '2026-09-30T12:00:00Z';
+const AS_OF = FIXTURE_AS_OF;
 // Nobody's home directory: check must not read one, and the commands it is
 // compared with read only what is in the project then.
 const HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-vault-check-home-'));
@@ -330,7 +335,7 @@ test('check: the feedback line is status\'s — a person at a terminal, not CI',
   const status = require('../mcp-ecosystem-intelligence/scripts/status.cjs');
   assert.equal(status.feedbackLine, feedbackLine);
   // main() with a TTY-like stdout prints it last; with CI set it does not.
-  const { main } = require('../mcp-ecosystem-intelligence/scripts/check_configs.cjs');
+  const { main } = require(path.join(S, 'check_configs.cjs'));
   const capture = (env) => {
     let out = '';
     const stdout = { isTTY: true, write: (s) => { out += s; return true; } };
