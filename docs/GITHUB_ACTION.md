@@ -112,4 +112,13 @@ repos:
 ```
 
 Runs `mcp-vault check --fail-on unknown` on staged `.mcp.json`,
-`.vscode/mcp.json` and `.cursor/mcp.json`, offline.
+`.vscode/mcp.json` and `.cursor/mcp.json`, offline (the hook's entry is
+`mcp-vault-pre-commit`, which runs exactly that).
+
+DB integrity: pre-commit installs the commit `rev:` names, which carries no
+release signature — that is made at release and is not in git. As in the
+Action's checkout mode, the pin is the integrity: the hook prints
+`mcp-vault: DB integrity: pinned by pre-commit rev`. It is accepted only for
+pre-commit's own install of the hook, from a clone whose DB is those bytes; a
+`.sig` that is present still has to verify, and the npm package still requires
+one. Pin `rev:` to a full SHA, as above.

@@ -316,7 +316,8 @@ test('.pre-commit-hooks.yaml: hook mcp-vault runs check and matches every host c
   assert.match(src, /^- id: mcp-vault$/m);
   // pre-commit appends the hook's args, then the staged file names; check
   // takes every bare argument as a config.
-  assert.match(src, /^\s+entry: mcp-vault check --fail-on unknown$/m);
+  // The hook's own entry: `check`, with the pre-commit rev as the DB's integrity.
+  assert.match(src, /^\s+entry: mcp-vault-pre-commit --fail-on unknown$/m);
   // YAML single quotes keep backslashes literal, so the text is the regex.
   const files = new RegExp(src.match(/^\s+files: '(.*)'$/m)[1]);
   for (const p of ['.mcp.json', '.vscode/mcp.json', '.cursor/mcp.json', 'pkg/a/.mcp.json']) {
