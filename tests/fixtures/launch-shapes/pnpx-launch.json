@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "devtools": {
+      "command": "pnpx",
+      "args": [
+        "chrome-devtools-mcp@latest",
+        "--no-usage-statistics",
+        "--browserUrl",
+        "http://127.0.0.1:9222"
+      ]
+    }
+  }
+}

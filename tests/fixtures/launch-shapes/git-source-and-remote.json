@@ -1,0 +1,24 @@
+{
+  "servers": {
+    "gh": {
+      "type": "http",
+      "url": "https://mcp.example.com/gh"
+    },
+    "source": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://git.example.com/acme/example-mcp",
+        "example-mcp",
+        "start"
+      ]
+    },
+    "pinned-elsewhere": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@example/desktop-mcp"
+      ]
+    }
+  }
+}

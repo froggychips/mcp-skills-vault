@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+    "remote-proxy": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://mcp.example.com/sse"
+      ]
+    },
+    "context": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ]
+    },
+    "docs": {
+      "type": "http",
+      "url": "https://mcp.example.com/docs"
+    },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "playwright",
+        "run-test-mcp-server"
+      ]
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "browser": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest",
+        "--cdp-endpoint=http://127.0.0.1:9000",
+        "--init-page",
+        "./init.cjs"
+      ]
+    }
+  }
+}

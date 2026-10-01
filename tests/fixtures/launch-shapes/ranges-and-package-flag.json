@@ -1,0 +1,40 @@
+{
+  "servers": {
+    "nx": {
+      "command": "npx",
+      "args": [
+        "nx-mcp@~0.25.0"
+      ]
+    },
+    "angular": {
+      "command": "npx",
+      "args": [
+        "@angular/cli@^21.0.0",
+        "mcp"
+      ]
+    },
+    "tool": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "-p",
+        "@example/tool-mcp@^14.0.0",
+        "tool-mcp-start"
+      ]
+    },
+    "tool-local": {
+      "command": "yarn",
+      "args": [
+        "node",
+        "./local/server/index.js"
+      ]
+    },
+    "browser": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@~0.0.70"
+      ]
+    }
+  }
+}

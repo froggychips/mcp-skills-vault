@@ -1,0 +1,27 @@
+{
+  "mcpServers": {
+    "chakra": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@chakra-ui/react-mcp"
+      ]
+    },
+    "next": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "next-devtools-mcp@latest"
+      ]
+    },
+    "browser": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest",
+        "--headless",
+        "--isolated"
+      ]
+    }
+  }
+}

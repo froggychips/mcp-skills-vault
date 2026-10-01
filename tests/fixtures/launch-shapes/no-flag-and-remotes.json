@@ -1,0 +1,42 @@
+{
+  "mcpServers": {
+    "ui": {
+      "command": "npx",
+      "args": [
+        "shadcn@latest",
+        "mcp"
+      ]
+    },
+    "gh": {
+      "command": "npx",
+      "args": [
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_TOKEN}"
+      }
+    },
+    "thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    },
+    "next": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "next-devtools-mcp@latest"
+      ]
+    },
+    "docs-a": {
+      "type": "http",
+      "url": "https://mcp.example.com/docs-a"
+    },
+    "docs-b": {
+      "type": "http",
+      "url": "https://mcp.example.com/docs-b"
+    }
+  }
+}

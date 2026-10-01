@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "mobile": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@example/mobile-mcp@latest"
+      ]
+    },
+    "notes": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@example/notes-bridge@latest"
+      ]
+    }
+  }
+}
