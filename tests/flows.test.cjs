@@ -361,13 +361,16 @@ test('status: the human screen has one Flows line per host', () => {
 test('audit: flows and shadowing are findings; fail exits 1 without --strict', () => {
   const dir = project(TRIFECTA, { toxicFlows: 'fail' });
   const r = run('audit_setup.cjs', dir, ['--json', '--global-config', path.join(dir, 'none.json')]);
-  const flow = r.json.findings.find((x) => x.category === 'toxic-flow');
-  assert.ok(flow, JSON.stringify(r.json.findings));
-  assert.equal(flow.effect, 'deny');
-  assert.match(flow.advice, /separate profiles/);
+  const doc = r.json.findings;
+  assert.equal(doc.schema, 'mcp-vault/findings@1');
+  const flow = doc.findings.find((x) => x.rule.startsWith('flows/'));
+  assert.ok(flow, JSON.stringify(doc.findings));
+  const outcome = doc.decisions.flatMap((d) => d.rules).find((o) => o.findings.includes(flow.id));
+  assert.equal(outcome.effect, 'deny');
+  assert.equal(r.json.details[flow.id].category, 'toxic-flow');
+  assert.match(r.json.details[flow.id].advice, /separate profiles/);
   assert.equal(r.status, 1);
   assert.ok(r.json.setup.flows.length >= 1);
-  assert.equal(r.json.setup_findings.schema, 'mcp-vault/findings@1');
 });
 
 test('audit: the default level only fails under --strict', () => {

@@ -39,7 +39,7 @@
  *   node scripts/check_license_drift.cjs --no-fetch       offline self-consistency only
  *   node scripts/check_license_drift.cjs --db <path>      override DB path
  *
- * Exit codes:
+ * Exit codes (a Decision per entry, docs/adr/0001 — mode observe):
  *   0  no restrictive drift (or --strict not set)
  *   1  --strict + at least one drift-osi-to-restrictive, or a fetch error
  *   2  bad arguments / DB not readable
@@ -71,6 +71,9 @@ const { staleDimensions, DEFAULT_MAX_AGE_DAYS, dbAsOf } = require('./lib/evidenc
 const { asOfFromArgv, requireAsOf } = require('./lib/clock.cjs');
 
 const { classifyLicense } = require('./calculate_health.cjs');
+const { finding } = require('./lib/finding.cjs');
+const { subjectForTool } = require('./lib/findings_from.cjs');
+const { commandPolicy, decideRun } = require('./lib/run_decision.cjs');
 
 const DEFAULT_DB_PATH = path.resolve(__dirname, '../assets/tools_database.json');
 
@@ -468,6 +471,7 @@ async function main() {
   }
 
   const report = await runDriftCheck(db, { fetcher: defaultFetcher, noFetch: opts.noFetch, asOf: opts.asOf });
+  const run = licenseDecision(report, { strict: opts.strict, asOf: opts.asOf, tools: db.tools || [] });
 
   if (opts.json) {
     // Match the documented output shape.
@@ -478,6 +482,8 @@ async function main() {
       drifts:  report.drifts,
       errors:  report.errors,
       gone:    (report.items || []).filter((i) => i.gone).map((i) => ({ name: i.name, recorded_at: i.gone.recorded_at })),
+      // Additive (mcp-vault/findings@1): each entry's Decision.
+      findings: run.document,
     }, null, 2) + '\n');
   } else {
     for (const d of report.drifts) {
@@ -496,7 +502,7 @@ async function main() {
     console.log(`\n${report.checked} entries checked — ${report.drifts.length} drift(s), ${report.errors.length} error(s)${goneNote}`);
   }
 
-  exitAfterFlush(licenseExitCode(report, opts.strict));
+  exitAfterFlush(run.exit);
 }
 
 if (require.main === module) {
@@ -511,16 +517,42 @@ if (require.main === module) {
  * outage (npm + PyPI + GitHub all unreachable) exited 0 and the weekly gate
  * reported green having checked nothing.
  */
-function licenseExitCode(report, strict) {
-  if (!strict) return 0;
-  const hardDrift = (report.drifts || []).some((d) => isHardFail(d.classification));
-  return (hardDrift || (report.errors || []).length > 0) ? 1 : 0;
+/**
+ * The report as findings, decided (docs/adr/0001): an OSI → restrictive
+ * relicensing is medium (warn: fails under --strict), any other drift low
+ * (reported); a licence that could not be read is `not-run` — unknown, which
+ * --strict (fail_on warn) fails on as well. Nothing fails without --strict:
+ * the report is the output. `asOf` is immaterial to the code (nothing here
+ * ages) and defaults to the epoch for a caller that only wants the code.
+ */
+function licenseDecision(report, { strict = false, asOf = 0, tools = [] } = {}) {
+  const byName = new Map((tools || []).map((t) => [t.name, t]));
+  const subjectOf = (name) => subjectForTool(byName.get(name) || { name: name || '(unnamed)' });
+  const findings = [
+    ...(report.drifts || []).map((d) => finding({
+      rule: isHardFail(d.classification) ? 'drift/license-restrictive' : 'drift/license', subject: subjectOf(d.name),
+      scope: 'license-drift', severity: isHardFail(d.classification) ? 'medium' : 'low',
+      message: `${d.old || '(none)'} → ${d.new || '(none)'} [${d.classification}${d.source ? `, ${d.source}` : ''}]`,
+    })),
+    ...(report.errors || []).map((e) => finding({
+      rule: 'drift/license-unread', subject: subjectOf(e.name), scope: 'license-drift', severity: 'medium', state: 'not-run',
+      message: `licence not read (${e.source || 'unknown'}): ${e.error}`,
+    })),
+  ];
+  const subjects = [...(report.items || []), ...(report.errors || [])].map((x) => subjectOf(x.name));
+  return decideRun({ findings, subjects, mode: 'observe', scope: 'license-drift', asOf, policy: commandPolicy({ strict }) });
+}
+
+/** The exit code of a drift report: licenseDecision's. */
+function licenseExitCode(report, strict, asOf = 0) {
+  return licenseDecision(report, { strict, asOf }).exit;
 }
 
 module.exports = {
   // Pure helpers — easy to unit-test.
   normalizeLicense,
   licenseExitCode,
+  licenseDecision,
   diffLicense,
   isHardFail,
   pypiClassifierToSpdx,

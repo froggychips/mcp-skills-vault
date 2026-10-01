@@ -351,8 +351,8 @@ const policyRules = [
     },
   },
   {
-    id: 'budget/over', status: 'active', thresholded: false, views: ['explain'], role: 'context',
-    doc: 'Context: `install` checks the budget itself (--allow-over-budget); the integrity gate does not.',
+    id: 'budget/over', status: 'active', thresholded: false, views: ['explain'], role: { default: 'context', budget: 'gate' },
+    doc: 'Context everywhere but `mcp-vault budget --budget <pct>`, which asks exactly this: `install` checks the budget itself (--allow-over-budget); the integrity gate does not.',
     evaluate(ctx) {
       const b = ctx.facts && ctx.facts.budget;
       if (!b || !b.over) return [];
@@ -715,6 +715,65 @@ const configRules = [
   },
 ];
 
+// ── a command's own run (ADR 0001 step 3) ────────────────────────────────
+//
+// status, audit, doctor, budget and the observers (availability, identity,
+// posture, capabilities, upgrade, docker-drift, license-drift, eval) used to
+// map their own findings to an exit code. Each now emits findings and exits
+// via decide(); what was a branch in a command is one of these rows, or a
+// generic finding/* row read in that command's mode.
+
+const commandRules = [
+  {
+    id: 'scope/unanswered', status: 'active', thresholded: false, views: [], claims: 'scope/unanswered',
+    doc: 'A question the run could not answer — a config that would not parse, a vault entry that names no artifact, '
+      + 'a source that answered for nothing. Unknown, never a failure at any threshold: the decision is `unanswered` '
+      + 'and the run exits 2 unless something else fails it (docs/COMPATIBILITY.md: a finding outranks an incomplete scope).',
+    evaluate(ctx) {
+      return ctx.findings.filter((f) => f.rule === 'scope/unanswered').map((f) => out('unknown', f.message, [f.id]));
+    },
+  },
+  {
+    id: 'unchecked/*', status: 'active', thresholded: false, views: [], claims: 'unchecked/',
+    doc: 'A subject this source does not cover — an image for a registry check, a launch command it cannot resolve, '
+      + 'a feed that did not answer for it. Unknown (never allow), and not a failure: when the source answered for '
+      + 'nothing at all, the run says so with scope/unanswered.',
+    evaluate(ctx) {
+      return ctx.findings.filter((f) => f.rule.startsWith('unchecked/')).map((f) => out('unknown', f.message, [f.id], f.rule));
+    },
+  },
+  {
+    id: 'environment/*', status: 'active', thresholded: true, owns_findings: true, views: [],
+    doc: 'What `doctor` checks about this machine: a failed requirement refuses, an absent optional tool or config '
+      + 'warns (fails under --strict). In `status` (mode setup) a warning is context: an absent optional tool is not '
+      + 'a finding about the configured servers.',
+    evaluate(ctx) {
+      const res = [];
+      for (const f of ctx.findings) {
+        if (!f.rule.startsWith('environment/') || f.state !== 'observed') continue;
+        if (f.severity === 'critical' || f.severity === 'high') res.push(out('deny', f.message, [f.id], f.rule));
+        else if (f.severity === 'medium') {
+          const o = out('warn', f.message, [f.id], f.rule);
+          res.push(ctx.mode === 'setup' ? context(o) : o);
+        }
+      }
+      return res;
+    },
+  },
+  {
+    id: 'eval/surface-drift', status: 'active', thresholded: false, views: [], claims: 'eval/surface-drift',
+    doc: 'A server that presented a different tool surface: refused under --fail-surface-drift, or under '
+      + '--fail-unexplained-surface-drift when the artifact identity did not change; otherwise reported, not enforced.',
+    evaluate(ctx) {
+      const g = ctx.policy.gate || {};
+      return ctx.findings.filter((f) => f.rule.startsWith('eval/surface-drift')).map((f) => {
+        const enforced = g.fail_surface_drift || (g.fail_unexplained_drift && f.rule === 'eval/surface-drift-unexplained');
+        return enforced ? out('deny', f.message, [f.id], f.rule) : out('allow', `${f.message} (reported, not enforced)`, [f.id], f.rule);
+      });
+    },
+  },
+];
+
 // ── reserved for the open feature PRs ──────────────────────────────────────
 //
 // Claimed here so that each lands as a row in this table — with this id in
@@ -773,7 +832,7 @@ const signatureRules = [
   },
 ];
 
-const RULES = Object.freeze([...explainRules, ...policyRules, ...secretRules, ...findingRules, ...lookalikeRules, ...configRules, ...toolScanRules, ...orgRules, ...setupRules, ...reservedRules, ...signatureRules].map((r) => Object.freeze(r)));
+const RULES = Object.freeze([...explainRules, ...policyRules, ...secretRules, ...findingRules, ...lookalikeRules, ...configRules, ...toolScanRules, ...orgRules, ...setupRules, ...reservedRules, ...signatureRules, ...commandRules].map((r) => Object.freeze(r)));
 const RULE_BY_ID = new Map(RULES.map((r) => [r.id, r]));
 
 // Evaluation order, per mode. It is the order the legacy views have always
@@ -793,6 +852,8 @@ const ORDER = Object.freeze({
     'lookalike/*', 'config/unpinned-launch', 'config/launch-source-override',
     'audits/recorded',
     'db/signature', 'audits/import',
+    // A command's own run (step 3): inert here — no gate run emits these.
+    'environment/*', 'eval/surface-drift', 'unchecked/*', 'scope/unanswered',
   ]),
   evidence: Object.freeze([
     'org/denylist', 'org/allowlist', 'org/min-tier', 'org/evidence/*', 'org/capabilities', 'org/capability/*', 'org/tool-approval',
@@ -806,13 +867,28 @@ const ORDER = Object.freeze({
     'lookalike/*', 'config/unpinned-launch', 'config/launch-source-override',
     'audits/recorded',
     'db/signature', 'audits/import',
+    // A command's own run (step 3): inert here — no gate run emits these.
+    'environment/*', 'eval/surface-drift', 'unchecked/*', 'scope/unanswered',
   ]),
   // `approve` and `lock --check` ask one question — has somebody approved
   // what this server offers, and is it what was locked — so only these rows
   // answer it; the entry-quality rows need facts those commands do not have.
   approval: Object.freeze(['org/tool-approval', 'finding/severity', 'finding/incomplete']),
-  // status / audit over a host's session: only what the set does together.
-  setup: Object.freeze([...SETUP_ORDER]),
+  // status / audit: what the configured set does together (#123), and what
+  // each command found about a configured server, a host config, a name and
+  // this machine.
+  setup: Object.freeze([
+    ...SETUP_ORDER, 'environment/*', 'secrets/*', 'finding/severity', 'finding/incomplete', 'lookalike/*', 'scope/unanswered',
+  ]),
+  // doctor: this machine.
+  environment: Object.freeze(['environment/*', 'scope/unanswered']),
+  // budget --budget <pct>: the context ceiling.
+  budget: Object.freeze(['budget/over', 'scope/unanswered']),
+  // The observers — availability, identity, posture, capabilities, upgrade,
+  // docker-drift, license-drift, eval: what one source said about each entry.
+  observe: Object.freeze([
+    'finding/severity', 'finding/incomplete', 'unchecked/*', 'eval/surface-drift', 'tool-scan/*', 'scope/unanswered',
+  ]),
 });
 // explain --verify: the gate's rows in the gate's order; explain's own inputs
 // are context (EXPLAIN_CONTEXT), so its exit is the live gate's.
@@ -822,7 +898,7 @@ const ROLES = ['gate', 'context'];
 /** A row's role in a mode: `role` as a string, or per mode (default gate). */
 function roleOf(row, mode) {
   const r = row && row.role;
-  const role = !r ? 'gate' : typeof r === 'string' ? r : (r[mode] || 'gate');
+  const role = !r ? 'gate' : typeof r === 'string' ? r : (r[mode] || r.default || 'gate');
   if (!ROLES.includes(role)) throw new TypeError(`policy_rules: row ${row.id} has role ${JSON.stringify(role)} (one of ${ROLES.join(', ')})`);
   return role;
 }
@@ -861,9 +937,10 @@ function deepFreeze(o) {
 // tests/decision_consistency.test.cjs checks that no producer emits a family
 // missing here.
 const FINDING_FAMILIES = Object.freeze([
-  'advisories', 'artifact', 'audits', 'config', 'db', 'dependencies', 'evidence', 'flows', 'install', 'integrity',
-  'license', 'lock', 'lookalike', 'metadata', 'oci', 'org', 'pin', 'provenance', 'registry', 'scope',
-  'secrets', 'shadowing', 'signature', 'tool-scan', 'verify',
+  'advisories', 'artifact', 'audit', 'audits', 'availability', 'capabilities', 'config', 'db', 'dependencies',
+  'drift', 'environment', 'eval', 'evidence', 'flows', 'identity', 'install', 'installed', 'integrity', 'license',
+  'lock', 'lookalike', 'metadata', 'oci', 'org', 'pin', 'policy', 'posture', 'provenance', 'registry', 'scope',
+  'secrets', 'shadowing', 'signature', 'tool-scan', 'unchecked', 'upgrade', 'verify',
 ]);
 const familiesKnown = () => new Set([...FINDING_FAMILIES, ...RULES.map((r) => r.id.split('/')[0])]);
 
@@ -917,6 +994,8 @@ function flagsFromArgv(argv = []) {
     requireProvenance:        a.has('--require-provenance'),
     requireProvenanceBinding: a.has('--require-provenance-binding'),
     failDepAdvisories:        a.has('--fail-dep-advisories'),
+    failSurfaceDrift:         a.has('--fail-surface-drift'),
+    failUnexplainedDrift:     a.has('--fail-unexplained-surface-drift'),
     deep:                     a.has('--deep'),
     deps:                     a.has('--deps'),
   };
@@ -968,6 +1047,11 @@ function effectivePolicy(base, flags = {}, { defaults = {}, policyRules = true }
     // without the tree, so requiring either implies resolving it.
     deps:                       Boolean(flags.deps) || p.deps === true
       || p.dependencyHooks === 'fail' || p.dependencyAdvisories === 'fail',
+    // eval's --fail-surface-drift / --fail-unexplained-drift (row
+    // eval/surface-drift). Present only when asked, so no other document's
+    // policy changes shape.
+    ...(flags.failSurfaceDrift ? { fail_surface_drift: true } : {}),
+    ...(flags.failUnexplainedDrift ? { fail_unexplained_drift: true } : {}),
   };
   let failOn = 'deny';
   if (gate.fail_unverified) failOn = stricter('fail_on', failOn, 'unknown');

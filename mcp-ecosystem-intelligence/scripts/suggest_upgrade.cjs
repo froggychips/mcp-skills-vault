@@ -38,7 +38,7 @@
  *   node scripts/suggest_upgrade.cjs [--entry <name>] [--json] [--strict]
  *                                    [--include-prereleases]
  *
- * Exit codes:
+ * Exit codes (a Decision per entry, docs/adr/0001 — mode observe):
  *   0  nothing to do (or advisories exist and --strict was not given)
  *   1  --strict and at least one entry is affected
  *   2  bad arguments
@@ -54,6 +54,9 @@ const { postJson, getJson, mapLimit } = require('./lib/http.cjs');
 const { npmPkgName, pypiPkgName } = require('./lib/install_cmd.cjs');
 const { toTypedEntry } = require('./lib/entry_model.cjs');
 const { comparatorFor, maxVersion, isPrerelease } = require('./lib/versions.cjs');
+const { finding } = require('./lib/finding.cjs');
+const { subjectForTool } = require('./lib/findings_from.cjs');
+const { commandPolicy, decideRun, unanswered } = require('./lib/run_decision.cjs');
 
 const DB_PATH = path.resolve(__dirname, '../assets/tools_database.json');
 const OSV      = 'https://api.osv.dev/v1/query';
@@ -344,6 +347,35 @@ async function checkEntry(tool, { osv = osvFor, published = publishedVersions } 
   return row;
 }
 
+// The plan states that mean "something known applies to the pinned version".
+const AFFECTED = ['upgrade', 'upgrade-unconfirmed', 'no-clean-target', 'no-fix'];
+
+/**
+ * The plans as findings, decided (docs/adr/0001): an entry something known
+ * applies to is medium (warn: fails under --strict) — the plan is the advice,
+ * the finding is that one is needed; a feed that did not answer is
+ * `unchecked/upgrade`. `clear` is no finding.
+ */
+function upgradeDecision(rows, tools, { strict = false, asOf }) {
+  const byName = new Map(tools.map((t) => [t.name, t]));
+  const subjectOf = (r) => subjectForTool(byName.get(r.name) || { name: r.name });
+  const findings = [];
+  for (const r of rows) {
+    const s = subjectOf(r);
+    const p = r.plan || {};
+    const ids = (p.advisories || []).map((a) => a.id).join(', ');
+    if (AFFECTED.includes(p.state)) {
+      findings.push(finding({
+        rule: `upgrade/${p.state}`, subject: s, scope: 'upgrade', severity: 'medium',
+        message: `${p.state}${ids ? ` (${ids})` : ''}${p.target ? ` → ${p.target}` : ''}${p.reason ? `: ${p.reason}` : ''}`,
+      }));
+    } else if (p.state === 'unknown') {
+      findings.push(finding({ rule: 'unchecked/upgrade', subject: s, scope: 'upgrade', severity: 'info', state: 'not-run', message: `unknown${p.reason ? `: ${p.reason}` : ''}` }));
+    }
+  }
+  return decideRun({ findings, subjects: rows.map(subjectOf), mode: 'observe', scope: 'upgrade', asOf, policy: commandPolicy({ strict }) });
+}
+
 function main(argv) {
   const opts = parseArgs(argv);
   if (opts.error) { process.stderr.write(`suggest_upgrade: ${opts.error}\n\n${HELP}`); return Promise.resolve(2); }
@@ -357,13 +389,14 @@ function main(argv) {
   }
 
   return mapLimit(tools, CONCURRENCY, (t) => checkEntry(t)).then((rows) => {
-    const STATES = ['upgrade', 'upgrade-unconfirmed', 'no-clean-target', 'no-fix'];
-    const affected = rows.filter((r) => STATES.includes(r.plan.state));
+    const affected = rows.filter((r) => AFFECTED.includes(r.plan.state));
+    const at = readWallClock();
+    const run = upgradeDecision(rows, tools, { strict: opts.strict, asOf: at });
 
     if (opts.json) {
       process.stdout.write(`${JSON.stringify({
         schema: 'mcp-vault/upgrade-plan@1',
-        generated_at: new Date(readWallClock()).toISOString(),
+        generated_at: new Date(at).toISOString(),
         source: 'OSV.dev',
         checked: rows.length,
         summary: {
@@ -375,6 +408,8 @@ function main(argv) {
           unknown:             rows.filter((r) => r.plan.state === 'unknown').length,
         },
         entries: rows,
+        // Additive (mcp-vault/findings@1): each entry's Decision.
+        findings: run.document,
       }, null, 2)}\n`);
     } else {
       for (const r of affected) {
@@ -423,7 +458,7 @@ function main(argv) {
       );
     }
 
-    return opts.strict && affected.length ? 1 : 0;
+    return run.exit;
   });
 }
 
@@ -434,4 +469,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseArgs, planUpgrade, fixedVersions, severityOf, checkEntry };
+module.exports = { parseArgs, upgradeDecision, planUpgrade, fixedVersions, severityOf, checkEntry };

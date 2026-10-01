@@ -34,7 +34,7 @@
  * Usage:
  *   node scripts/check_identity.cjs [--json] [--write] [--entry <name>]
  *
- * Exit codes:
+ * Exit codes (a Decision per entry, docs/adr/0001 — mode observe):
  *   0  nothing contradicts
  *   1  at least one contradiction / withdrawal
  *   2  bad arguments, or the registry answered for no entry at all — a
@@ -52,6 +52,9 @@ const { npmPkgName, pypiPkgName } = require('./lib/install_cmd.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { buildEvidence, mergeEvidence } = require('./lib/evidence.cjs');
 const { findByPackage, identityFindings, namespaceOwner } = require('./lib/mcp_registry.cjs');
+const { finding } = require('./lib/finding.cjs');
+const { subjectForTool } = require('./lib/findings_from.cjs');
+const { commandPolicy, decideRun, unanswered } = require('./lib/run_decision.cjs');
 
 const DB_PATH = path.resolve(__dirname, '../assets/tools_database.json');
 // The registry's full-text search is slow; four in flight keeps a 114-entry
@@ -132,6 +135,32 @@ async function checkEntry(tool, { find = findByPackage } = {}) {
   return row;
 }
 
+/**
+ * The rows as findings, decided (docs/adr/0001): a contradiction or a
+ * withdrawal is high; "not listed" is not a finding (listing is opt-in); an
+ * entry the registry did not answer for is `unchecked/identity`, and when it
+ * answered for none, scope/unanswered (exit 2).
+ */
+function identityDecision(rows, tools, { asOf }) {
+  const byName = new Map(tools.map((t) => [t.name, t]));
+  const subjectOf = (r) => subjectForTool(byName.get(r.name) || { name: r.name });
+  const nothing = rows.length > 0 && rows.every((r) => r.registry.state === 'unknown');
+  const findings = [];
+  for (const r of rows) {
+    const s = subjectOf(r);
+    const g = r.registry;
+    const msg = `${g.state}${g.findings && g.findings.length ? `: ${g.findings.join('; ')}` : ''}`;
+    if (FINDING_STATES.has(g.state)) {
+      findings.push(finding({ rule: `identity/${g.state}`, subject: s, scope: 'identity', severity: 'high', message: msg }));
+    } else if (g.state === 'unknown') {
+      findings.push(nothing
+        ? unanswered({ subject: s, scope: 'identity', message: `the registry answered for none of the entries — ${msg}` })
+        : finding({ rule: 'unchecked/identity', subject: s, scope: 'identity', severity: 'info', state: 'not-run', message: msg }));
+    }
+  }
+  return decideRun({ findings, subjects: rows.map(subjectOf), mode: 'observe', scope: 'identity', asOf, policy: commandPolicy({}) });
+}
+
 function main(argv) {
   const opts = parseArgs(argv);
   if (opts.error) { process.stderr.write(`check_identity: ${opts.error}\n\n${HELP}`); return Promise.resolve(2); }
@@ -150,6 +179,7 @@ function main(argv) {
   return mapLimit(tools, CONCURRENCY, (t) => checkEntry(t)).then((rows) => {
     const byState = (state) => rows.filter((r) => r.registry.state === state);
     const findings = rows.filter((r) => FINDING_STATES.has(r.registry.state));
+    const run = identityDecision(rows, tools, { asOf: observedAt });
 
     if (opts.write) {
       const byName = new Map(rows.map((r) => [r.name, r]));
@@ -188,6 +218,8 @@ function main(argv) {
           unknown:      byState('unknown').length,
         },
         entries: rows,
+        // Additive (mcp-vault/findings@1): each entry's Decision.
+        findings: run.document,
       }, null, 2)}\n`);
     } else {
       for (const r of rows) {
@@ -205,15 +237,11 @@ function main(argv) {
       process.stdout.write(`${DM}"Not listed" is not a finding: listing is opt-in and the registry is young.${RS}\n`);
     }
 
-    if (findings.length) return 1;
     // Nothing was checkable: the registry did not answer for a single entry.
     // Exiting 0 there reads as "nothing contradicts", which is a statement
-    // about a comparison that never happened. 2 is "could not answer".
-    if (rows.length && byState('unknown').length === rows.length) {
-      process.stderr.write('check_identity: the registry answered for none of the entries — nothing was established\n');
-      return 2;
-    }
-    return 0;
+    // about a comparison that never happened — the decisions are unanswered.
+    if (run.exit === 2) process.stderr.write('check_identity: the registry answered for none of the entries — nothing was established\n');
+    return run.exit;
   });
 }
 
@@ -224,4 +252,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseArgs, identifierFor, checkEntry, namespaceOwner, FINDING_STATES };
+module.exports = { parseArgs, identityDecision, identifierFor, checkEntry, namespaceOwner, FINDING_STATES };

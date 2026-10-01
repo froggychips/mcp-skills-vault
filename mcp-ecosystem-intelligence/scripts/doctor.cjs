@@ -11,6 +11,8 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 const { exitAfterFlush } = require("./lib/exit.cjs");
 const { readWallClock } = require("./lib/clock.cjs");
+const { subject, finding } = require("./lib/finding.cjs");
+const { commandPolicy, decideRun, unanswered } = require("./lib/run_decision.cjs");
 
 function parseArgs(argv) {
   const out = { json: false, strict: false, help: false, cwd: process.cwd() };
@@ -89,7 +91,7 @@ function status(level, name, message, details = {}) {
   return { level, name, message, ...details };
 }
 
-function runDoctor({ cwd }) {
+function runDoctor({ cwd, at = readWallClock() }) {
   const checks = [];
 
   checks.push(status(
@@ -157,7 +159,7 @@ function runDoctor({ cwd }) {
   return {
     schema: "mcp-vault/doctor@1",
     cwd,
-    checked_at: new Date(readWallClock()).toISOString(),
+    checked_at: new Date(at).toISOString(),
     counts: {
       ok: checks.filter(c => c.level === "ok").length,
       warn: checks.filter(c => c.level === "warn").length,
@@ -165,6 +167,46 @@ function runDoctor({ cwd }) {
     },
     checks,
   };
+}
+
+// What doctor checks is this machine: one subject, shared with `status`.
+const ENVIRONMENT = subject.setup({ host: "environment" });
+
+// A config file that exists and does not parse is not a failing environment
+// — it is a question left unanswered, and the CLI's contract reserves 2 for
+// that (docs/COMPATIBILITY.md).
+const unreadableCheck = (c) => c.level === "fail" && /parse failed|read failed/i.test(c.message);
+
+/**
+ * The checks as findings (docs/adr/0001): a failed requirement is high, an
+ * absent optional tool or config is medium (the row environment/* says what
+ * each means — in `status` a warning is context), a config that would not
+ * parse is scope/unanswered. `ids` maps a check name to its finding id.
+ */
+function doctorFindings(result) {
+  const findings = [];
+  const ids = {};
+  for (const c of result.checks) {
+    if (c.level === "ok") continue;
+    const f = unreadableCheck(c)
+      ? unanswered({ subject: ENVIRONMENT, scope: "environment", message: `${c.name}: ${c.message}` })
+      : finding({
+        rule: `environment/${c.name.replace(/_/g, "-")}`, subject: ENVIRONMENT, scope: "environment",
+        severity: c.level === "fail" ? "high" : "medium", message: `${c.name}: ${c.message}`,
+      });
+    findings.push(f);
+    ids[c.name] = f.id;
+  }
+  return { findings, subjects: [ENVIRONMENT], ids };
+}
+
+/** doctor's decision: mode `environment`, --strict is fail_on. */
+function doctorDecision(result, { strict = false, asOf }) {
+  const m = doctorFindings(result);
+  return decideRun({
+    findings: m.findings, subjects: m.subjects, mode: "environment", scope: "environment",
+    policy: commandPolicy({ strict }), asOf,
+  });
 }
 
 function printHuman(result) {
@@ -186,26 +228,20 @@ function main() {
     process.stdout.write(HELP);
     process.exit(0);
   }
-  const result = runDoctor({ cwd: path.resolve(args.cwd || process.cwd()) });
-  if (args.json) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  // When this run looked; the decision is made at the same instant.
+  const at = readWallClock();
+  const result = runDoctor({ cwd: path.resolve(args.cwd || process.cwd()), at });
+  // The verdict is a Decision (docs/adr/0001): a failed requirement fails,
+  // a warning fails under --strict (fail_on), a config that would not parse
+  // is unanswered (2) unless something else fails — a real failure outranks
+  // it, so an unsupported Node is never reported as "could not answer".
+  const run = doctorDecision(result, { strict: args.strict, asOf: at });
+  // Additive (mcp-vault/findings@1): the checks as findings, and the Decision.
+  if (args.json) process.stdout.write(`${JSON.stringify({ ...result, findings: run.document }, null, 2)}\n`);
   else printHuman(result);
-
-  // A config file that exists and does not parse is not a failing environment
-  // — it is a question left unanswered, and the CLI's contract reserves 2 for
-  // that (docs/COMPATIBILITY.md). `status` already routed these to 2 while
-  // `doctor` reported the same input as 1.
-  //
-  // But a real failure outranks it, so the unreadable checks are excluded from
-  // the `fail` count *and* considered second: scheduling the 2 first meant an
-  // unsupported Node version was reported as "could not answer".
-  const unreadable = result.checks.filter((c) => c.level === 'fail' && /parse failed|read failed/i.test(c.message));
-  const realFails  = result.counts.fail - unreadable.length;
-  const hard = realFails > 0 || (args.strict && result.counts.warn > 0);
-  if (hard) return exitAfterFlush(1);
-  if (unreadable.length) return exitAfterFlush(2);
-  exitAfterFlush(0);
+  exitAfterFlush(run.exit);
 }
 
 if (require.main === module) main();
 
-module.exports = { runDoctor, versionGte };
+module.exports = { runDoctor, versionGte, doctorFindings, doctorDecision, ENVIRONMENT };

@@ -120,8 +120,9 @@ A server on a version nobody verified gets no tier at all.
 It makes **no network calls** — every claim comes from evidence already on
 disk, and says so rather than implying it was checked just now. Exit `1` means
 something installed must not run: gone, yanked, wrong bytes, or a live advisory
-against the pinned version. `--strict` also fails on drift, unvetted servers
-and claims past their shelf life.
+against the pinned version, or a credential in plain text in a host config.
+`--strict` also fails on drift, unvetted servers and claims past their shelf
+life.
 
 The commands it summarises are all still there, and the footer names them:
 
@@ -502,8 +503,9 @@ mcp-vault tool-scan --rules             # the table: id, severity, why
 
 Each match is a finding `tool-scan/<rule>` on the tool it was found in, and
 the verdict is the `tool-scan/*` row of the one policy table: high denies in
-`tool-scan` and in `eval --fail-tool-scan`, medium warns, low is listed with
-`--show-low`. `explain` shows the same outcomes as context beside the gate's
+`tool-scan` and in `eval --fail-tool-scan`, medium warns (and fails under
+`--strict`, which lowers `fail_on` to `warn` for every command), low is listed
+with `--show-low`. `explain` shows the same outcomes as context beside the gate's
 answer ("refused beside the gate"): the integrity gate does not read the scan,
 and explain's exit code is the gate's. Recorded with `eval --record-evidence`
 it also blocks trust through a `tool_descriptions` evidence dimension.
@@ -840,7 +842,7 @@ mcp-vault audit --strict   # exit 1 on drift/untrusted/heavy
 | `scope` | global install of a typically project-scoped category (`vcs`/`ci-cd`/`pm`/`infra`) |
 | `secret` | a credential written in plain text into a server's `env`/`args`/`headers`/`url` (see below) |
 
-Exit codes: `0` clean / info-only · `1` `--strict` triggered · `2` bad invocation. Closes the "Audit my MCP setup" use case without an LLM in the critical path.
+Exit codes: `0` clean / info-only · `1` a finding that refuses (a plain-text secret), or `--strict` triggered · `2` bad invocation or an unreadable config. Closes the "Audit my MCP setup" use case without an LLM in the critical path.
 
 #### What the set can do together (toxic flows, tool shadowing)
 
@@ -905,8 +907,8 @@ is in history, so rotate it. The suggestion uses the syntax each host documents 
 `${VAR}` in `.mcp.json`, `${env:NAME}` in Cursor, `inputs` + `${input:id}` in VS
 Code, `env_vars` / `env_http_headers` in Codex — and says so where a host
 documents none (Claude Desktop, `~/.claude.json`). `audit` reports the same
-findings for Claude Code's two files (`--strict` fails on them); `status` shows
-one line and fails on it only with `--strict`.
+findings for Claude Code's two files; `status` shows one line. Both fail on
+them, as `secrets` does: one host-config line, one answer.
 
 ### Lookalike names (typosquatting)
 

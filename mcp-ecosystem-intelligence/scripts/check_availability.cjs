@@ -51,7 +51,7 @@
  *              hour, and this is the only check here that needs a token.
  *   --strict   deprecated / relocated also fail
  *
- * Exit codes:
+ * Exit codes (a Decision per entry, docs/adr/0001 — mode observe):
  *   0  everything still published where we expect it
  *   1  at least one entry gone / version-gone / yanked (or, with --strict,
  *      deprecated / relocated)
@@ -69,6 +69,9 @@ const { getJson, mapLimit } = require('./lib/http.cjs');
 const { npmPkgName, pypiPkgName } = require('./lib/install_cmd.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { buildEvidence, mergeEvidence } = require('./lib/evidence.cjs');
+const { finding } = require('./lib/finding.cjs');
+const { subjectForTool } = require('./lib/findings_from.cjs');
+const { commandPolicy, decideRun, unanswered } = require('./lib/run_decision.cjs');
 // One definition of what a repository URL names, anchored: see lib/repo_url.cjs.
 const { githubSlug: repoSlug } = require('./lib/repo_url.cjs');
 
@@ -319,6 +322,40 @@ async function checkEntry(tool, opts, { get = getJson } = {}) {
   return row;
 }
 
+/**
+ * The rows as findings on each entry, decided (docs/adr/0001): gone /
+ * version-gone / yanked are high (deny), deprecated and a relocated
+ * repository medium (warn: fail under --strict), an entry no registry
+ * answered for `unchecked/availability` — unless none answered at all, which
+ * is scope/unanswered (exit 2).
+ */
+function availabilityDecision(rows, tools, { strict = false, asOf }) {
+  const byName = new Map(tools.map((t) => [t.name, t]));
+  const subjectOf = (r) => subjectForTool(byName.get(r.name) || { name: r.name });
+  const nothing = rows.length > 0 && rows.every((r) => r.availability.state === 'unknown');
+  const findings = [];
+  for (const r of rows) {
+    const s = subjectOf(r);
+    const a = r.availability;
+    const detail = (x) => `${x.state}${x.detail ? `: ${x.detail}` : ''}`;
+    if (BLOCKING.has(a.state)) {
+      findings.push(finding({ rule: `availability/${a.state}`, subject: s, scope: 'availability', severity: 'high', message: detail(a) }));
+    } else if (a.state === 'deprecated') {
+      findings.push(finding({ rule: 'availability/deprecated', subject: s, scope: 'availability', severity: 'medium', message: detail(a) }));
+    } else if (a.state === 'unknown') {
+      findings.push(nothing
+        ? unanswered({ subject: s, scope: 'availability', message: `no registry answered for any entry — ${detail(a)}` })
+        : finding({ rule: 'unchecked/availability', subject: s, scope: 'availability', severity: 'info', state: 'not-run', message: detail(a) }));
+    }
+    if (r.identity && NOTABLE.has(r.identity.state)) {
+      findings.push(finding({ rule: `availability/${r.identity.state}`, subject: s, scope: 'availability', severity: 'medium', message: detail(r.identity) }));
+    }
+  }
+  return decideRun({
+    findings, subjects: rows.map(subjectOf), mode: 'observe', scope: 'availability', asOf, policy: commandPolicy({ strict }),
+  });
+}
+
 function main(argv) {
   const opts = parseArgs(argv);
   if (opts.error) { process.stderr.write(`check_availability: ${opts.error}\n\n${HELP}`); return Promise.resolve(2); }
@@ -338,6 +375,7 @@ function main(argv) {
     const blocking = rows.filter((r) => BLOCKING.has(r.availability.state));
     const notable  = rows.filter((r) => r.availability.state === 'deprecated' || (r.identity && NOTABLE.has(r.identity.state)));
     const unknown  = rows.filter((r) => r.availability.state === 'unknown');
+    const run      = availabilityDecision(rows, tools, { strict: opts.strict, asOf: observedAt });
 
     if (opts.write) {
       const byName = new Map(rows.map((r) => [r.name, r]));
@@ -394,6 +432,8 @@ function main(argv) {
           unknown:        unknown.length,
         },
         entries: rows,
+        // Additive (mcp-vault/findings@1): each entry's Decision.
+        findings: run.document,
       }, null, 2)}\n`);
     } else {
       for (const r of rows) {
@@ -418,15 +458,10 @@ function main(argv) {
       }
     }
 
-    if (blocking.length) return 1;
-    if (opts.strict && notable.length) return 1;
     // No registry answered for any entry. "Everything is still published" is
-    // not what that means.
-    if (rows.length && unknown.length === rows.length) {
-      process.stderr.write('check_availability: no registry answered for any entry — nothing was established\n');
-      return 2;
-    }
-    return 0;
+    // not what that means: the decisions are unanswered.
+    if (run.exit === 2) process.stderr.write('check_availability: no registry answered for any entry — nothing was established\n');
+    return run.exit;
   });
 }
 
@@ -437,4 +472,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseArgs, repoSlug, successorFrom, checkNpm, checkPypi, checkRepo, checkEntry, BLOCKING, NOTABLE };
+module.exports = { parseArgs, availabilityDecision, repoSlug, successorFrom, checkNpm, checkPypi, checkRepo, checkEntry, BLOCKING, NOTABLE };

@@ -304,7 +304,7 @@ test('CLI --help exits 0', () => {
   assert.match(res.stdout, /audit_setup\.cjs/);
 });
 
-test('CLI --json emits {cwd, db_path, global_path, counts, findings}', () => {
+test('CLI --json emits {cwd, db_path, global_path, counts, findings (findings@1), details}', () => {
   const dbPath  = writeTestDb();
   const proj    = makeProject({ mcp: { mcpServers: { 'mcp-redis': { command: 'uvx', args: ['--from', 'git+https://x', 'mcp-redis'] } } } });
   const globalCfg = makeGlobalCfg({});
@@ -313,8 +313,13 @@ test('CLI --json emits {cwd, db_path, global_path, counts, findings}', () => {
   const out = JSON.parse(res.stdout);
   assert.equal(out.counts.project, 1);
   assert.equal(out.counts.global,  0);
-  assert.ok(Array.isArray(out.findings));
-  assert.ok(out.findings.some(f => f.category === 'untrusted'));
+  // One key, one document (pre-1.0): the categories are findings, and what a
+  // row carried besides is in `details`, by finding id.
+  assert.equal(out.findings.schema, 'mcp-vault/findings@1');
+  const untrusted = out.findings.findings.find(f => f.rule === 'audit/untrusted');
+  assert.ok(untrusted);
+  assert.equal(out.details[untrusted.id].category, 'untrusted');
+  assert.equal(untrusted.subject.type, 'host-config');
   assert.ok(typeof out.cwd === 'string');
   assert.ok(typeof out.db_path === 'string');
 });
@@ -327,12 +332,19 @@ test('CLI --strict exit code 1 on untrusted finding', () => {
   assert.equal(res.status, 1, `expected strict exit 1, got ${res.status}; stdout: ${res.stdout}`);
 });
 
-test('CLI --strict exit code 0 on info-only findings (unknown)', () => {
+test('CLI: a server not in the DB is unknown — 0 by default, 1 under --strict (no data is not clean)', () => {
+  // docs/adr/0001: nothing has checked it, so it is `no-data` → unknown, and
+  // --strict (fail_on warn) fails on unknown — as `status --strict` always did
+  // for the same server. Pre-1.0 change: audit --strict used to pass it.
   const dbPath = writeTestDb();
   const proj = makeProject({ mcp: { mcpServers: { 'custom-internal': { command: 'node', args: ['./x.js'] } } } });
   const globalCfg = makeGlobalCfg({});
-  const res = runCli(['--strict', '--cwd', proj, '--global-config', globalCfg], dbPath);
-  assert.equal(res.status, 0, `expected 0 for unknown-only, got ${res.status}; stdout: ${res.stdout}`);
+  assert.equal(runCli(['--cwd', proj, '--global-config', globalCfg], dbPath).status, 0);
+  const res = runCli(['--strict', '--json', '--cwd', proj, '--global-config', globalCfg], dbPath);
+  assert.equal(res.status, 1, `expected 1 for unknown under --strict, got ${res.status}; stdout: ${res.stdout}`);
+  const d = JSON.parse(res.stdout).findings.decisions.find((x) => x.subject.server === 'custom-internal');
+  assert.match(d.subject.id, /^\.mcp\.json:\d+$/, 'the host-config line that launches it');
+  assert.deepEqual([d.effect, d.decided_by, d.fails], ['unknown', 'finding/incomplete', true]);
 });
 
 test('CLI --strict exit code 0 on clean setup', () => {
@@ -360,7 +372,7 @@ test('CLI: enabledMcpjsonServers excluding heavy server silences heavy-unbounded
   const globalCfg = makeGlobalCfg({});
   const res = runCli(['--json', '--cwd', proj, '--global-config', globalCfg], dbPath);
   const out = JSON.parse(res.stdout);
-  assert.equal(out.findings.filter(f => f.category === 'heavy-unbounded').length, 0);
+  assert.equal(out.findings.findings.filter(f => f.rule === 'audit/heavy-unbounded').length, 0);
 });
 
 test('CLI: bad argument exits 2', () => {

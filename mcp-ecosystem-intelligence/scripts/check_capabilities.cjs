@@ -34,7 +34,7 @@
  *   node scripts/check_capabilities.cjs [--entry <name>] [--write] [--json]
  *                                       [--strict] [--all]
  *
- * Exit codes:
+ * Exit codes (a Decision per entry, docs/adr/0001 — mode observe):
  *   0  nothing new appeared
  *   1  --strict and a high-risk capability appeared since the last scan
  *   2  bad arguments
@@ -54,6 +54,9 @@ const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { readTarGz } = require('./lib/tarball.cjs');
 const { detect, diffCapabilities, HIGH_RISK, CAPABILITIES } = require('./lib/capabilities.cjs');
 const { comparatorFor } = require('./lib/versions.cjs');
+const { finding } = require('./lib/finding.cjs');
+const { subjectForTool } = require('./lib/findings_from.cjs');
+const { commandPolicy, decideRun, unanswered } = require('./lib/run_decision.cjs');
 
 const DB_PATH   = path.resolve(__dirname, '../assets/tools_database.json');
 const CAPS_PATH = path.resolve(__dirname, '../assets/capabilities.json');
@@ -257,6 +260,38 @@ async function scanEntry(tool, history) {
   return row;
 }
 
+/**
+ * The scans as findings, decided (docs/adr/0001): a high-risk capability that
+ * appeared since the last scan is medium (warn: fails under --strict), any
+ * other addition low (reported); a package that could not be read or is not
+ * an npm tarball is `unchecked/capabilities`. A first scan has nothing to
+ * compare with and is not a finding.
+ */
+function capabilitiesDecision(rows, tools, { strict = false, asOf }) {
+  const byName = new Map(tools.map((t) => [t.name, t]));
+  const subjectOf = (r) => subjectForTool(byName.get(r.name) || { name: r.name });
+  const findings = [];
+  for (const r of rows) {
+    const s = subjectOf(r);
+    if (r.state === 'scanned') {
+      for (const a of (r.delta && r.delta.added) || []) {
+        const where = (a.evidence || [])[0];
+        findings.push(finding({
+          rule: a.high_risk ? 'capabilities/high-risk-added' : 'capabilities/added', subject: s, scope: 'capabilities',
+          severity: a.high_risk ? 'medium' : 'low',
+          message: `+ ${a.capability} since ${r.compared_with}${where ? ` (${where.file}:${where.line || '?'})` : ''}`,
+        }));
+      }
+    } else {
+      findings.push(finding({
+        rule: 'unchecked/capabilities', subject: s, scope: 'capabilities', severity: 'info', state: 'not-run',
+        message: `${r.state}${r.reason ? `: ${r.reason}` : ''}`,
+      }));
+    }
+  }
+  return decideRun({ findings, subjects: rows.map(subjectOf), mode: 'observe', scope: 'capabilities', asOf, policy: commandPolicy({ strict }) });
+}
+
 function main(argv) {
   const opts = parseArgs(argv);
   if (opts.error) { process.stderr.write(`check_capabilities: ${opts.error}\n\n${HELP}`); return Promise.resolve(2); }
@@ -289,6 +324,7 @@ function main(argv) {
     const scanned = rows.filter((r) => r.state === 'scanned');
     const withAdditions = scanned.filter((r) => r.delta && r.delta.added.length);
     const highRisk = withAdditions.filter((r) => r.delta.added.some((a) => a.high_risk));
+    const run = capabilitiesDecision(rows, tools, { strict: opts.strict, asOf: readWallClock() });
 
     if (opts.write) {
       for (const r of scanned) {
@@ -321,6 +357,8 @@ function main(argv) {
           unknown: rows.filter((r) => r.state === 'unknown').length,
         },
         entries: rows,
+        // Additive (mcp-vault/findings@1): each entry's Decision.
+        findings: run.document,
       }, null, 2)}\n`);
     } else {
       for (const r of scanned) {
@@ -358,7 +396,7 @@ function main(argv) {
       process.stdout.write(`${DM}A capability found is a fact; nothing here says a package cannot do something.${RS}\n`);
     }
 
-    return opts.strict && highRisk.length ? 1 : 0;
+    return run.exit;
   });
 }
 
@@ -369,4 +407,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseArgs, fetchTarball, previousScan, scanEntry, CAPABILITIES, ALLOWED_TARBALL_HOSTS };
+module.exports = { parseArgs, capabilitiesDecision, fetchTarball, previousScan, scanEntry, CAPABILITIES, ALLOWED_TARBALL_HOSTS };
