@@ -20,6 +20,15 @@ const { spawnSync } = require('child_process');
 const SCRIPT = path.resolve(__dirname, '../mcp-ecosystem-intelligence/scripts/status.cjs');
 const s      = require('../mcp-ecosystem-intelligence/scripts/status.cjs');
 
+// A staged DB (tests/lib/fixture_skill.cjs: mcp-server-aws yanked,
+// mcp-atlassian with an advisory, both on their pinned release) and a fixed
+// instant, for the tests whose answer turns on what the record says — not on
+// what the shipped DB says today or how old it is.
+const { fixtureSkill, AS_OF: FIX_AS_OF } = require('./lib/fixture_skill.cjs');
+const FIX = fixtureSkill();
+process.on('exit', () => FIX.cleanup());
+const FIX_STATUS = path.join(FIX.scripts, 'status.cjs');
+
 /** A throwaway project directory with the given `.mcp.json`, and no global config. */
 function project(servers) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-status-'));
@@ -46,40 +55,17 @@ test('a clean project is exit 0 and says so in one screen', () => {
   assert.ok(lines <= 24, `status printed ${lines} lines:\n${r.stdout}`);
 });
 
-/**
- * A throwaway copy of the skill in which one entry's `dimension` reads
- * `status`, dated today — for a test that needs a finding the committed DB
- * does not carry, or no longer carries fresh. Same approach as the install
- * test below: the code under test is the real one, only the data is staged.
- */
-function skillWith(entryName, dimension, status) {
-  const skill = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'vault-status-skill-')), 'mcp-ecosystem-intelligence');
-  fs.cpSync(path.resolve(__dirname, '../mcp-ecosystem-intelligence'), skill, { recursive: true });
-  const dbPath = path.join(skill, 'assets/tools_database.json');
-  const dbJson = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
-  const entry  = dbJson.tools.find((t) => t.name === entryName);
-  assert.ok(entry && entry.trust_evidence, `${entryName} is no longer in the DB with evidence; pick another entry`);
-  const today = new Date().toISOString().slice(0, 10);
-  entry.trust_evidence.dimensions[dimension] = { status, checked_at: today };
-  fs.writeFileSync(dbPath, JSON.stringify(dbJson, null, 2));
-  return path.join(skill, 'scripts/status.cjs');
-}
-
 test('an installed server that must not run is blocking, and exit 1', () => {
   // mcp-atlassian has an advisory against its pinned version; mcp-server-aws
   // is yanked. Both are Deprecated in the derived tier — "do not install".
   //
-  // The advisory is staged: the committed DB moved mcp-atlassian to 0.22.0,
-  // which clears every advisory, and this test would otherwise depend on some
-  // entry in the real DB being vulnerable *and* its evidence being under a
-  // week old. The yanked one is read from the committed DB as before.
-  const script = skillWith('mcp-atlassian', 'advisories', 'vulnerable');
-  const db = JSON.parse(fs.readFileSync(path.join(path.dirname(script), '../assets/tools_database.json'), 'utf8'));
-  const pinned = db.tools.find((t) => t.name === 'mcp-atlassian').version;
+  // Both are staged (tests/lib/fixture_skill.cjs) and decided at a fixed
+  // instant: the test must not depend on some entry in the real DB being
+  // vulnerable or yanked today, nor on how old its evidence is.
   const r = run(project({
-    'mcp-atlassian':  { command: 'uvx', args: [`mcp-atlassian==${pinned}`] },
-    'mcp-server-aws': { command: 'uvx', args: ['awslabs.core-mcp-server==1.0.27'] },
-  }), [], script);
+    'mcp-atlassian':  FIX.launches['mcp-atlassian'],
+    'mcp-server-aws': FIX.launches['mcp-server-aws'],
+  }), ['--as-of', FIX_AS_OF], FIX_STATUS);
   assert.equal(r.status, 1);
   assert.match(r.stdout, /Blocking/);
   assert.match(r.stdout, /mcp-atlassian: advisories: vulnerable/);
@@ -146,7 +132,7 @@ test('two spellings of one PyPI distribution are one package', () => {
   // installs either spelling. Comparing raw strings meant a host launching the
   // underscore form of a yanked package came out unvetted, with the finding
   // sitting in the DB unmatched.
-  const r = run(project({ ok: { command: 'uvx', args: ['awslabs_core_mcp_server==1.0.27'] } }), ['--json']);
+  const r = run(project({ ok: { command: 'uvx', args: ['awslabs_core_mcp_server==1.0.27'] } }), ['--json', '--as-of', FIX_AS_OF], FIX_STATUS);
   assert.equal(r.json.installed[0].in_db, true);
   assert.equal(r.json.installed[0].db_entry, 'mcp-server-aws');
   assert.equal(r.json.installed[0].tier, 'Deprecated');
@@ -186,11 +172,11 @@ test('the config key is a label, not an identity', () => {
   // `mcp-server-aws` is yanked in the DB. A server merely *named* that, which
   // launches something else entirely, must not inherit its status — and a
   // server named anything at all that *does* launch it must.
-  const misnamed = run(project({ 'mcp-server-aws': { command: 'node', args: ['./mine.js'] } }), ['--json']);
+  const misnamed = run(project({ 'mcp-server-aws': { command: 'node', args: ['./mine.js'] } }), ['--json', '--as-of', FIX_AS_OF], FIX_STATUS);
   assert.equal(misnamed.json.installed[0].in_db, false);
   assert.equal(misnamed.status, 0, 'a name collision is not a finding about anybody');
 
-  const disguised = run(project({ 'totally-fine': { command: 'uvx', args: ['awslabs.core-mcp-server==1.0.27'] } }), ['--json']);
+  const disguised = run(project({ 'totally-fine': { command: 'uvx', args: ['awslabs.core-mcp-server==1.0.27'] } }), ['--json', '--as-of', FIX_AS_OF], FIX_STATUS);
   assert.equal(disguised.json.installed[0].db_entry, 'mcp-server-aws');
   assert.equal(disguised.json.installed[0].tier, 'Deprecated');
   assert.equal(disguised.status, 1);

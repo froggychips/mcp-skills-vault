@@ -21,7 +21,14 @@ const { spawnSync } = require('node:child_process');
 const REPO     = path.resolve(__dirname, '..');
 const ACTION   = fs.readFileSync(path.join(REPO, 'action.yml'), 'utf8');
 const FIXTURES = path.join(REPO, 'tests', 'fixtures', 'action');
-const VERIFY   = path.join(REPO, 'mcp-ecosystem-intelligence', 'scripts', 'verify_integrity.cjs');
+// The Action's steps and the CLI run from a copy of the repository whose DB
+// evidence the tests control (tests/lib/fixture_skill.cjs), deciding as of a
+// fixed instant (MCP_VAULT_TEST_AS_OF, `check --as-of`): a verdict here must
+// not change as the shipped DB's evidence ages (#116).
+const { fixtureSkill, AS_OF } = require('./lib/fixture_skill.cjs');
+const FIX = fixtureSkill({ with: ['action.yml', 'package.json', 'bin'] });
+process.on('exit', () => FIX.cleanup());
+const VERIFY   = path.join(FIX.scripts, 'verify_integrity.cjs');
 
 const HAS_BASH = spawnSync('bash', ['-c', 'exit 0']).status === 0;
 
@@ -52,6 +59,7 @@ const INPUT_DEFAULTS = {
   VAULT_OFFLINE: 'true',
   VAULT_MODE: 'checkout',
   VAULT_ACTION_REF: '',
+  MCP_VAULT_TEST_AS_OF: AS_OF,
   // The test runner's own environment must not decide the signature cases.
   MCP_VAULT_ALLOW_UNSIGNED_DB: '',
   MCP_VAULT_REQUIRE_SIGNED_DB: '',
@@ -81,11 +89,11 @@ function runStep(key, { cwd, env = {} }) {
     encoding: 'utf8',
     env: {
       ...process.env,
-      GITHUB_ACTION_PATH: REPO,
+      GITHUB_ACTION_PATH: FIX.root,
       GITHUB_OUTPUT: outputs,
       GITHUB_STEP_SUMMARY: summary,
       RUNNER_TEMP: tmp,
-      VAULT_CLI: path.join(REPO, 'bin', 'mcp-vault.cjs'),
+      VAULT_CLI: path.join(FIX.root, 'bin', 'mcp-vault.cjs'),
       ...INPUT_DEFAULTS,
       ...env,
     },
@@ -159,14 +167,13 @@ test('action: a clean config passes and says so in the job summary', { skip: !HA
   const r = runStep('check', { cwd: path.join(FIXTURES, 'clean') });
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.outputs['exit-code'], '0', r.stdout + r.stderr);
-  // Nothing fails. The one warning is what the configured set does together
-  // (flows/*, a warning that only --strict fails), not a pin.
-  assert.match(r.summary, /\*\*WARN\*\* — 3 servers checked, 0 failing, 0 unverified \(fail on: unknown, mode: offline,/);
-  // "Why" is empty, or — once the shipped record is past its shelf life (a
-  // matter of the wall clock) — the record's age, as context only.
-  const why = '(— |evidence\\/vault-age: vault evidence for \\S+ is \\d+ days old [^|]*)';
-  assert.match(r.summary, new RegExp(`\\| playwright-mcp \\| allow \\| trust\\/ok \\| \\.mcp\\.json:3 \\| ${why}\\|`));
-  assert.match(r.summary, new RegExp(`\\| mongodb-mcp-server \\| allow \\| trust\\/ok \\| \\.vscode\\/mcp\\.json:3 \\| ${why}\\|`));
+  // Nothing fails, on the staged record at the fixed instant: both servers
+  // are the vault's pinned releases with a current, clean record.
+  assert.match(r.summary, /\*\*OK\*\* — 2 servers checked, 0 failing, 0 unverified \(fail on: unknown, mode: offline, as of 2026-06-02T12:00:00\.000Z\)/);
+  assert.match(r.summary, /\| playwright-mcp \| allow \| trust\/ok \| \.mcp\.json:3 \| — \|/);
+  // The test switch is never silent.
+  assert.match(r.stdout, /::warning::mcp-vault: MCP_VAULT_TEST_AS_OF is set — deciding as of 2026-06-02/);
+  assert.match(r.summary, /\| mongodb-mcp-server \| allow \| trust\/ok \| \.vscode\/mcp\.json:3 \| — \|/);
   const report = JSON.parse(fs.readFileSync(r.outputs.report, 'utf8'));
   assert.equal(report.schema, 'mcp-vault/findings@1');
   assert.equal(report.scope, 'config');
@@ -243,7 +250,7 @@ test('action: a version that is not exact is refused before anything is fetched'
   }
   const own = runStep('cli', { cwd: REPO, env: { VAULT_VERSION: '', VAULT_INTEGRITY: '' } });
   assert.equal(own.status, 0);
-  assert.equal(own.outputs.cli, path.join(REPO, 'bin', 'mcp-vault.cjs'));
+  assert.equal(own.outputs.cli, path.join(FIX.root, 'bin', 'mcp-vault.cjs'));
 });
 
 /**
@@ -253,7 +260,7 @@ test('action: a version that is not exact is refused before anything is fetched'
 function unpackedAction() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-vault-uses-'));
   for (const p of ['action.yml', 'package.json', 'bin', 'mcp-ecosystem-intelligence']) {
-    fs.cpSync(path.join(REPO, p), path.join(dir, p), { recursive: true, filter: (src) => !src.endsWith('.sig') });
+    fs.cpSync(path.join(FIX.root, p), path.join(dir, p), { recursive: true, filter: (src) => !src.endsWith('.sig') });
   }
   return dir;
 }
@@ -266,7 +273,7 @@ test('action: its own checkout without .git (uses: @sha) runs, integrity pinned 
     env: { GITHUB_ACTION_PATH: dir, VAULT_CLI: path.join(dir, 'bin', 'mcp-vault.cjs'), VAULT_MODE: 'checkout', VAULT_ACTION_REF: sha },
   });
   assert.equal(r.outputs['exit-code'], '0', r.stdout + r.stderr);
-  assert.match(r.summary, /\*\*WARN\*\* — 3 servers checked, 0 failing/);
+  assert.match(r.summary, /\*\*OK\*\* — 2 servers checked, 0 failing/);
   assert.ok(r.summary.includes(`DB integrity: pinned by action SHA ${sha}`), r.summary);
   // The allowance is this step's alone, and only for a missing signature: a
   // .sig that is present still has to verify.
@@ -333,7 +340,7 @@ test('.pre-commit-hooks.yaml: hook mcp-vault runs check and matches every host c
 
 // ── verify --config / --policy ─────────────────────────────────────────────
 
-const runVerify = (args, cwd = REPO) => spawnSync(process.execPath, [VERIFY, ...args], { cwd, encoding: 'utf8' });
+const runVerify = (args, cwd = REPO) => spawnSync(process.execPath, [VERIFY, '--as-of', AS_OF, ...args], { cwd, encoding: 'utf8' });
 
 test('verify --config: checks exactly the named files, and reads nothing else', () => {
   const r = runVerify(['--offline', '--json', '--config', '.mcp.json', '.vscode/mcp.json'], path.join(FIXTURES, 'clean'));

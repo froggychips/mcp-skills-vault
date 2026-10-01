@@ -18,7 +18,7 @@
  * them.
  *
  * API:
- *   fixtureSkill({ stale = [] })  -> { root, scripts, dbFile, launches, run(script, args, opts) }
+ *   fixtureSkill({ stale = [], with = [] }) -> { root, scripts, dbFile, launches, run(script, args, opts), cleanup() }
  *   OBSERVED, STALE_OBSERVED, AS_OF (a day after OBSERVED), LATE (past every shelf life)
  */
 
@@ -56,9 +56,14 @@ function record(dims, day) {
   return out;
 }
 
-function fixtureSkill({ stale = [], env = process.env } = {}) {
+function fixtureSkill({ stale = [], env = process.env, with: extra = [] } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-vault-fixture-skill-'));
-  fs.cpSync(path.join(ROOT, 'mcp-ecosystem-intelligence'), path.join(root, 'mcp-ecosystem-intelligence'), { recursive: true });
+  // `with`: more of the repository beside the skill (bin/, package.json,
+  // action.yml) for a test that runs the CLI or the Action from the copy.
+  // Never the DB signature: a staged DB has none.
+  for (const p of ['mcp-ecosystem-intelligence', ...extra]) {
+    fs.cpSync(path.join(ROOT, p), path.join(root, p), { recursive: true, filter: (src) => !src.endsWith('.sig') });
+  }
   const dbFile = path.join(root, 'mcp-ecosystem-intelligence', 'assets', 'tools_database.json');
   const db = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
   const launches = {};

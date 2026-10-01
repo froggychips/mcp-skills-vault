@@ -226,6 +226,13 @@ runs:
           *) echo "::error::mcp-vault: fail-on must be error, unverified or warning, got '$VAULT_FAIL_ON'"; echo "exit-code=2" >> "$GITHUB_OUTPUT"; exit 0 ;;
         esac
         [ -n "$VAULT_POLICY" ] && args+=(--policy "$VAULT_POLICY")
+        # For this repository's own tests only, not an input: decide as of a
+        # fixed instant (`check --as-of`, offline only), so the tests do not
+        # change verdict as the DB's evidence ages. Said loudly when set.
+        if [ -n "${MCP_VAULT_TEST_AS_OF:-}" ]; then
+          echo "::warning::mcp-vault: MCP_VAULT_TEST_AS_OF is set — deciding as of $MCP_VAULT_TEST_AS_OF, not now (a test switch)"
+          args+=(--as-of "$MCP_VAULT_TEST_AS_OF")
+        fi
 
         if [ ${#configs[@]} -eq 0 ]; then
           echo "mcp-vault: no MCP config found among: $listed"
