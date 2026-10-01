@@ -26,6 +26,8 @@
  *     "maxContextPercent": 20,         // …or as a share of the context window
  *     "contextBudget": "warn",         // fail | warn      (default warn)
  *     "maxEvidenceAgeDays": 30,       // stored evidence older than this is stale
+ *     "toxicFlows": "warn",            // fail | warn | allow  (default warn)
+ *     "toolShadowing": "warn",         // fail | warn | allow  (default warn)
  *     "trust": ["verified"],           // acceptable trust tiers
  *     "deep": true,                    // hash artifacts locally
  *     "deps": true                     // resolve and check dependency trees
@@ -73,6 +75,13 @@ const DEFAULTS = {
   maxContextPercent:    null,
   contextBudget:        'warn',
   maxEvidenceAgeDays:   null,
+  // Properties of the set, like the context ceiling: lib/flows.cjs finds a
+  // session that can read untrusted content, reach private data and send it
+  // out, and tools two servers both claim. `warn` reports them (and fails
+  // only under --strict); `fail` makes them blocking; `allow` keeps them in
+  // --json and out of the verdict.
+  toxicFlows:           'warn',
+  toolShadowing:        'warn',
   trust:                null,
   deep:                 false,
   deps:                 false,
@@ -89,6 +98,8 @@ const ENUMS = {
   provenance:           ['require', 'prefer'],
   docker:               ['digest', 'tag'],
   contextBudget:        ['fail', 'warn'],
+  toxicFlows:           ['fail', 'warn', 'allow'],
+  toolShadowing:        ['fail', 'warn', 'allow'],
 };
 
 /** Nearest policy file at or above `startDir`. */

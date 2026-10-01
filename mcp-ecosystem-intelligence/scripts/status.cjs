@@ -43,6 +43,9 @@ const {
 const { staleDimensions, DEFAULT_MAX_AGE_DAYS, dbAsOf, evalResultsAsOf } = require('./lib/evidence.cjs');
 const { asOfFromArgv, requireAsOf } = require('./lib/clock.cjs');
 const budget               = require('./lib/budget.cjs');
+const flows                = require('./lib/flows.cjs');
+const { loadEffectivePolicy } = require('./lib/policy_rules.cjs');
+const { findingsDocument, toJson } = require('./lib/finding.cjs');
 const { runDoctor }        = require('./doctor.cjs');
 const orchestrate          = require('./orchestrate.cjs');
 const auditSetup           = require('./audit_setup.cjs');
@@ -50,6 +53,7 @@ const { scanHostConfigs, redact } = require('./lib/secrets.cjs');
 
 const DB_PATH   = path.resolve(__dirname, '../assets/tools_database.json');
 const EVAL_PATH = path.resolve(__dirname, '../assets/eval_results.json');
+const CAPS_PATH = path.resolve(__dirname, '../assets/capabilities.json');
 const PKG_PATH  = path.resolve(__dirname, '../../package.json');
 
 const T  = process.stdout.isTTY && !process.env.NO_COLOR;
@@ -340,6 +344,48 @@ function context(rows, db, evals) {
   };
 }
 
+/**
+ * What the servers of one host can do *together* — lib/flows.cjs.
+ *
+ * Per host, because that is the unit that shares a context: a server in
+ * Cursor and a server in Claude Code never see each other's output. Tool names
+ * and hints come from the stored eval surface of the matched DB entry; when
+ * the host launches another version than the one measured, the names are
+ * still used (a rename is rarer than a leg) and the row says so.
+ *
+ * The findings go through decide() (rows `flows/*`, `shadowing/*`), and the
+ * verdict below renders its Decisions.
+ */
+function setup({ installedRows, db, evals, capabilities, policy, asOf }) {
+  const byHost = new Map();
+  for (const r of installedRows) {
+    if (r.unreadable) continue;
+    const host = r.host || 'unknown';
+    if (!byHost.has(host)) byHost.set(host, []);
+    const dbEntry = r.in_db ? db.tools.find((t) => t.name === r.db_entry) || null : null;
+    const evalEntry = dbEntry ? evals.get(dbEntry.name) || null : null;
+    byHost.get(host).push(flows.memberFrom({
+      name: r.name,
+      dbEntry,
+      evalEntry,
+      capabilities,
+      artifactIds: [r.installed_artifact, r.vault_artifact],
+      launch: r.launches,
+      note: dbEntry && r.version_match !== 'same' && evalEntry && evalEntry.surface
+        ? `tool names measured on the vault's ${r.vault_artifact}, not ${r.installed_artifact || 'what this host launches'}`
+        : null,
+    }));
+  }
+  const sets = [...byHost.entries()].sort(([a], [b]) => (a < b ? -1 : 1))
+    .map(([host, members]) => ({ host, scope: 'installed', analysis: flows.analyseSet(members) }));
+  const judged = flows.judgeSets(sets, policy, asOf);
+  return {
+    policy: { toxicFlows: policy.toxicFlows, toolShadowing: policy.toolShadowing },
+    hosts: sets.map(({ host, analysis }) => ({ host, ...analysis, lines: judged.lines.filter((l) => l.host === host) })),
+    judged,
+  };
+}
+
 /** What this project's stack suggests that is not already installed. */
 function project({ cwd, db, installedRows, asOf }) {
   const stack   = orchestrate.detectStack(cwd);
@@ -383,7 +429,7 @@ function secrets(cwd) {
  * server is a gap in *our* coverage, not a finding about the server, and a
  * default that failed on it would train people to pass --no-strict forever.
  */
-function verdict({ env, installedRows, auditFindings, auditUnreadable = [], secretsBlock = null, strict }) {
+function verdict({ env, installedRows, auditFindings, auditUnreadable = [], secretsBlock = null, setupReport = null, policyErrors = [], strict }) {
   const blocking   = [];   // something installed must not run  → 1
   const notable    = [];   // worth knowing, not a blocker      → 1 only with --strict
   const unanswered = [];   // a question we could not answer    → 2
@@ -444,6 +490,21 @@ function verdict({ env, installedRows, auditFindings, auditUnreadable = [], secr
     notable.unshift(`${n} secret${n === 1 ? '' : 's'} in plain text in host configs`
       + (trackedFiles.length ? ` — ${secretsBlock.tracked} in git-tracked ${trackedFiles.join(', ')}: rotate` : '')
       + ' (mcp-vault secrets)');
+  }
+
+  // A policy we could not read is not a policy with nothing in it — said out
+  // loud. Notable rather than unanswered: status never read the policy before
+  // it judged flows, and an exit code that turns 2 on a file it used to ignore
+  // would be a stricter default (docs/COMPATIBILITY.md).
+  for (const e of policyErrors) notable.push(`policy: ${e} — defaults in force for toxicFlows / toolShadowing`);
+
+  // Cross-server findings, as decide() judged them (rows flows/*, shadowing/*):
+  // a deny blocks, a warn is worth knowing (and fails under --strict, which is
+  // the policy's fail_on); allow and unknown stay in --json.
+  for (const l of (setupReport && setupReport.hosts || []).flatMap((h) => h.lines)) {
+    const line = `${l.host}: ${l.message}${l.rule.startsWith('flows/') && l.advice ? ` — ${l.advice}` : ''}`;
+    if (l.effect === 'deny') blocking.push(line);
+    else if (l.effect === 'warn') notable.push(line);
   }
 
   for (const u of auditUnreadable) {
@@ -529,7 +590,23 @@ function printReport(r) {
     }
   }
 
-  // 5. this project
+  // 5. what the set can do together
+  for (const h of (r.setup && r.setup.hosts) || []) {
+    const counted = (prefix) => h.lines.filter((l) => l.rule.startsWith(prefix) && (l.effect === 'deny' || l.effect === 'warn')).length;
+    const high = counted('flows/');
+    const shared = counted('shadowing/');
+    const bits = [
+      // "No toxic flow" about servers nobody could see into would be the
+      // summary claiming more than its inputs support.
+      high ? `${YL}${high} toxic flow${high === 1 ? '' : 's'}${RS}`
+        : (h.no_data.length === h.servers.length ? `${DM}nothing known about these servers${RS}` : 'no toxic flow found'),
+      shared ? `${YL}${shared} tool-name overlap${shared === 1 ? '' : 's'}${RS}` : null,
+      h.no_data.length ? `${DM}${h.no_data.length} without data${RS}` : null,
+    ].filter(Boolean);
+    out(`${label('Flows')}${h.host}: ${bits.join(` ${DM}·${RS} `)}\n`);
+  }
+
+  // 6. this project
   const p = r.project;
   const suggestion = p.not_installed_for_stack.length
     ? ` ${DM}→${RS} ${p.not_installed_for_stack.length} matching server${p.not_installed_for_stack.length === 1 ? '' : 's'} not installed`
@@ -592,6 +669,9 @@ function main(argv) {
   const db = dbAsOf(rawDb, opts.asOf);
   const evals = evalIndex(evalResultsAsOf((readJson(EVAL_PATH) || {}).results, opts.asOf));
   const pkg   = readJson(PKG_PATH) || {};
+  // The one policy loader (lib/policy_rules.cjs): the file, then --strict,
+  // frozen. --strict is the decision's fail_on, not a branch below.
+  const loadedPolicy = loadEffectivePolicy(opts.cwd, { flags: { strict: opts.strict } });
 
   const env           = environment(opts.cwd);
   const installedRows = installed({ cwd: opts.cwd, db, evals, asOf: opts.asOf });
@@ -625,7 +705,21 @@ function main(argv) {
     audit:       auditFindings,
     secrets:     secrets(opts.cwd),
   };
-  report.verdict = verdict({ env, installedRows, auditFindings, auditUnreadable, secretsBlock: report.secrets, strict: opts.strict });
+  const setupReport = setup({
+    installedRows, db, evals, capabilities: readJson(CAPS_PATH) || { packages: {} },
+    policy: loadedPolicy.policy, asOf: opts.asOf,
+  });
+  report.setup = { policy: setupReport.policy, hosts: setupReport.hosts };
+  // Additive (mcp-vault/findings@1): the cross-server findings and the
+  // Decisions the Flows line and the verdict's flow lines are a view of.
+  const j = setupReport.judged;
+  report.findings = toJson(findingsDocument({
+    asOf: opts.asOf, findings: j.findings, decisions: j.decisions, scope: 'setup', policy: loadedPolicy.policy, facts: j.facts,
+  }));
+  report.verdict = verdict({
+    env, installedRows, auditFindings, auditUnreadable,
+    secretsBlock: report.secrets, setupReport, policyErrors: loadedPolicy.errors, strict: opts.strict,
+  });
 
   if (opts.json) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   else printReport(report);
@@ -637,4 +731,4 @@ if (require.main === module) {
   exitAfterFlush(main(process.argv.slice(2)));
 }
 
-module.exports = { parseArgs, environment, installed, context, project, secrets, verdict, main };
+module.exports = { parseArgs, environment, installed, context, setup, project, secrets, verdict, main };

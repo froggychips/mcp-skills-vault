@@ -35,8 +35,15 @@ const path = require('path');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { asOfFromArgv } = require('./lib/clock.cjs');
 const { scanHostConfigs } = require('./lib/secrets.cjs');
+const flows = require('./lib/flows.cjs');
+const { loadEffectivePolicy } = require('./lib/policy_rules.cjs');
+const { findingsDocument, toJson } = require('./lib/finding.cjs');
+const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
+const { toInstallCmd } = require('./lib/installed.cjs');
 
 const DEFAULT_DB = path.resolve(__dirname, '../assets/tools_database.json');
+const EVAL_PATH  = path.resolve(__dirname, '../assets/eval_results.json');
+const CAPS_PATH  = path.resolve(__dirname, '../assets/capabilities.json');
 
 // Server `category` values whose deploys are typically project-specific —
 // secrets like a TeamCity URL or a GitHub token belong with the project,
@@ -93,6 +100,16 @@ Finding categories:
   scope              global install of a project-scoped category
   secret             credential written in plain text into env/args/headers/url
                      (the value is never printed; see mcp-vault secrets)
+  toxic-flow         the servers together (or one alone) read untrusted content,
+                     reach private data and can send outward — or let untrusted
+                     content reach a destructive tool
+  tool-shadowing     two servers expose the same (or nearly the same) tool name,
+                     or a description names another server's tool
+
+  toxic-flow and tool-shadowing are decided by the policy rows flows/* and
+  shadowing/* ("toxicFlows" / "toolShadowing" in .mcp-vault.policy.json:
+  fail | warn | allow, default warn): fail exits 1 without --strict, warn
+  fails under --strict, allow and low-confidence findings never fail.
 
 Flags:
   --json             emit findings array as JSON
@@ -431,6 +448,60 @@ function audit({ project, global, settings, db, evals = null }) {
   return findings;
 }
 
+// ── cross-server: what the set does together ───────────────────────────────
+
+/**
+ * Toxic flows and tool shadowing over the Claude Code session this audit
+ * reads — project and global servers together, since that is what one session
+ * loads, minus project servers `enabledMcpjsonServers` leaves out.
+ *
+ * A server is matched to the vault by what it launches, never by its config
+ * key: a key is the user's label, and `github-mcp-server` running
+ * `node innocent.js` must not inherit the GitHub entry's labels. Tool names
+ * come from the stored eval surface of the matched entry; a server with
+ * neither is a `no-data` finding (lib/flows.cjs).
+ *
+ * `policy` is the frozen effective policy and `asOf` the instant; decide()
+ * judges the findings, and `findings` here is the audit@1 view of that
+ * Decision (category, the effect it gave, advice).
+ */
+function flowFindings({ project, global, settings, db, evals = null, capabilities = null, policy, asOf }) {
+  const members = [];
+  const seen = new Set();
+  for (const [servers, scope] of [[project, 'project'], [global, 'global']]) {
+    for (const [name, entry] of Object.entries(servers || {})) {
+      if (seen.has(name) || !entry || typeof entry !== 'object') continue;
+      seen.add(name);
+      if (scope === 'project' && settings && Array.isArray(settings.enabled) && !settings.enabled.includes(name)) continue;
+      const tool = flows.dbEntryForLaunch(db.tools, toInstallCmd(entry));
+      let typed = null;
+      try { typed = tool ? toTypedEntry(tool) : null; } catch { typed = null; }
+      members.push(flows.memberFrom({
+        name,
+        dbEntry: tool,
+        evalEntry: tool && evals && evals.get ? evals.get(tool.name) || null : null,
+        capabilities,
+        artifactIds: [typed ? artifactId(typed.artifact) : null],
+        launch: [entry.command, ...(Array.isArray(entry.args) ? entry.args : [])].filter((t) => typeof t === 'string').join(' '),
+      }));
+    }
+  }
+  const analysis = flows.analyseSet(members);
+  const judged = flows.judgeSets([{ host: 'claude-code', scope: 'session', analysis }], policy, asOf);
+  const findings = judged.lines.filter((l) => l.rule !== 'flows/no-data').map((l) => ({
+    category: l.rule.startsWith('flows/') ? 'toxic-flow' : 'tool-shadowing',
+    rule:     l.rule,
+    effect:   l.effect,
+    server:   l.servers.join(', '),
+    servers:  l.servers,
+    scope:    'session',
+    message:  l.message,
+    advice:   l.advice,
+    finding_ids: l.findings,
+  }));
+  return { analysis, judged, findings };
+}
+
 // ── reporting ──────────────────────────────────────────────────────────────
 
 const T  = process.stdout.isTTY;
@@ -442,13 +513,15 @@ const GN = T ? '\x1b[32m' : '';
 const RS = T ? '\x1b[0m'  : '';
 
 const CATEGORY_ORDER = [
-  'secret', 'drift', 'untrusted', 'heavy-unbounded', 'scope', 'unknown', 'version-unknown',
+  'secret', 'drift', 'untrusted', 'heavy-unbounded', 'toxic-flow', 'tool-shadowing', 'scope', 'unknown', 'version-unknown',
 ];
 const CATEGORY_COLOR = {
   'secret':          RD,
   'drift':           RD,
   'untrusted':       YL,
   'heavy-unbounded': YL,
+  'toxic-flow':      YL,
+  'tool-shadowing':  YL,
   'scope':           YL,
   'unknown':         DM,
   'version-unknown': DM,
@@ -479,6 +552,9 @@ function printReport(findings, counts) {
       }
       if (cat === 'secret') {
         process.stdout.write(`    ${DM}${f.file}${f.line ? `:${f.line}` : ''}${f.tracked ? ' (tracked by git: rotate it)' : ''}${RS}\n`);
+      }
+      if ((cat === 'toxic-flow' || cat === 'tool-shadowing') && f.advice && (f.effect === 'deny' || f.effect === 'warn')) {
+        process.stdout.write(`    ${DM}→ ${f.advice}${RS}\n`);
       }
       if (cat === 'untrusted' && f.notes) {
         process.stdout.write(`    ${DM}${truncate(f.notes, 110)}${RS}\n`);
@@ -571,6 +647,21 @@ function main(argv) {
   const findings = audit({ project, global: global_, settings, db });
   findings.push(...secretFindings(cwd, globalCfg));
 
+  // The cross-server pass reads the stored eval surfaces and capability
+  // scans; decide() judges it under the one effective policy (the file, then
+  // --strict as fail_on). A policy with errors is said out loud and counts
+  // under --strict; it does not change the default exit, because this command
+  // did not read the policy before (docs/COMPATIBILITY.md).
+  const loaded = loadEffectivePolicy(cwd, { flags: { strict: args.strict } });
+  const policyErrors = loaded.errors.map((e) => ({ path: loaded.path || '.mcp-vault.policy.json', error: e }));
+  const evalRows = (readJsonSafe(EVAL_PATH) || {}).results;
+  const evals = new Map((Array.isArray(evalRows) ? evalRows : []).map((r) => [r.name, r]));
+  const setup = flowFindings({
+    project, global: global_, settings, db, evals,
+    capabilities: readJsonSafe(CAPS_PATH), policy: loaded.policy, asOf: args.asOf,
+  });
+  findings.push(...setup.findings);
+
   if (args.json) {
     process.stdout.write(JSON.stringify({
       schema:      'mcp-vault/audit@1',
@@ -582,6 +673,14 @@ function main(argv) {
       global_path: globalCfg,
       counts,
       findings,
+      setup:       setup.analysis,
+      // Additive (mcp-vault/findings@1): the cross-server findings and the
+      // Decisions the toxic-flow / tool-shadowing rows above are a view of.
+      setup_findings: toJson(findingsDocument({
+        asOf: args.asOf, findings: setup.judged.findings, decisions: setup.judged.decisions,
+        scope: 'setup', policy: loaded.policy, facts: setup.judged.facts,
+      })),
+      policy_errors: policyErrors,
     }, null, 2) + '\n');
   } else {
     printReport(findings, counts);
@@ -593,7 +692,11 @@ function main(argv) {
   // parse, and returning 2 for it hid the drift behind our own inability to
   // read something else. Both are reported either way.
   for (const u of unreadable) process.stderr.write(`audit: ${u.path}: ${u.error}\n`);
-  if (args.strict && findings.some(f => STRICT_CATEGORIES.has(f.category))) return 1;
+  for (const u of policyErrors) process.stderr.write(`audit: ${u.path}: ${u.error} (defaults in force)\n`);
+  // The cross-server part fails when its Decision does: `toxicFlows: fail`
+  // without --strict, `warn` with it (fail_on) — decide() said which.
+  if (setup.judged.decisions.some((d) => d.fails)) return 1;
+  if (args.strict && (policyErrors.length || findings.some(f => STRICT_CATEGORIES.has(f.category)))) return 1;
   // A config we could not read is still not a clean config: "no findings"
   // would be a claim about servers we never saw.
   if (unreadable.length) return 2;
@@ -619,6 +722,7 @@ module.exports = {
   hasArgScope,
   audit,
   secretFindings,
+  flowFindings,
   main,
   PROJECT_SCOPED_CATEGORIES,
   HEAVY_THRESHOLD,

@@ -762,6 +762,33 @@ mcp-vault audit --strict   # exit 1 on drift/untrusted/heavy
 
 Exit codes: `0` clean / info-only · `1` `--strict` triggered · `2` bad invocation. Closes the "Audit my MCP setup" use case without an LLM in the critical path.
 
+#### What the set can do together (toxic flows, tool shadowing)
+
+Each server can pass every check and the combination still not be safe.
+[`lib/flows.cjs`](./mcp-ecosystem-intelligence/scripts/lib/flows.cjs) labels
+every configured server — and every tool, where the eval stored its surface —
+`untrusted_content`, `private_data`, `public_sink` or `destructive`, each label
+with its evidence (DB category, tool name, MCP annotation, code capability).
+It flags a host session that holds all of the first three (the
+[lethal trifecta](https://invariantlabs.ai/blog/toxic-flow-analysis)), including
+one server alone — `github-mcp-server` reads public issues, private repos and
+opens PRs — and untrusted content next to a destructive tool. It also flags two
+servers exposing the same tool name, and a description that names another
+server's tool (checked through hashed tokens; no description text is stored).
+The advice is concrete where the DB knows the server's `toolsets`, and
+otherwise says which servers to split into separate profiles.
+
+It runs in `status`, `audit` and `explain <name>`, all offline, and reports
+through the one findings model ([ADR 0001](./docs/adr/0001-findings-and-time.md)):
+findings `flows/*` on the host's session and `shadowing/*` on the colliding tool,
+judged by the policy rows of the same names. A server with no DB entry and no
+stored surface is a `flows/no-data` finding (unknown, never clean), and servers
+are matched to the vault by what they launch, not by their config key. A flow
+that needs a code capability to close is low confidence: reported, never
+enforced. `"toxicFlows"` and `"toolShadowing"` in the policy file (`fail` |
+`warn` | `allow`, default `warn`) set how loud it is: `warn` fails only under
+`--strict`.
+
 ### Plain-text secrets in host configs (`secrets`)
 
 `claude mcp add -e GITHUB_TOKEN=ghp_…` writes the token into `~/.claude.json`;
@@ -1008,6 +1035,7 @@ Everything in this table is scripted and tested; the column says where it lives.
 | CycloneDX SBOM | [`sbom.cjs`](./mcp-ecosystem-intelligence/scripts/sbom.cjs) |
 | Signed DB checked before use; signed, non-transitive audit imports | [`lib/signing.cjs`](./mcp-ecosystem-intelligence/scripts/lib/signing.cjs), [`lib/audits.cjs`](./mcp-ecosystem-intelligence/scripts/lib/audits.cjs) |
 | Context ceiling enforced where the set changes | [`lib/budget.cjs`](./mcp-ecosystem-intelligence/scripts/lib/budget.cjs) |
+| Toxic flows and tool shadowing across the configured set | [`lib/flows.cjs`](./mcp-ecosystem-intelligence/scripts/lib/flows.cjs) |
 | Tier derived from evidence, not from a score | [`lib/tiers.cjs`](./mcp-ecosystem-intelligence/scripts/lib/tiers.cjs) |
 | One command instead of six | [`status.cjs`](./mcp-ecosystem-intelligence/scripts/status.cjs) |
 | Plain-text secrets in host configs, never printed | [`lib/secrets.cjs`](./mcp-ecosystem-intelligence/scripts/lib/secrets.cjs), [`check_secrets.cjs`](./mcp-ecosystem-intelligence/scripts/check_secrets.cjs) |
