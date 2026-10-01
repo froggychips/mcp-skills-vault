@@ -60,7 +60,7 @@
  * cron job on a trusted runner). Without either, the live smoke refuses to run.
  * `--no-spawn` is exempt: it never executes anything.
  *
- * Exit codes:
+ * Exit codes (a Decision per entry, docs/adr/0001 — mode observe):
  *   0  smoke completed (and, under --strict, all entries passed)
  *   1  --strict: at least one entry failed, or an entry went unchecked
  *      because its launcher was missing on this host (a CI gap, not a pass)
@@ -76,6 +76,9 @@ const { performance } = require('perf_hooks');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { readWallClock, requireAsOf } = require('./lib/clock.cjs');
 const { readInstalledServers } = require('./lib/installed.cjs');
+const { subject: subjectOf, finding } = require('./lib/finding.cjs');
+const { subjectForTool } = require('./lib/findings_from.cjs');
+const { commandPolicy, decideRun, unanswered } = require('./lib/run_decision.cjs');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -136,8 +139,6 @@ const { toTypedEntry, artifactId, comparableArtifactId, isExactArtifact } = requ
 const { smokeEvidence, mergeEvidence } = require('./lib/evidence.cjs');
 const { fingerprintTools, diffSurface, describeDiff, isEmpty: surfaceUnchanged } = require('./lib/surface.cjs');
 const toolScan      = require('./lib/tool_scan.cjs');
-const { decide }    = require('./lib/finding.cjs');
-const { loadEffectivePolicy } = require('./lib/policy_rules.cjs');
 const stdio         = require('./lib/mcp_stdio.cjs'); // shared framing + sandbox + classifier (vendored, zero-dep)
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -1010,6 +1011,74 @@ function spawnPolicy(opts) {
   };
 }
 
+// ── the decision ───────────────────────────────────────────────────────────
+
+// The one run-level subject: an early stop is about the run, not an entry.
+const RUN = subjectOf.setup({ host: 'eval', scope: 'run' });
+
+/**
+ * A smoke run as findings, decided (docs/adr/0001):
+ *
+ *   eval/fail                         a server that failed: medium (warn — fails under --strict)
+ *   eval/launcher-unavailable,
+ *   eval/sandbox-unavailable,
+ *   eval/not-attempted, eval/aborted  not-run: unknown, which --strict fails on —
+ *                                     a run that did not deliver what was asked
+ *                                     for; when nothing at all could be run,
+ *                                     scope/unanswered (2)
+ *   eval/surface-drift[-unexplained]  row eval/surface-drift: refused under
+ *                                     --fail-surface-drift / --fail-unexplained-surface-drift
+ *   tool-scan/*                       with --fail-tool-scan only: the stored scan,
+ *                                     judged by the row tool-scan and explain use
+ *   eval/malformed                    --no-spawn: a malformed result (warn)
+ */
+function evalDecision({ results = [], picked = [], aborted = false, malformed = [], toolScanModel = null, opts = {}, asOf }) {
+  const byName = new Map(picked.map((t) => [t.name, t]));
+  const subjectFor = (name) => subjectForTool(byName.get(name) || { name });
+  const answered = results.filter((r) => r.status === 'pass' || r.status === 'fail').length;
+  const nothing = picked.length > 0 && answered === 0;
+  const notRun = (rule, s, message) => (nothing
+    ? unanswered({ subject: s, scope: 'eval', message })
+    : finding({ rule, subject: s, scope: 'eval', severity: 'medium', state: 'not-run', message }));
+  const findings = [];
+  for (const r of results) {
+    const s = subjectFor(r.name);
+    if (r.status === 'fail') {
+      findings.push(finding({ rule: 'eval/fail', subject: s, scope: 'eval', severity: 'medium', message: `failed: ${r.error_code || r.failure_class || 'no reason recorded'}` }));
+    } else if (r.status === 'skip' && /^launcher unavailable: /.test(r.error_code || '')) {
+      findings.push(notRun('eval/launcher-unavailable', s, `not checked: ${r.error_code}`));
+    } else if (r.failure_class === 'SANDBOX_UNAVAILABLE') {
+      findings.push(notRun('eval/sandbox-unavailable', s, 'not checked: the sandbox was unavailable'));
+    }
+    if (r.surface_drift) {
+      const unexplained = r.surface_drift.artifact_changed === false;
+      findings.push(finding({
+        rule: unexplained ? 'eval/surface-drift-unexplained' : 'eval/surface-drift', subject: s, scope: 'eval', severity: 'low',
+        message: unexplained ? 'presented a different tool surface from the same artifact identity'
+          : r.surface_drift.artifact_changed === null ? 'changed tool surface; the previous snapshot recorded no artifact identity'
+            : 'changed tool surface with the artifact',
+      }));
+    }
+  }
+  const attempted = new Set(results.map((r) => r.name));
+  for (const t of picked) if (!attempted.has(t.name)) findings.push(notRun('eval/not-attempted', subjectFor(t.name), 'never attempted: the run stopped early'));
+  if (aborted) findings.push(notRun('eval/aborted', RUN, 'the run stopped early'));
+  for (const m of malformed) {
+    findings.push(finding({ rule: 'eval/malformed', subject: subjectFor(m.name), scope: 'eval', severity: 'medium', message: `${m.schema_errors_recheck.length} malformed entr${m.schema_errors_recheck.length === 1 ? 'y' : 'ies'} in the stored result` }));
+  }
+  const subjects = [...picked.map((t) => subjectFor(t.name)), ...results.map((r) => subjectFor(r.name)), ...malformed.map((m) => subjectFor(m.name))];
+  const facts = {};
+  if (toolScanModel) {
+    findings.push(...toolScanModel.findings);
+    subjects.push(...toolScanModel.subjects);
+    Object.assign(facts, toolScanModel.facts);
+  }
+  return decideRun({
+    findings, subjects, facts, mode: 'observe', scope: 'eval', asOf,
+    policy: commandPolicy({ strict: opts.strict, failSurfaceDrift: opts.failSurfaceDrift, failUnexplainedDrift: opts.failUnexplainedDrift }),
+  });
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -1031,6 +1100,7 @@ async function main() {
     }
     const recheck  = noSpawnLint(existing);
     const malformed = recheck.filter(r => r.schema_errors_recheck.length > 0);
+    const run = evalDecision({ malformed, opts, asOf: readWallClock() });
     if (opts.json) {
       process.stdout.write(JSON.stringify({
         schema: 'mcp-vault/eval@1',
@@ -1039,6 +1109,8 @@ async function main() {
         entries: recheck.length,
         malformed: malformed.length,
         details: recheck,
+        // Additive (mcp-vault/findings@1): the lint as a Decision.
+        findings: run.document,
       }, null, 2) + '\n');
     } else {
       process.stdout.write(`no-spawn mode: lint over ${opts.results}\n`);
@@ -1053,7 +1125,7 @@ async function main() {
     // synchronous code below kept running in the same tick and reached
     // spawn() — `--no-spawn` executed the very third-party servers it promises
     // not to touch before the exit landed.
-    return exitAfterFlush(opts.strict && malformed.length ? 1 : 0);
+    return exitAfterFlush(run.exit);
   }
 
   // Default-deny: refuse a live smoke unless a spawn policy was chosen.
@@ -1292,14 +1364,14 @@ async function main() {
   const sandboxUnavailable = newResults.filter(r => r.failure_class === 'SANDBOX_UNAVAILABLE').length;
   const surfaceDrifted = newResults.filter(r => r.surface_drift);
   const toolScanHigh = newResults.filter(r => r.tool_scan && r.tool_scan.high > 0);
-  // --fail-tool-scan is decide()'s answer (docs/adr/0001), from the same
-  // `tool-scan/*` row explain and `mcp-vault tool-scan` use — not a counter.
-  const toolScanFails = opts.failToolScan && (() => {
-    const at = readWallClock();
-    const m = toolScan.evalRowsModel(newResults, { asOf: at });
-    const { policy } = loadEffectivePolicy(process.cwd(), { noPolicy: true });
-    return decide(m.findings, policy, at, { subjects: m.subjects, facts: m.facts }).some(d => d.fails);
-  })();
+  // The verdict is a Decision (docs/adr/0001). --fail-tool-scan adds the
+  // stored scan to it, judged by the `tool-scan/*` row explain and
+  // `mcp-vault tool-scan` use — not a counter.
+  const decidedAt = readWallClock();
+  const run = evalDecision({
+    results: newResults, picked, aborted: runAborted, opts, asOf: decidedAt,
+    toolScanModel: opts.failToolScan ? toolScan.evalRowsModel(newResults, { asOf: decidedAt }) : null,
+  });
   const toolScanMedium = newResults.filter(r => r.tool_scan && !r.tool_scan.high && r.tool_scan.medium > 0);
   // Split on the one distinction that matters: an upgrade changing its surface
   // is expected, the same artifact changing its surface is not.
@@ -1329,6 +1401,8 @@ async function main() {
       planned: picked.length,
       not_attempted: notAttempted,
       results: newResults,
+      // Additive (mcp-vault/findings@1): each entry's Decision.
+      findings: run.document,
     }, null, 2) + '\n');
   } else {
     process.stderr.write(`\n${newResults.length} checked — ${pass} pass, ${fail} fail, ${skip} skip\n`);
@@ -1382,39 +1456,20 @@ async function main() {
 
   // --json writes the whole result set to stdout just above; process.exit()
   // would truncate it mid-object into "Unexpected end of JSON input".
-  // A run that was cut short, or that could not use the sandbox, has not
-  // produced the evidence it was asked for — under --strict that is a failure
-  // regardless of how few entries got as far as failing.
-  const incomplete = runAborted || notAttempted > 0 || sandboxUnavailable > 0;
-  const driftFails = (opts.failSurfaceDrift && surfaceDrifted.length > 0)
-    // Strictly the unexplained ones: a drift we could not attribute (`null`)
-    // is not evidence of anything, and failing a build on it would punish an
-    // old snapshot rather than a changed server.
-    || (opts.failUnexplainedDrift && unexplainedDrift.length > 0)
-    || toolScanFails;
-  // A run where *nothing* could be attempted established nothing, and the
-  // CLI reserves 2 for that: the launcher was missing for every entry, or the
-  // sandbox was unavailable throughout. Default mode reported 0 for it — a
-  // clean smoke of no servers — and --strict reported 1, which reads as a
-  // finding about somebody's code. A real finding still outranks it.
-  const answered = newResults.filter((r) => r.status === 'pass' || r.status === 'fail').length;
-  // A genuine finding first — but `skippedLauncher` and `incomplete` are not
-  // findings about anybody's server, they are reasons this run established
-  // nothing. Counting them as `hard` made `--strict` answer 1 for a run that
-  // never started, which reads as a verdict on code nobody executed.
-  const hard = (opts.strict && fail > 0) || driftFails;
-  if (hard) return exitAfterFlush(1);
-  if (picked.length > 0 && answered === 0) {
+  //
+  // The exit code is the Decision's. A genuine finding first (a failure under
+  // --strict, an enforced surface drift, a high tool-scan finding); a run
+  // where *nothing* could be attempted established nothing, and is unanswered
+  // (2) — the launcher was missing for every entry, or the sandbox was
+  // unavailable throughout; and under --strict a partial run (a missing
+  // launcher, an early stop) is still a failure to deliver what was asked for.
+  if (run.exit === 2) {
     process.stderr.write(
       `mcp_eval: none of the ${picked.length} selected entr${picked.length === 1 ? 'y' : 'ies'} could be run `
       + `(${skippedLauncher} missing a launcher, ${sandboxUnavailable} with no sandbox) — nothing was established\n`,
     );
-    return exitAfterFlush(2);
   }
-  // Something ran, and under --strict a partial run is still a failure to
-  // deliver what was asked for.
-  if (opts.strict && (skippedLauncher > 0 || incomplete)) return exitAfterFlush(1);
-  exitAfterFlush(0);
+  exitAfterFlush(run.exit);
 }
 
 if (require.main === module) {
@@ -1439,6 +1494,7 @@ module.exports = {
   writeResults,
   noSpawnLint,
   spawnPolicy,
+  evalDecision,
   sandboxWrap: stdio.sandboxWrap,
   classifyFailure: stdio.classifyFailure,
   VERSION,
