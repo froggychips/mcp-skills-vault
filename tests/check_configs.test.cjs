@@ -83,9 +83,41 @@ test('check: an unpinned launch warns, and fails under --strict', () => {
   const text = check(['single-latest.json'], SHAPES).stdout;
   assert.match(text, /^single-latest\.json$/m);
   assert.match(text, /^ {2}:3 nx$/m);
-  assert.match(text, /^ {4}! this config launches nx-mcp@latest, a tag rather than a version: .* \[config\/unpinned-launch: warn\]$/m);
+  assert.match(text, /^ {4}! this config launches nx-mcp@latest, a tag rather than a version: .* \[config\/unpinned-launch: warn; so pin\/missing: unknown\]$/m);
   assert.match(text, /^ {6}fix: pin to an exact version \(nx-mcp@<x\.y\.z>\)$/m);
-  assert.match(text.trim().split('\n').pop(), /^PASS — \d+ to look at \(--strict fails on these\) · 1 server in 1 config · fail on deny · offline$/);
+  assert.match(text.trim().split('\n').pop(), /^PASS — 1 to look at \(--strict fails on these\) · 1 server in 1 config · fail on deny · offline$/);
+});
+
+test('check text: one line per cause — the gate\'s "nothing to compare" follows from the config\'s own finding', () => {
+  const lines = (r) => r.stdout.split('\n').filter((l) => /^ {4}[!✗?] /.test(l));
+  // Unpinned: one line, and the consequence is named in its tag — including
+  // when it is the part that fails (fail-on unknown).
+  const plain = check(['single-latest.json'], SHAPES);
+  assert.equal(lines(plain).length, 1, plain.stdout);
+  assert.doesNotMatch(plain.stdout, /no stored hash to compare/);
+  const strictish = check(['--fail-on', 'unknown', 'single-latest.json'], SHAPES);
+  assert.equal(strictish.status, 1);
+  assert.deepEqual(lines(strictish).map((l) => l.trim()[0]), ['✗']);
+  assert.match(lines(strictish)[0], /\[config\/unpinned-launch: warn; so pin\/missing: unknown, fails\]$/);
+  assert.match(strictish.stdout.trim().split('\n').pop(), /^FAIL — 1 failing · /);
+  // An overridden source: one line, no second "cannot verify".
+  const dir = project({ mcpServers: { tool: { command: 'npx', args: ['-y', '--registry', 'https://registry.example', 'some-pkg@1.0.0'] } } });
+  const ovr = check([], dir);
+  const l = lines(ovr).filter((x) => !/flows\//.test(x));
+  assert.equal(l.length, 1, ovr.stdout);
+  assert.match(l[0], /from a source other than the public registry.*\[config\/launch-source-override: unknown; so verify\/unverified: unknown\]$/);
+  // The model keeps both findings, and the decision rests on both.
+  for (const [args, cwd, id, rules] of [
+    [['single-latest.json'], SHAPES, 'single-latest.json:3', ['config/unpinned-launch', 'pin/missing']],
+    [[], dir, '.mcp.json:3', ['config/launch-source-override', 'verify/unverified']],
+  ]) {
+    const { doc } = json(args, cwd);
+    const got = doc.findings.filter((f) => f.subject.id === id).map((f) => f.rule).sort();
+    assert.deepEqual(got, rules);
+    assert.equal(decisionOf(doc, id).effect, 'unknown');
+    const sarif = JSON.parse(check(['--sarif', ...args], cwd).stdout).runs[0].results.map((x) => x.ruleId);
+    for (const r of rules) assert.ok(sarif.includes(r), `${r} missing from SARIF`);
+  }
 });
 
 test('check: the fix line is the exact launch with the version the vault verified', () => {

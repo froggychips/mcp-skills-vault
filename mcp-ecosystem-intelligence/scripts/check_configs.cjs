@@ -442,15 +442,39 @@ function render(m, { opts, policyPath, cwd, color }) {
       }
     }
   }
+  // One line per cause. A launch with no exact version, or from an overridden
+  // source, is the config's own finding; the gate's "nothing to compare it
+  // against" on the same line (pin/missing, verify/unverified — not observed)
+  // is a consequence of it, not a second problem. It is folded into the main
+  // line's tag, so its effect and whether it fails stay visible; the document,
+  // the JSON and the SARIF keep both findings, and decide() saw both.
+  const CAUSES = new Set(['config/unpinned-launch', 'config/launch-source-override']);
+  const CONSEQUENCES = new Set(['pin/missing', 'verify/unverified']);
+  const caused = new Set(doc.findings.filter((f) => CAUSES.has(f.rule)).map((f) => f.subject.id));
+  const folded = new Map();          // subject id -> [{ rule, effect, fails }]
+  const entries = [];
+  for (const e of shown.values()) {
+    if (e.f && CONSEQUENCES.has(e.f.rule) && e.f.state !== 'observed' && caused.has(e.f.subject.id)) {
+      const list = folded.get(e.f.subject.id) || [];
+      list.push({ rule: e.f.rule, effect: e.o.effect, fails: e.fails });
+      folded.set(e.f.subject.id, list);
+    } else entries.push(e);
+  }
   const items = [];
-  for (const { d, o, f, cls, fails } of shown.values()) {
+  for (const { d, o, f, cls, fails } of entries) {
     const where = locate(d.subject, doc, m.servers, cwd);
     const srv = m.servers.find((x) => rel(x.source, cwd) === where.path && x.line && x.line === where.line) || null;
     // The unpinned finding's message carries its advice; the advice gets its own line.
     const u = srv && f && f.rule === 'config/unpinned-launch' ? unpinnedLaunch(srv, { dbTools: [] }) : null;
-    const what = (u ? u.message : (f ? f.message : (o.detail || o.rule))).replace(/ \(use --fail-unverified to fail closed\)/g, '');
+    const what = (u ? u.message : (f ? f.message : (o.detail || o.rule)))
+      .replace(/ \(use --fail-unverified to fail closed\)/g, '')
+      .replace(/ The gate does not check it against the registry; .*$/, '');
+    const also = f && CAUSES.has(f.rule) ? folded.get(f.subject.id) || [] : [];
+    const failsHere = fails || also.some((x) => x.fails);
+    const tag = `${f && o.rule !== f.rule ? `${o.rule} ← ${f.rule}` : o.rule}: ${o.effect}`
+      + also.map((x) => `; so ${x.rule}: ${x.effect}`).join('');
     items.push({
-      ...where, cls, fails, effect: o.effect, rule: f && o.rule !== f.rule ? `${o.rule} ← ${f.rule}` : o.rule,
+      ...where, cls, fails: failsHere, effect: o.effect, rule: o.rule, tag,
       what: secrets.redact(what),
       fix: fixFor(o, f, { m, srv, policyPath, dbTools }),
     });
@@ -465,7 +489,7 @@ function render(m, { opts, policyPath, cwd, color }) {
       lastLine = it.line;
     }
     const mark = it.fails ? `${RD}✗${RS}` : it.cls === 'unanswered' ? `${YL}?${RS}` : `${YL}!${RS}`;
-    out.push(`    ${mark} ${it.what} ${DM}[${it.rule}: ${it.effect}${it.fails ? ', fails' : ''}]${RS}`);
+    out.push(`    ${mark} ${it.what} ${DM}[${it.tag}${it.fails ? ', fails' : ''}]${RS}`);
     out.push(`      ${DM}fix:${RS} ${it.fix}`);
   }
 
