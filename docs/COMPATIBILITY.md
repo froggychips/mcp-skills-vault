@@ -93,6 +93,28 @@ forbids dependency hooks passed an offline run that never saw the tree.
 `--fail-families` without a usable list (missing, another switch, empty, or a
 family nobody emits) is exit `2`.
 
+And one more set, made when the last commands that kept their own exit ladder
+moved onto the one decision ([ADR 0001](adr/0001-findings-and-time.md), step
+3). Every command that gives a verdict now exits via `decide()`; `--strict` is
+the policy's `fail_on` everywhere. Three answers changed, each to agree with
+another command about the same subject:
+
+- **A plain-text secret in a host config fails `status` and `audit` by
+  default**, as it always failed `mcp-vault secrets`: the host-config line is
+  one subject, and the `secrets/*` row denies it. Both used to fail on it only
+  under `--strict`.
+- **`audit --strict` fails on a configured server the DB does not know**
+  (`no-data` → `unknown`), as `status --strict` and `verify --installed
+  --strict` always did. A policy with `unverified: fail` makes it, and stale
+  evidence in `status`, fail without `--strict` too.
+- **`audit` reads the measured tool counts** (`eval_results.json`, as of
+  `--as-of`) for `heavy-unbounded`, as `status` did: a server measured at three
+  tools is no longer an unbounded surface in one and not in the other.
+
+Every other exit code is unchanged — checked against the previous release on
+fixtures for each command (tests/decision_consistency.test.cjs keeps the old
+ladder of each observer as an oracle).
+
 ### 3. `--json` payloads
 
 Every JSON document this tool writes carries a schema identifier of the form
@@ -120,7 +142,7 @@ Every JSON document this tool writes carries a schema identifier of the form
 | `mcp-vault/doctor@1` | `mcp-vault doctor --json` |
 | `mcp-vault/entries@1` | `mcp-vault list --json` |
 | `mcp-vault/eval@1` | `mcp-vault eval --json` |
-| `mcp-vault/findings@1` | the `findings` field of `verify --json`, `explain --json`, `lock --check --json`, `approve --json`, `secrets --json` and `status --json` (see below); `install <lookalike> --json`; `setup_findings` and `model` of `audit --json` |
+| `mcp-vault/findings@1` | the `findings` field of every deciding command's `--json`: `verify`, `explain`, `lock --check`, `approve`, `secrets`, `status`, `audit`, `doctor`, `budget`, `availability`, `identity`, `posture`, `capabilities`, `upgrade`, `docker-drift`, `license-drift`, `eval` (see below); `install <lookalike> --json` |
 | `mcp-vault/health@1` | `mcp-vault health` |
 | `mcp-vault/identity@1` | `mcp-vault identity --json` |
 | `mcp-vault/license-drift@1` | `mcp-vault license-drift --json` |
@@ -191,6 +213,21 @@ Two things every decision-bearing document now carries, both additive:
   New commands report through this schema rather than a new one.
   `mcp-vault signature --json` and `mcp-vault audits fetch|check --json`
   print a findings@1 document as their whole output (#121).
+
+Before 1.0, three fields moved rather than grew (ADR 0001, step 3 — one
+decision, one document per command):
+
+- **`audit@1` `findings`** is the findings@1 document. It was the array of
+  categorised rows; the cross-server part was in `setup_findings` and the
+  lookalike part in `model`, and both keys are gone. A row's own fields
+  (versions, tool counts, hints, the masked shape of a secret) are in
+  `details`, keyed by finding id; its category is the finding's `rule`
+  (`audit/<category>`, `lookalike/<technique>`, `secrets/<rule>`, `flows/*`,
+  `shadowing/*`).
+- **`status@1`** no longer carries `audit` (the audit rows: they are findings
+  in `findings`), and `secrets` is counts only (`files_read`, `tracked`,
+  `count`) — each secret is a `secrets/<rule>` finding in `findings`, which now
+  holds everything on the screen, not only the flows.
 
 Removing a field, changing its type, or changing what an existing value means
 bumps the schema to `@2`. When that happens, `@1` keeps being written for at
