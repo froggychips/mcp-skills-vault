@@ -71,7 +71,8 @@ inputs:
   version:
     description: >-
       Exact @froggychips/mcp-vault version to run instead of this action's own
-      checkout (e.g. 0.16.0). Ranges, tags and `latest` are refused. Needs
+      checkout (e.g. 0.16.0, the first with `check`; an older one is refused
+      with exit 2). Ranges, tags and `latest` are refused. Needs
       network to registry.npmjs.org.
     required: false
     default: ''
@@ -147,6 +148,7 @@ runs:
       env:
         VAULT_CLI: ${{ steps.cli.outputs.cli }}
         VAULT_MODE: ${{ steps.cli.outputs.mode }}
+        VAULT_VERSION: ${{ inputs.version }}
         VAULT_ACTION_REF: ${{ github.action_ref }}
         VAULT_PATHS: ${{ inputs.paths }}
         VAULT_POLICY: ${{ inputs.policy }}
@@ -190,6 +192,16 @@ runs:
           db_integrity="Ed25519 signature, checked by the CLI"
         fi
         echo "mcp-vault: DB integrity: $db_integrity"
+
+        # `check` is what this step runs, and it first shipped in 0.16.0. An
+        # older `version:` is refused here, plainly, rather than run as
+        # `verify --config`: that would be a different gate (no secrets, no
+        # flows) under the same green check, chosen by a version number.
+        if [ ! -f "$cli_root/mcp-ecosystem-intelligence/scripts/check_configs.cjs" ]; then
+          echo "::error::mcp-vault: version ${VAULT_VERSION:-(this checkout)} predates \`check\`; use >= 0.16.0 or omit version"
+          echo "exit-code=2" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
 
         configs=()
         for match in $VAULT_PATHS; do

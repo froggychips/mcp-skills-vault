@@ -78,7 +78,7 @@ same commit gives the same answer on every run.
 | `fail-on` | `unverified` | The decision's exit threshold, passed as `check --fail-on` (`fail_on`). `error`/`deny`: integrity mismatch, advisory, policy violation. `unverified`/`unknown`: also anything that could not be checked — unpinned, not in the vault, a local command. `warning`/`warn`: also an unpinned launch, a lookalike name, a risky combination of servers (`--strict`). A policy file can raise it, never lower it |
 | `sarif` | `false` | Upload to code scanning (`security-events: write`) |
 | `offline` | `true` | `false` adds live registry and advisory checks (network; pass `GITHUB_TOKEN` in `env` for the GHSA feed) |
-| `version` | — | Run the published npm package at this exact version instead. Ranges and `latest` are refused. The tarball is fetched with `npm pack --ignore-scripts`, hashed, compared with `integrity`, and unpacked with tar — never `npm install`ed, never run through npx |
+| `version` | — | Run the published npm package at this exact version instead, 0.16.0 or later (the first with `check`; an older one fails the job with exit 2). Ranges and `latest` are refused. The tarball is fetched with `npm pack --ignore-scripts`, hashed, compared with `integrity`, and unpacked with tar — never `npm install`ed, never run through npx |
 | `integrity` | — | sha512 SRI of that tarball (`npm view @froggychips/mcp-vault@X dist.integrity`) |
 | `node-version` | `22` | For `actions/setup-node` |
 

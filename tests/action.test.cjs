@@ -288,6 +288,22 @@ test('action: the npm package (version:) without a .sig is refused — the tarba
   assert.match(r.summary, /DB integrity: Ed25519 signature, checked by the CLI/);
 });
 
+test('action: a version: that predates `check` is refused with exit 2 and says why', { skip: !HAS_BASH && 'no bash' }, () => {
+  // An unpacked release from before `check` existed: the same files, minus it.
+  const old = unpackedAction();
+  fs.rmSync(path.join(old, 'mcp-ecosystem-intelligence', 'scripts', 'check_configs.cjs'));
+  const r = runStep('check', {
+    cwd: path.join(FIXTURES, 'clean'),
+    env: { GITHUB_ACTION_PATH: REPO, VAULT_CLI: path.join(old, 'bin', 'mcp-vault.cjs'), VAULT_MODE: 'package', VAULT_VERSION: '0.15.2' },
+  });
+  // The step itself ends cleanly under bash -eo pipefail; Enforce turns the 2 red.
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.outputs['exit-code'], '2');
+  assert.equal(r.outputs.report, undefined, 'nothing ran, so there is no report');
+  assert.match(r.stdout, /::error::mcp-vault: version 0\.15\.2 predates `check`; use >= 0\.16\.0 or omit version/);
+  assert.equal(runStep('Enforce', { cwd: REPO, env: { VAULT_EXIT: r.outputs['exit-code'] } }).status, 2);
+});
+
 test('action: the resolve step says which mode it picked', { skip: !HAS_BASH && 'no bash' }, () => {
   const own = runStep('cli', { cwd: REPO, env: { VAULT_VERSION: '', VAULT_INTEGRITY: '' } });
   assert.equal(own.outputs.mode, 'checkout');
