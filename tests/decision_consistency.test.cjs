@@ -14,9 +14,9 @@
  *   3. It is a new command nobody classified, or new code that writes a
  *      decision word outside lib/finding.cjs and lib/policy_rules.cjs.
  *
- * The legacy deciders — commands that still map their own findings to an
- * exit code — are listed by name with the step that moves them. Moving one
- * is deleting its line; adding a command without a line fails.
+ * There are no legacy deciders left (ADR step 3): every command either
+ * decides via decide() — and is checked here on fixtures — or gives no
+ * verdict; adding a command without saying which fails.
  */
 const { test } = require('node:test');
 const assert   = require('node:assert/strict');
@@ -592,59 +592,270 @@ test('secrets: every decision is decide() of the document\'s own inputs, and the
   }
 });
 
-// ── the configured set: flows/* and shadowing/* (#123) ─────────────────────
+// ── status and audit (#123, ADR step 3) ───────────────────────────────────
 //
-// status and audit are still legacy deciders for everything else, but their
-// cross-server part is decide()'s: each prints a findings@1 document of it,
-// and the lines they show for it are views of those Decisions.
+// Everything either command reports is a finding in one findings@1 document
+// (`findings`), decided once in mode `setup`; the verdict lines, the flow
+// lines and both exit codes are views of it. And the two answer alike about
+// the subjects both of them see — the host-config line that launches a
+// server, the host's session, a host config.
 
-test('status / audit: the cross-server decisions are decide()\'s, and their lines and exit codes are views of them', () => {
+const sameAnswer = (label, a, b) => {
+  const byId = (doc) => new Map(doc.decisions.map((d) => [d.subject.id, d]));
+  const A = byId(a);
+  let shared = 0;
+  for (const [id, d] of byId(b)) {
+    const x = A.get(id);
+    if (!x) continue;
+    shared++;
+    assert.deepEqual([x.effect, x.decided_by, x.fails], [d.effect, d.decided_by, d.fails], `${label}: ${id} is decided two ways`);
+  }
+  return shared;
+};
+
+test('status / audit: every decision is decide()\'s, the verdict and exit code are views of it, and one subject has one answer', () => {
   const servers = {
     exa:    { command: 'npx', args: ['-y', 'exa-mcp-server@3.2.1'] },
     memory: { command: 'npx', args: ['-y', '@modelcontextprotocol/server-memory@2026.1.26'] },
     homegrown: { command: 'node', args: ['server.js'] },
+    squat:  { command: 'npx', args: ['-y', 'mcp-server-memmory@1.0.0'] },
   };
-  for (const pol of [null, { toxicFlows: 'fail' }, { toxicFlows: 'allow', toolShadowing: 'fail' }]) {
-    const dir = fs.mkdtempSync(path.join(TMP, 'setup-'));
-    fs.writeFileSync(path.join(dir, '.mcp.json'), JSON.stringify({ mcpServers: servers }));
-    if (pol) fs.writeFileSync(path.join(dir, '.mcp-vault.policy.json'), JSON.stringify(pol));
-    for (const flags of [[], ['--strict']]) {
-      const label = `${JSON.stringify(pol)} ${flags.join(' ') || '(no flags)'}`;
+  const body = (n, seed) => { let x = seed, o = ''; for (let i = 0; i < n; i++) { x = (x * 1103515245 + 12345) & 0x7fffffff; o += 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'[x % 57]; } return o; };
+  let shared = 0;
+  for (const secret of [false, true]) {
+    for (const pol of [null, { toxicFlows: 'fail' }, { toxicFlows: 'allow', toolShadowing: 'fail' }, { unverified: 'fail' }]) {
+      const dir = fs.mkdtempSync(path.join(TMP, 'setup-'));
+      const cfg = { ...servers, ...(secret ? { keyed: { command: 'npx', args: ['-y', 'x-mcp@1.0.0'], env: { MY_API_KEY: body(28, 2) } } } : {}) };
+      // Pretty-printed, so each server has its own line — its own subject.
+      fs.writeFileSync(path.join(dir, '.mcp.json'), JSON.stringify({ mcpServers: cfg }, null, 2));
+      if (pol) fs.writeFileSync(path.join(dir, '.mcp-vault.policy.json'), JSON.stringify(pol));
+      for (const flags of [[], ['--strict']]) {
+        const label = `${secret ? 'secret ' : ''}${JSON.stringify(pol)} ${flags.join(' ') || '(no flags)'}`;
 
-      const st = run('status.cjs', ['--json', '--cwd', dir, '--as-of', AS_OF, ...flags]);
-      const sr = JSON.parse(st.stdout);
-      const sdoc = sr.findings;
-      assert.equal(sdoc.schema, 'mcp-vault/findings@1', label);
-      assert.ok(sdoc.findings.some((f) => f.rule.startsWith('flows/')), `${label}: the fixture has no flow`);
-      assert.deepEqual(recompute(sdoc), sdoc.decisions, `status ${label}: the printed decisions are not decide()'s`);
-      const outcomes = sdoc.decisions.flatMap((d) => d.rules);
-      const lines = sr.setup.hosts.flatMap((h) => h.lines);
-      for (const l of lines) {
-        for (const id of l.findings) {
-          assert.ok(outcomes.some((o) => o.rule === l.rule && o.effect === l.effect && o.findings.includes(id)), `status ${label}: ${l.rule} ${l.effect} is not the decision's`);
+        const st = run('status.cjs', ['--json', '--cwd', dir, '--as-of', AS_OF, ...flags]);
+        const sr = JSON.parse(st.stdout);
+        const sdoc = sr.findings;
+        assert.equal(sdoc.schema, 'mcp-vault/findings@1', label);
+        assert.ok(sdoc.findings.some((f) => f.rule.startsWith('flows/')), `${label}: the fixture has no flow`);
+        assert.deepEqual(recompute(sdoc), sdoc.decisions, `status ${label}: the printed decisions are not decide()'s`);
+        assert.equal(st.status, F.exitCode(sdoc.decisions), `status ${label}: the exit code is not the decisions'`);
+        assert.equal(sr.verdict.exit_code, st.status, label);
+        const outcomes = sdoc.decisions.flatMap((d) => d.rules);
+        for (const l of sr.setup.hosts.flatMap((h) => h.lines)) {
+          for (const id of l.findings) {
+            assert.ok(outcomes.some((o) => o.rule === l.rule && o.effect === l.effect && o.findings.includes(id)), `status ${label}: ${l.rule} ${l.effect} is not the decision's`);
+          }
+          const text = (x) => x.startsWith(`${l.host}: ${l.message}`);
+          if (l.effect === 'deny') assert.ok(sr.verdict.blocking.some(text), `status ${label}: a deny is not blocking`);
+          if (l.effect === 'warn') assert.ok(sr.verdict.notable.some(text), `status ${label}: a warn is not notable`);
+          if (l.effect === 'allow') assert.ok(![...sr.verdict.blocking, ...sr.verdict.notable].some(text), `status ${label}: ${l.effect} reached the verdict`);
         }
-        const text = (x) => x.startsWith(`${l.host}: ${l.message}`);
-        if (l.effect === 'deny') assert.ok(sr.verdict.blocking.some(text), `status ${label}: a deny is not blocking`);
-        if (l.effect === 'warn') assert.ok(sr.verdict.notable.some(text), `status ${label}: a warn is not notable`);
-        if (l.effect === 'allow' || l.effect === 'unknown') assert.ok(![...sr.verdict.blocking, ...sr.verdict.notable].some(text), `status ${label}: ${l.effect} reached the verdict`);
-      }
-      if (sdoc.decisions.some((d) => d.fails)) assert.equal(st.status, 1, `status ${label}: a failing decision did not fail the run`);
+        // Blocking is exactly "a gate outcome denies".
+        const denies = outcomes.some((o) => o.role !== 'context' && o.effect === 'deny');
+        assert.equal(sr.verdict.blocking.length > 0, denies, `status ${label}: blocking ${JSON.stringify(sr.verdict.blocking)}`);
+        if (secret) assert.match(sr.verdict.blocking[0], /secret in plain text/, label);
 
-      const au = run('audit_setup.cjs', ['--json', '--cwd', dir, '--global-config', path.join(dir, 'none.json'), '--as-of', AS_OF, ...flags]);
-      const ar = JSON.parse(au.stdout);
-      const adoc = ar.setup_findings;
-      assert.equal(adoc.schema, 'mcp-vault/findings@1', label);
-      assert.deepEqual(recompute(adoc), adoc.decisions, `audit ${label}: the printed decisions are not decide()'s`);
-      const aOutcomes = adoc.decisions.flatMap((d) => d.rules);
-      for (const f of ar.findings.filter((x) => x.category === 'toxic-flow' || x.category === 'tool-shadowing')) {
-        for (const id of f.finding_ids) {
-          assert.ok(aOutcomes.some((o) => o.rule === f.rule && o.effect === f.effect && o.findings.includes(id)), `audit ${label}: ${f.rule} ${f.effect} is not the decision's`);
-        }
+        const au = run('audit_setup.cjs', ['--json', '--cwd', dir, '--global-config', path.join(dir, 'none.json'), '--as-of', AS_OF, ...flags]);
+        const ar = JSON.parse(au.stdout);
+        const adoc = ar.findings;
+        assert.equal(adoc.schema, 'mcp-vault/findings@1', label);
+        assert.equal(ar.setup_findings, undefined, 'one key, one document');
+        assert.equal(ar.model, undefined, 'one key, one document');
+        assert.deepEqual(recompute(adoc), adoc.decisions, `audit ${label}: the printed decisions are not decide()'s`);
+        assert.equal(au.status, F.exitCode(adoc.decisions), `audit ${label}: the exit code is not the decisions'`);
+        for (const f of adoc.findings) assert.ok(ar.details[f.id] || f.rule.startsWith('flows/no-data') || f.rule.startsWith('scope/') || f.rule.startsWith('policy/'), `audit ${label}: ${f.rule} has no row`);
+
+        shared += sameAnswer(`${label} status vs audit`, sdoc, adoc);
       }
-      const fails = adoc.decisions.some((d) => d.fails);
-      if (fails) assert.equal(au.status, 1, `audit ${label}: a failing decision did not fail the run`);
-      if (!flags.length && !fails) assert.equal(au.status, 0, `audit ${label}: exit ${au.status} with no failing decision`);
     }
+  }
+  assert.ok(shared >= 16, `the fixtures must share subjects between status and audit (got ${shared})`);
+});
+
+test('doctor and budget: the decision is decide() of the document, the exit code is the decisions\', and status agrees about this machine', () => {
+  for (const [label, files] of [['clean', {}], ['unreadable', { '.mcp.json': '{ "mcpServers": { oops' }],
+    ['servers', { '.mcp.json': JSON.stringify({ mcpServers: { fetch: { command: 'uvx', args: ['mcp-server-fetch==2025.4.7'] }, gl: { command: 'npx', args: ['-y', '@zereight/mcp-gitlab@1.6.0'] } } }, null, 2) }]]) {
+    const dir = fs.mkdtempSync(path.join(TMP, 'env-'));
+    for (const [rel, text] of Object.entries(files)) fs.writeFileSync(path.join(dir, rel), text);
+    for (const flags of [[], ['--strict']]) {
+      const dr = run('doctor.cjs', ['--json', '--cwd', dir, ...flags]);
+      const ddoc = JSON.parse(dr.stdout).findings;
+      assert.equal(ddoc.schema, 'mcp-vault/findings@1', label);
+      assert.deepEqual(recompute(ddoc), ddoc.decisions, `doctor ${label}: not decide()'s`);
+      assert.equal(dr.status, F.exitCode(ddoc.decisions), `doctor ${label} ${flags}: exit ${dr.status}`);
+      if (label === 'unreadable' && !flags.length) assert.equal(dr.status, 2, 'a config that would not parse is unanswered');
+      // status reads the same machine: its refusals are doctor's; a warning
+      // (an absent optional tool) is context there.
+      const st = JSON.parse(run('status.cjs', ['--json', '--cwd', dir, '--as-of', AS_OF, ...flags]).stdout).findings;
+      const env = (doc) => doc.decisions.find((d) => d.subject.id === 'environment');
+      const denied = (d) => d.rules.filter((o) => o.role !== 'context' && o.effect === 'deny').map((o) => o.rule);
+      assert.deepEqual(denied(env(st)), denied(env(ddoc)), `${label}: status and doctor refuse this machine differently`);
+      assert.ok(env(st).rules.every((o) => o.effect !== 'warn' || o.role === 'context'), `${label}: a warning about this machine is context in status`);
+    }
+    for (const budget of [null, '0.01', '99']) {
+      const args = ['--json', '--cwd', dir, ...(budget ? ['--budget', budget] : [])];
+      const br = run('token_budget.cjs', args);
+      const bdoc = JSON.parse(br.stdout).findings;
+      assert.deepEqual(recompute(bdoc), bdoc.decisions, `budget ${label} ${budget}: not decide()'s`);
+      assert.equal(br.status, F.exitCode(bdoc.decisions), `budget ${label} ${budget}: exit ${br.status}`);
+      if (label === 'servers' && budget === '0.01') assert.deepEqual([br.status, bdoc.decisions[0].decided_by], [1, 'budget/over']);
+      if (label === 'unreadable' && budget !== '0.01') assert.equal(br.status, 2);
+    }
+  }
+});
+
+// ── the observers (ADR step 3) ─────────────────────────────────────────────
+//
+// availability, identity, posture, capabilities, upgrade, docker-drift,
+// license-drift and eval each decide their run with decide() in mode
+// `observe`. The network is not for a test, so the model each CLI prints is
+// called on fixture rows; `oracle` is the exit ladder each command used to
+// keep, which the Decision must reproduce.
+
+const observed = (label, run, oracle) => {
+  assert.equal(run.document.schema, 'mcp-vault/findings@1', label);
+  assert.deepEqual(recompute(run.document), run.document.decisions, `${label}: not decide()'s`);
+  assert.equal(run.exit, F.exitCode(run.document.decisions), `${label}: exit`);
+  assert.equal(run.exit, oracle, `${label}: exit ${run.exit}, the command used to answer ${oracle}`);
+  for (const d of run.document.decisions) {
+    const own = run.document.findings.filter((f) => f.subject.id === d.subject.id);
+    if (own.length && own.every((f) => f.state !== 'observed')) assert.equal(d.effect, 'unknown', `${label}: ${d.subject.id} had no data and was not unknown`);
+  }
+};
+
+test('observers: availability, identity, posture, capabilities and upgrade exit as decide() says — and as they always did', () => {
+  const tools = DB.slice(0, 6);
+  const [a, b, c, d, e] = tools.map((t) => t.name);
+  const at = Date.parse(AS_OF);
+  const av = require(path.join(S, 'check_availability.cjs'));
+  const id = require(path.join(S, 'check_identity.cjs'));
+  const po = require(path.join(S, 'check_posture.cjs'));
+  const ca = require(path.join(S, 'check_capabilities.cjs'));
+  const up = require(path.join(S, 'suggest_upgrade.cjs'));
+  const A = (state, extra = {}) => ({ state, detail: `${state} fixture`, ...extra });
+  const availability = {
+    clean:   [{ name: a, availability: A('present') }, { name: b, availability: A('unknown') }],
+    gone:    [{ name: a, availability: A('gone') }, { name: b, availability: A('present') }],
+    notable: [{ name: a, availability: A('deprecated') }, { name: b, availability: A('present'), identity: A('relocated') }],
+    nothing: [{ name: a, availability: A('unknown') }, { name: b, availability: A('unknown') }],
+  };
+  for (const [k, rows] of Object.entries(availability)) {
+    for (const strict of [false, true]) {
+      const oracle = rows.some((r) => av.BLOCKING.has(r.availability.state)) ? 1
+        : strict && rows.some((r) => r.availability.state === 'deprecated' || (r.identity && av.NOTABLE.has(r.identity.state))) ? 1
+          : rows.every((r) => r.availability.state === 'unknown') ? 2 : 0;
+      observed(`availability ${k} strict=${strict}`, av.availabilityDecision(rows, tools, { strict, asOf: at }), oracle);
+    }
+  }
+  const R = (state, findings = []) => ({ state, findings });
+  for (const [k, rows] of Object.entries({
+    clean: [{ name: a, registry: R('listed') }, { name: b, registry: R('unlisted') }, { name: c, registry: R('unknown') }],
+    contradicted: [{ name: a, registry: R('contradicted', ['repository differs']) }, { name: b, registry: R('withdrawn') }],
+    nothing: [{ name: a, registry: R('unknown') }],
+  })) {
+    const oracle = rows.some((r) => id.FINDING_STATES.has(r.registry.state)) ? 1 : rows.every((r) => r.registry.state === 'unknown') ? 2 : 0;
+    observed(`identity ${k}`, id.identityDecision(rows, tools, { asOf: at }), oracle);
+  }
+  for (const [k, rows] of Object.entries({
+    weak: [{ name: a, posture: { x: 1 }, state: 'weak', findings: ['Code-Review: 0'] }, { name: b, no_report: true, findings: [] }],
+    clean: [{ name: a, posture: { x: 1 }, state: 'clean', findings: [] }, { name: b, findings: ['could not reach the Scorecard feed: timeout'] }],
+    nothing: [{ name: a, findings: ['could not reach the Scorecard feed: timeout'] }],
+  })) {
+    for (const strict of [false, true]) {
+      const weak = rows.filter((r) => r.posture && r.state === 'weak');
+      const oracle = strict && weak.length ? 1 : (!rows.some((r) => r.posture) && !rows.some((r) => r.no_report)) ? 2 : 0;
+      observed(`posture ${k} strict=${strict}`, po.postureDecision(rows, tools, { strict, asOf: at }), oracle);
+    }
+  }
+  const added = (cap, high) => ({ capability: cap, high_risk: high, evidence: [{ file: 'index.js', line: 3, match: 'x' }] });
+  for (const [k, rows] of Object.entries({
+    risky: [{ name: a, state: 'scanned', compared_with: '1.0.0', delta: { added: [added('shell', true), added('net', false)], removed: [] } }, { name: b, state: 'unknown', reason: 'tarball too large' }],
+    mild:  [{ name: a, state: 'scanned', compared_with: '1.0.0', delta: { added: [added('net', false)], removed: [] } }, { name: c, state: 'scanned', baseline: true, delta: null }],
+  })) {
+    for (const strict of [false, true]) {
+      const oracle = strict && rows.some((r) => r.delta && r.delta.added.some((x) => x.high_risk)) ? 1 : 0;
+      observed(`capabilities ${k} strict=${strict}`, ca.capabilitiesDecision(rows, tools, { strict, asOf: at }), oracle);
+    }
+  }
+  const plans = [{ name: a, plan: { state: 'clear' } }, { name: b, plan: { state: 'no-fix', advisories: [{ id: 'GHSA-x' }], reason: 'no fix' } },
+    { name: c, plan: { state: 'upgrade', target: '2.0.0', advisories: [{ id: 'GHSA-y' }] } }, { name: d, plan: { state: 'unknown', reason: 'OSV did not answer' } },
+    { name: e, plan: { state: 'upgrade-unconfirmed', target: '3.0.0', advisories: [] } }];
+  for (const rows of [plans, plans.filter((r) => ['clear', 'unknown'].includes(r.plan.state))]) {
+    for (const strict of [false, true]) {
+      const oracle = strict && rows.some((r) => ['upgrade', 'upgrade-unconfirmed', 'no-clean-target', 'no-fix'].includes(r.plan.state)) ? 1 : 0;
+      observed(`upgrade ${rows.length} strict=${strict}`, up.upgradeDecision(rows, tools, { strict, asOf: at }), oracle);
+    }
+  }
+});
+
+test('observers: docker-drift, license-drift and eval exit as decide() says — and as they always did', () => {
+  const at = Date.parse(AS_OF);
+  const dd = require(path.join(S, 'check_docker_drift.cjs'));
+  const subj = (n) => F.subject.artifact({ entry: `img-${n}` });
+  const L = (n) => Array.from({ length: n }, (_, i) => ({ subject: subj(i), message: `fixture ${i}` }));
+  for (const [drifts, errors, unapplied, checked] of [[0, 0, 0, 2], [2, 0, 0, 2], [0, 1, 0, 3], [0, 3, 0, 3], [1, 3, 0, 3], [0, 0, 1, 1]]) {
+    for (const strict of [false, true]) {
+      // The ladder docker-drift used to keep.
+      const oracle = strict && drifts ? 1 : unapplied ? 1 : (errors && drifts === 0 && errors >= checked) ? 2 : errors ? 1 : 0;
+      const label = `docker-drift d${drifts} e${errors} u${unapplied}/${checked} strict=${strict}`;
+      observed(label, dd.driftDecision({ drifts: L(drifts), errors: L(errors), unapplied: L(unapplied), checked, strict, asOf: at }), oracle);
+      assert.equal(dd.driftExitCode({ drifts, errors, unapplied, checked, strict }), oracle, label);
+    }
+  }
+
+  const ld = require(path.join(S, 'check_license_drift.cjs'));
+  for (const report of [
+    { items: [{ name: 'a' }], drifts: [], errors: [] },
+    { items: [{ name: 'a' }], drifts: [{ name: 'a', old: 'MIT', new: 'BUSL-1.1', classification: 'drift-osi-to-restrictive' }], errors: [] },
+    { items: [{ name: 'a' }], drifts: [{ name: 'a', old: 'MIT', new: null, classification: 'drift-to-unknown' }], errors: [] },
+    { items: [], drifts: [], errors: [{ name: 'b', error: 'npm view failed', source: 'npm' }] },
+  ]) {
+    for (const strict of [false, true]) {
+      const oracle = !strict ? 0 : (report.drifts.some((x) => ld.isHardFail(x.classification)) || report.errors.length ? 1 : 0);
+      observed(`license-drift ${JSON.stringify(report.drifts.map((x) => x.classification))} e${report.errors.length} strict=${strict}`, ld.licenseDecision(report, { strict, asOf: at }), oracle);
+    }
+  }
+  // Offline, the CLI prints the same: --no-fetch --as-of replays the DB.
+  for (const flags of [[], ['--strict']]) {
+    const r = run('check_license_drift.cjs', ['--no-fetch', '--json', '--as-of', AS_OF, ...flags]);
+    const doc = JSON.parse(r.stdout).findings;
+    assert.deepEqual(recompute(doc), doc.decisions, 'license-drift --no-fetch: not decide()\'s');
+    assert.equal(r.status, F.exitCode(doc.decisions));
+    assert.equal(doc.as_of, AS_OF);
+  }
+
+  const ev = require(path.join(S, 'mcp_eval.cjs'));
+  const picked = DB.slice(0, 3);
+  const [p, q, w] = picked.map((t) => t.name);
+  const cases = {
+    pass:      { results: [{ name: p, status: 'pass' }, { name: q, status: 'pass' }, { name: w, status: 'pass' }] },
+    fail:      { results: [{ name: p, status: 'fail', error_code: 'exit 1' }, { name: q, status: 'pass' }, { name: w, status: 'pass' }] },
+    launcher:  { results: [{ name: p, status: 'skip', error_code: 'launcher unavailable: uvx' }, { name: q, status: 'pass' }, { name: w, status: 'pass' }] },
+    nothing:   { results: [{ name: p, status: 'skip', error_code: 'launcher unavailable: uvx' }, { name: q, status: 'skip', failure_class: 'SANDBOX_UNAVAILABLE' }], aborted: true },
+    aborted:   { results: [{ name: p, status: 'pass' }], aborted: true },
+    drift:     { results: [{ name: p, status: 'pass', surface_drift: { artifact_changed: false } }, { name: q, status: 'pass', surface_drift: { artifact_changed: true } }, { name: w, status: 'pass' }] },
+  };
+  for (const [k, c] of Object.entries(cases)) {
+    for (const opts of [{}, { strict: true }, { failSurfaceDrift: true }, { failUnexplainedDrift: true }]) {
+      const results = c.results;
+      const fail = results.filter((r) => r.status === 'fail').length;
+      const answered = results.filter((r) => r.status === 'pass' || r.status === 'fail').length;
+      const drifted = results.filter((r) => r.surface_drift);
+      const skippedLauncher = results.filter((r) => /^launcher unavailable: /.test(r.error_code || '')).length;
+      const incomplete = Boolean(c.aborted) || picked.length > results.length || results.some((r) => r.failure_class === 'SANDBOX_UNAVAILABLE');
+      const driftFails = (opts.failSurfaceDrift && drifted.length > 0) || (opts.failUnexplainedDrift && drifted.some((r) => r.surface_drift.artifact_changed === false));
+      // The ladder eval used to keep.
+      const oracle = (opts.strict && fail > 0) || driftFails ? 1
+        : (picked.length > 0 && answered === 0) ? 2
+          : (opts.strict && (skippedLauncher > 0 || incomplete)) ? 1 : 0;
+      observed(`eval ${k} ${JSON.stringify(opts)}`, ev.evalDecision({ results, picked, aborted: Boolean(c.aborted), opts, asOf: at }), oracle);
+    }
+  }
+  for (const flags of [[], ['--strict']]) {
+    const r = run('mcp_eval.cjs', ['--no-spawn', '--json', ...flags]);
+    const doc = JSON.parse(r.stdout).findings;
+    assert.deepEqual(recompute(doc), doc.decisions, 'eval --no-spawn: not decide()\'s');
+    assert.equal(r.status, F.exitCode(doc.decisions));
   }
 });
 
@@ -782,6 +993,8 @@ test('registry-ingest: every decision is decide() of the document, and the exit 
 // ── who decides ────────────────────────────────────────────────────────────
 
 // Commands whose verdict is a Decision from decide() (and prints findings@1).
+// There is no other kind (docs/adr/0001, step 3): a command either decides
+// this way or answers a question without a verdict.
 const DECIDES_VIA_MODEL = {
   verify:  'verify_integrity.cjs',
   explain: 'explain.cjs',
@@ -804,41 +1017,48 @@ const DECIDES_VIA_MODEL = {
   // denied one out); ingest's exit code is its decisions'.
   'export-registry': 'export_subregistry.cjs',
   'registry-ingest': 'registry_ingest.cjs',
-};
-// Commands that still map their own findings to an exit code. Each moves by
-// emitting findings@1 and exiting via decide() — then its line goes.
-const LEGACY_DECIDERS = {
-  // Their cross-server part (flows/*, shadowing/*) already decides via the
-  // model and is checked above; the rest moves at step 3.
-  status:          'step 3: installed rows + audit findings → findings; verdict() → decide()',
-  audit:           'step 3: categories → findings audit/<category>; --strict is fail_on',
-  budget:          'step 4: the ceiling is the budget/over row explain already uses',
-  doctor:          'step 5: environment checks → findings on a setup subject',
-  eval:            'step 5: behaviour → findings; the ceiling rows already exist',
-  availability:    'step 5: gone/yanked → findings; exit via decide()',
-  identity:        'step 5: registry contradictions → findings',
-  posture:         'step 5: scorecard → observations; weak → finding',
-  capabilities:    'step 5: delta → findings; denyCapabilities is an org row (#127)',
-  'docker-drift':  'step 5: drift → finding on the artifact',
-  'license-drift': 'step 5: drift → finding; --strict is fail_on',
-  upgrade:         'step 5: an upgrade plan is advice; its exit reports whether one exists',
-  health:          'step 5: a score with a threshold → finding',
+  // Step 3: everything on the screen is a finding, decided once in mode
+  // `setup`; the verdict and the category lists are views of it.
+  status:  'status.cjs',
+  audit:   'audit_setup.cjs',
+  // This machine (mode `environment`, row environment/*) and the context
+  // ceiling (mode `budget`, row budget/over).
+  doctor:  'doctor.cjs',
+  budget:  'token_budget.cjs',
+  // The observers (mode `observe`): what one source said about each entry.
+  eval:            'mcp_eval.cjs',
+  availability:    'check_availability.cjs',
+  identity:        'check_identity.cjs',
+  posture:         'check_posture.cjs',
+  capabilities:    'check_capabilities.cjs',
+  'docker-drift':  'check_docker_drift.cjs',
+  'license-drift': 'check_license_drift.cjs',
+  upgrade:         'suggest_upgrade.cjs',
 };
 // Commands that answer a question without a verdict.
 const NON_DECIDING = {
   scan: 'recommends; `install` is the decision', list: 'lists', ls: 'alias of list', discover: 'harvests candidates',
   refresh: 'writes pins', wrap: 'generates code', 'site-registry': 'renders the registry page', sbom: 'describes',
+  // A score and its breakdown; exit 0, or 2 for a usage error. The threshold
+  // over it is the policy's (row policy/health), decided by verify and explain.
+  health: 'computes a maintenance score; the bar is policy/health',
 };
 
-test('every command is classified: decides via the model, legacy decider (with its step), or no verdict', () => {
+test('every command is classified: decides via the model, or gives no verdict — and no legacy decider is left', () => {
   const bin = fs.readFileSync(path.join(ROOT, 'bin', 'mcp-vault.cjs'), 'utf8');
   const block = bin.slice(bin.indexOf('const COMMANDS = {'), bin.indexOf('};', bin.indexOf('const COMMANDS = {')));
   const commands = [...block.matchAll(/^\s*"?([a-z-]+)"?:\s*"/gm)].map((m) => m[1]).sort();
-  const classified = [...Object.keys(DECIDES_VIA_MODEL), ...Object.keys(LEGACY_DECIDERS), ...Object.keys(NON_DECIDING)].sort();
+  const classified = [...Object.keys(DECIDES_VIA_MODEL), ...Object.keys(NON_DECIDING)].sort();
   assert.deepEqual(commands, classified,
     'a command was added or removed without saying whether it decides. New commands decide via decide() '
     + '(lib/finding.cjs) and print mcp-vault/findings@1 — see docs/adr/0001-findings-and-time.md');
-  for (const [k, v] of Object.entries(LEGACY_DECIDERS)) assert.match(v, /^step \d/, `${k}: say which migration step moves it`);
+  // A deciding command reaches decide() — directly, through lib/run_decision.cjs,
+  // or (install) through verify — and keeps no category list of its own.
+  for (const [cmd, script] of Object.entries(DECIDES_VIA_MODEL)) {
+    const src = fs.readFileSync(path.join(S, script), 'utf8');
+    assert.ok(/\bdecide(Run)?\(|\bdecide\b.*require|explainModel|verify_integrity|[a-z]+Decision\(/.test(src), `${cmd}: ${script} does not reach decide()`);
+    assert.doesNotMatch(src, /STRICT_CATEGORIES|LEGACY_DECIDERS/, `${cmd}: a category list decides beside decide()`);
+  }
 });
 
 // ── nobody else writes a decision word ─────────────────────────────────────
@@ -943,9 +1163,14 @@ test('lookalike: install, explain, audit and verify --installed print decide()\'
     for (const flags of [[], ['--strict'], ['--strict', '--allow-lookalike', 'memory']]) {
       const label = `${pname} ${flags.join(' ') || '(no flags)'}`;
       const au = run('audit_setup.cjs', ['--cwd', dir, '--global-config', g, '--json', '--as-of', AS_OF, ...flags]);
-      const adoc = JSON.parse(au.stdout).model;
+      const adoc = JSON.parse(au.stdout).findings;
       assert.deepEqual(recompute(adoc), adoc.decisions, `${label} audit: the printed decision is not decide()'s`);
-      assert.equal(au.status === 1, F.exitCode(adoc.decisions) === 1, `${label} audit: exit ${au.status}`);
+      assert.equal(au.status, F.exitCode(adoc.decisions), `${label} audit: exit ${au.status}`);
+      const name = adoc.decisions.find((x) => x.subject.type === 'name');
+      const vname = JSON.parse(run('verify_integrity.cjs', ['--installed', '--offline', '--json', '--cwd', dir, '--as-of', AS_OF, ...flags]).stdout)
+        .findings.decisions.find((x) => x.subject.type === 'name');
+      assert.deepEqual([name.subject.id, name.effect, name.decided_by, name.fails], [vname.subject.id, vname.effect, vname.decided_by, vname.fails],
+        `${label}: audit and verify --installed decide the name differently`);
 
       const vr = run('verify_integrity.cjs', ['--installed', '--offline', '--json', '--cwd', dir, '--as-of', AS_OF, ...flags]);
       const report = JSON.parse(vr.stdout);
