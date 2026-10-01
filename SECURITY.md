@@ -89,9 +89,15 @@ without an attestation unless a maintainer dispatches it with
 
 **No published version so far has a provenance attestation.** npm accepts a
 provenance bundle only from a GitHub-hosted runner, and hosted runners do not
-start on this account (a billing lock), so 0.14.0, 0.14.1, 0.15.1 and 0.15.2
-went out through the override, on purpose and in the open; 0.12.0 predates the
-requirement. 0.15.0 was never published (the registry goes 0.14.1 → 0.15.1).
+start on this account (a billing lock), so 0.14.0, 0.14.1, 0.15.1, 0.15.2 and
+0.16.0 went out through the override, on purpose and in the open; 0.12.0
+predates the requirement. For 0.16.0 the automatic publish job did not start
+("your account is locked due to a billing issue") after the tag and the GitHub
+Release were created; it was then published from the same commit (`449bac6f`,
+the one `v0.16.0` points at) by the `allow_unprovenanced` dispatch. 0.16.0 is
+the first version whose package carries the signed DB: its
+`tools_database.json.sig` verifies against key `92cf62804f86a312`
+(`npx -y @froggychips/mcp-vault@0.16.0 signature --strict`). 0.15.0 was never published (the registry goes 0.14.1 → 0.15.1).
 Every version does carry npm's registry signature over `name@version:integrity`
 (`npm audit signatures` verifies it); what is absent is `dist.attestations`,
 and `npm view @froggychips/mcp-vault@<version> dist.attestations` shows that
