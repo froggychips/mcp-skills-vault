@@ -41,7 +41,7 @@ FAIL  mcp-server-aws@1.0.27 (PyPI offline pin present for awslabs.core-mcp-serve
 | | Without | With |
 |---|---|---|
 | **Discoverability** | search GitHub, hope the README isn't lying | curated DB of **113 entries** with health scores, license, category, est-tools-count |
-| **Trust** | unknown publisher, unknown last commit | `trust` is **derived from dated evidence**, not typed by hand: **107 verified / 1 candidate / 4 unverified** as of 2026-09-30 (the date of the newest evidence in the DB). The 4 are one entry with an advisory recorded against the pinned version, two whose repository disagrees with the registry's, and one yanked (see [Install-Hook Policy](./CONTRIBUTING.md#install-hook-policy)) |
+| **Trust** | unknown publisher, unknown last commit | `trust` is **derived from dated evidence**, not typed by hand: **110 verified / 0 candidate / 2 unverified** as of 2026-10-01 (the date of the newest evidence in the DB). The 2 are one whose repository disagrees with the registry's, and one yanked (see [Install-Hook Policy](./CONTRIBUTING.md#install-hook-policy)) |
 | **Integrity** | `npx -y whatever@latest` runs whatever ships today | sha512/sha256/Docker `@sha256:` pinned + re-verified against the live registry on every check |
 | **Vulnerabilities** | `npm audit` after the fact, if you remember | 4 advisory feeds merged: npm bulk + OSV.dev + GHSA + Snyk† — checked *before* the install command is written |
 | **Depth** | the package you asked for | `--deps` resolves the whole tree without installing it: **19,377 transitive packages** across the DB, 25 entries whose *dependencies* run install scripts, 38 with a high/critical advisory somewhere in the tree |
@@ -363,12 +363,12 @@ dimensions it fills for this DB today:
 availability   present 104, deprecated 4, yanked 1
 artifact       verified 112, unverified 1
 signature      verified 100, absent 1
-provenance     bound 45, absent 55
-source_binding verified 98, unverified 9, mismatch 2
+provenance     bound 46, absent 54
+source_binding verified 99, unverified 9, mismatch 1
 registry       listed 11, unlisted 101
 advisories     clean 107, vulnerable 1, advisories-present 1
 posture        clean 1, weak 3        (Scorecard covers 4 of 113 repositories)
-→ trust:       verified 108, candidate 1, unverified 4
+→ trust:       verified 110, candidate 0, unverified 2
 ```
 
 ### Is it still there? (`availability`)
@@ -411,7 +411,7 @@ official registry  →  who published it, under a name they proved they own
 mcp-vault          →  supply-chain evidence, policy, behaviour
 ```
 
-11 entries are listed as of 2026-09-30 and all of them agree; a verified namespace under a
+11 entries are listed as of 2026-10-01 and all of them agree; a verified namespace under a
 different owner is the finding worth having. **Being unlisted is explicitly not
 a finding** — listing is opt-in and 101 entries simply are not listed.
 
@@ -457,13 +457,13 @@ scanned so far — every npm entry's current pin, plus the six pins those entrie
 moved off, kept as the baseline their delta is computed against — it can read:
 
 ```
-env_access  89    shell           38    dynamic_code      16
+env_access  91    shell           38    dynamic_code      16
 network     79    install_script  32    dynamic_require    8
 fs_read     62    fs_write        41    credential_paths   5
 ```
 
 31 of those packages can both run other programs and reach the network. 20 of
-104 ship at least one minified file, where a pattern scan can show presence and
+106 ship at least one minified file, where a pattern scan can show presence and
 nothing else.
 
 Two rules make this honest rather than theatrical:
@@ -1116,7 +1116,7 @@ maps      memory    meta       mobile     observability   payments
 pm        reasoning search     testing    utility         vcs       web-scraping
 ```
 
-Distribution as of 2026-09-30 (the date of the newest evidence in the DB): **0 Core / 10 Recommended / 101 Experimental / 1 Deprecated**.
+Distribution as of 2026-10-01 (the date of the newest evidence in the DB): **0 Core / 110 Recommended / 1 Experimental / 1 Deprecated**.
 On that date only the nine entries re-checked that day carry fresh evidence. The
 rest hold evidence from 2026-09-17, and wherever it includes `availability` or
 `advisories` (a seven-day shelf life) it has aged out, so those 101 read
