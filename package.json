@@ -1,6 +1,6 @@
 {
   "name": "@froggychips/mcp-vault",
-  "version": "0.16.0",
+  "version": "0.16.1",
   "description": "Offline security check for MCP configs in CI. A GitHub Action, pre-commit hook and CLI that flag unpinned MCP servers, plaintext secrets, typosquats, tool poisoning and toxic tool flows — offline, zero dependencies, no telemetry.",
   "bin": {
     "mcp-vault": "bin/mcp-vault.cjs",
