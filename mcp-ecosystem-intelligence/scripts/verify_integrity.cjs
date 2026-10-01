@@ -74,7 +74,7 @@ const { parseImageRef, fetchManifest, ALLOWED_REGISTRIES } = require('./lib/oci.
 const {
   verifyRegistrySignature, provenanceClaim, checkProvenance, keysUrl,
 } = require('./lib/npm_signatures.cjs');
-const { readInstalledServers, explicitConfigPaths } = require('./lib/installed.cjs');
+const { readInstalledServers, explicitConfigPaths, unpinnedLaunch } = require('./lib/installed.cjs');
 const lookalike = require('./lib/lookalike.cjs');
 const {
   resolveNpmTreeCached, pypiDirectDependencies, summarizeTree,
@@ -82,7 +82,7 @@ const {
 const { loadEffectivePolicy, flagsFromArgv, rowFor, RANK } = require('./lib/policy_rules.cjs');
 const { hasOrgRules, loadOrgContext, orgModel } = require('./lib/org_policy.cjs');
 const {
-  decide, exitCode, outcomeFails, findingsDocument, toJson, toSarif: findingsToSarif,
+  decide, exitCode, outcomeFails, findingsDocument, toJson, toSarif: findingsToSarif, finding,
 } = require('./lib/finding.cjs');
 const { fromVerifyResults, fromStoredEvidence, foundProblem } = require('./lib/findings_from.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
@@ -1377,15 +1377,27 @@ function processOfflinePackage(tool, pkg, ecosystem, results) {
 
   // Offline, the pins *are* the evidence. A missing one means this entry was
   // never verified — the same verdict the online path now gives.
-  if (!tool.version) {
-    lines.push(['UNVERIFIED', `no pinned version in DB${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`, { rule: 'pin/missing', state: 'no-data' }]);
+  // For a configured server the subject is the config, not the DB: a missing
+  // version is the config's (its own UNPINNED line says so), and a missing
+  // hash is "the vault has none for this artifact" — not "the DB is broken".
+  const inst = tool._installed;
+  const fu = FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)';
+  if (inst && tool._unpinned) {
+    lines.push(['UNVERIFIED', `the config names no exact version, so there is no stored hash to compare it against${fu}`, { rule: 'pin/missing', state: 'no-data' }]);
     if (FAIL_UNVERIFIED) failures++;
+  } else {
+    if (!tool.version) {
+      lines.push(['UNVERIFIED', `no pinned version in DB${fu}`, { rule: 'pin/missing', state: 'no-data' }]);
+      if (FAIL_UNVERIFIED) failures++;
+    }
+    if (!tool.pkg_integrity) {
+      lines.push(['UNVERIFIED', `${inst ? `${missingPinAdvice(tool)} (offline)` : 'no stored pkg_integrity — cannot compare without network'}${fu}`, { rule: 'pin/missing', state: 'no-data' }]);
+      if (FAIL_UNVERIFIED) failures++;
+    }
   }
-  if (!tool.pkg_integrity) {
-    lines.push(['UNVERIFIED', `no stored pkg_integrity — cannot compare without network${FAIL_UNVERIFIED ? '' : ' (use --fail-unverified to fail closed)'}`, { rule: 'pin/missing', state: 'no-data' }]);
-    if (FAIL_UNVERIFIED) failures++;
-  }
-  if (!tool.source_url) {
+  // "no source_url in DB" is about a DB entry; a configured server whose key
+  // is not a vault name has no entry to lack one.
+  if (!tool.source_url && !(inst && !inst.in_vault)) {
     lines.push(['NOTE', 'no source_url in DB']);
   }
 
@@ -1393,7 +1405,9 @@ function processOfflinePackage(tool, pkg, ecosystem, results) {
   results.push({
     tool,
     status: verdictFor(failures, lines),
-    msg: `${tool.name}${pin} (${ecosystem} offline pin present for ${pkg})`,
+    msg: inst
+      ? `${tool.name}${pin} (${ecosystem} ${pkg}, offline)`
+      : `${tool.name}${pin} (${ecosystem} offline pin present for ${pkg})`,
     lines,
     failures,
     // Offline establishes that the DB *has* pins, not that they match anything.
@@ -1562,6 +1576,9 @@ async function main() {
           command: srv.command,
         },
         _lookalike: look,
+        // The config launches a registry package with no exact version: a
+        // finding about the config line, decided by `config/unpinned-launch`.
+        _unpinned: srv.install_cmd ? unpinnedLaunch(srv, { dbTools: allTools }) : null,
       };
     });
     // A config that exists but does not parse is a finding: it may be the file
@@ -1899,6 +1916,22 @@ async function main() {
   // own fields — licence, health, the trust this run derived — are facts.
   const model = fromVerifyResults(results, { asOf: AS_OF, maxAgeDays: evidenceMaxAge(), scope: INSTALLED ? 'installed' : 'database' });
   model.findings.push(...lookalikeRun.findings);
+  // Unpinned launches, on the server's own host-config subject: the line that
+  // launches it is the line to change. Severity medium so code scanning shows
+  // it as a warning on that line; the effect is the `config/unpinned-launch`
+  // row's (policy.unpinnedLaunch), which owns the finding.
+  const unpinnedRun = new Map();
+  results.forEach((r, i) => {
+    const u = r.tool && r.tool._unpinned;
+    const s = model.subjects[i];
+    if (!u || !s) return;
+    const f = finding({
+      rule: 'config/unpinned-launch', subject: s, scope: 'installed', severity: 'medium', state: 'observed',
+      message: `${u.message}. ${u.advice[0].toUpperCase()}${u.advice.slice(1)}.`,
+    });
+    unpinnedRun.set(i, f);
+    model.findings.push(f);
+  });
   const facts = { ...lookalikeRun.facts };
   // Offline, nothing is re-checked — so what the DB already knows about each
   // entry is the rest of the evidence, and the decision applies it: a known
@@ -2018,6 +2051,28 @@ async function main() {
     if (!o || o.effect === 'allow') { r.lines.push(['NOTE', o ? o.detail : f.message]); continue; }
     r.lines.push(['LOOKALIKE', `${f.message} If you meant the vetted server: mcp-vault install ${r.lookalike.matches[0].db_name}`, { decided_by: o.rule }]);
     if (d.fails) {
+      r.failures = (r.failures || 0) + 1;
+      r.status = 'FAIL';
+    } else if (r.status === 'OK') {
+      r.status = 'WARN';
+    }
+  }
+
+  // The unpinned-launch decisions, rendered on the server: an UNPINNED line
+  // (counted when that outcome fails the run), or a NOTE when the policy
+  // allows it.
+  for (const [i, f] of unpinnedRun) {
+    const s = model.subjects[i];
+    const d = s && decisionOf.get(s.id);
+    const o = d && d.rules.find((x) => x.findings.includes(f.id));
+    const r = results[i];
+    r.lines = r.lines || [];
+    if (!o || o.effect === 'allow') { r.lines.push(['NOTE', o ? o.detail : f.message]); continue; }
+    r.lines.push(['UNPINNED', f.message, { decided_by: o.rule }]);
+    const failsHere = outcomeFails(o, {
+      threshold: d.fail_on, families: EP.fail_families, ruleOf: new Map([[f.id, f.rule]]), thresholded: true,
+    });
+    if (failsHere) {
       r.failures = (r.failures || 0) + 1;
       r.status = 'FAIL';
     } else if (r.status === 'OK') {

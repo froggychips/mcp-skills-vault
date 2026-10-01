@@ -90,6 +90,7 @@ const RANK = {
   toolApproval:         ['off', 'require'],
   toxicFlows:           ['allow', 'warn', 'fail'],
   toolShadowing:        ['allow', 'warn', 'fail'],
+  unpinnedLaunch:       ['allow', 'warn', 'fail'],
   // The exit threshold: which effects fail the run. `deny` always does.
   fail_on:              ['deny', 'unknown', 'warn'],
 };
@@ -684,6 +685,23 @@ const lookalikeRules = [
   },
 ];
 
+// ── what a host config launches (lib/installed.cjs unpinnedLaunch) ─────────
+//
+// A finding about the *config*, on its host-config line: it launches a
+// registry package with no exact version, so each start runs whatever is
+// latest. Not a fact about the vault's DB, and not the gate's "could not
+// verify" — a config that pins the vault's version passes both. The level is
+// `policy.unpinnedLaunch` (fail | warn | allow, default warn: fails only
+// under --strict, as a default does not get stricter in a minor).
+
+const configRules = [
+  {
+    id: 'config/unpinned-launch', status: 'active', thresholded: true, owns_findings: true, views: [],
+    doc: 'A host config that launches a registry package without an exact version (none, a tag, a range); the level is policy.unpinnedLaunch.',
+    evaluate: (ctx) => setJudged(ctx, (r) => r === 'config/unpinned-launch', 'unpinnedLaunch'),
+  },
+];
+
 // ── reserved for the open feature PRs ──────────────────────────────────────
 //
 // Claimed here so that each lands as a row in this table — with this id in
@@ -742,7 +760,7 @@ const signatureRules = [
   },
 ];
 
-const RULES = Object.freeze([...explainRules, ...policyRules, ...secretRules, ...findingRules, ...lookalikeRules, ...toolScanRules, ...orgRules, ...setupRules, ...reservedRules, ...signatureRules].map((r) => Object.freeze(r)));
+const RULES = Object.freeze([...explainRules, ...policyRules, ...secretRules, ...findingRules, ...lookalikeRules, ...configRules, ...toolScanRules, ...orgRules, ...setupRules, ...reservedRules, ...signatureRules].map((r) => Object.freeze(r)));
 const RULE_BY_ID = new Map(RULES.map((r) => [r.id, r]));
 
 // Evaluation order, per mode. It is the order the legacy views have always
@@ -759,7 +777,7 @@ const ORDER = Object.freeze({
     'gate/fail', 'gate/unverified', 'tool-scan/*', 'behaviour/*', 'budget/over', ...SETUP_ORDER,
     'secrets/*',
     'gate/require-provenance', 'gate/fail-dep-advisories', 'finding/severity', 'finding/incomplete',
-    'lookalike/*',
+    'lookalike/*', 'config/unpinned-launch',
     'audits/recorded',
     'db/signature', 'audits/import',
   ]),
@@ -772,7 +790,7 @@ const ORDER = Object.freeze({
     'gate/fail', 'gate/unverified', 'tool-scan/*', 'behaviour/*', 'budget/over', ...SETUP_ORDER,
     'secrets/*',
     'gate/require-provenance', 'gate/fail-dep-advisories', 'finding/severity', 'finding/incomplete',
-    'lookalike/*',
+    'lookalike/*', 'config/unpinned-launch',
     'audits/recorded',
     'db/signature', 'audits/import',
   ]),
@@ -830,7 +848,7 @@ function deepFreeze(o) {
 // tests/decision_consistency.test.cjs checks that no producer emits a family
 // missing here.
 const FINDING_FAMILIES = Object.freeze([
-  'advisories', 'artifact', 'audits', 'db', 'dependencies', 'evidence', 'flows', 'install', 'integrity',
+  'advisories', 'artifact', 'audits', 'config', 'db', 'dependencies', 'evidence', 'flows', 'install', 'integrity',
   'license', 'lock', 'lookalike', 'metadata', 'oci', 'org', 'pin', 'provenance', 'registry', 'scope',
   'secrets', 'shadowing', 'signature', 'tool-scan', 'verify',
 ]);
