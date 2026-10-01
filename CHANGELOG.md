@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.1](https://github.com/froggychips/mcp-skills-vault/compare/v0.16.0...v0.16.1) (2026-10-01)
+
+
+### Documentation
+
+* **security:** 0.16.0 went out unprovenanced too, and is the first with a signed DB ([74c6aeb](https://github.com/froggychips/mcp-skills-vault/commit/74c6aeb7e50cd0e7a4efdfe5cb408cb2ca51b1f4))
+* **security:** 0.16.0 went out unprovenanced, and is the first with a signed DB ([c9728d4](https://github.com/froggychips/mcp-skills-vault/commit/c9728d41a7cebccc702c07a90d98c6c6fd6b7bde))
+
 ## [0.16.0](https://github.com/froggychips/mcp-skills-vault/compare/v0.15.2...v0.16.0) (2026-10-01)
 
 
