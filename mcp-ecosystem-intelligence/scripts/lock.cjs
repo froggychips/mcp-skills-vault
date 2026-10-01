@@ -49,6 +49,7 @@ const { execFileSync } = require('child_process');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { readWallClock, isoDay } = require('./lib/clock.cjs');
 const { readInstalledServers, toInstallCmd } = require('./lib/installed.cjs');
+const { sameArtifactEntry } = require('./lib/entry_match.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { resolveNpmTree } = require('./lib/deps.cjs');
 const { isExactVersion } = require('./lib/install_cmd.cjs');
@@ -137,8 +138,10 @@ function subjects(opts, db, unreadable = null) {
     .filter((srv) => opts.includeUser || srv.scope !== 'user')
     .map((srv) => {
       const install_cmd = srv.install_cmd || toInstallCmd(srv);
-      const dbEntry = (db.tools || []).find((t) => t.name === srv.name)
-        || (db.tools || []).find((t) => t.install_cmd && install_cmd && t.install_cmd === install_cmd);
+      // The vault entry for exactly this artifact (lib/entry_match.cjs): by
+      // package, never by the config key, and only when the versions agree —
+      // its hash is the one to lock against, and another version's is not.
+      const dbEntry = sameArtifactEntry(db.tools || [], install_cmd);
       return {
         name:        srv.name,
         install_cmd,

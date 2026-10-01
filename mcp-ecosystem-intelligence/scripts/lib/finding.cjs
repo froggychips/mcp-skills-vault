@@ -453,6 +453,11 @@ function toJson(doc) {
 
 // ── SARIF ──────────────────────────────────────────────────────────────────
 
+// Context a reader of the code-scanning view should still see, at note level:
+// the age of the vault's record of a configured release (check, verify
+// --config) — never part of the answer, but no data is not clean.
+const SARIF_ALWAYS_NOTE = new Set(['evidence/vault-age']);
+
 function sarifLevel(f) {
   if (f.severity === 'critical' || f.severity === 'high') return 'error';
   if (f.severity === 'medium') return 'warning';
@@ -512,8 +517,9 @@ function toSarif(findings, {
   }
   for (const f of sortFindings(findings)) {
     const level = sarifLevel(f);
-    if (level === 'note' && !includeNotes) continue;
-    used.set(f.rule, level === 'error' || used.get(f.rule) === 'error' ? 'error' : 'warning');
+    if (level === 'note' && !includeNotes && !SARIF_ALWAYS_NOTE.has(f.rule)) continue;
+    const prev = used.get(f.rule);
+    used.set(f.rule, level === 'error' || prev === 'error' ? 'error' : (level === 'warning' || prev === 'warning' ? 'warning' : 'note'));
     results.push({
       ruleId: f.rule,
       level,

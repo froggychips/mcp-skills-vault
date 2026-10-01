@@ -62,6 +62,7 @@ const { evalResultsAsOf, dbAsOf } = require('./lib/evidence.cjs');
 const { evalIndex } = require('./lib/tiers.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { feedbackLine } = require('./lib/feedback.cjs');
+const { entryForLaunch } = require('./lib/entry_match.cjs');
 
 const VERIFY    = path.join(__dirname, 'verify_integrity.cjs');
 const DB_PATH   = path.resolve(__dirname, '../assets/tools_database.json');
@@ -457,6 +458,13 @@ function fixFor(o, f, { m, srv, policyPath, dbTools }) {
     const u = unpinnedLaunch(srv, { dbTools });
     if (u) return secrets.redact(u.advice);
   }
+  // What the vault stored about the release this line launches (verify's
+  // fromStoredEvidence, on the config line).
+  if (rule === 'evidence/stale') return 'the vault\'s record of this release is past its shelf life: re-check it live (mcp-vault check --online), or accept it as unverified';
+  if (rule.startsWith('evidence/') || rule.startsWith('trust/')) {
+    const entry = srv && srv.install_cmd ? entryForLaunch(dbTools, srv.install_cmd) : null;
+    return `the vault recorded this against the exact release launched here: move to a release without it${entry ? ` (mcp-vault explain ${entry.name})` : ''}`;
+  }
   if (/not in the vault/.test(msg)) return 'not in the vault, so there is no hash to compare: use a vetted server (mcp-vault list), or accept it as unverified';
   if (/source install|git URL|VCS/.test(msg)) return 'launch a published release from the registry, or verify that source yourself';
   return `run \`mcp-vault verify --offline --config ${srv ? rel(srv.source, process.cwd()) : '<file>'}\` for the full gate report`;
@@ -528,7 +536,14 @@ function render(m, { opts, policyPath, cwd, color }) {
       fix: fixFor(o, f, { m, srv, policyPath, dbTools }),
     });
   }
-  items.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0) || ((a.line || 0) - (b.line || 0)) || (a.rule < b.rule ? -1 : a.rule > b.rule ? 1 : 0));
+  // Context: how old the vault's record of each launched release is. Never
+  // part of the answer (evidence/vault-age, role context), never counted —
+  // but said, because no data is not clean.
+  for (const f of doc.findings) {
+    if (f.rule !== 'evidence/vault-age') continue;
+    items.push({ ...locate(f.subject, doc, m.servers, cwd), cls: 'context', fails: false, effect: 'context', rule: f.rule, tag: null, what: secrets.redact(f.message), fix: null });
+  }
+  items.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0) || ((a.line || 0) - (b.line || 0)) || ((a.cls === 'context') - (b.cls === 'context')) || (a.rule < b.rule ? -1 : a.rule > b.rule ? 1 : 0));
 
   let lastFile = null; let lastLine = null;
   for (const it of items) {
@@ -537,6 +552,7 @@ function render(m, { opts, policyPath, cwd, color }) {
       out.push(`  ${it.line ? `${DM}:${it.line}${RS} ` : ''}${it.server ? `${B}${it.server}${RS}` : `${DM}(the config as a whole)${RS}`}`);
       lastLine = it.line;
     }
+    if (it.cls === 'context') { out.push(`    ${DM}i ${it.what}${RS}`); continue; }
     const mark = it.fails ? `${RD}✗${RS}` : it.cls === 'unanswered' ? `${YL}?${RS}` : `${YL}!${RS}`;
     out.push(`    ${mark} ${it.what} ${DM}[${it.tag}${it.fails ? ', fails' : ''}]${RS}`);
     out.push(`      ${DM}fix:${RS} ${it.fix}`);
@@ -544,7 +560,7 @@ function render(m, { opts, policyPath, cwd, color }) {
 
   const failing = items.filter((i) => i.fails).length;
   const open = items.filter((i) => !i.fails && i.cls === 'unanswered').length;
-  const notes = items.length - failing - open;
+  const notes = items.filter((i) => i.cls !== 'context').length - failing - open;
   const n = m.servers.length;
   const scope = `${n} server${n === 1 ? '' : 's'} in ${m.configs.length} config${m.configs.length === 1 ? '' : 's'}`;
   const tail = `${DM}fail on ${doc.policy ? doc.policy.fail_on : 'deny'} · ${opts.online ? 'online' : 'offline'}${RS}`;

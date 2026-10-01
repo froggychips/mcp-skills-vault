@@ -37,10 +37,11 @@ const path = require('path');
 
 const { exitAfterFlush }   = require('./lib/exit.cjs');
 const { readInstalledServers, toInstallCmd } = require('./lib/installed.cjs');
+const { matchLaunch }      = require('./lib/entry_match.cjs');
 const { trustScore }       = require('./lib/scores.cjs');
-const { classifyEntry, evalIndex, currentArtifactId, packageKeyOfId, NAME_SCOPED } = require('./lib/tiers.cjs');
+const { classifyEntry, evalIndex, packageKeyOfId, NAME_SCOPED } = require('./lib/tiers.cjs');
 const {
-  toTypedEntry, artifactId, comparableArtifactId, comparableId, packageKey, isExactArtifact,
+  toTypedEntry, comparableId, packageKey,
 } = require('./lib/entry_model.cjs');
 const { staleDimensions, DEFAULT_MAX_AGE_DAYS, dbAsOf, evalResultsAsOf } = require('./lib/evidence.cjs');
 const { asOfFromArgv, requireAsOf } = require('./lib/clock.cjs');
@@ -158,19 +159,14 @@ function installed({ cwd, db, evals, asOf }) {
   const unreadable = [];
   const servers = readInstalledServers({ cwd, onUnreadable: (loc) => unreadable.push(loc) });
 
-  const byPackage = new Map();
-  for (const tool of db.tools) {
-    const typed = toTypedEntry(tool);
-    const key = typed ? packageKey(typed.artifact) : null;
-    if (key && !byPackage.has(key)) byPackage.set(key, tool);
-  }
-
   const rows = [];
   for (const server of servers) {
     const withCmd = { ...server, install_cmd: server.install_cmd || toInstallCmd(server) };
     const typed   = toTypedEntry(withCmd);
-    const key     = typed ? packageKey(typed.artifact) : null;
-    const entry   = key ? byPackage.get(key) || null : null;
+    // lib/entry_match.cjs: the one matcher check and verify --config use too.
+    const match   = matchLaunch(db.tools, withCmd.install_cmd);
+    const key     = match.package;
+    const entry   = match.entry;
     const base    = { name: server.name, host: server.host, scope: server.scope || null, launches: redact(withCmd.install_cmd) || null };
     // The host-config line that launches it: what every finding about this
     // server is about (the subject `audit` uses for the same line). Kept off
@@ -189,16 +185,11 @@ function installed({ cwd, db, evals, asOf }) {
       continue;
     }
 
-    const installedId = artifactId(typed.artifact);
-    const vaultId     = currentArtifactId(entry);
+    const installedId = match.installed_artifact;
+    const vaultId     = match.vault_artifact;
     const vaultTyped  = toTypedEntry(entry);
-    // Equality is necessary and not sufficient: both sides must also *resolve*
-    // to one artifact. `npx -y pkg` equals `npx -y pkg` and names nothing.
-    const pinned      = isExactArtifact(typed.artifact);
-    const vaultPinned = Boolean(vaultTyped && isExactArtifact(vaultTyped.artifact));
-    const comparable  = comparableArtifactId(typed.artifact);
-    const version_match = (!comparable || !vaultId) ? 'unknown'
-      : (pinned && vaultPinned && comparable === vaultId ? 'same' : 'different');
+    const pinned      = match.pinned;
+    const version_match = match.version_match;
 
     const row = keep({
       ...base,

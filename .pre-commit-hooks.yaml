@@ -12,10 +12,17 @@
 # nothing but a copy. pre-commit appends the staged file names to `entry`;
 # `check` takes every bare argument as a config, wherever the hook's `args`
 # land: `args: [--strict]` works as written.
+#
+# DB integrity: pre-commit installs the commit `rev:` names, which carries no
+# release signature (that is made at release, not committed). The entry,
+# bin/mcp-vault-pre-commit.cjs, runs `check` and lets the CLI take `rev:` as
+# the integrity — only when pre-commit installed it, from a clone whose DB is
+# these bytes — and says so: "DB integrity: pinned by pre-commit rev". A .sig
+# that is present still has to verify. Pin `rev:` to a full SHA.
 - id: mcp-vault
   name: mcp-vault (check MCP server configs)
-  description: Fail when a committed .mcp.json / .vscode/mcp.json / .cursor/mcp.json launches a server that is unpinned, not in the vault, does not match its pinned hash, or holds a plain-text secret.
-  entry: mcp-vault check --fail-on unknown
+  description: Fail when a committed .mcp.json / .vscode/mcp.json / .cursor/mcp.json launches a server that is unpinned, not in the vault, does not match its pinned hash, has a yanked release or a known advisory on record, or holds a plain-text secret.
+  entry: mcp-vault-pre-commit --fail-on unknown
   language: node
   files: '(^|/)(\.mcp\.json|\.vscode/mcp\.json|\.cursor/mcp\.json)$'
   pass_filenames: true

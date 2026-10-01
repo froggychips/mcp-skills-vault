@@ -24,7 +24,7 @@
  *
  *   required        whether a missing signature refuses. **Only an installed
  *                   package requires one** — see `signatureContext`.
- *   context         'package' | 'git checkout' | 'MCP_VAULT_REQUIRE_SIGNED_DB'
+ *   context         'package' | 'git checkout' | 'pre-commit rev' | 'MCP_VAULT_REQUIRE_SIGNED_DB'
  *   allow_unsigned  the loud development override (--allow-unsigned-db /
  *                   MCP_VAULT_ALLOW_UNSIGNED_DB=1): a refusal becomes a warning,
  *                   printed on every run. A flag that goes quiet after the first
@@ -33,12 +33,13 @@
  * The decision itself is decide()'s. `checkDb` renders it for the wrapper.
  *
  * API:
- *   PACKAGE_ROOT, ALLOW_ENV, REQUIRE_ENV, ALLOW_FLAG
+ *   PACKAGE_ROOT, ALLOW_ENV, REQUIRE_ENV, ALLOW_FLAG, PRE_COMMIT_ENV, PRE_COMMIT_CONTEXT
  *   sigPathFor(file)                                 -> `${file}.sig`
  *   verifyFile(file, { keys, artifact? })            -> verifyCanonical result (+ 'unreadable', 'no-signature')
  *   signFile(file, { privateKeyPem, now })           -> envelope (written to sigPathFor(file))
  *   allowUnsignedFromEnv(env)                        -> boolean
  *   signatureContext({ root?, env? })                -> { required, context, reason }
+ *   preCommitPin({ root?, env? })                    -> { ok, repo?, reason }  (the hook's pinned clone)
  *   signatureFindings(files, { keyring, keyringPath, context, allowUnsigned, root? })
  *                                                    -> { subjects, findings, facts }
  *   signatureDocument(files, { keyring, keyringPath, context, allowUnsigned, asOf, policy })
@@ -56,6 +57,10 @@ const { requireAsOf } = require('./clock.cjs');
 
 const ALLOW_ENV   = 'MCP_VAULT_ALLOW_UNSIGNED_DB';
 const REQUIRE_ENV = 'MCP_VAULT_REQUIRE_SIGNED_DB';
+// Set only by the pre-commit hook's entry (bin/mcp-vault-pre-commit.cjs), for
+// its own process: "ask whether pre-commit's pinned clone is the integrity".
+const PRE_COMMIT_ENV = 'MCP_VAULT_PRE_COMMIT_HOOK';
+const PRE_COMMIT_CONTEXT = 'pre-commit rev';
 const ALLOW_FLAG  = '--allow-unsigned-db';
 // The package root: bin/, mcp-ecosystem-intelligence/, package.json.
 const PACKAGE_ROOT = path.resolve(__dirname, '../../..');
@@ -122,8 +127,13 @@ const allowUnsignedFromEnv = (env = process.env) => yes(env[ALLOW_ENV]);
  *     package directory, which is write access to the code that does this
  *     check: it is not a weaker boundary than the code itself.
  *
+ * One more positive signal, as narrow: the copy pre-commit installs for the
+ * hook, from the commit `rev:` pins (`preCommitPin`, asked only when the hook's
+ * own entry sets PRE_COMMIT_ENV). There `rev:` is the integrity, as the action
+ * SHA is in the Action.
+ *
  * `MCP_VAULT_REQUIRE_SIGNED_DB=1` makes a checkout behave like a package (a
- * release rehearsal, the tests). It can only tighten.
+ * release rehearsal, the tests). It can only tighten — the pre-commit pin too.
  *
  * Whatever the context, a signature that is *present* must verify, and the
  * keyring must be readable: `required` is only about a missing `.sig`.
@@ -134,9 +144,71 @@ function signatureContext({ root = PACKAGE_ROOT, env = process.env } = {}) {
   }
   let checkout = false;
   try { fs.lstatSync(path.join(root, '.git')); checkout = true; } catch { checkout = false; }
-  return checkout
-    ? { required: false, context: 'git checkout', reason: `${path.join(root, '.git')} exists — development, CI or a PR` }
-    : { required: true, context: 'package', reason: `no .git at ${root} — an installed package` };
+  if (checkout) return { required: false, context: 'git checkout', reason: `${path.join(root, '.git')} exists — development, CI or a PR` };
+  if (yes(env[PRE_COMMIT_ENV])) {
+    const pin = preCommitPin({ root, env });
+    if (pin.ok) return { required: false, context: PRE_COMMIT_CONTEXT, reason: pin.reason };
+    return { required: true, context: 'package', reason: `no .git at ${root} — an installed package (${PRE_COMMIT_ENV} is set, but ${pin.reason})` };
+  }
+  return { required: true, context: 'package', reason: `no .git at ${root} — an installed package` };
+}
+
+/**
+ * Is this package the copy pre-commit installed for a hook, from the commit a
+ * `.pre-commit-config.yaml` pins? Then `rev:` is the DB's integrity, as the
+ * action SHA is in the Action: pre-commit clones exactly that commit, and the
+ * DB is its bytes, like the code that checks it. The release signature is not
+ * there — it is made at release and is not in git — so without this the hook
+ * refused to run at all.
+ *
+ * Asked only when the hook's own entry (bin/mcp-vault-pre-commit.cjs) sets
+ * PRE_COMMIT_ENV for its process; `mcp-vault` itself never relaxes. And only
+ * on positive evidence of that layout, all of it:
+ *
+ *   - pre-commit is running the hook: it sets PRE_COMMIT=1 for every hook.
+ *   - This package root is `<repo>/node_env-*\/{lib/,}node_modules/<name>` —
+ *     where pre-commit's node language installs a hook repo (`npm pack`, then
+ *     `npm install -g` into the repo's node_env). npm and npx never install
+ *     there.
+ *   - `<repo>` is a `repo*` directory of a pre-commit store (its parent holds
+ *     pre-commit's `db.db`) and a git clone (`.git`) carrying this hook's
+ *     `.pre-commit-hooks.yaml`.
+ *   - The clone's DB is byte-for-byte the DB this package reads: the bytes
+ *     `rev:` names are the bytes used.
+ *
+ * Anything missing — and the answer is "not pinned", so the signature is
+ * required as for any installed package. A `.sig` that is present must still
+ * verify: `required` is only about a missing one.
+ */
+function preCommitPin({ root = PACKAGE_ROOT, env = process.env } = {}) {
+  const no = (why) => ({ ok: false, reason: why });
+  if (env.PRE_COMMIT !== '1') return no('PRE_COMMIT=1 is not set, so pre-commit is not running this hook');
+  let real;
+  try { real = fs.realpathSync(root); } catch { return no(`cannot resolve ${root}`); }
+  const parts = real.split(path.sep);
+  const at = parts.findIndex((p, i) => /^node_env-[^/\\]+$/.test(p) && i > 0);
+  if (at === -1) return no(`${real} is not inside a pre-commit node_env`);
+  const tail = parts.slice(at + 1);
+  const pkgName = (() => { try { return JSON.parse(fs.readFileSync(path.join(real, 'package.json'), 'utf8')).name; } catch { return null; } })();
+  const nameParts = String(pkgName || '').split('/');
+  const layouts = [['lib', 'node_modules', ...nameParts], ['node_modules', ...nameParts], ['Scripts', 'node_modules', ...nameParts]];
+  if (!pkgName || !layouts.some((l) => l.length === tail.length && l.every((x, i) => x === tail[i]))) {
+    return no(`${real} is not where pre-commit installs a node hook (<repo>/node_env-*/lib/node_modules/${pkgName || '<name>'})`);
+  }
+  const repo = parts.slice(0, at).join(path.sep) || path.sep;
+  const store = path.dirname(repo);
+  const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
+  const exists = (p) => { try { fs.lstatSync(p); return true; } catch { return false; } };
+  if (!/^repo[A-Za-z0-9_]+$/.test(path.basename(repo))) return no(`${repo} is not a pre-commit repo directory`);
+  if (!isFile(path.join(store, 'db.db'))) return no(`${store} is not a pre-commit store (no db.db)`);
+  if (!exists(path.join(repo, '.git')) || !isFile(path.join(repo, '.pre-commit-hooks.yaml'))) {
+    return no(`${repo} is not a pre-commit clone of this hook's repository`);
+  }
+  const rel = path.join('mcp-ecosystem-intelligence', 'assets', 'tools_database.json');
+  let same = false;
+  try { same = fs.readFileSync(path.join(repo, rel)).equals(fs.readFileSync(path.join(real, rel))); } catch { same = false; }
+  if (!same) return no(`the DB this package reads is not the one in ${repo}`);
+  return { ok: true, repo, reason: `installed by pre-commit from the commit its rev: pins (${repo})` };
 }
 
 // The DB as a subject: a file. Inside the package it is named relative to the
@@ -262,7 +334,7 @@ function checkDb({ dbPath, keys, keyringOk = true, keyringErrors = [], allowUnsi
 }
 
 module.exports = {
-  PACKAGE_ROOT, ALLOW_ENV, REQUIRE_ENV, ALLOW_FLAG,
+  PACKAGE_ROOT, ALLOW_ENV, REQUIRE_ENV, ALLOW_FLAG, PRE_COMMIT_ENV, PRE_COMMIT_CONTEXT,
   sigPathFor, verifyFile, signFile, allowUnsignedFromEnv,
-  signatureContext, signatureFindings, signaturePolicy, signatureDocument, checkDb,
+  signatureContext, preCommitPin, signatureFindings, signaturePolicy, signatureDocument, checkDb,
 };

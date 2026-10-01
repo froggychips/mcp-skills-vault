@@ -66,7 +66,7 @@
 
 const { tokenHash } = require('./surface.cjs');
 const { subject, finding, decide } = require('./finding.cjs');
-const { toTypedEntry, packageKey } = require('./entry_model.cjs');
+const { entryForLaunch } = require('./entry_match.cjs');
 
 const LABELS = {
   untrusted_content: 'reads content somebody else wrote: web pages, issues, email, messages',
@@ -689,19 +689,14 @@ function judgeSets(sets, policy, asOf) {
 }
 
 /**
- * The vault entry a configured launch runs, matched by package identity. The
- * config key is the user's label: a server keyed `github-mcp-server` that runs
+ * The vault entry a configured launch runs, matched by package identity
+ * (lib/entry_match.cjs, the one matcher every command uses). The config key is
+ * the user's label: a server keyed `github-mcp-server` that runs
  * `node innocent.js` is not the vault's GitHub server and must not inherit
  * its labels.
  */
 function dbEntryForLaunch(tools, installCmd) {
-  if (!installCmd) return null;
-  let key = null;
-  try { const t = toTypedEntry({ install_cmd: installCmd }); key = t ? packageKey(t.artifact) : null; } catch { key = null; }
-  if (!key) return null;
-  return (tools || []).find((tool) => {
-    try { const t = toTypedEntry(tool); return Boolean(t && packageKey(t.artifact) === key); } catch { return false; }
-  }) || null;
+  return entryForLaunch(tools, installCmd);
 }
 
 module.exports = {

@@ -75,6 +75,7 @@ const {
   verifyRegistrySignature, provenanceClaim, checkProvenance, keysUrl,
 } = require('./lib/npm_signatures.cjs');
 const { readInstalledServers, explicitConfigPaths, unpinnedLaunch } = require('./lib/installed.cjs');
+const { matchLaunch } = require('./lib/entry_match.cjs');
 const lookalike = require('./lib/lookalike.cjs');
 const {
   resolveNpmTreeCached, pypiDirectDependencies, summarizeTree,
@@ -82,7 +83,7 @@ const {
 const { loadEffectivePolicy, flagsFromArgv, rowFor, RANK } = require('./lib/policy_rules.cjs');
 const { hasOrgRules, loadOrgContext, orgModel } = require('./lib/org_policy.cjs');
 const {
-  decide, exitCode, outcomeFails, findingsDocument, toJson, toSarif: findingsToSarif, finding,
+  decide, exitCode, outcomeFails, findingsDocument, toJson, toSarif: findingsToSarif, finding, observationState,
 } = require('./lib/finding.cjs');
 const { fromVerifyResults, fromStoredEvidence, foundProblem } = require('./lib/findings_from.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
@@ -1456,6 +1457,38 @@ function configRef(file, base = process.cwd()) {
   return (rel && !rel.startsWith('..') && !path.isAbsolute(rel) ? rel : file).split(path.sep).join('/');
 }
 
+/**
+ * The vault record's age, for a config line: one context finding saying which
+ * claims of absence aged out (and which were never made), or null when none.
+ * `stored` is fromStoredEvidence's result for the vault entry `source`.
+ */
+function vaultAgeFinding(source, stored, s) {
+  const DAY = 86400000;
+  const stale = stored.observations.filter((o) => observationState(o, AS_OF) === 'stale' && !foundProblem(o.dimension, o.status));
+  const missing = stored.findings.filter((f) => f.rule === 'evidence/missing').map((f) => f.message.split(' ')[0]).sort();
+  if (!stale.length && !missing.length) return null;
+  let what = source.name;
+  try {
+    const t = toTypedEntry(source);
+    const id = t ? artifactId(t.artifact) : null;
+    if (id) what = id.replace(/^[a-z]+:/, '');
+  } catch { /* keep the entry name */ }
+  const parts = [];
+  if (stale.length) {
+    const days = Math.max(...stale.map((o) => Math.floor((AS_OF - Date.parse(o.confirmed_at || o.observed_at)) / DAY)));
+    const dims = [...new Set(stale.map((o) => o.dimension))].sort();
+    parts.push(`vault evidence for ${what} is ${days} days old (${dims.join(', ')})`);
+    if (missing.length) parts.push(`and never checked: ${missing.join(', ')}`);
+  } else {
+    parts.push(`vault evidence for ${what} never checked: ${missing.join(', ')}`);
+  }
+  return finding({
+    rule: 'evidence/vault-age', subject: s, scope: 'installed', severity: 'info', state: 'stale',
+    refs: stale.map((o) => o.id),
+    message: `${parts.join(' ')} — the result above uses what was last seen`,
+  });
+}
+
 // ── main ───────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -1578,23 +1611,25 @@ async function main() {
       }
       return exitAfterFlush(0);
     }
-    const byName = new Map(allTools.map((t) => [t.name, t]));
     const lookalikeIndex = lookalike.buildIndex(allTools);
-    // The vault entry for an npm package, by package (for the extra `-p`
-    // packages, which have no config key of their own).
-    const byNpmPackage = new Map();
-    for (const t of allTools) {
-      const p = typeof t.install_cmd === 'string' ? npmPkgName(t.install_cmd) : null;
-      if (p && !byNpmPackage.has(p)) byNpmPackage.set(p, t);
-    }
     scope = servers.flatMap((srv) => {
-      const known = byName.get(srv.name) || null;
+      // The entry this launch runs, by package identity — the config key is a
+      // label (lib/entry_match.cjs, the matcher `status` uses). A launch whose
+      // package source is overridden is not the registry's package, whatever
+      // its name says, so it matches nothing.
+      const match = srv.source_override ? matchLaunch([], null) : matchLaunch(allTools, srv.install_cmd);
+      const known = match.entry;
       // Registry checks answer "is this the artifact it claims to be". A
       // typosquat is exactly that — a real, signed, unvulnerable package — so
       // the gate passed it. What it is not is the package the user meant.
-      const look = lookalike.checkServer(srv, lookalikeIndex, { dbName: known ? known.name : null });
+      // Here, and only here, the config key is read as a claim: a key that is
+      // a vault name on another package is impersonation (checkServer finds
+      // the entry the key names itself; `known` is what actually runs).
+      const look = lookalike.checkServer(srv, lookalikeIndex);
       const pinnedVersion = versionFromInstallCmd(srv.install_cmd);
-      const sameVersion = known && pinnedVersion && known.version === pinnedVersion;
+      // Only the same artifact (version compared as `status` compares it):
+      // what the vault stored about x@1 says nothing about x@2.
+      const sameVersion = match.version_match === 'same';
       const main = {
         name:          srv.name,
         install_cmd:   srv.install_cmd || `(${srv.remote ? `remote: ${srv.remote}` : srv.command || 'no command'})`,
@@ -1618,6 +1653,9 @@ async function main() {
           // option or environment variable): never checked as if it did.
           override: srv.source_override || null,
           launch: srv.launch || null,
+          // The vault entry, when it pins exactly this artifact: its stored
+          // evidence is then about these bytes (applied offline, below).
+          vault_entry: sameVersion ? known.name : null,
         },
         _lookalike: look,
         // The config launches a registry package with no exact version: a
@@ -1631,17 +1669,19 @@ async function main() {
         ? (srv.launch.packages || []).filter((x) => x.name !== srv.launch.package) : [])
         .map((x) => {
           const cmd = `npx -y ${x.name}${x.version ? `@${x.version}` : ''}`;
-          const k = byNpmPackage.get(x.name) || null;
+          const xm = matchLaunch(allTools, cmd);
+          const k = xm.entry;
           const v = versionFromInstallCmd(cmd);
+          const same = xm.version_match === 'same';
           return {
             name:          `${srv.name} (-p ${x.name})`,
             install_cmd:   cmd,
             version:       v,
-            pkg_integrity: k && v && k.version === v ? k.pkg_integrity : null,
+            pkg_integrity: same ? k.pkg_integrity : null,
             source_url:    k ? k.source_url : null,
             trust:         k ? k.trust : 'not-in-vault',
             license:       k ? k.license : null,
-            _installed: { ...main._installed, in_vault: !!k, extra_of: srv.name },
+            _installed: { ...main._installed, in_vault: !!k, extra_of: srv.name, vault_entry: same ? k.name : null },
             _lookalike: lookalike.checkServer({ name: null, install_cmd: cmd }, lookalikeIndex),
             _unpinned: unpinnedLaunch(srv, { dbTools: allTools, only: x.name }),
           };
@@ -2033,8 +2073,12 @@ async function main() {
   // advisory against the pinned version, a yanked release, a claim past its
   // shelf life. The same producer explain uses (lib/findings_from.cjs
   // fromStoredEvidence), so `verify --offline` and `explain` are one decision
-  // with one exit code. Not for --installed: a configured server's version
-  // need not be the one the DB's evidence describes.
+  // with one exit code. For --installed / --config the same, on the config
+  // line, when the server launches exactly the artifact a vault entry pins
+  // (`_installed.vault_entry`, lib/entry_match.cjs): a configured server's
+  // version need not be the one the DB's evidence describes, and when it is
+  // not, nothing stored applies. `check` runs this, so a yanked or advised
+  // release fails it as it fails `verify --offline` and `status`.
   const storedFindings = [];
   let orgShared = null;
   results.forEach((r, i) => {
@@ -2061,8 +2105,13 @@ async function main() {
       facts[s.id].org = org.facts;
       model.findings.push(...org.findings);
     }
-    if (!OFFLINE || INSTALLED || s.type !== 'artifact' || r.status === 'UPD') return;
-    const stored = fromStoredEvidence(r.tool, { asOf: AS_OF, maxAgeDays: evidenceMaxAge(), subject: s, scope: 'database' });
+    if (!OFFLINE || r.status === 'UPD') return;
+    const inst = r.tool._installed;
+    const source = INSTALLED
+      ? (inst && inst.vault_entry && s.type === 'host-config' ? allTools.find((t) => t.name === inst.vault_entry) || null : null)
+      : (s.type === 'artifact' ? r.tool : null);
+    if (!source) return;
+    const stored = fromStoredEvidence(source, { asOf: AS_OF, maxAgeDays: evidenceMaxAge(), subject: s, scope: INSTALLED ? 'installed' : 'database' });
     Object.assign(facts[s.id], stored.facts);
     // Offline the stored record is all there is to judge a policy
     // requirement by, so the policy/* rows read it (evidence mode) as they do
@@ -2072,8 +2121,23 @@ async function main() {
     facts[s.id].mode = 'evidence';
     const seen = new Set(model.observations.map((o) => o.id));
     for (const o of stored.observations) if (!seen.has(o.id)) model.observations.push(o);
-    model.findings.push(...stored.findings);
-    storedFindings[i] = stored.findings;
+    // On a config line, what the record *found* (a yanked release, a known
+    // advisory, a hash or repo that disagreed — observed, never ageing,
+    // docs/adr/0001 §5) is decided. The record's own age is not: a claim of
+    // absence past its shelf life, or a dimension never checked, is about the
+    // vault release the hook or Action is pinned to, not about the config,
+    // and deciding it turned every vault server into `unknown` a week after
+    // each release, which fail-on unknown fails. It is still said — no data
+    // is not clean — as one context finding per line (evidence/vault-age,
+    // never part of the answer); `check --online` re-observes it.
+    let kept = stored.findings;
+    if (INSTALLED) {
+      kept = stored.findings.filter((f) => f.state === 'observed');
+      const age = vaultAgeFinding(source, stored, s);
+      if (age && !model.findings.some((f) => f.id === age.id)) kept.push(age);
+    }
+    model.findings.push(...kept);
+    storedFindings[i] = kept;
   });
   const decisions = decide(model.findings, EP, AS_OF, {
     subjects: [...model.subjects.filter(Boolean), ...lookalikeRun.findings.map((f) => f.subject)], facts,
@@ -2097,11 +2161,12 @@ async function main() {
     });
     for (const f of fs_) {
       if (f.rule === 'evidence/stale') continue;
-      const tag = f.state !== 'observed' ? 'UNVERIFIED'
+      const tag = f.rule === 'evidence/vault-age' ? 'NOTE'
+        : f.state !== 'observed' ? 'UNVERIFIED'
         : f.severity === 'high' ? (f.rule === 'evidence/advisories' ? 'CVE' : 'FAIL')
         : 'WARN';
       r.lines = r.lines || [];
-      r.lines.push([tag, `stored evidence: ${f.message}`, { rule: f.rule, severity: f.severity, state: f.state }]);
+      r.lines.push([tag, tag === 'NOTE' ? f.message : `stored evidence: ${f.message}`, { rule: f.rule, severity: f.severity, state: f.state }]);
       if (d.rules.some((o) => o.findings.includes(f.id) && fails(o))) failed = true;
       if (tag === 'UNVERIFIED') unverified = true;
     }

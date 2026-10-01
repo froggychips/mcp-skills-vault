@@ -521,7 +521,7 @@ function checkBudget(tool, cwd) {
     return estimateServer({
       name:      srv.name,
       dbEntry,
-      evalEntry: evalBy.get(srv.name) || (dbEntry && evalBy.get(dbEntry.name)),
+      evalEntry: (dbEntry && evalBy.get(dbEntry.name)) || null,
     });
   });
   const adding = estimateServer({ name: tool.name, dbEntry: tool, evalEntry: evalBy.get(tool.name) });

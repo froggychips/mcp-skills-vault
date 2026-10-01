@@ -41,12 +41,15 @@ test('estimateServer: a zero-byte payload is not a measurement', () => {
   assert.equal(r.source, 'eval');
 });
 
-test('matchDbEntry: by name, then by package', () => {
+test('matchDbEntry: by package, never by the config key', () => {
   const db = [
     { name: '@scope/server', install_cmd: 'npx -y @scope/server@1.0.0', est_tools_count: 5 },
     { name: 'git-server',    install_cmd: 'uvx mcp-server-git==1.0',    est_tools_count: 3 },
   ];
-  assert.equal(b.matchDbEntry({ name: '@scope/server' }, db).est_tools_count, 5);
+  assert.equal(b.matchDbEntry({ name: '@scope/server' }, db), null);
+  assert.equal(b.matchDbEntry({ name: 'x', install_cmd: 'npx -y @scope/server@1.0.0' }, db).est_tools_count, 5);
+  // The vault's name on another package is not that entry.
+  assert.equal(b.matchDbEntry({ name: 'git-server', install_cmd: 'npx -y @scope/server@1.0.0' }, db).name, '@scope/server');
   // A config can name a server anything; the package is what identifies it.
   assert.equal(b.matchDbEntry({ name: 'my-git', install_cmd: 'uvx mcp-server-git==1.0' }, db).name, 'git-server');
   assert.equal(b.matchDbEntry({ name: 'unknown', install_cmd: 'npx -y other' }, db), null);

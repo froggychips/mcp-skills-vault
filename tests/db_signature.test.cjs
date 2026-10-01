@@ -281,3 +281,93 @@ test('bin: with the shipped (empty) keyring nothing changes for today\'s users',
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stderr, '');
 });
+
+// ── the pre-commit hook: `rev:` is the integrity, in pre-commit's install only ──
+
+/**
+ * pre-commit's layout for a node hook: <store>/db.db, <store>/repoXXXX (a git
+ * clone of the hook repo at `rev:`), and the package `npm install -g`-ed into
+ * <store>/repoXXXX/node_env-<v>/lib/node_modules/<name>.
+ */
+function preCommitLayout({ name = '@froggychips/mcp-vault', storeDb = true, git = true, hooks = true, sameDb = true, envDir = 'node_env-system' } = {}) {
+  const store = tmp();
+  if (storeDb) fs.writeFileSync(path.join(store, 'db.db'), '');
+  const repo = path.join(store, 'repoab12_cd');
+  const rel = path.join('mcp-ecosystem-intelligence', 'assets');
+  fs.mkdirSync(path.join(repo, rel), { recursive: true });
+  if (git) fs.mkdirSync(path.join(repo, '.git'));
+  if (hooks) fs.writeFileSync(path.join(repo, '.pre-commit-hooks.yaml'), '- id: mcp-vault\n');
+  const root = path.join(repo, envDir, 'lib', 'node_modules', ...name.split('/'));
+  fs.mkdirSync(path.join(root, rel), { recursive: true });
+  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name }));
+  const dbPath = dbIn(path.join(root, rel));
+  if (sameDb) fs.copyFileSync(dbPath, path.join(repo, rel, 'tools_database.json'));
+  else dbIn(path.join(repo, rel), { tools: [] });
+  return { store, repo, root, dbPath };
+}
+const HOOK_ENV = { PRE_COMMIT: '1', [ds.PRE_COMMIT_ENV]: '1' };
+
+test('signatureContext: pre-commit\'s install of the hook, asked by the hook entry, is pinned by rev — nothing else is', () => {
+  const { root } = preCommitLayout();
+  const ctx = ds.signatureContext({ root, env: HOOK_ENV });
+  assert.equal(ctx.required, false);
+  assert.equal(ctx.context, ds.PRE_COMMIT_CONTEXT);
+  assert.match(ctx.reason, /rev: pins/);
+
+  // Each condition is necessary.
+  const required = (root2, env, why) => assert.equal(ds.signatureContext({ root: root2, env }).required, true, why);
+  required(root, { PRE_COMMIT: '1' }, 'mcp-vault itself (no hook entry) never relaxes');
+  required(root, { [ds.PRE_COMMIT_ENV]: '1' }, 'pre-commit is not running the hook');
+  required(root, { ...HOOK_ENV, [ds.REQUIRE_ENV]: '1' }, 'MCP_VAULT_REQUIRE_SIGNED_DB still tightens');
+  required(preCommitLayout({ storeDb: false }).root, HOOK_ENV, 'not a pre-commit store');
+  required(preCommitLayout({ git: false }).root, HOOK_ENV, 'not a clone');
+  required(preCommitLayout({ hooks: false }).root, HOOK_ENV, 'not this hook\'s repository');
+  required(preCommitLayout({ sameDb: false }).root, HOOK_ENV, 'the DB is not the clone\'s bytes');
+  required(preCommitLayout({ envDir: 'node_modules_x' }).root, HOOK_ENV, 'not a node_env');
+
+  // npm and npx install elsewhere: never pinned, whatever the environment says.
+  const npx = path.join(tmp(), '_npx', 'abc123', 'node_modules', '@froggychips', 'mcp-vault');
+  fs.mkdirSync(npx, { recursive: true });
+  fs.writeFileSync(path.join(npx, 'package.json'), JSON.stringify({ name: '@froggychips/mcp-vault' }));
+  required(npx, HOOK_ENV, 'an npx install');
+});
+
+test('checkDb: pinned by pre-commit rev, a missing .sig runs — a .sig that is present still has to verify', () => {
+  const pair = s.generateKeyPair();
+  const { root, dbPath } = preCommitLayout();
+  const context = ds.signatureContext({ root, env: HOOK_ENV });
+  let r = check({ dbPath, keys: ring(pair), context });
+  assert.equal(r.proceed, true);
+  assert.equal(r.state, 'not-required');
+  assert.equal(r.decision.effect, 'allow');
+
+  fs.writeFileSync(`${dbPath}.sig`, '{"format":"nope"}');
+  r = check({ dbPath, keys: ring(pair), context });
+  assert.equal(r.proceed, false);
+  assert.equal(r.decision.effect, 'deny');
+
+  const other = s.generateKeyPair();
+  ds.signFile(dbPath, { privateKeyPem: other.privateKeyPem, now: NOW });
+  r = check({ dbPath, keys: ring(pair), context });
+  assert.equal(r.proceed, false, 'signed by a key the keyring does not list');
+
+  ds.signFile(dbPath, { privateKeyPem: pair.privateKeyPem, now: NOW });
+  r = check({ dbPath, keys: ring(pair), context });
+  assert.equal(r.proceed, true);
+  assert.equal(r.state, 'verified');
+});
+
+test('bin/mcp-vault-pre-commit: runs `check` only and refuses --db; outside pre-commit\'s install it claims nothing', () => {
+  const hook = path.join(ROOT, 'bin', 'mcp-vault-pre-commit.cjs');
+  const dir = tmp();
+  fs.writeFileSync(path.join(dir, '.mcp.json'), JSON.stringify({ mcpServers: {} }));
+  const env = { ...process.env, MCP_VAULT_ALLOW_UNSIGNED_DB: '', MCP_VAULT_REQUIRE_SIGNED_DB: '', PRE_COMMIT: '1', NO_COLOR: '1' };
+  const runHook = (args) => spawnSync(process.execPath, [hook, ...args], { cwd: dir, encoding: 'utf8', env });
+  // This repository is a checkout: the CLI's own rule, and no pre-commit claim.
+  const ok = runHook(['--fail-on', 'unknown', '.mcp.json']);
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.doesNotMatch(ok.stderr, /pinned by pre-commit rev/);
+  const db = runHook(['--db', 'x.json', '.mcp.json']);
+  assert.equal(db.status, 2);
+  assert.match(db.stderr, /--db is not accepted/);
+});

@@ -132,7 +132,11 @@ function main(argv) {
 
   const rows = servers.map((srv) => {
     const dbEntry = matchDbEntry(srv, db);
-    const est = estimateServer({ name: srv.name, dbEntry, evalEntry: evalBy.get(srv.name) || (dbEntry && evalBy.get(dbEntry.name)) });
+    // The shipped results are keyed by vault entry, so only the entry the
+    // launch runs selects a row. `--results` from `eval --installed` is keyed
+    // by this config's own server names: there the key is the measurement's.
+    const evalEntry = (opts.results ? evalBy.get(srv.name) : null) || (dbEntry && evalBy.get(dbEntry.name)) || null;
+    const est = estimateServer({ name: srv.name, dbEntry, evalEntry });
     return {
       ...est,
       host:     srv.host,

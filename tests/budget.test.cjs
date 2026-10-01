@@ -99,9 +99,11 @@ test('a config already over the ceiling says so separately', () => {
   assert.equal(r.over, true);
 });
 
-test('matchDbEntry falls back to the package name when the label differs', () => {
+test('matchDbEntry matches the launched package, never the label', () => {
   const db = [{ name: 'playwright-mcp', install_cmd: 'npx -y @playwright/mcp@0.0.75' }];
-  assert.equal(b.matchDbEntry({ name: 'playwright-mcp' }, db).name, 'playwright-mcp');
+  // The vault's name with nothing launched is not the vault's server.
+  assert.equal(b.matchDbEntry({ name: 'playwright-mcp' }, db), null);
+  assert.equal(b.matchDbEntry({ name: 'playwright-mcp', command: 'npx', args: ['-y', '@playwright/mcp@0.0.75'] }, db).name, 'playwright-mcp');
   assert.equal(b.matchDbEntry({ name: 'browser', install_cmd: 'npx -y @playwright/mcp@0.0.75' }, db).name, 'playwright-mcp');
   assert.equal(b.matchDbEntry({ name: 'unrelated', install_cmd: 'npx -y other-pkg' }, db), null);
   assert.equal(b.matchDbEntry({ name: 'remote' }, db), null);

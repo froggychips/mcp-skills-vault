@@ -113,9 +113,9 @@ test('parseDbVersion: handles all three install styles', () => {
   assert.equal(a.parseDbVersion('uvx --from git+https://x mcp-redis'),                                    null);
 });
 
-test('matchDbEntry: exact name wins', () => {
-  const t = a.matchDbEntry(TEST_DB, 'gitlab-mcp', { command: 'npx', args: ['-y', 'whatever'] });
-  assert.equal(t.name, 'gitlab-mcp');
+test('matchDbEntry: the config key never selects an entry — the launched package does', () => {
+  // The vault's name on another package is not that entry (lib/entry_match.cjs).
+  assert.equal(a.matchDbEntry(TEST_DB, 'gitlab-mcp', { command: 'npx', args: ['-y', 'whatever'] }), null);
 });
 
 test('matchDbEntry: nickname resolves via package token', () => {
@@ -165,7 +165,9 @@ test('audit: drift finding when installed version ≠ DB version', () => {
 
 test('audit: untrusted finding when DB trust=candidate', () => {
   const findings = a.audit({
-    project: { 'mcp-redis': { command: 'uvx', args: ['--from', 'git+https://x', 'mcp-redis'] } },
+    // The entry's own source: matched by what it launches (a different git
+    // URL is a different artifact, whatever the key says).
+    project: { 'mcp-redis': { command: 'uvx', args: ['--from', 'git+https://github.com/redis/mcp-redis', 'mcp-redis'] } },
     global:   {},
     settings: { enabled: null, allowedTools: [] },
     db:       TEST_DB,
@@ -268,12 +270,12 @@ test('audit: version-unknown when DB pinned but installed has no @ver token', ()
     settings: { enabled: null, allowedTools: [] },
     db:       TEST_DB,
   });
-  // Won't match by package token, so this becomes 'unknown', not version-unknown.
+  // Won't match by package, so this becomes 'unknown', not version-unknown.
   // version-unknown requires a match; build that case explicitly:
   const findings2 = a.audit({
     project: {
-      // server name == DB name → exact match, but args carry no parseable version
-      'mcp-server-filesystem': { command: 'node', args: ['./wrapper.js'] },
+      // the entry's package, launched with no version
+      fs: { command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', '/data'] },
     },
     global:   {},
     settings: { enabled: null, allowedTools: [] },
@@ -306,7 +308,7 @@ test('CLI --help exits 0', () => {
 
 test('CLI --json emits {cwd, db_path, global_path, counts, findings (findings@1), details}', () => {
   const dbPath  = writeTestDb();
-  const proj    = makeProject({ mcp: { mcpServers: { 'mcp-redis': { command: 'uvx', args: ['--from', 'git+https://x', 'mcp-redis'] } } } });
+  const proj    = makeProject({ mcp: { mcpServers: { 'mcp-redis': { command: 'uvx', args: ['--from', 'git+https://github.com/redis/mcp-redis', 'mcp-redis'] } } } });
   const globalCfg = makeGlobalCfg({});
   const res = runCli(['--json', '--cwd', proj, '--global-config', globalCfg], dbPath);
   assert.equal(res.status, 0, `stderr: ${res.stderr}`);
@@ -326,7 +328,7 @@ test('CLI --json emits {cwd, db_path, global_path, counts, findings (findings@1)
 
 test('CLI --strict exit code 1 on untrusted finding', () => {
   const dbPath = writeTestDb();
-  const proj = makeProject({ mcp: { mcpServers: { 'mcp-redis': { command: 'uvx', args: ['--from', 'git+https://x', 'mcp-redis'] } } } });
+  const proj = makeProject({ mcp: { mcpServers: { 'mcp-redis': { command: 'uvx', args: ['--from', 'git+https://github.com/redis/mcp-redis', 'mcp-redis'] } } } });
   const globalCfg = makeGlobalCfg({});
   const res = runCli(['--strict', '--cwd', proj, '--global-config', globalCfg], dbPath);
   assert.equal(res.status, 1, `expected strict exit 1, got ${res.status}; stdout: ${res.stdout}`);
