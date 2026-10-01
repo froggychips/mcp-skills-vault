@@ -897,6 +897,19 @@ mcp-vault site-registry
 
 The generated page is static, searchable, and filterable by category, tier, and trust. It is meant to be published with the rest of the GitHub Pages site.
 
+### Badges
+
+The same run renders a badge per entry into `badges/` under the site root — a flat SVG drawn by [`lib/badge.cjs`](./mcp-ecosystem-intelligence/scripts/lib/badge.cjs), no external service, plus a shields.io endpoint JSON — and an evidence page per entry under `entry/` that the badge links to. It carries the derived tier and the date of the newest evidence; once a check the tier rests on is past its shelf life it says `stale` in grey, and a failed check says `blocked` in red. None of that is decided by the badge: `blocked` is the entry's Decision from `decide()` being `deny`, `stale` is an observation's state at `--as-of`, and `badge --json` carries the `findings@1` document it was read off.
+
+```bash
+mcp-vault badge <name>          # README snippet (Markdown / HTML / shields), --json, --as-of
+mcp-vault site-registry --out <site root> --base-url https://mcp.froggychips.xyz
+```
+
+`--out` defaults to `docs/site` in a checkout and `--base-url` to `https://mcp.froggychips.xyz`; every link on a badge and in a snippet is built from the base URL. The public site is assembled in [froggychips/mcp-site](https://github.com/froggychips/mcp-site), which runs these generators from the npm release into its own root — the generated files are not committed here.
+
+[`.github/scripts/finding_reports.cjs`](./.github/scripts/finding_reports.cjs) drafts a short issue text for each entry with a real finding (advisory, repository mismatch, yanked or unpublished release, install scripts in the tree, tool surface changed without a release). It writes files only; nothing is opened in anyone's repository.
+
 ### Health scorer
 
 [`scripts/calculate_health.cjs`](./mcp-ecosystem-intelligence/scripts/calculate_health.cjs) — score any MCP candidate:
@@ -1117,6 +1130,7 @@ Everything in this table is scripted and tested; the column says where it lives.
 | Tier derived from evidence, not from a score | [`lib/tiers.cjs`](./mcp-ecosystem-intelligence/scripts/lib/tiers.cjs) |
 | One command instead of six | [`status.cjs`](./mcp-ecosystem-intelligence/scripts/status.cjs) |
 | Plain-text secrets in host configs, never printed | [`lib/secrets.cjs`](./mcp-ecosystem-intelligence/scripts/lib/secrets.cjs), [`check_secrets.cjs`](./mcp-ecosystem-intelligence/scripts/check_secrets.cjs) |
+| Badges that go grey when the evidence ages | [`lib/badge.cjs`](./mcp-ecosystem-intelligence/scripts/lib/badge.cjs), [`badge.cjs`](./mcp-ecosystem-intelligence/scripts/badge.cjs) |
 | The documented numbers checked against the data | [`tests/docs_numbers.test.cjs`](./tests/docs_numbers.test.cjs) |
 | What will not change without a major bump | [`docs/COMPATIBILITY.md`](./docs/COMPATIBILITY.md) |
 | One findings model and one place that decides; time as an explicit input (`--as-of`) | [`docs/adr/0001`](./docs/adr/0001-findings-and-time.md), [`lib/finding.cjs`](./mcp-ecosystem-intelligence/scripts/lib/finding.cjs), [`lib/policy_rules.cjs`](./mcp-ecosystem-intelligence/scripts/lib/policy_rules.cjs), [`lib/clock.cjs`](./mcp-ecosystem-intelligence/scripts/lib/clock.cjs) |

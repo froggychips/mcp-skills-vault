@@ -162,10 +162,42 @@ function buildEntries(db, evals, asOf) {
   );
 }
 
-function main() {
-  // Read once (or `--as-of`), so a regenerated page is reproducible.
-  const clock = asOfFromArgv(process.argv.slice(2));
-  if (clock.error) { console.error(clock.error); process.exit(2); }
+const HELP = `site-registry — the browsable registry page, and every entry's badge
+
+USAGE
+  mcp-vault site-registry [--out <dir>] [--base-url <url>] [--as-of <date>]
+
+  --out       the site root to write into (default: docs/site in this checkout).
+              Writes registry.html, registry.json, badges/ and entry/ under it.
+  --base-url  URL the site root is served at (default: https://mcp.froggychips.xyz);
+              passed through to the badges
+  --as-of     judge tiers and badges at this instant (YYYY-MM-DD or ISO-8601
+              with a zone; default: now). The badges get the same instant.
+`;
+
+function parseArgs(argv) {
+  const opts = { out: OUT_DIR, base: null, help: false };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "-h" || a === "--help") opts.help = true;
+    else if (a === "--out") { const v = argv[++i]; if (!v) return { ...opts, error: "--out needs a directory" }; opts.out = path.resolve(v); }
+    else if (a === "--base-url") { const v = argv[++i]; if (!v) return { ...opts, error: "--base-url needs a URL" }; opts.base = v; }
+    else if (a === "--as-of") i++;               // read by asOfFromArgv
+    else if (a.startsWith("--as-of=")) continue;
+    else return { ...opts, error: `unknown argument ${a}` };
+  }
+  return opts;
+}
+
+function main(argv = process.argv.slice(2)) {
+  const opts = parseArgs(argv);
+  if (opts.help) { process.stdout.write(HELP); return; }
+  if (opts.error) { process.stderr.write(`site-registry: ${opts.error}\n\n${HELP}`); process.exitCode = 2; return; }
+  // Read once (or `--as-of`), so a regenerated page is reproducible — and the
+  // badges are judged at the very same instant as the tiers on the page.
+  const clock = asOfFromArgv(argv);
+  if (clock.error) { process.stderr.write(`site-registry: ${clock.error}\n`); process.exitCode = 2; return; }
+  const outDir = opts.out;
   const db = JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
   // Behavioural results are a separate stream, and may be absent (nothing has
   // run yet) — an empty file must not become an empty claim.
@@ -175,12 +207,18 @@ function main() {
   } catch { /* no results shipped */ }
 
   const entries = buildEntries(db, evals, clock.asOf);
-  fs.mkdirSync(OUT_DIR, { recursive: true });
-  fs.writeFileSync(path.join(OUT_DIR, "registry.json"), `${JSON.stringify({ generated_at: clock.iso, as_of: clock.iso, count: entries.length, entries }, null, 2)}\n`);
-  fs.writeFileSync(path.join(OUT_DIR, "registry.html"), renderHtml(entries));
-  console.log(`Wrote ${entries.length} entries to ${path.join(OUT_DIR, "registry.html")}`);
+  fs.mkdirSync(outDir, { recursive: true });
+  fs.writeFileSync(path.join(outDir, "registry.json"), `${JSON.stringify({ generated_at: clock.iso, as_of: clock.iso, count: entries.length, entries }, null, 2)}\n`);
+  fs.writeFileSync(path.join(outDir, "registry.html"), renderHtml(entries));
+  console.log(`Wrote ${entries.length} entries to ${path.join(outDir, "registry.html")}`);
+  // The badges and per-entry evidence pages ride with the page, so a rebuild
+  // of one is a rebuild of the other — into the same root, for the same URL.
+  const badgeArgs = ["--write", "--out", outDir, "--as-of", clock.iso];
+  if (opts.base) badgeArgs.push("--base-url", opts.base);
+  const code = require("./badge.cjs").main(badgeArgs);
+  if (code !== 0) process.exitCode = code;
 }
 
 if (require.main === module) main();
 
-module.exports = { slimEntry, renderHtml, buildEntries, DB_PATH, EVAL_PATH, OUT_DIR };
+module.exports = { slimEntry, renderHtml, buildEntries, parseArgs, main, DB_PATH, EVAL_PATH, OUT_DIR };
