@@ -22,10 +22,15 @@
  *   node scripts/audit_setup.cjs --global-config <path>  override ~/.claude.json (test hook)
  *   node scripts/audit_setup.cjs --help
  *
- * Exit codes:
+ * Exit codes — the Decision's (docs/adr/0001, mode setup; --strict is the
+ * policy's fail_on):
  *   0  clean or info-only findings
- *   1  --strict triggered (drift / untrusted / heavy-unbounded present)
- *   2  bad invocation
+ *   1  a finding that refuses (a plain-text secret, a toxic flow under
+ *      `toxicFlows: fail`, …); with --strict also drift / untrusted /
+ *      heavy-unbounded / a lookalike / a server not in the DB / an unreadable
+ *      policy
+ *   2  bad invocation, or a config that could not be read (unless something
+ *      else fails)
  */
 
 'use strict';
@@ -34,13 +39,16 @@ const fs   = require('fs');
 const path = require('path');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { asOfFromArgv } = require('./lib/clock.cjs');
-const { scanHostConfigs } = require('./lib/secrets.cjs');
+const { scanHostConfigs, toFindings: secretsToFindings, subjectPath } = require('./lib/secrets.cjs');
 const flows = require('./lib/flows.cjs');
 const lookalike = require('./lib/lookalike.cjs');
 const { loadEffectivePolicy, flagsFromArgv } = require('./lib/policy_rules.cjs');
-const { decide, exitCode, findingsDocument, toJson } = require('./lib/finding.cjs');
+const { subject, finding } = require('./lib/finding.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
-const { toInstallCmd } = require('./lib/installed.cjs');
+const { toInstallCmd, serverLine } = require('./lib/installed.cjs');
+const { evalIndex } = require('./lib/tiers.cjs');
+const { evalResultsAsOf } = require('./lib/evidence.cjs');
+const { decideRun, unanswered } = require('./lib/run_decision.cjs');
 
 const DEFAULT_DB = path.resolve(__dirname, '../assets/tools_database.json');
 const EVAL_PATH  = path.resolve(__dirname, '../assets/eval_results.json');
@@ -117,9 +125,13 @@ Finding categories:
   fail | warn | allow, default warn): fail exits 1 without --strict, warn
   fails under --strict, allow and low-confidence findings never fail.
 
+  Every category is a finding (lib/finding.cjs) and the exit code is the
+  Decision's: a plain-text secret refuses; drift, untrusted, heavy-unbounded,
+  a lookalike and a server not in the DB fail under --strict.
+
 Flags:
-  --json             emit findings array as JSON
-  --strict           exit 1 on any lookalike/drift/untrusted/heavy-unbounded/secret
+  --json             emit the findings@1 document (and per-finding details) as JSON
+  --strict           also exit 1 on any lookalike/drift/untrusted/heavy-unbounded/unknown
   --allow-lookalike  a server (key or package) you know is yours; still
                      reported, no longer fails --strict. Repeatable, or a,b
   --cwd <path>       project root override (default: process.cwd())
@@ -573,10 +585,6 @@ const CATEGORY_COLOR = {
   'unknown':         DM,
   'version-unknown': DM,
 };
-const STRICT_CATEGORIES = new Set(['lookalike', 'drift', 'untrusted', 'heavy-unbounded', 'secret']);
-// Categories whose exit is decide()'s (lookalikeDecisions). `status` still
-// reads STRICT_CATEGORIES as the legacy decider it is.
-const MODEL_CATEGORIES = new Set(['lookalike', 'lookalike-allowed']);
 
 function printReport(findings, counts) {
   const total = findings.length;
@@ -640,13 +648,17 @@ function truncate(s, n) {
  * finding. Unreadable files are already reported by the reads above.
  */
 function secretFindings(cwd, globalCfg, { git = true } = {}) {
-  const { findings } = scanHostConfigs({
+  return secretRows(scanHostConfigs({
     git,
     paths: [
       { host: 'claude-code', scope: 'project', path: path.join(cwd, '.mcp.json') },
       { host: 'claude-code', scope: 'user',    path: globalCfg },
     ],
-  });
+  }));
+}
+
+/** A scan's findings as audit rows, for the text report. */
+function secretRows({ findings }) {
   return findings.map((f) => ({
     category:   'secret',
     server:     f.server,
@@ -667,37 +679,140 @@ function secretFindings(cwd, globalCfg, { git = true } = {}) {
   }));
 }
 
+// ── the audit as findings (docs/adr/0001, step 3) ──────────────────────────
+
 /**
- * The lookalike findings of an audit, decided (docs/adr/0001): each one a
- * `lookalike/*` finding on the name, `--allow-lookalike` an input to the
- * row, `--strict` the policy's `fail_on`. The rest of the categories are
- * still judged by STRICT_CATEGORIES below until they move (migration step 3).
- * Returns the findings@1 document and, per legacy finding, its decision.
+ * Where a configured server lives: the host-config line that launches it
+ * (`path:line`), the same subject `status` uses for it — so the two commands
+ * answer about one subject, not two spellings of it.
  */
-function lookalikeDecisions(findings, { policy, asOf, allow = [] }) {
-  const model = [];
-  const facts = {};
-  const byEntry = new Map();
-  for (const x of findings) {
-    if (x.category !== 'lookalike') continue;
-    const hit = { candidate: x.candidate, kind: x.kind, server: x.server, lookalike: true, matches: x.matches };
-    const f = lookalike.toFinding(hit, { scope: x.scope });
-    if (!model.some((m) => m.id === f.id)) model.push(f);
-    const fx = lookalike.factsFor(hit, { intent: 'configured', allow });
-    const prev = facts[f.subject.id];
-    if (prev) fx.lookalike.names = [...new Set([...prev.lookalike.names, ...fx.lookalike.names])].sort();
-    facts[f.subject.id] = fx;
-    byEntry.set(x, f);
-  }
-  const decisions = decide(model, policy, asOf, { subjects: model.map((f) => f.subject), facts });
-  const bySubject = new Map(decisions.map((d) => [d.subject.id, d]));
-  const outcomeOf = (x) => {
-    const f = byEntry.get(x);
-    const d = f && bySubject.get(f.subject.id);
-    return d ? { decision: d, outcome: d.rules.find((o) => o.findings.includes(f.id)) || null } : null;
+function serverSubjects({ cwd, projectPath, globalPath }) {
+  const texts = new Map();
+  const textOf = (file) => {
+    if (!texts.has(file)) { let t = null; try { t = fs.readFileSync(file, 'utf8'); } catch { t = null; } texts.set(file, t); }
+    return texts.get(file);
   };
-  const document = toJson(findingsDocument({ asOf, findings: model, decisions, scope: 'setup', policy, facts }));
-  return { document, decisions, outcomeOf };
+  return (name, scope) => {
+    const file = scope === 'global' ? globalPath : projectPath;
+    return subject.hostConfig({
+      path: subjectPath(file, cwd), line: serverLine(textOf(file), name), host: 'claude-code',
+      scope: scope === 'global' ? 'user' : 'project', server: name,
+    });
+  };
+}
+
+// audit@1 categories as finding rules. A category a --strict run fails on is
+// medium (warn); one it never failed on is low or info (reported); a server
+// the DB has never seen is `no-data` — unknown, never clean.
+const CATEGORY_FINDING = {
+  'drift':           { severity: 'medium' },
+  'untrusted':       { severity: 'medium' },
+  'heavy-unbounded': { severity: 'medium' },
+  'unknown':         { severity: 'medium', state: 'no-data' },
+  'scope':           { severity: 'low' },
+  'version-unknown': { severity: 'info' },
+};
+
+/**
+ * One audit (or the part of it `status` composes) as findings on typed
+ * subjects, decided once, under the effective policy in mode `setup`:
+ *
+ *   legacy        audit() rows (and their lookalike/flow siblings) — each
+ *                 category becomes `audit/<category>`, a lookalike
+ *                 `lookalike/<technique>` on the name, a flow or a collision
+ *                 the `flows/*` / `shadowing/*` finding it already was
+ *   secrets       a lib/secrets.cjs scan of the same files: `secrets/<rule>`
+ *   setupJudged   lib/flows.cjs judgeSets() output (its findings and facts)
+ *   unreadable    configs that would not read: scope/unanswered
+ *   policyErrors  an unreadable policy file: `policy/unreadable` (warn)
+ *   extra         findings and subjects a caller adds (status: its own)
+ *
+ * Returns { decisions, document, details, idsOf, outcomeOf, exit }: `details`
+ * is what audit@1 carried besides the finding (versions, counts, hints),
+ * keyed by finding id; `idsOf(row)` the finding ids a legacy row rests on.
+ */
+function auditModel({
+  legacy = [], cwd, projectPath, globalPath, secrets = null, setupJudged = null,
+  unreadable = [], policyErrors = [], policyPath = null, allow = [], policy, asOf, extra = null,
+}) {
+  const subjectFor = serverSubjects({ cwd, projectPath, globalPath });
+  const findings = [];
+  const subjects = [];
+  const facts = {};
+  const details = {};
+  const ids = new Map();
+  const add = (f, row, detail) => {
+    if (!findings.some((x) => x.id === f.id)) findings.push(f);
+    if (row) ids.set(row, [...(ids.get(row) || []), f.id]);
+    if (detail) details[f.id] = detail;
+  };
+  const detailOf = (x) => {
+    const { message, effect, finding_ids, ...rest } = x;   // the decision is decide()'s
+    void message; void effect; void finding_ids;
+    return rest;
+  };
+  for (const x of legacy) {
+    if (x.category === 'lookalike' || x.category === 'lookalike-allowed') {
+      const hit = { candidate: x.candidate, kind: x.kind, server: x.server, lookalike: true, matches: x.matches };
+      const f = lookalike.toFinding(hit, { scope: x.scope });
+      const fx = lookalike.factsFor(hit, { intent: 'configured', allow });
+      const prev = facts[f.subject.id];
+      if (prev && prev.lookalike) fx.lookalike.names = [...new Set([...prev.lookalike.names, ...fx.lookalike.names])].sort();
+      facts[f.subject.id] = { ...(prev || {}), ...fx };
+      add(f, x, { ...detailOf(x), category: 'lookalike' });
+    } else if (CATEGORY_FINDING[x.category]) {
+      const c = CATEGORY_FINDING[x.category];
+      add(finding({
+        rule: `audit/${x.category}`, subject: subjectFor(x.server, x.scope), scope: x.scope,
+        severity: c.severity, state: c.state || 'observed', message: `${x.server}: ${x.message}`,
+      }), x, detailOf(x));
+    } else if (x.category === 'toxic-flow' || x.category === 'tool-shadowing') {
+      for (const id of x.finding_ids || []) { ids.set(x, [...(ids.get(x) || []), id]); details[id] = detailOf(x); }
+    }
+  }
+  if (secrets) {
+    // Unreadable files are reported by the reads below, once.
+    const m = secretsToFindings(secrets, { cwd });
+    for (const f of m.findings) if (f.rule !== 'scope/unreadable') add(f);
+    subjects.push(...m.subjects);
+    for (const d of m.details) {
+      const { finding: id, ...rest } = d;
+      details[id] = { category: 'secret', ...rest };
+    }
+  }
+  if (setupJudged) {
+    findings.push(...setupJudged.findings.filter((f) => !findings.some((x) => x.id === f.id)));
+    subjects.push(...setupJudged.subjects);
+    for (const [id, fx] of Object.entries(setupJudged.facts || {})) facts[id] = { ...(facts[id] || {}), ...fx };
+  }
+  for (const u of unreadable) {
+    add(unanswered({
+      subject: subject.hostConfig({ path: subjectPath(u.path, cwd), host: u.host || null, scope: u.scope || null }),
+      scope: 'setup', message: `${subjectPath(u.path, cwd)}: ${u.error} — its servers were not audited`,
+    }), u);
+  }
+  for (const e of policyErrors) {
+    add(finding({
+      rule: 'policy/unreadable', subject: subject.hostConfig({ path: subjectPath(policyPath || '.mcp-vault.policy.json', cwd) }),
+      scope: 'setup', severity: 'medium', message: `${e} — the defaults are in force`,
+    }), e);
+  }
+  if (extra) {
+    for (const f of extra.findings || []) add(f);
+    subjects.push(...(extra.subjects || []));
+    for (const [id, fx] of Object.entries(extra.facts || {})) facts[id] = { ...(facts[id] || {}), ...fx };
+  }
+  const run = decideRun({ findings, subjects, facts, mode: 'setup', scope: 'setup', policy, asOf });
+  const idsOf = (row) => ids.get(row) || [];
+  const outcomeOf = (row) => {
+    const want = new Set(idsOf(row));
+    for (const d of run.decisions) {
+      const o = d.rules.find((r) => r.findings.some((id) => want.has(id)));
+      if (o) return { decision: d, outcome: o };
+    }
+    return null;
+  };
+  return { ...run, details, idsOf, outcomeOf };
 }
 
 // ── main ───────────────────────────────────────────────────────────────────
@@ -730,8 +845,18 @@ function main(argv) {
   const settings = readSettings(cwd, unreadable);
 
   const counts = { project: Object.keys(project).length, global: Object.keys(global_).length };
-  const findings = audit({ project, global: global_, settings, db });
-  findings.push(...secretFindings(cwd, globalCfg));
+  // Measured tool counts, as of the instant (the same index `status` uses), so
+  // a server measured at three tools is not called an unbounded surface here
+  // while `status` says it is not.
+  const evals = evalIndex(evalResultsAsOf((readJsonSafe(EVAL_PATH) || {}).results, args.asOf));
+  const findings = audit({ project, global: global_, settings, db, evals });
+  const secretScan = scanHostConfigs({
+    paths: [
+      { host: 'claude-code', scope: 'project', path: path.join(cwd, '.mcp.json') },
+      { host: 'claude-code', scope: 'user',    path: globalCfg },
+    ],
+  });
+  findings.push(...secretRows(secretScan));
 
   // The cross-server pass reads the stored eval surfaces and capability
   // scans; decide() judges it under the one effective policy (the file, then
@@ -742,20 +867,27 @@ function main(argv) {
   const loaded = loadEffectivePolicy(cwd, { flags: flagsFromArgv(argv) });
   const policy = loaded.policy;
   const policyErrors = loaded.errors.map((e) => ({ path: loaded.path || '.mcp-vault.policy.json', error: e }));
-  const evalRows = (readJsonSafe(EVAL_PATH) || {}).results;
-  const evals = new Map((Array.isArray(evalRows) ? evalRows : []).map((r) => [r.name, r]));
   const setup = flowFindings({
     project, global: global_, settings, db, evals,
     capabilities: readJsonSafe(CAPS_PATH), policy: loaded.policy, asOf: args.asOf,
   });
   findings.push(...setup.findings);
 
-  const looks = lookalikeDecisions(findings, { policy, asOf: args.asOf, allow: args.allowLookalike || [] });
+  // Every category, decided once (docs/adr/0001): the findings, the
+  // configs that would not read, the policy that would not parse, and the
+  // cross-server part, under the one effective policy — --strict is its
+  // fail_on, not a branch here.
+  const model = auditModel({
+    legacy: findings, cwd, projectPath: path.join(cwd, '.mcp.json'), globalPath: globalCfg,
+    secrets: secretScan, setupJudged: setup.judged, unreadable,
+    policyErrors: loaded.errors, policyPath: loaded.path, allow: args.allowLookalike || [], policy, asOf: args.asOf,
+  });
   // Rendering: a lookalike the user vouched for is listed apart, with the
   // row's own wording.
   for (const x of findings) {
-    const o = looks.outcomeOf(x);
-    if (o && o.outcome && o.outcome.effect === 'allow') { x.category = 'lookalike-allowed'; x.message = o.outcome.detail; }
+    if (x.category !== 'lookalike') continue;
+    const o = model.outcomeOf(x);
+    if (o && o.outcome.effect === 'allow') { x.category = 'lookalike-allowed'; x.message = o.outcome.detail; }
   }
 
   if (args.json) {
@@ -768,19 +900,16 @@ function main(argv) {
       db_path:     dbPath,
       global_path: globalCfg,
       counts,
-      findings,
+      // mcp-vault/findings@1 (pre-1.0 change: this was the legacy array of
+      // categorised rows, and the cross-server and lookalike parts were in
+      // `setup_findings` and `model`): every finding, the policy and facts
+      // it was decided on, and the Decision per subject.
+      findings:    model.document,
+      // What a row carried that is not a finding — versions, tool counts,
+      // hints, the masked shape of a secret — keyed by finding id.
+      details:     model.details,
       setup:       setup.analysis,
-      // Additive (mcp-vault/findings@1): the cross-server findings and the
-      // Decisions the toxic-flow / tool-shadowing rows above are a view of.
-      setup_findings: toJson(findingsDocument({
-        asOf: args.asOf, findings: setup.judged.findings, decisions: setup.judged.decisions,
-        scope: 'setup', policy: loaded.policy, facts: setup.judged.facts,
-      })),
       policy_errors: policyErrors,
-      // Additive (mcp-vault/findings@1): the categories already on the
-      // findings model — lookalike names — with the policy and facts they
-      // were decided on. `findings` above is the audit@1 view.
-      model: looks.document,
     }, null, 2) + '\n');
   } else {
     printReport(findings, counts);
@@ -793,15 +922,11 @@ function main(argv) {
   // read something else. Both are reported either way.
   for (const u of unreadable) process.stderr.write(`audit: ${u.path}: ${u.error}\n`);
   for (const u of policyErrors) process.stderr.write(`audit: ${u.path}: ${u.error} (defaults in force)\n`);
-  // The cross-server part fails when its Decision does: `toxicFlows: fail`
-  // without --strict, `warn` with it (fail_on) — decide() said which.
-  if (setup.judged.decisions.some((d) => d.fails)) return 1;
-  if (exitCode(looks.decisions) === 1) return 1;
-  if (args.strict && (policyErrors.length || findings.some(f => STRICT_CATEGORIES.has(f.category) && !MODEL_CATEGORIES.has(f.category)))) return 1;
-  // A config we could not read is still not a clean config: "no findings"
-  // would be a claim about servers we never saw.
-  if (unreadable.length) return 2;
-  return 0;
+  // The Decision's exit code: a failing decision is 1 (`toxicFlows: fail`, a
+  // secret, and under --strict every warning); a config we could not read is
+  // still not a clean config — "no findings" would be a claim about servers
+  // we never saw — so it is 2 when nothing fails.
+  return model.exit;
 }
 
 if (require.main === module) {
@@ -815,7 +940,6 @@ module.exports = {
   readProjectMcpServers,
   readGlobalMcpServers,
   readSettings,
-  STRICT_CATEGORIES,
   parseInstalledVersion,
   parseDbVersion,
   matchDbEntry,
@@ -824,7 +948,8 @@ module.exports = {
   audit,
   secretFindings,
   flowFindings,
-  lookalikeDecisions,
+  auditModel,
+  secretRows,
   main,
   PROJECT_SCOPED_CATEGORIES,
   HEAVY_THRESHOLD,
