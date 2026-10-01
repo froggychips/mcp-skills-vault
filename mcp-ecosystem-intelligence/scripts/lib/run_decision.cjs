@@ -25,6 +25,7 @@
  *   decideRun({ findings, subjects, policy, asOf, mode, facts, scope })
  *        -> { decisions, document, exit }
  *   classify(decisions, findingIds)            -> 'blocking' | 'notable' | 'unanswered' | null
+ *   outcomeClass(ruleOutcome)                  -> the same, for one outcome
  *   unanswered({ subject, message, scope })    -> a scope/unanswered finding
  */
 
@@ -70,19 +71,31 @@ const CLASS_RANK = { blocking: 0, notable: 1, unanswered: 2 };
 function classify(decisions, ids) {
   const want = new Set(ids || []);
   let best = null;
-  const take = (c) => { if (!best || CLASS_RANK[c] < CLASS_RANK[best]) best = c; };
+  const take = (c) => { if (c && (!best || CLASS_RANK[c] < CLASS_RANK[best])) best = c; };
   for (const d of decisions || []) {
     for (const o of d.rules || []) {
-      if (o.role === 'context' || !(o.findings || []).some((id) => want.has(id))) continue;
-      if (o.effect === 'deny') take('blocking');
-      else if (o.rule === 'scope/unanswered') take('unanswered');
-      else if (o.effect === 'warn' || o.effect === 'unknown') {
-        const row = rowFor(o.rule);
-        if (row && row.thresholded) take('notable');
-      }
+      if (!(o.findings || []).some((id) => want.has(id))) continue;
+      take(outcomeClass(o));
     }
   }
   return best;
+}
+
+/**
+ * One rule outcome's class, by the same reading `classify` makes: for a
+ * renderer that lists outcomes rather than findings (`check` also shows a
+ * policy outcome that rests on no finding). A policy row's warning that no
+ * threshold reaches is not shown, as it is not by `classify`; its deny is.
+ */
+function outcomeClass(o) {
+  if (!o || o.role === 'context') return null;
+  if (o.effect === 'deny') return 'blocking';
+  if (o.rule === 'scope/unanswered') return 'unanswered';
+  if (o.effect === 'warn' || o.effect === 'unknown') {
+    const row = rowFor(o.rule);
+    if (row && row.thresholded) return 'notable';
+  }
+  return null;
 }
 
 /** A question this run could not answer, about `subject`. */
@@ -90,4 +103,4 @@ function unanswered({ subject, message, scope = null }) {
   return finding({ rule: 'scope/unanswered', subject, scope, severity: 'medium', state: 'no-data', message });
 }
 
-module.exports = { commandPolicy, decideRun, classify, unanswered };
+module.exports = { commandPolicy, decideRun, classify, outcomeClass, unanswered };
