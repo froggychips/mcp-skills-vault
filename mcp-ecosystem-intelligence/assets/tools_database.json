@@ -1684,7 +1684,7 @@
     {
       "name": "@mapbox/mcp-server",
       "category": "maps",
-      "install_cmd": "npx -y @mapbox/mcp-server",
+      "install_cmd": "npx -y @mapbox/mcp-server@0.11.0",
       "source_url": "https://github.com/mapbox/mcp-server",
       "version": "0.11.0",
       "pkg_integrity": "sha512-5ZFOfordbtKrV2GERYm2lPrmWXIeHyG+Qdmg9meOAFX70vRrgnPaewypelUJnLWwFJeomyXOZGAZsUZm46PZ4Q==",
@@ -1801,7 +1801,7 @@
     {
       "name": "@browserstack/mcp-server",
       "category": "browser",
-      "install_cmd": "npx -y @browserstack/mcp-server",
+      "install_cmd": "npx -y @browserstack/mcp-server@1.2.16",
       "source_url": "https://github.com/browserstack/mcp-server",
       "version": "1.2.16",
       "pkg_integrity": "sha512-aGENep9N3jgXoYSC8IilmuwqeU/eAJYTd1teFZp6ynAOijK7f7yRxYoV6z7ViOqWD5QKAKgfOtqThZhzeh7xQg==",
@@ -1858,7 +1858,7 @@
     {
       "name": "@phantom/mcp-server",
       "category": "payments",
-      "install_cmd": "npx -y @phantom/mcp-server",
+      "install_cmd": "npx -y @phantom/mcp-server@1.2.7",
       "source_url": "https://github.com/phantom/phantom-connect-sdk",
       "version": "1.2.7",
       "pkg_integrity": "sha512-NEgBOobF4u+eLjLkoZc3vC8Jm1agfzReQuitKUQA3mpSE1i0MnFjAWUYVbEhIaIDaT1VdPVIQdqe40JyIVMMew==",
@@ -1918,7 +1918,7 @@
     {
       "name": "@azure-devops/mcp",
       "category": "infra",
-      "install_cmd": "npx -y @azure-devops/mcp",
+      "install_cmd": "npx -y @azure-devops/mcp@2.7.0",
       "source_url": "https://github.com/microsoft/azure-devops-mcp",
       "version": "2.7.0",
       "pkg_integrity": "sha512-nQG/D4EM9faYOecvdLuGVG84Au0t9rAxzLCwOlMUqWJpTk8ywKBDZ23mgpUFgjyaiMUI+vEoU8opB2yHhSpJYw==",
@@ -1975,7 +1975,7 @@
     {
       "name": "@roychri/mcp-server-asana",
       "category": "pm",
-      "install_cmd": "npx -y @roychri/mcp-server-asana",
+      "install_cmd": "npx -y @roychri/mcp-server-asana@1.8.0",
       "source_url": "https://github.com/roychri/mcp-server-asana",
       "version": "1.8.0",
       "pkg_integrity": "sha512-qiEqfrrIjiLzD95A9zXrSGHcKx6S15i2mT9fHYyFPah8QgqdphERWUcEj98IAIRnYgGPh6deKEVr4msXXLGYgA==",
@@ -2032,7 +2032,7 @@
     {
       "name": "@eslint/mcp",
       "category": "testing",
-      "install_cmd": "npx -y @eslint/mcp",
+      "install_cmd": "npx -y @eslint/mcp@0.3.5",
       "source_url": "https://github.com/eslint/rewrite",
       "version": "0.3.5",
       "pkg_integrity": "sha512-nozX03GqvCyxDJOYtv9jaL/fyVAYSOsG8sCcBEns3p+bvNAfSI8n3FUtswxg1er2HNEQVhPzDorAG9Byv/a4hA==",
@@ -2092,7 +2092,7 @@
     {
       "name": "argocd-mcp",
       "category": "utility",
-      "install_cmd": "npx -y argocd-mcp",
+      "install_cmd": "npx -y argocd-mcp@0.7.0",
       "source_url": "https://github.com/argoproj-labs/mcp-for-argocd",
       "version": "0.7.0",
       "pkg_integrity": "sha512-IvUcLpNe4wBroXEQZRqNZFP+A2NRvPpS8izSN67o8MmYEqO1K9TzLMDqy/OmSVedCqTGVjHX2FArPc6OOoUdmw==",
@@ -2152,7 +2152,7 @@
     {
       "name": "@salesforce/mcp",
       "category": "crm",
-      "install_cmd": "npx -y @salesforce/mcp",
+      "install_cmd": "npx -y @salesforce/mcp@0.30.9",
       "source_url": "https://github.com/salesforcecli/mcp",
       "version": "0.30.9",
       "pkg_integrity": "sha512-HzkFeqtYT0nUz6Ra1ecInmMZqcYdfbMiz4ssRMXZfscD6b8rdgaLwbtxWqc2WSnuzcluwrGEu8+cshXML2mKmg==",
@@ -2209,7 +2209,7 @@
     {
       "name": "@postman/postman-mcp-server",
       "category": "testing",
-      "install_cmd": "npx -y @postman/postman-mcp-server",
+      "install_cmd": "npx -y @postman/postman-mcp-server@2.8.9",
       "source_url": "https://github.com/postmanlabs/postman-mcp-server",
       "version": "2.8.9",
       "pkg_integrity": "sha512-B75NPyCgyQkI/P/xwJHniurVyOnpGQhLrKkzkLdurlcAmFecJc6I7bk8JzYjsdCCA8wvl8DxtJ3b86yAtwuhug==",
@@ -2269,7 +2269,7 @@
     {
       "name": "@brave/brave-search-mcp-server",
       "category": "search",
-      "install_cmd": "npx -y @brave/brave-search-mcp-server",
+      "install_cmd": "npx -y @brave/brave-search-mcp-server@2.0.80",
       "source_url": "https://github.com/brave/brave-search-mcp-server",
       "version": "2.0.80",
       "pkg_integrity": "sha512-GAPDWHU3PPsLsKUPWUZZOGksndRlfSizLhhoKTFOB9nI6lV94XQsMvOzgEzfy0GY+OY+tuONhrOIhnG9TjgkBQ==",
@@ -2326,7 +2326,7 @@
     {
       "name": "openapi-mcp-generator",
       "category": "utility",
-      "install_cmd": "npx -y openapi-mcp-generator",
+      "install_cmd": "npx -y openapi-mcp-generator@3.3.0",
       "source_url": "https://github.com/harsha-iiiv/openapi-mcp-generator",
       "version": "3.3.0",
       "pkg_integrity": "sha512-RXS0QjqtgmNiq9DA/euPA+LFVwg5dRkyhOEYxf4WFGOhgfyoeDKdUsTA8PKJYWTB0lkmUkl5/9dqK+Lhn94LjQ==",
@@ -2383,7 +2383,7 @@
     {
       "name": "@softeria/ms-365-mcp-server",
       "category": "utility",
-      "install_cmd": "npx -y @softeria/ms-365-mcp-server",
+      "install_cmd": "npx -y @softeria/ms-365-mcp-server@0.107.2",
       "source_url": "https://github.com/softeria/ms-365-mcp-server",
       "version": "0.107.2",
       "pkg_integrity": "sha512-OqrK8xmhfOskJ2xLZJvmKk/gEh5CZDJjJjC1bp7EGGV3wDFou8Eha2ClHNs3UIJ38Io8gI2KrYj2DhvzpArlww==",
@@ -2440,7 +2440,7 @@
     {
       "name": "@regle/mcp-server",
       "category": "utility",
-      "install_cmd": "npx -y @regle/mcp-server",
+      "install_cmd": "npx -y @regle/mcp-server@1.25.2",
       "source_url": "https://github.com/victorgarciaesgi/regle",
       "version": "1.25.2",
       "pkg_integrity": "sha512-XnF4qlPwPoKIsX+FsRrfViLkDUXhh7vqRIreRgU6cjp78NvkvYoURtAm7WpoDIguw9YSiMlwfaCqIGaoJIGMLQ==",
@@ -2500,7 +2500,7 @@
     {
       "name": "@vibeframe/mcp-server",
       "category": "utility",
-      "install_cmd": "npx -y @vibeframe/mcp-server",
+      "install_cmd": "npx -y @vibeframe/mcp-server@0.104.3",
       "source_url": "https://github.com/vericontext/vibeframe",
       "version": "0.104.3",
       "pkg_integrity": "sha512-OO6mRhUlYMJYMqJ0VUgJu45iyyb2wK+WBNRIW9mWHzFWzFl6pnCQb/xi/5sp8AxVgqmzVudLYM7I1kq5ptvtwA==",
@@ -2557,7 +2557,7 @@
     {
       "name": "@bitwarden/mcp-server",
       "category": "utility",
-      "install_cmd": "npx -y @bitwarden/mcp-server",
+      "install_cmd": "npx -y @bitwarden/mcp-server@2026.2.0",
       "source_url": "https://github.com/bitwarden/mcp-server",
       "version": "2026.2.0",
       "pkg_integrity": "sha512-6FjjVQIOMbyLwrSL1LdXDEjnJev6f2ubhWB5Asn2VOMDBGy+FlJAKTHqbfFygI1a+5HSqH2vb14EEiWbWx1gdQ==",
@@ -2617,7 +2617,7 @@
     {
       "name": "@voltagent/mcp-server",
       "category": "utility",
-      "install_cmd": "npx -y @voltagent/mcp-server",
+      "install_cmd": "npx -y @voltagent/mcp-server@2.0.2",
       "source_url": "https://github.com/VoltAgent/voltagent",
       "version": "2.0.2",
       "pkg_integrity": "sha512-rU2jkcj5wE8y0LX9GAcxzE/4jZNiZT18vPzNJlKoIGx3lV290sZgmDq7eSZTsaSQei/KmO37CyUi+6hryJ5zTQ==",
@@ -2674,7 +2674,7 @@
     {
       "name": "@delorenj/mcp-server-trello",
       "category": "pm",
-      "install_cmd": "npx -y @delorenj/mcp-server-trello",
+      "install_cmd": "npx -y @delorenj/mcp-server-trello@1.7.1",
       "source_url": "https://github.com/delorenj/mcp-server-trello",
       "version": "1.7.1",
       "pkg_integrity": "sha512-PPHQGeQsiXypw5e321oGp5Rz+lmdPV82Fm0HCCnI9abpZQNmKoK6FJk9y4O5i1aydbalhgzwIw/AiNuhK+BTdg==",
@@ -2730,7 +2730,7 @@
     {
       "name": "godot-mcp-server",
       "category": "utility",
-      "install_cmd": "npx -y godot-mcp-server",
+      "install_cmd": "npx -y godot-mcp-server@0.5.0",
       "source_url": "https://github.com/tomyud1/godot-mcp",
       "version": "0.5.0",
       "pkg_integrity": "sha512-ZRYtA2fGytPZAdwKb1/JqIud3A/MUoKnlQpWnqpcKqybkY7hYHVo9r6nMuiIO33Ny/hqWaQZ8itTzZgaS8FjHw==",
@@ -2849,7 +2849,7 @@
     {
       "name": "deepl-mcp-server",
       "category": "utility",
-      "install_cmd": "npx -y deepl-mcp-server",
+      "install_cmd": "npx -y deepl-mcp-server@1.1.0",
       "source_url": "https://github.com/DeepLcom/deepl-mcp-server",
       "version": "1.1.0",
       "pkg_integrity": "sha512-IouBSs0qDDwaUeMGPJQCN52PkhwCmHTkRiGlncEPIZIq2rNysmCM3GTuGok+5iwmdELUsE1td0JRq1HXWlkqUg==",
@@ -2906,7 +2906,7 @@
     {
       "name": "@knip/mcp",
       "category": "utility",
-      "install_cmd": "npx -y @knip/mcp",
+      "install_cmd": "npx -y @knip/mcp@0.0.28",
       "source_url": "https://github.com/webpro-nl/knip",
       "version": "0.0.28",
       "pkg_integrity": "sha512-eYuvs6TovPtf0r2XTR84H/iETrmPmVaG5I26lCtPXetWOnvPBjjKIQ8h4mJGm7JbQEozIMvDvn5/bl5Tpo10rQ==",
@@ -2963,7 +2963,7 @@
     {
       "name": "@pandacss/mcp",
       "category": "utility",
-      "install_cmd": "npx -y @pandacss/mcp",
+      "install_cmd": "npx -y @pandacss/mcp@1.11.1",
       "source_url": "https://github.com/chakra-ui/panda",
       "version": "1.11.1",
       "pkg_integrity": "sha512-sfAewHwDy+XWk9SFRSNVtTEwKb9KMLlzM0MDgzio/ZBxZK6MZiSskrRSqSeHWJOdw52IdQWQlFLGPakV5p30Zw==",
@@ -3020,7 +3020,7 @@
     {
       "name": "@cyanheads/git-mcp-server",
       "category": "vcs",
-      "install_cmd": "npx -y @cyanheads/git-mcp-server",
+      "install_cmd": "npx -y @cyanheads/git-mcp-server@2.15.1",
       "source_url": "https://github.com/cyanheads/git-mcp-server",
       "version": "2.15.1",
       "pkg_integrity": "sha512-IuBjTfFhyNCceNwfTWcda2SPiQaGqyo3fw2OVwXzRzPT+vKAybFH4ntZTbZt5VRlpdTIpVevUkmGC0ZY09roLQ==",
@@ -3077,7 +3077,7 @@
     {
       "name": "@socketsecurity/mcp",
       "category": "utility",
-      "install_cmd": "npx -y @socketsecurity/mcp",
+      "install_cmd": "npx -y @socketsecurity/mcp@0.0.17",
       "source_url": "https://github.com/SocketDev/socket-mcp",
       "version": "0.0.17",
       "pkg_integrity": "sha512-hhdZL1m/Y20m05ysPV9AC+WOmIxIdUDQB/Eeeu1IK1g/Ju23yT/VHIOec+WJ6YR1TPZjwY65M1pjwafpn451uA==",
@@ -3137,7 +3137,7 @@
     {
       "name": "obsidian-mcp-server",
       "category": "search",
-      "install_cmd": "npx -y obsidian-mcp-server",
+      "install_cmd": "npx -y obsidian-mcp-server@3.1.9",
       "source_url": "https://github.com/cyanheads/obsidian-mcp-server",
       "version": "3.1.9",
       "pkg_integrity": "sha512-sx/dn3C6brhEXeLtoHJI5Qzgah8su9SMIryD4tfWGOwUSQqSWUjiywe5hqZ62S9FYMeGGxaRSZXq9NboXIsq4Q==",
@@ -3262,7 +3262,7 @@
     {
       "name": "@drawio/mcp",
       "category": "utility",
-      "install_cmd": "npx -y @drawio/mcp",
+      "install_cmd": "npx -y @drawio/mcp@1.2.7",
       "source_url": "https://github.com/jgraph/drawio-mcp",
       "version": "1.2.7",
       "pkg_integrity": "sha512-S2VWhXqJdgvuLzTdRJAg6RtZmnmf4nsVAuiQJmer0hbkEtBzurixbdgblV/483MWaVarzT6sk5oTlc/FVD+/Fw==",
@@ -3319,7 +3319,7 @@
     {
       "name": "@google-cloud/observability-mcp",
       "category": "infra",
-      "install_cmd": "npx -y @google-cloud/observability-mcp",
+      "install_cmd": "npx -y @google-cloud/observability-mcp@0.2.3",
       "source_url": "https://github.com/googleapis/gcloud-mcp",
       "version": "0.2.3",
       "pkg_integrity": "sha512-Pn7JNA2PF168jUp196Jj9xwSdTtfcIu43Cqeaxh2O4oLMBAcjjK45K6zWvimWBOMuifJaUvtoSt+cLnZIdYpgw==",
@@ -3376,7 +3376,7 @@
     {
       "name": "dataforseo-mcp-server",
       "category": "http",
-      "install_cmd": "npx -y dataforseo-mcp-server",
+      "install_cmd": "npx -y dataforseo-mcp-server@2.9.2",
       "source_url": "https://github.com/dataforseo/mcp-server-typescript",
       "version": "2.9.2",
       "pkg_integrity": "sha512-cyoYhdv8bzKM9T+kSuaWDFavXaVnsP9j5esOrWFeCy5jKkS/iHjXlPVadr+ACuCKWnAca9Q+TMnD3mAF3aQPWg==",
@@ -3436,7 +3436,7 @@
     {
       "name": "ios-simulator-mcp",
       "category": "mobile",
-      "install_cmd": "npx -y ios-simulator-mcp",
+      "install_cmd": "npx -y ios-simulator-mcp@1.6.0",
       "source_url": "https://github.com/joshuayoes/ios-simulator-mcp",
       "version": "1.6.0",
       "pkg_integrity": "sha512-IwueCMUZDwu8XtKZWFQxfHIdzSgf07WgbaHLUOG/BZTuBcAzgDcspjWulUxiCNep7lgv/1cz/cRUfD48zi6ayA==",
@@ -3496,7 +3496,7 @@
     {
       "name": "@instantdb/mcp",
       "category": "utility",
-      "install_cmd": "npx -y @instantdb/mcp",
+      "install_cmd": "npx -y @instantdb/mcp@1.0.32",
       "source_url": "https://github.com/instantdb/instant",
       "version": "1.0.32",
       "pkg_integrity": "sha512-c04bT5QARTHACZtYlAhqnAgatDlFa/ULETfwL1RBdIVR7ty1eZfmC3NbRKFsDweebg2uav54eKVB2LgB3dpgkg==",
@@ -3556,7 +3556,7 @@
     {
       "name": "@cap-js/mcp-server",
       "category": "utility",
-      "install_cmd": "npx -y @cap-js/mcp-server",
+      "install_cmd": "npx -y @cap-js/mcp-server@0.0.5",
       "source_url": "https://github.com/cap-js/mcp-server",
       "version": "0.0.5",
       "pkg_integrity": "sha512-77kswa8aJPxJ5gypFPKlp19opr1Ex7VcA1BkphbixyVPAZ7t+mz8EyGuKTAwN5LlmSGaGTijboHc3jklsQ2qUw==",
@@ -3616,7 +3616,7 @@
     {
       "name": "hostinger-api-mcp",
       "category": "utility",
-      "install_cmd": "npx -y hostinger-api-mcp",
+      "install_cmd": "npx -y hostinger-api-mcp@0.1.43",
       "source_url": "https://github.com/hostinger/api-mcp-server",
       "version": "0.1.43",
       "pkg_integrity": "sha512-8vd7L5hKvDWpcsXMQQXQ1vM0agXi4+fGqoo4BUj42C62RGRiItX+Tkn1aefSAHVyodittpzLmyrlZWXJEFo4iQ==",
@@ -3678,7 +3678,7 @@
     {
       "name": "@professional-wiki/mediawiki-mcp-server",
       "category": "docs",
-      "install_cmd": "npx -y @professional-wiki/mediawiki-mcp-server",
+      "install_cmd": "npx -y @professional-wiki/mediawiki-mcp-server@0.9.1",
       "source_url": "https://github.com/ProfessionalWiki/MediaWiki-MCP-Server",
       "version": "0.9.1",
       "pkg_integrity": "sha512-bmnSuASaLxcHAiInNXo2Uy/b54gpnMYQ64vJX49sZ2wldgPKSyoWDsOqRnWco+i57GJUg7pG3iU/N+Nz6OeS7g==",
@@ -3738,7 +3738,7 @@
     {
       "name": "@ui5/mcp-server",
       "category": "utility",
-      "install_cmd": "npx -y @ui5/mcp-server",
+      "install_cmd": "npx -y @ui5/mcp-server@0.2.11",
       "source_url": "https://github.com/UI5/mcp-server",
       "version": "0.2.11",
       "pkg_integrity": "sha512-wT353pXcJkePmXJkc6nOslfd9z5HgVYuStX0rXUcCCULKnfshSnhL1LwQyYrSkpuRvpRag6AvtxbRe0N8YPvTQ==",
@@ -3798,7 +3798,7 @@
     {
       "name": "@alchemy/mcp-server",
       "category": "utility",
-      "install_cmd": "npx -y @alchemy/mcp-server",
+      "install_cmd": "npx -y @alchemy/mcp-server@0.3.0",
       "source_url": "https://github.com/alchemyplatform/alchemy-mcp-server",
       "version": "0.3.0",
       "pkg_integrity": "sha512-guoaOkFctJHeexcwqHkjsd02zKQdoaaV4aZHQ2UCFkG7KMzkYfSuR6TGkLEf+DYhb8bhd/S9n+gELa3gcdiv3A==",
@@ -3858,7 +3858,7 @@
     {
       "name": "@translated/lara-mcp",
       "category": "utility",
-      "install_cmd": "npx -y @translated/lara-mcp",
+      "install_cmd": "npx -y @translated/lara-mcp@1.0.2",
       "source_url": "https://github.com/translated/lara-mcp",
       "version": "1.0.2",
       "pkg_integrity": "sha512-qGM93ZRss0IeW1Z1gE5oOv/aYusbLOk0Ij5XdsSjIZP+Gsa6XHmxs0EMImbXezcwwLHtKTRx3RjLf41b2g7NqQ==",
@@ -3915,7 +3915,7 @@
     {
       "name": "@heroku/mcp-server",
       "category": "utility",
-      "install_cmd": "npx -y @heroku/mcp-server",
+      "install_cmd": "npx -y @heroku/mcp-server@1.2.2",
       "source_url": "https://github.com/heroku/heroku-mcp-server",
       "version": "1.2.2",
       "pkg_integrity": "sha512-LJ2f/5RHXrFiVl9eBh0sbuSf15/EL0TGQm8l2pgsMCsuPoYWifGTuMvPSIYyWh5puDu42Ff0khEK21/pr84RlA==",
@@ -3975,7 +3975,7 @@
     {
       "name": "@transloadit/mcp-server",
       "category": "utility",
-      "install_cmd": "npx -y @transloadit/mcp-server",
+      "install_cmd": "npx -y @transloadit/mcp-server@0.3.21",
       "source_url": "https://github.com/transloadit/node-sdk",
       "version": "0.3.21",
       "pkg_integrity": "sha512-GovQJSUyTdrQOGCk5ywW1fv6jdS4uDIDoHtQsdpUwqWQ8rdzRlW2RXg99E4B7XuNPzOWwKz2vkK/lCZVlg98TA==",
@@ -4051,7 +4051,7 @@
     {
       "name": "clinicaltrialsgov-mcp-server",
       "category": "search",
-      "install_cmd": "npx -y clinicaltrialsgov-mcp-server",
+      "install_cmd": "npx -y clinicaltrialsgov-mcp-server@2.4.7",
       "source_url": "https://github.com/cyanheads/clinicaltrialsgov-mcp-server",
       "version": "2.4.7",
       "pkg_integrity": "sha512-p3/McGAF3CDCpKqT1L4LwSML5mrFIaY8tipOoMrYtf/XzIoWTnjtcbArTm7V5M++edhH1vBwQjEhAuwX7EGE5w==",
@@ -4110,7 +4110,7 @@
     {
       "name": "@tocharianou/mcp-server-kibana",
       "category": "utility",
-      "install_cmd": "npx -y @tocharianou/mcp-server-kibana",
+      "install_cmd": "npx -y @tocharianou/mcp-server-kibana@0.8.0",
       "source_url": "https://github.com/TocharianOU/mcp-server-kibana",
       "version": "0.8.0",
       "pkg_integrity": "sha512-+uYVwK5euLVaz0yy0oYbJ+SDg+2nYv8X7aH662qM/TThWj1rf+rUrrxmhWVMfkPMsYKvUntDvVFIeutPpIPlFQ==",
@@ -4167,7 +4167,7 @@
     {
       "name": "todoist-mcp",
       "category": "pm",
-      "install_cmd": "npx -y todoist-mcp",
+      "install_cmd": "npx -y todoist-mcp@1.3.4",
       "source_url": "https://github.com/stanislavlysenko0912/todoist-mcp-server",
       "version": "1.3.4",
       "pkg_integrity": "sha512-S5anBdEUEvfhNGT3jiirwRA6g0nmioIirkk1R4GsgY+/jNYN5Bvu1udt2tQ01DNk9Ms2EuBJvXxWUYk5iEugTQ==",
@@ -4224,7 +4224,7 @@
     {
       "name": "@last9/mcp-server",
       "category": "ai",
-      "install_cmd": "npx -y @last9/mcp-server",
+      "install_cmd": "npx -y @last9/mcp-server@0.7.1",
       "source_url": "https://github.com/last9/last9-mcp-server",
       "version": "0.7.1",
       "pkg_integrity": "sha512-DprwVOZ+20X8inIImU0puZHTvJk51I8/gLt7WpsIczdqLgcrZvr7cQa7mZB4Azm/cHuBOIiiWZR1Z3LNAkNRiQ==",
@@ -4338,7 +4338,7 @@
     {
       "name": "@esaio/esa-mcp-server",
       "category": "utility",
-      "install_cmd": "npx -y @esaio/esa-mcp-server",
+      "install_cmd": "npx -y @esaio/esa-mcp-server@0.7.5",
       "source_url": "https://github.com/esaio/esa-mcp-server",
       "version": "0.7.5",
       "pkg_integrity": "sha512-TJZkreKCYFl/vjodW+XDVGLZO5uEE2nNkH3d55lS7zIXBFLNt3dTv2Rz0S2ZTxuEPWBg9bVS2bANcQYyI2TQjw==",
@@ -4398,7 +4398,7 @@
     {
       "name": "@upstash/mcp-server",
       "category": "utility",
-      "install_cmd": "npx -y @upstash/mcp-server",
+      "install_cmd": "npx -y @upstash/mcp-server@0.2.3",
       "source_url": "https://github.com/upstash/mcp-server",
       "version": "0.2.3",
       "pkg_integrity": "sha512-KV8s7O0aYsyvHxEsDZ9DU14Eiuxr4ocHfELO/HUjtOJwfE4U6QJ0lSBFfg9HTopo56Hh9mFUToIptZpY0E63ZQ==",
@@ -4458,7 +4458,7 @@
     {
       "name": "@renseiai/agentfactory-mcp-server",
       "category": "utility",
-      "install_cmd": "npx -y @renseiai/agentfactory-mcp-server",
+      "install_cmd": "npx -y @renseiai/agentfactory-mcp-server@0.9.0",
       "source_url": "https://github.com/RenseiAI/agentfactory",
       "version": "0.9.0",
       "pkg_integrity": "sha512-k7koBni2uRTBHV19FxRd3EP3m6dSZcCyio+SulNN3HQ6GBVFdlVgXxHbg1RanMnwrnbaVbvAvRHe/fNI/b7kVw==",
@@ -4579,7 +4579,7 @@
     {
       "name": "@vapi-ai/mcp-server",
       "category": "utility",
-      "install_cmd": "npx -y @vapi-ai/mcp-server",
+      "install_cmd": "npx -y @vapi-ai/mcp-server@0.0.9",
       "source_url": "https://github.com/VapiAI/mcp-server",
       "version": "0.0.9",
       "pkg_integrity": "sha512-AYGX79nIv3rHlryqIFQdr2p3Vs9ODJxIE+rIonHTYdoC1fu1sYVyfsgKTSu90IOoAbmYeyEzZ/9cuCxpHy1x8A==",
@@ -4636,7 +4636,7 @@
     {
       "name": "@kintone/mcp-server",
       "category": "utility",
-      "install_cmd": "npx -y @kintone/mcp-server",
+      "install_cmd": "npx -y @kintone/mcp-server@1.3.12",
       "source_url": "https://github.com/kintone/mcp-server",
       "version": "1.3.12",
       "pkg_integrity": "sha512-a/L1au1LvVtZpQcktrg/ETYJIVsy69DncVzmYF25qluuIP7Z8QVzcY3CIbREIHaI6/OaawKT03KNs0z07uUcyw==",
@@ -4696,7 +4696,7 @@
     {
       "name": "@contextlint/mcp-server",
       "category": "utility",
-      "install_cmd": "npx -y @contextlint/mcp-server",
+      "install_cmd": "npx -y @contextlint/mcp-server@1.1.1",
       "source_url": "https://github.com/nozomi-koborinai/contextlint",
       "version": "1.1.1",
       "pkg_integrity": "sha512-Z3NcgWQGOFKBPaaUjVZkSHrv8jm6SsqAP0xp6f1nliaXYSfdO6QG4W6GdVbe+qgkU3v6z/YojilNxSMLaajz0A==",
@@ -4753,7 +4753,7 @@
     {
       "name": "chrome-devtools-mcp",
       "category": "browser",
-      "install_cmd": "npx -y chrome-devtools-mcp",
+      "install_cmd": "npx -y chrome-devtools-mcp@0.26.0",
       "source_url": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
       "version": "0.26.0",
       "pkg_integrity": "sha512-tSU6E8mmlki9mmfPy3aHlXKkGCcKXVXjAWF4Y/KZIslW7fQy0PalrsUoe8J4FQpEhxbh9vv2TkO08fFLDenMmA==",
@@ -4815,7 +4815,7 @@
     {
       "name": "@sap-ux/fiori-mcp-server",
       "category": "utility",
-      "install_cmd": "npx -y @sap-ux/fiori-mcp-server",
+      "install_cmd": "npx -y @sap-ux/fiori-mcp-server@0.6.58",
       "source_url": "https://github.com/SAP/open-ux-tools",
       "version": "0.6.58",
       "pkg_integrity": "sha512-zC43mo+TcOQafbcZtlL+R5UG2oKMDmEEJftgdhgYi7z8SjGnTVMkiAmHbwH4BTbFWfwZqxvN+GAPFZKPvm5frA==",
@@ -4872,7 +4872,7 @@
     {
       "name": "@supabase/mcp-server-supabase",
       "category": "database",
-      "install_cmd": "npx -y @supabase/mcp-server-supabase",
+      "install_cmd": "npx -y @supabase/mcp-server-supabase@0.8.1",
       "source_url": "https://github.com/supabase-community/supabase-mcp",
       "version": "0.8.1",
       "pkg_integrity": "sha512-MNf/Yc6JNITWAwTSD6KbyAPO1ZeZFhC6qQZlH+lECceDhXisd6oeM15aXXGwuLmUybutq+DXN49j7yuylS0ekw==",
@@ -4932,7 +4932,7 @@
     {
       "name": "kubernetes-mcp-server",
       "category": "infra",
-      "install_cmd": "npx -y kubernetes-mcp-server",
+      "install_cmd": "npx -y kubernetes-mcp-server@0.0.62",
       "source_url": "https://github.com/containers/kubernetes-mcp-server",
       "version": "0.0.62",
       "pkg_integrity": "sha512-zYuieO6w/IxlBtzWKQajpuLlCaiBOGbljvjjsGP/COZQjzFcLMZ/FDTXINvz6yUYdKFgDIy+Tg99+4AgRY1s2g==",
@@ -4994,7 +4994,7 @@
     {
       "name": "@azure/mcp",
       "category": "infra",
-      "install_cmd": "npx -y @azure/mcp",
+      "install_cmd": "npx -y @azure/mcp@3.0.0-beta.10",
       "source_url": "https://github.com/microsoft/mcp",
       "version": "3.0.0-beta.10",
       "pkg_integrity": "sha512-xW47hDIJazF2w+SKg+qyzMuFetmYSmo5sCP8Qnwve6gURtVh1EvtnPIuM/xgMBs0yQ9MN8d4lrszdLfPziGmpA==",
@@ -5051,7 +5051,7 @@
     {
       "name": "@penpot/mcp",
       "category": "utility",
-      "install_cmd": "npx -y @penpot/mcp",
+      "install_cmd": "npx -y @penpot/mcp@2.15.0",
       "source_url": "https://github.com/penpot/penpot",
       "version": "2.15.0",
       "pkg_integrity": "sha512-x+PoE5Urf3HBKot5cp1gRvvWE/3Gn15estTk8emMkr5WQOsY9FMLUiYTS59y57qGOC3YnkuROiF/1OiYR+YQNw==",
@@ -5124,7 +5124,7 @@
     {
       "name": "@agent-infra/mcp-server-browser",
       "category": "browser",
-      "install_cmd": "npx -y @agent-infra/mcp-server-browser",
+      "install_cmd": "npx -y @agent-infra/mcp-server-browser@1.2.29",
       "source_url": "https://github.com/bytedance/UI-TARS-desktop",
       "version": "1.2.29",
       "pkg_integrity": "sha512-z2PVFQ4+w5NV/esYZs/JyesyPPX7ombcA0mPZFSpMXqOoM20oENTH48XzLnKqW53pU7DiDlfv7fg1zdi4bga9A==",
@@ -5181,7 +5181,7 @@
     {
       "name": "slack-mcp-server",
       "category": "communication",
-      "install_cmd": "npx -y slack-mcp-server",
+      "install_cmd": "npx -y slack-mcp-server@1.2.3",
       "source_url": "https://github.com/korotovsky/slack-mcp-server",
       "version": "1.2.3",
       "pkg_integrity": "sha512-R2RR+Z6YyQpIvD9m3eLsxQLFYJ3nqujNu9FLlv+H+9+ovwevKLN4EJmq3hT2G3t5mmnArcPNHHOc5t2Dv/QTKA==",
@@ -5238,7 +5238,7 @@
     {
       "name": "@qase/mcp-server",
       "category": "testing",
-      "install_cmd": "npx -y @qase/mcp-server",
+      "install_cmd": "npx -y @qase/mcp-server@1.1.7",
       "source_url": "https://github.com/qase-tms/qase-mcp-server",
       "version": "1.1.7",
       "pkg_integrity": "sha512-dP6yOF0aWWo92kGtMloxoROeeHG3D9d768TwQPwl1Qj6XblSrYUiV+dkYmtedOM+D08ZyK1yROugCOKvh3tGOQ==",
@@ -5298,7 +5298,7 @@
     {
       "name": "linkup-mcp-server",
       "category": "search",
-      "install_cmd": "npx -y linkup-mcp-server",
+      "install_cmd": "npx -y linkup-mcp-server@3.2.0",
       "source_url": "https://github.com/LinkupPlatform/linkup-mcp-server",
       "version": "3.2.0",
       "pkg_integrity": "sha512-MAw7md5agV2lCTRv9cdy8zbZ/DBZTDzgxoExf+HfyyVHyvAd6bAp/UiR1m88sRJVJshOgVa1c9C+Dxk1PrVZPw==",
@@ -5355,7 +5355,7 @@
     {
       "name": "@tankpkg/mcp-server",
       "category": "utility",
-      "install_cmd": "npx -y @tankpkg/mcp-server",
+      "install_cmd": "npx -y @tankpkg/mcp-server@0.15.7",
       "source_url": "https://github.com/tankpkg/tank",
       "version": "0.15.7",
       "pkg_integrity": "sha512-iOsAr4MnqZAWdOdvylXpqqFW5W2t7wEKv8zctA3b5xgpTWEraGmRPWlkc9vJ/hOH1zRUIylZ4PYDcyN+W8hxbg==",
@@ -5412,7 +5412,7 @@
     {
       "name": "@growthbook/mcp",
       "category": "utility",
-      "install_cmd": "npx -y @growthbook/mcp",
+      "install_cmd": "npx -y @growthbook/mcp@1.8.1",
       "source_url": "https://github.com/growthbook/growthbook-mcp",
       "version": "1.8.1",
       "pkg_integrity": "sha512-jwplJWY6X7Rd2K1wDI5XfvRBbHPo/zLAGcCZDOhzfUi73MHydHGFhyqI/Ivgy33cS0nI6bqXRrXk8HFfh0MklQ==",
@@ -5472,7 +5472,7 @@
     {
       "name": "@nexus2520/bitbucket-mcp-server",
       "category": "vcs",
-      "install_cmd": "npx -y @nexus2520/bitbucket-mcp-server",
+      "install_cmd": "npx -y @nexus2520/bitbucket-mcp-server@2.1.0",
       "source_url": "https://github.com/pdogra1299/bitbucket-mcp-server",
       "version": "2.1.0",
       "pkg_integrity": "sha512-2Mm6MKtKxAmWEXru9GsNTEjMBA18zpTjRix+UOCvcHKnJML5tw2XqYmUi1r/m9OCu/h32GQpm/h/G4Zuwxmq7A==",
@@ -5529,7 +5529,7 @@
     {
       "name": "@currents/mcp",
       "category": "utility",
-      "install_cmd": "npx -y @currents/mcp",
+      "install_cmd": "npx -y @currents/mcp@2.2.18",
       "source_url": "https://github.com/currents-dev/currents-mcp",
       "version": "2.2.18",
       "pkg_integrity": "sha512-7jyKyzc1m+RNL9nkTbqMV4qrFlz/M7RUn4nOUUKZ+VhUNp0AB8oXKAPz7aC9S5DUdBFy2wP22Adk3Lqsh5jHsg==",
@@ -5589,7 +5589,7 @@
     {
       "name": "lsp-mcp-server",
       "category": "ai",
-      "install_cmd": "npx -y lsp-mcp-server",
+      "install_cmd": "npx -y lsp-mcp-server@1.1.17",
       "source_url": "https://github.com/ProfessioneIT/lsp-mcp-server",
       "version": "1.1.17",
       "pkg_integrity": "sha512-2t/9YtmZ14do9k1G2+JgeWSrzik53XOcEvQaNt1P1arV/G0Z7mTlts4r+ySvXPbCvr5gIIIOQVQ4qzPaJ+sNCg==",
@@ -5646,7 +5646,7 @@
     {
       "name": "codex-mcp-server",
       "category": "ai",
-      "install_cmd": "npx -y codex-mcp-server",
+      "install_cmd": "npx -y codex-mcp-server@1.4.10",
       "source_url": "https://github.com/tuannvm/codex-mcp-server",
       "version": "1.4.10",
       "pkg_integrity": "sha512-F/GDVSvs26z74OpsnyQsseao8xcW3ym76UmgT/5DRd5u7Ep0yO9mKLKmtCMPwwv557wGQfYWLWOBDpKmHAgJww==",
@@ -5706,7 +5706,7 @@
     {
       "name": "@circleci/mcp-server-circleci",
       "category": "ci-cd",
-      "install_cmd": "npx -y @circleci/mcp-server-circleci",
+      "install_cmd": "npx -y @circleci/mcp-server-circleci@0.15.1",
       "source_url": "https://github.com/CircleCI-Public/mcp-server-circleci",
       "version": "0.15.1",
       "pkg_integrity": "sha512-Bwmk+Cr4SwEjiQRPqxVkB/Inf7spbDKBZXix9nINAXmWf6p52CMx7fH2xVlsZpaLWyqQhNRR+UhnmczouG6lZw==",
@@ -5763,7 +5763,7 @@
     {
       "name": "@memberjunction/ai-mcp-server",
       "category": "utility",
-      "install_cmd": "npx -y @memberjunction/ai-mcp-server",
+      "install_cmd": "npx -y @memberjunction/ai-mcp-server@5.34.0",
       "source_url": "https://github.com/MemberJunction/MJ",
       "version": "5.34.0",
       "pkg_integrity": "sha512-Hwm3+/hru10hR5vQFEkgrLvK0ZAMhBLHBey/qWo6xBTHW6G/cZPX6S/BiAV9K/o0Ts0dK68Ivm58PEcUFP3i2g==",
@@ -5823,7 +5823,7 @@
     {
       "name": "fsb-mcp-server",
       "category": "browser",
-      "install_cmd": "npx -y fsb-mcp-server",
+      "install_cmd": "npx -y fsb-mcp-server@0.9.0",
       "source_url": "https://github.com/lakshmanturlapati/FSB",
       "version": "0.9.0",
       "pkg_integrity": "sha512-w/+joT2EiNkf6ueeCkihViaqtWwVpQo2n1erJsNe6n9IHvVzIPDLjULPOrqTx9Kp17t35ksju7MJ52vHGj6Pvw==",
@@ -5880,7 +5880,7 @@
     {
       "name": "@skillsmith/mcp-server",
       "category": "utility",
-      "install_cmd": "npx -y @skillsmith/mcp-server",
+      "install_cmd": "npx -y @skillsmith/mcp-server@0.5.1",
       "source_url": "https://github.com/smith-horn/skillsmith",
       "version": "0.5.1",
       "pkg_integrity": "sha512-MRtsEuPWqG7MIYlrWFKUDCNGJh5MNQ07PKSK0kO/pBupz5W2M9L2Pkfsn3r0YPddTzDHJmlrJDtRY1k8aKwdtQ==",
@@ -5937,7 +5937,7 @@
     {
       "name": "@theia/ai-mcp-server",
       "category": "utility",
-      "install_cmd": "npx -y @theia/ai-mcp-server",
+      "install_cmd": "npx -y @theia/ai-mcp-server@1.71.1",
       "source_url": "https://github.com/eclipse-theia/theia",
       "version": "1.71.1",
       "pkg_integrity": "sha512-2dcbtKbHAh/6UdoY492yl07QRTgS7m/La7E3jQz7Hr2OcXMwfvRDMPBHIOgTRxzZoGvWOl0L7QTtge0x4lX/0g==",
@@ -6013,7 +6013,7 @@
     {
       "name": "teamcity-mcp",
       "category": "ci-cd",
-      "install_cmd": "npx -y @daghis/teamcity-mcp",
+      "install_cmd": "npx -y @daghis/teamcity-mcp@2.12.1",
       "source_url": "https://github.com/Daghis/teamcity-mcp",
       "version": "2.12.1",
       "pkg_integrity": "sha512-co73JiDX829vVTciq/FBQjNJrRulHE9YI+2zGFdZ4JnFFDoFyqRBCiCSkFtsKZ5Cq9H8tT1PFJqhRtLoqCUgfw==",
@@ -6073,7 +6073,7 @@
     {
       "name": "prometheus-mcp",
       "category": "observability",
-      "install_cmd": "npx -y prometheus-mcp",
+      "install_cmd": "npx -y prometheus-mcp@1.1.3",
       "source_url": "https://github.com/idanfishman/prometheus-mcp",
       "version": "1.1.3",
       "pkg_integrity": "sha512-iln/dRdYhzrm8+YOc6yLuqcwWjtced370ME4XR79wAZkE5IpvZYdFHXSlEz0R2V0h1AvZ47R4n/iFL6eWgQeCA==",
@@ -6133,7 +6133,7 @@
     {
       "name": "mcp-server-mysql",
       "category": "database",
-      "install_cmd": "npx -y @benborla29/mcp-server-mysql",
+      "install_cmd": "npx -y @benborla29/mcp-server-mysql@2.0.8",
       "source_url": "https://github.com/benborla/mcp-server-mysql",
       "version": "2.0.8",
       "pkg_integrity": "sha512-tlbpsncFO53D6hTYIjhVZM94Xyjbj+zjyWfF+fH7VjNUvue1WL4YZtaEh0rbHt0j1XihsiJwk4qtUr+PguZ1cA==",
@@ -6189,7 +6189,7 @@
     {
       "name": "datadog-mcp",
       "category": "observability",
-      "install_cmd": "npx -y @winor30/mcp-server-datadog",
+      "install_cmd": "npx -y @winor30/mcp-server-datadog@1.7.0",
       "source_url": "https://github.com/winor30/mcp-server-datadog",
       "version": "1.7.0",
       "pkg_integrity": "sha512-TX2e2SjdNQEmL3ZVNf0KaKFo8PhaaaN6WiJpQbyU2xmlqpB55Iolj+YnLMvSyBKJABCL1mQtiJPx/ebc+8jl1g==",
