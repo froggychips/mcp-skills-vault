@@ -72,24 +72,6 @@ function recompute(doc) {
   }));
 }
 
-/**
- * explain's document without the inputs only explain weighs: what the
- * configured set would do with the entry (#123: findings flows/*,
- * shadowing/*) and the tool-description scan of its eval row (#124: fact
- * tool_scan). What is left is the artifact part verify and the export share.
- */
-const SETUP_RULE = (rule) => /^(flows|shadowing)\//.test(rule);
-function artifactPart(edoc) {
-  const facts = Object.fromEntries(Object.entries(edoc.facts || {}).map(([id, x]) => {
-    const { tool_scan, ...rest } = x || {};
-    return [id, rest];
-  }));
-  return { ...edoc, findings: edoc.findings.filter((f) => !SETUP_RULE(f.rule)), facts };
-}
-function hasExplainOnlyInputs(edoc) {
-  return edoc.findings.some((f) => SETUP_RULE(f.rule)) || Object.values(edoc.facts || {}).some((x) => x && x.tool_scan);
-}
-
 // A spread of entries: npm, PyPI, docker, a blocked one, an unroutable one.
 const SAMPLE = (() => {
   const pick = (pred) => DB.find(pred);
@@ -130,7 +112,9 @@ test('verify: every decision is decide() of the document\'s own inputs, and its 
         const lines = e.findings.filter((f) => f.tag === 'POLICY-FAIL' || f.tag === 'POLICY-WARN').map((f) => f.message);
         const rendered = d.rules.filter((o) => {
           const row = PR.rowFor(o.rule);
-          return row && row.views.includes('policy-line') && (o.effect === 'deny' || o.effect === 'warn');
+          // Context (a stored reading the policy does not require) is traced,
+          // not a POLICY line: the gate has never warned on it.
+          return row && row.views.includes('policy-line') && o.role !== 'context' && (o.effect === 'deny' || o.effect === 'warn');
         }).map((o) => `${o.rule}: ${o.detail}`);
         assert.deepEqual(lines, rendered, `${label}: ${e.name} POLICY lines are not the decision's rules`);
       }
@@ -229,42 +213,55 @@ test('one subject, one answer: the same inputs decide the same way whichever com
 });
 
 test('explain exits as verify does: same policy, flags and --as-of, same exit and decided_by', () => {
-  // Far enough ahead that every stored claim is past its shelf life: the case
-  // where explain used to answer 0 ("not denied") while verify, holding the
-  // same decision to `fail_on: unknown`, answered 1.
+  // The whole decision, not a part of it (#131). explain also shows what
+  // verify does not read — behaviour, the tool-description scan (#124), what
+  // the configured set would do (#123), a stored reading the policy does not
+  // require — and those rows are context in explain's modes
+  // (lib/policy_rules.cjs `role`): traced, never in effect, decided_by or
+  // exit. So nothing is filtered here. STALE is far enough ahead that every
+  // stored claim is past its shelf life: the case where explain used to
+  // answer 0 ("not denied") while verify, holding the same decision to
+  // `fail_on: unknown`, answered 1.
   const STALE = '2027-06-01T00:00:00.000Z';
-  const cases = [[DIRS.unverified, []], [DIRS.none, ['--fail-unverified']], [DIRS.none, ['--strict']]];
+  const cases = [];
+  for (const at of [STALE, AS_OF]) {
+    for (const [dir, flags] of [[DIRS.none, []], [DIRS.none, ['--strict']], [DIRS.none, ['--fail-unverified']],
+      [DIRS.unverified, []], [DIRS.strict, []], [DIRS.licences, ['--strict']]]) cases.push([at, dir, flags]);
+  }
   let stale = 0;
-  for (const [dir, flags] of cases) {
-    const v = JSON.parse(run('verify_integrity.cjs', ['--offline', '--json', '--cwd', dir, '--as-of', STALE, ...flags]).stdout);
+  let context = 0;
+  for (const [at, dir, flags] of cases) {
+    const v = JSON.parse(run('verify_integrity.cjs', ['--offline', '--json', '--cwd', dir, '--as-of', at, ...flags]).stdout);
     const byId = new Map(v.findings.decisions.map((d) => [d.subject.id, d]));
     for (const name of SAMPLE) {
-      const label = `${path.basename(dir)} ${flags.join(' ') || '(no flags)'} ${name}`;
-      const vr = run('verify_integrity.cjs', ['--offline', '--json', '--entry', name, '--cwd', dir, '--as-of', STALE, ...flags]);
-      const er = run('explain.cjs', [name, '--json', '--cwd', dir, '--as-of', STALE, ...flags]);
-      // explain also weighs inputs `verify --entry` does not read (the
-      // configured set, #123; the tool-description scan, #124). The artifact
-      // part is what the two share: explain's document without those,
-      // re-decided, must be verify's decision; the exit code is explain's
-      // whole decision.
-      const edoc = JSON.parse(er.stdout).findings;
-      const explainOnly = hasExplainOnlyInputs(edoc);
-      const [ed] = explainOnly ? recompute(artifactPart(edoc)) : edoc.decisions;
+      const label = `${at} ${path.basename(dir)} ${flags.join(' ') || '(no flags)'} ${name}`;
+      const vr = run('verify_integrity.cjs', ['--offline', '--json', '--entry', name, '--cwd', dir, '--as-of', at, ...flags]);
+      const er = run('explain.cjs', [name, '--json', '--cwd', dir, '--as-of', at, ...flags]);
+      const [ed] = JSON.parse(er.stdout).findings.decisions;
+      const [vd1] = JSON.parse(vr.stdout).findings.decisions.filter((d) => d.subject.id === ed.subject.id);
       const vd = byId.get(ed.subject.id);
-      assert.ok(vd, `${label}: verify made no decision for ${ed.subject.id}`);
-      assert.equal(ed.fail_on, vd.fail_on, `${label}: explain and verify hold the entry to different thresholds`);
-      assert.equal(ed.fails, vd.fails, `${label}: explain's artifact part fails=${ed.fails}, verify ${vd.fails}`);
-      if (!explainOnly) assert.equal(er.status, vr.status, `${label}: explain exits ${er.status}, verify ${vr.status}`);
-      else assert.equal(er.status, edoc.decisions[0].fails ? 1 : 0, `${label}: explain exits ${er.status}, not its decision's`);
-      // The case this test is about: nothing denies, and the threshold decides.
-      if (vd.fails && vd.effect === 'unknown' && ed.effect !== 'deny') {
+      assert.ok(vd && vd1, `${label}: verify made no decision for ${ed.subject.id}`);
+      assert.equal(er.status, vr.status, `${label}: explain exits ${er.status}, verify ${vr.status}`);
+      assert.deepEqual([ed.effect, ed.decided_by, ed.fails, ed.fail_on], [vd1.effect, vd1.decided_by, vd1.fails, vd1.fail_on],
+        `${label}: explain decides ${ed.effect}/${ed.decided_by}, verify --entry ${vd1.effect}/${vd1.decided_by}`);
+      assert.deepEqual([ed.effect, ed.decided_by, ed.fails], [vd.effect, vd.decided_by, vd.fails], `${label}: and the whole-DB run agrees`);
+      // What explain adds is context, and only context. (Rule and effect: the
+      // one detail that may differ is policy/trust's tier, which verify
+      // derives from this run's pin check and explain reads off the entry.)
+      const vRules = new Set(vd1.rules.map((o) => `${o.rule} ${o.effect}`));
+      for (const o of ed.rules) {
+        if (o.role === 'context') { context++; continue; }
+        assert.ok(vRules.has(`${o.rule} ${o.effect}`), `${label}: explain's gate outcome ${o.rule} (${o.effect}: ${o.detail}) is not verify's`);
+      }
+      // The case this test was written for: nothing denies, and the threshold decides.
+      if (vd.fails && vd.effect === 'unknown') {
         stale++;
-        assert.equal(ed.decided_by, vd.decided_by, `${label}: decided by ${ed.decided_by} here, ${vd.decided_by} in verify`);
         assert.equal(er.status, 1, `${label}: unknown under fail_on=${vd.fail_on} must fail`);
       }
     }
   }
   assert.ok(stale >= 3, `the fixtures must exercise stale evidence failing at fail_on (got ${stale})`);
+  assert.ok(context > 0, 'the fixtures must exercise explain-only context');
 });
 
 // ── stored evidence: verify --offline and explain are one decision ─────────
@@ -365,6 +362,72 @@ test('--fail-families narrows what fails the run, not what is decided', (t) => {
   const adv = runIn('verify_integrity.cjs', ['--offline', '--json', '--cwd', DIRS.none, '--as-of', FIX_AS_OF, '--fail-families=evidence']);
   assert.equal(adv.status, 1);
   assert.doesNotMatch(adv.stderr, /internal:/);
+});
+
+test('roles: what explain shows beside the gate is context in its modes, and the gate in the command that asks it', () => {
+  const role = (id, mode) => PR.roleOf(PR.RULE_BY_ID.get(id), mode);
+  for (const id of ['behaviour/*', 'budget/over']) {
+    for (const mode of ['gate', 'evidence', 'live', 'setup']) assert.equal(role(id, mode), 'context', `${id} in ${mode}`);
+  }
+  for (const id of ['tool-scan/*', 'flows/lethal-trifecta', 'flows/untrusted-destructive', 'shadowing/*', 'flows/no-data']) {
+    assert.equal(role(id, 'evidence'), 'context', `${id} in explain`);
+    assert.equal(role(id, 'live'), 'context', `${id} in explain --verify`);
+  }
+  assert.equal(role('tool-scan/*', 'gate'), 'gate', 'tool-scan and mcp-eval --fail-tool-scan ask it');
+  assert.equal(role('flows/lethal-trifecta', 'setup'), 'gate', 'status / audit ask it');
+  // Every row's role is one of the two, in every mode.
+  for (const r of PR.RULES) for (const mode of [...Object.keys(PR.ORDER), 'live']) assert.ok(['gate', 'context'].includes(PR.roleOf(r, mode)), r.id);
+  // A context outcome never fails the run, whatever the threshold.
+  assert.equal(F.outcomeFails({ rule: 'tool-scan/unicode-tags', effect: 'deny', findings: [], role: 'context', thresholded: true }, { threshold: 'warn' }), false);
+  // And decide() keeps it out of effect, decided_by and fails, but in rules.
+  const ep = PR.effectivePolicy(null, { strict: true });
+  const s = F.subject.artifact({ entry: 'x', version: '1.0.0' });
+  const [d] = F.decide([], ep, Date.parse(AS_OF), { subjects: [s], facts: { [s.id]: { mode: 'evidence', budget: { over: true, after: 2, limit: 1 }, behaviour: { state: 'never-started', reason: 'crashed' } } } });
+  assert.deepEqual([d.effect, d.decided_by, d.fails], ['allow', 'finding/none', false]);
+  assert.deepEqual(d.rules.map((o) => [o.rule, o.effect, o.role]), [['behaviour/never-started', 'warn', 'context'], ['budget/over', 'warn', 'context']]);
+});
+
+test('--fail-families: a missing, empty or unknown value is a usage error, never a filter that matches nothing', (t) => {
+  const runIn = fixtureTree(t);
+  const base = ['--offline', '--entry', 'fx-advisory-fresh', '--cwd', DIRS.none, '--as-of', FIX_AS_OF];
+  for (const [args, why] of [
+    [['--fail-families'], /needs a comma-separated list/],
+    [['--fail-families', '--strict'], /needs a comma-separated list/],
+    [['--fail-families='], /names no family/],
+    [['--fail-families', ',,'], /names no family/],
+    [['--fail-families', 'trust,intgrity'], /unknown rule family "intgrity"/],
+    [['--fail-families=advisory'], /unknown rule family "advisory"/],
+  ]) {
+    const r = runIn('verify_integrity.cjs', [...base, ...args]);
+    assert.equal(r.status, 2, `${args.join(' ')}: exit ${r.status} (${r.stderr})`);
+    assert.match(r.stderr, why, args.join(' '));
+  }
+  assert.deepEqual(PR.parseFailFamilies(['--fail-families', 'trust/*,integrity']), { families: ['trust', 'integrity'], error: null });
+  assert.deepEqual(PR.parseFailFamilies(['--strict']), { families: null, error: null });
+  // Every family a producer emits is one --fail-families accepts.
+  const known = new Set([...PR.FINDING_FAMILIES, ...PR.RULES.map((r) => r.id.split('/')[0])]);
+  const src = [path.join(S, 'lib'), S].flatMap((d) => fs.readdirSync(d).filter((f) => f.endsWith('.cjs')).map((f) => path.join(d, f)));
+  for (const file of src) {
+    for (const m of fs.readFileSync(file, 'utf8').matchAll(/rule:\s*['`]([a-z0-9-]+)\//g)) {
+      assert.ok(known.has(m[1]), `${path.relative(ROOT, file)} emits family "${m[1]}", which --fail-families rejects`);
+    }
+  }
+});
+
+test('--fail-families trust: a failing trust outcome counts against its entry, and the report explains the exit', (t) => {
+  const runIn = fixtureTree(t);
+  const r = runIn('verify_integrity.cjs', ['--offline', '--json', '--entry', 'fx-advisory-fresh', '--cwd', DIRS.none, '--as-of', FIX_AS_OF, '--fail-families', 'trust']);
+  assert.equal(r.status, 1, r.stderr);
+  assert.doesNotMatch(r.stderr, /internal:/, 'the decision and the counters must agree');
+  const report = JSON.parse(r.stdout);
+  const [d] = report.findings.decisions;
+  assert.deepEqual([d.effect, d.decided_by, d.fails], ['deny', 'trust/advisories', true]);
+  const e = report.entries.find((x) => x.name === 'fx-advisory-fresh');
+  assert.equal(e.status, 'FAIL');
+  assert.ok(e.failures > 0, `failures ${e.failures}`);
+  assert.ok(e.findings.some((f) => f.tag === 'FAIL' && /^trust\/advisories: /.test(f.message)), 'the failing outcome is named');
+  const { judgeRun } = require(path.join(S, 'verify_summary.cjs'));
+  assert.deepEqual(judgeRun(report, r.status), { ok: true, reason: null });
 });
 
 test('outcomeFails: the family filter, by the outcome\'s rule or a finding it rests on', () => {
@@ -667,15 +730,17 @@ test('export-registry: _meta verdicts and skips are views of decide(), under no 
   }
   // One subject, one answer: explain's model of the same entry at the same
   // instant, re-decided under the export's policy, is the export's decision.
-  // explain also weighs inputs the export does not (the configured set, #123;
-  // the tool-description scan, #124), so those are left out of the comparison.
+  // What explain weighs and the export does not (the configured set, #123;
+  // the tool-description scan, #124) is context in explain's mode, so nothing
+  // is left out: effect and decided_by whole, and the gate outcomes equal.
   const byEntry = new Map(first.decisions.map((d) => [d.subject.entry, d]));
+  const gate = (d) => d.rules.filter((o) => o.role !== 'context');
   for (const name of SAMPLE) {
     const edoc = JSON.parse(run('explain.cjs', [name, '--json', '--cwd', DIRS.none, '--as-of', AS_OF]).stdout).findings;
-    const [x] = recompute({ ...artifactPart(edoc), policy: first.policy });
+    const [x] = recompute({ ...edoc, policy: first.policy });
     const d = byEntry.get(name);
     assert.ok(d, `${name}: no decision in the export`);
-    assert.deepEqual([d.subject.id, d.effect, d.decided_by, d.rules], [x.subject.id, x.effect, x.decided_by, x.rules],
+    assert.deepEqual([d.subject.id, d.effect, d.decided_by, d.fails, gate(d)], [x.subject.id, x.effect, x.decided_by, x.fails, gate(x)],
       `${name}: export and explain decide the same entry differently`);
   }
 });

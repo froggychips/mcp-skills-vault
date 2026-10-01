@@ -1459,6 +1459,11 @@ async function main() {
     console.error(`--fail-on must be ${RANK.fail_on.join(', ').replace(/, (\w+)$/, ' or $1')} (got ${JSON.stringify(FAIL_ON_ARG)}).`);
     process.exit(2);
   }
+  // A family filter that matches nothing would pass a denied entry (#134).
+  if (RUN_FLAGS.failFamiliesError) {
+    console.error(RUN_FLAGS.failFamiliesError);
+    process.exit(2);
+  }
   if (POLICY_FILE && NO_POLICY) {
     console.error('--policy and --no-policy contradict each other.');
     process.exit(2);
@@ -1933,6 +1938,12 @@ async function main() {
     if (!OFFLINE || INSTALLED || s.type !== 'artifact' || r.status === 'UPD') return;
     const stored = fromStoredEvidence(r.tool, { asOf: AS_OF, maxAgeDays: evidenceMaxAge(), subject: s, scope: 'database' });
     Object.assign(facts[s.id], stored.facts);
+    // Offline the stored record is all there is to judge a policy
+    // requirement by, so the policy/* rows read it (evidence mode) as they do
+    // in explain: a signature the DB recorded as verified for this artifact is
+    // verified, not "no verifiable registry signature" because this run did
+    // not look. Same rows, same mode, same answer (#131).
+    facts[s.id].mode = 'evidence';
     const seen = new Set(model.observations.map((o) => o.id));
     for (const o of stored.observations) if (!seen.has(o.id)) model.observations.push(o);
     model.findings.push(...stored.findings);
@@ -1986,7 +1997,7 @@ async function main() {
       if (!d) continue;
       const verdicts = d.rules.filter((o) => {
         const row = rowFor(o.rule);
-        return row && row.views.includes('policy-line') && (o.effect === 'deny' || o.effect === 'warn');
+        return row && row.views.includes('policy-line') && o.role !== 'context' && (o.effect === 'deny' || o.effect === 'warn');
       });
       if (!verdicts.length) continue;
       results[i].lines = results[i].lines || [];
@@ -2027,6 +2038,26 @@ async function main() {
       results[i].failures = 0;
       results[i].status = verdictFor(0, results[i].lines);
     }
+  }
+
+  // The entry's failure count is its Decision's (#134). An outcome can fail
+  // the run without resting on any finding rendered above — `trust/<dimension>`
+  // under `--fail-families trust`: the stored advisory's own line is decided
+  // by `finding/severity`, outside the question — so an entry whose decision
+  // fails and that nothing above counted is counted here, with the outcomes
+  // that failed it named. Otherwise the report says 0 failures for an exit 1.
+  for (let i = 0; i < results.length; i++) {
+    const s = model.subjects[i];
+    const d = s && decisionOf.get(s.id);
+    if (!d || !d.fails || results[i].failures > 0) continue;
+    const ruleOf = new Map(model.findings.filter((f) => f.subject.id === s.id).map((f) => [f.id, f.rule]));
+    const failing = d.rules.filter((o) => outcomeFails(o, {
+      threshold: d.fail_on, families: EP.fail_families, ruleOf, thresholded: Boolean((rowFor(o.rule) || {}).thresholded),
+    }));
+    results[i].lines = results[i].lines || [];
+    for (const o of failing) results[i].lines.push(['FAIL', `${o.rule}: ${o.detail || o.rule}`, { decided_by: o.rule }]);
+    results[i].failures = Math.max(1, failing.length);
+    results[i].status = 'FAIL';
   }
 
   // The exit code is the decisions'. The per-entry `failures` counters are the

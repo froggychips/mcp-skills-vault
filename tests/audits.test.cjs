@@ -265,12 +265,19 @@ test('CLI: keygen → add → export → fetch → check → list, the last thre
   let r = run(['keygen', keyFile, '--json']);
   assert.equal(r.status, 0, r.stderr);
   const { public_key: publicKey } = JSON.parse(r.stdout);
-  assert.equal(fs.statSync(keyFile).mode & 0o777, 0o600);
+  // One open, then fstat and read through the same descriptor: the mode
+  // checked is the mode of the file whose key is used (no check-then-use).
+  let privateKey;
+  const fd = fs.openSync(keyFile, 'r');
+  try {
+    assert.equal(fs.fstatSync(fd).mode & 0o777, 0o600);
+    privateKey = fs.readFileSync(fd, 'utf8');
+  } finally { fs.closeSync(fd); }
   assert.equal(run(['keygen', keyFile]).status, 1, 'never overwrites a key');
 
   r = run(['add', entry.name, '--criteria', 'safe-to-deploy', '--who', 'Me', '--cwd', mine]);
   assert.equal(r.status, 0, r.stderr);
-  r = run(['export', '--cwd', mine, '--out', path.join(mine, 'export.json')], { MCP_VAULT_AUDIT_KEY: fs.readFileSync(keyFile, 'utf8') });
+  r = run(['export', '--cwd', mine, '--out', path.join(mine, 'export.json')], { MCP_VAULT_AUDIT_KEY: privateKey });
   assert.equal(r.status, 0, r.stderr);
 
   fs.writeFileSync(path.join(theirs, A.IMPORTS_FILE), JSON.stringify({

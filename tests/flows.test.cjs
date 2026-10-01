@@ -385,16 +385,24 @@ test('audit: a project server left out by enabledMcpjsonServers is not in the se
   assert.equal(r.findings.filter((x) => x.category === 'toxic-flow' && x.rule === 'flows/lethal-trifecta').length, 0);
 });
 
-test('explain: a setup finding denies only when the policy says fail, and a low-confidence one never does', () => {
+test('explain: a setup finding refuses only when the policy says fail, a low-confidence one never does — as context', () => {
   const tool = { name: 'x', install_cmd: 'npx -y x@1.0.0' };
   const s = subjectForTool(tool);
   const base = { tool, gateEntry: null, trust: { gate: 'ok', score: 90, reasons: [] }, behav: { state: 'ok' }, budget: null, asOf: AS_OF };
   const flow = (confidence = 'high') => F.finding({ rule: 'flows/lethal-trifecta', subject: s, scope: 'claude-code', severity: 'high', confidence, message: 'claude-code: x alone …' });
-  assert.equal(explain.decide({ ...base, policy: eff({ toxicFlows: 'fail' }), setup: [flow()] }).decision, 'deny');
-  assert.equal(explain.decide({ ...base, policy: eff(), setup: [flow()] }).decision, 'allow');
+  const outcome = (d) => d.rules.filter((r) => r.rule === 'flows/lethal-trifecta').map((r) => [r.outcome, r.role]);
+  // What the set would do is `audit`'s question (mode setup, where the row is
+  // the gate); in explain it is context: shown, refused beside the gate, and
+  // not in its exit code — which is verify's (#131).
+  const fail = explain.decide({ ...base, policy: eff({ toxicFlows: 'fail' }), setup: [flow()] });
+  assert.deepEqual(outcome(fail), [['deny', 'context']]);
+  assert.deepEqual(fail.context_blocking, ['flows/lethal-trifecta']);
+  assert.equal(fail.decision, 'allow');
+  assert.equal(fail.model.decision.fails, false);
+  assert.deepEqual(outcome(explain.decide({ ...base, policy: eff(), setup: [flow()] })), [['warn', 'context']]);
   const low = explain.decide({ ...base, policy: eff({ toxicFlows: 'fail' }), setup: [flow('low')] });
   assert.equal(low.decision, 'allow');
-  assert.deepEqual(low.rules.filter((r) => r.rule === 'flows/lethal-trifecta').map((r) => r.outcome), ['allow']);
+  assert.deepEqual(outcome(low), [['allow', 'context']]);
 });
 
 test('explain: with nothing configured, an entry is still judged alone; a flow already there is not this entry\'s', () => {

@@ -270,8 +270,11 @@ function decision({
     findings: [...new Set(ids)].sort(cmp),
     // Every rule that had something to say, in table order, with what it
     // said — the trace `explain` prints and the audit record keeps.
+    // A context outcome (lib/policy_rules.cjs `role`) is listed, marked, and
+    // decides nothing; a gate outcome carries no mark, as before.
     rules: rules.map((r) => ({
       rule: r.rule, effect: r.effect, detail: r.detail || null, findings: [...new Set(r.findings || [])].sort(cmp),
+      ...(r.role === 'context' ? { role: 'context' } : {}),
     })),
   };
 }
@@ -281,7 +284,8 @@ const failsAt = (effect, failOn) => effect === 'deny'
   || (failOn === 'warn' && (effect === 'unknown' || effect === 'warn'));
 
 /**
- * Whether one rule outcome fails the run: `deny` always, `unknown` / `warn`
+ * Whether one rule outcome fails the run: never a context outcome (its row's
+ * `role`, lib/policy_rules.cjs); otherwise `deny` always, `unknown` / `warn`
  * from a thresholded row when `threshold` (fail_on) reaches them — and, when
  * the policy names `fail_families`, only an outcome of one of them: by its
  * own rule id, or by a finding it rests on (`ruleOf`: finding id -> rule).
@@ -289,6 +293,8 @@ const failsAt = (effect, failOn) => effect === 'deny'
  * outcome failed (verify's report lines) asks the same function.
  */
 function outcomeFails(o, { threshold = 'deny', families = null, ruleOf = new Map(), thresholded = o.thresholded } = {}) {
+  // Context is shown beside the gate's answer and never part of it.
+  if (o.role === 'context') return false;
   const fam = Array.isArray(families) && families.length ? families : null;
   const inFamily = (rule) => fam.some((f) => rule === f || String(rule).startsWith(`${f}/`));
   if (fam && !inFamily(o.rule) && !(o.findings || []).some((id) => ruleOf.has(id) && inFamily(ruleOf.get(id)))) return false;
@@ -313,7 +319,9 @@ function outcomeFails(o, { threshold = 'deny', families = null, ruleOf = new Map
  *
  * Rules come from the table in lib/policy_rules.cjs, in its order. The worst
  * effect wins (deny > unknown > warn > allow); `decided_by` is the first rule
- * in table order that produced it.
+ * in table order that produced it. Both, and `fails` (fail_on,
+ * fail_families), are over the gate outcomes: a row whose `role` in this
+ * mode is 'context' is evaluated, listed in `rules` and decides nothing.
  */
 function decide(findings, policy, asOf, { subjects = [], facts = {}, mode = 'gate', failOn = null } = {}) {
   const at = requireAsOf(asOf, 'decide');
@@ -322,7 +330,7 @@ function decide(findings, policy, asOf, { subjects = [], facts = {}, mode = 'gat
   }
   // Required here rather than at the top: lib/policy_rules.cjs reads this
   // module's constants and must be loadable without it.
-  const { rulesFor } = require('./policy_rules.cjs');
+  const { rulesFor, roleOf } = require('./policy_rules.cjs');
   // The threshold is the policy's (flags already applied). `failOn` exists
   // for a caller that must ask a different question; explain and verify do
   // not pass it, so one decision exits the same way from both.
@@ -349,20 +357,28 @@ function decide(findings, policy, asOf, { subjects = [], facts = {}, mode = 'gat
     for (const row of rulesFor(ctx.mode)) {
       // --no-policy drops the policy file's rules; the gate's own stay.
       if (!policy.policy_rules && row.id.startsWith('policy/')) continue;
+      const role = roleOf(row, ctx.mode);
       for (const o of row.evaluate(ctx)) {
-        outcomes.push({ rule: o.rule || row.id, effect: o.effect, detail: o.detail, findings: o.findings || [], thresholded: row.thresholded });
+        outcomes.push({
+          rule: o.rule || row.id, effect: o.effect, detail: o.detail, findings: o.findings || [], thresholded: row.thresholded,
+          role: o.role === 'context' ? 'context' : role,
+        });
       }
     }
     const ruleOf = new Map(fs.map((f) => [f.id, f.rule]));
+    // The answer is the gate's: effect, decided_by and fails are over the gate
+    // outcomes only, so a command that also shows context (explain) exits as
+    // the one that does not (verify) on the same inputs.
+    const gate = outcomes.filter((o) => o.role !== 'context');
     let worst = null;
-    for (const o of outcomes) if (!worst || EFFECT_RANK[o.effect] < EFFECT_RANK[worst.effect]) worst = o;
+    for (const o of gate) if (!worst || EFFECT_RANK[o.effect] < EFFECT_RANK[worst.effect]) worst = o;
     const effect = worst ? worst.effect : 'allow';
     out.push(decision({
       subject: s,
       effect,
       decided_by: worst ? worst.rule : 'finding/none',
       as_of: at,
-      findings: outcomes.filter((o) => o.effect === effect).flatMap((o) => o.findings),
+      findings: gate.filter((o) => o.effect === effect).flatMap((o) => o.findings),
       rules: outcomes,
       fails: outcomes.some((o) => outcomeFails(o, { threshold, families: policy.fail_families, ruleOf })),
       fail_on: threshold,
@@ -553,6 +569,7 @@ function explainTrace(doc, subjectId = null) {
         rule: r.rule,
         effect: r.effect,
         detail: r.detail || null,
+        ...(r.role === 'context' ? { role: 'context' } : {}),
         findings: r.findings.map((id) => fById.get(id)).filter(Boolean).map((f) => ({
           id: f.id, rule: f.rule, state: f.state, severity: f.severity, message: f.message,
           observations: f.refs.map((id) => obsById.get(id)).filter(Boolean).map((o) => ({
@@ -569,7 +586,7 @@ function renderTrace(trace) {
   for (const d of trace) {
     lines.push(`${d.effect.toUpperCase()}  ${d.subject}  — decided by ${d.decided_by} as of ${d.as_of}${d.fails ? ' (fails the run)' : ''}`);
     for (const r of d.rules) {
-      lines.push(`  ${r.effect.padEnd(7)} ${r.rule}${r.detail ? ` — ${r.detail}` : ''}`);
+      lines.push(`  ${r.effect.padEnd(7)} ${r.rule}${r.detail ? ` — ${r.detail}` : ''}${r.role === 'context' ? ' (context)' : ''}`);
       for (const f of r.findings) {
         lines.push(`    ← ${f.rule} [${f.state}, ${f.severity}] ${f.message}`);
         for (const o of f.observations) {

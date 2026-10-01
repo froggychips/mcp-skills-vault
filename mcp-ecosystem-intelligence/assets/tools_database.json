@@ -630,7 +630,7 @@
       "version": "1.0.27",
       "pkg_integrity": "sha256-a75febfe46bf80b63c7e2530ace1bd915e283ce5eae9316c74a1e52f61047381",
       "trust": "unverified",
-      "notes": "Original entry referenced awslabs.aws-mcp-server which does not exist on PyPI. Replaced with awslabs.core-mcp-server (the entry-point package for the awslabs MCP suite).",
+      "notes": "Original entry referenced awslabs.aws-mcp-server which does not exist on PyPI. Replaced with awslabs.core-mcp-server (the entry-point package for the awslabs MCP suite). 2026-09-30: all 41 releases of awslabs.core-mcp-server on PyPI are yanked by the publisher (\"load individual MCPs\") and its README carries a deprecation notice pointing to the individual awslabs servers, so there is no unyanked version to re-pin to; availability: yanked is correct. Removal or replacement candidate.",
       "license": "Apache-2.0",
       "trust_evidence": {
         "artifact_id": "pypi:awslabs.core-mcp-server@1.0.27",

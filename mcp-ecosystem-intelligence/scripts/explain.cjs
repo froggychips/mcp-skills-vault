@@ -29,8 +29,11 @@
  *                                   [--record <file>] [--installed] [--as-of <date>]
  *                                   [--strict] [--fail-unverified]
  *
- * Exit codes — the gate's, for this entry (`verify` with the same policy,
- * flags and --as-of exits the same way):
+ * Exit codes — the gate's, for this entry (`verify --offline` with the same
+ * policy, flags and --as-of exits the same way). What explain shows beyond
+ * the gate — behaviour, budget, the tool scan, the configured set, a stored
+ * reading the policy does not require — is context (lib/policy_rules.cjs
+ * `role`): printed, traced, and never part of the exit code:
  *   0  the decision does not fail at the policy's fail_on
  *   1  it does (deny always — including a name not in the vault but shaped
  *      like an entry that is; unknown under `unverified: fail` /
@@ -270,7 +273,9 @@ function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, b
   }) : null;
   const facts = {
     [s.id]: {
-      mode: gateEntry ? 'gate' : 'evidence',
+      // 'live': the gate's semantics over its findings, with explain's own
+      // inputs (the set, the tool scan, behaviour, budget) as context.
+      mode: gateEntry ? 'live' : 'evidence',
       legacy_status: gateEntry ? gateEntry.status : null,
       gate_status: gateEntry ? gateEntry.status : null,
       entry: {
@@ -303,22 +308,32 @@ function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, b
  */
 function decide({ tool, policy, gateEntry, gateDoc = null, trust, behav, budget, evidence = null, evalRow = null, asOf, maxAgeDays, org = null, audits = [], setup = [] }) {
   const m = explainModel({ tool, policy, gateEntry, gateDoc, trust, behav, budget, evidence, evalRow, asOf, maxAgeDays, org, audits, setup });
-  const rules = m.decision.rules
-    .filter((r) => { const row = rowFor(r.rule); return row && row.views.includes('explain'); })
-    .map((r) => ({ rule: r.rule, outcome: r.effect, detail: r.detail }));
+  const rules = explainRules(m.decision);
   return {
     decision: m.decision.effect === 'deny' ? 'deny' : 'allow',
     // The rule id that decided (docs/adr/0001): a string, the same one the
     // findings document's decision carries. Which layer and which position
     // of a list matched is in that rule's detail.
     decided_by: m.decision.decided_by,
-    blocking: rules.filter((r) => r.outcome === 'deny').map((r) => r.rule),
+    // What the gate refuses on; a context deny (an over-budget config) is in
+    // `rules`, marked, and is not the gate's answer.
+    blocking: rules.filter((r) => r.outcome === 'deny' && r.role !== 'context').map((r) => r.rule),
+    // Additive: what refuses beside the gate — the tool scan, the set, the
+    // budget — each asked by its own command (tool-scan, audit, install).
+    context_blocking: rules.filter((r) => r.outcome === 'deny' && r.role === 'context').map((r) => r.rule),
     // Named separately so a caller can tell "allowed" from "allowed as far as
     // anyone has looked".
     unevaluated: rules.filter((r) => r.outcome === 'unknown').map((r) => r.rule),
     rules,
     model: m,
   };
+}
+
+/** explain's `rules` view of a Decision: its rows in table order, context marked. */
+function explainRules(d) {
+  return d.rules
+    .filter((r) => { const row = rowFor(r.rule); return row && row.views.includes('explain'); })
+    .map((r) => ({ rule: r.rule, outcome: r.effect, detail: r.detail, ...(r.role === 'context' ? { role: 'context' } : {}) }));
 }
 
 /**
@@ -356,16 +371,14 @@ function main(argv) {
       process.stderr.write(`explain: no entry matching "${opts.name}"\n`);
       return 2;
     }
-    const rules = m.decision.rules
-      .filter((r) => { const row = rowFor(r.rule); return row && row.views.includes('explain'); })
-      .map((r) => ({ rule: r.rule, outcome: r.effect, detail: r.detail }));
+    const rules = explainRules(m.decision);
     const record = {
       schema:       'mcp-vault/decision@1',
       evaluated_at: opts.asOfIso,
       as_of:        opts.asOfIso,
       subject:  { name: opts.name, artifact_id: null, launch: null, trust_field: null, in_vault: false },
       decision: m.decision.effect === 'deny' ? 'deny' : 'allow',
-      blocking: rules.filter((r) => r.outcome === 'deny').map((r) => r.rule),
+      blocking: rules.filter((r) => r.outcome === 'deny' && r.role !== 'context').map((r) => r.rule),
       rules,
       unevaluated: rules.filter((r) => r.outcome === 'unknown').map((r) => r.rule),
       lookalike: { candidate: m.hit.candidate, kind: m.hit.kind, matches: m.hit.matches },
@@ -483,6 +496,7 @@ function main(argv) {
     decision: verdict.decision,
     decided_by: verdict.decided_by,
     blocking: verdict.blocking,
+    context_blocking: verdict.context_blocking,
     rules:    verdict.rules,
     unevaluated: verdict.unevaluated,
     policy: {
@@ -597,11 +611,15 @@ function main(argv) {
   for (const r of verdict.rules) {
     const colour = r.outcome === 'deny' ? RD : (r.outcome === 'warn' ? YL : (r.outcome === 'unknown' ? DM : GN));
     const mark   = r.outcome === 'deny' ? '✗' : (r.outcome === 'warn' ? '!' : (r.outcome === 'unknown' ? '·' : '✓'));
-    process.stdout.write(`  ${colour}${mark} ${r.rule.padEnd(30)}${RS} ${r.detail}\n`);
+    process.stdout.write(`  ${colour}${mark} ${r.rule.padEnd(30)}${RS} ${r.detail}${r.role === 'context' ? ` ${DM}(context)${RS}` : ''}\n`);
   }
 
   if (verdict.blocking.length) {
     process.stdout.write(`\n${RD}Blocking: ${verdict.blocking.join(', ')}${RS}\n`);
+  }
+  if (verdict.context_blocking.length) {
+    // Not the gate's answer, and not to be missed either.
+    process.stdout.write(`\n${YL}Refused beside the gate (context, not in the exit code): ${verdict.context_blocking.join(', ')}${RS}\n`);
   }
   process.stdout.write(`${verdict.decision === 'deny' ? RD : DM}Decided by ${verdict.decided_by}${RS}\n`);
   if (verdict.unevaluated.length) {

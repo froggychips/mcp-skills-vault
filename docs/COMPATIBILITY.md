@@ -78,6 +78,21 @@ A job whose question is narrower ("is the DB consistent") says so with
 `--fail-families` (for example `integrity,pin,oci,verify,policy`): the same
 findings are decided and reported, only the listed families fail the run.
 
+Two more, made together so that `explain` and `verify --offline` stay one
+decision (#131). `explain`'s exit code is the gate's: what it shows and the
+gate does not read — behaviour, the context budget, the tool-description scan,
+what the configured set would do, a stored reading the policy does not require
+— is context (a `role` in the rule table), listed and traced, and no longer
+fails `explain` (a context refusal is in `context_blocking`). And under a
+policy *requirement* (`signatures: require`, `dependencyHooks: fail`, …)
+`verify --offline` judges the requirement by the stored record, as `explain`
+does: a signature the DB recorded as verified passes, where an offline run
+used to refuse it for not having looked, and a required dimension with nothing
+on record refuses in both — where `explain` said `unknown` and a policy that
+forbids dependency hooks passed an offline run that never saw the tree.
+`--fail-families` without a usable list (missing, another switch, empty, or a
+family nobody emits) is exit `2`.
+
 ### 3. `--json` payloads
 
 Every JSON document this tool writes carries a schema identifier of the form

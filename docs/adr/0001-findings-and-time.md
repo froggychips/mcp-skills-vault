@@ -69,6 +69,16 @@ bytes; every `--json` document says which `asOf` it used.
   `--fail-unverified` → `warn` with `--strict`) is part of it. Every command
   that decides one entry takes it from there — `explain` exits as `verify`
   does for the same inputs, rather than asking the narrower "is it denied".
+- **Gate and context.** A row has a `role` per mode (`gate` by default, or
+  `context`). Only gate outcomes set the effect, `decided_by` and `fails`;
+  context outcomes are listed in `rules` (marked `role: "context"`) and
+  traced. What `explain` shows and `verify` does not read — behaviour, the
+  context budget, the tool-description scan, what the configured set would
+  do, a stored reading the policy does not require (`provenance: prefer`) —
+  is context in explain's modes (`evidence`, and `live` for `--verify`), and
+  the gate in the command that asks that question (`tool-scan`, `status` /
+  `audit`). So explain's exit and `decided_by` are verify's on the same
+  inputs, compared whole in the consistency test (#131).
 - **Loading policy is one function**, `loadEffectivePolicy(startDir, { flags,
   noPolicy })`: the file(s), then flags, normalised and deep-frozen. `decide`
   refuses a policy that is not frozen.
@@ -135,7 +145,10 @@ evidence has aged out" line listed every dimension past its TTL, a
 ### 6. One producer for stored evidence
 
 `verify --offline` and `explain` (without `--verify`) decide over the same
-thing: the DB's dated record. Both build that part of the decision with
+thing: the DB's dated record — the `policy/*` rows included, which read it in
+evidence mode in both (a policy requirement with nothing on record refuses;
+one the record satisfies passes, rather than "no verifiable signature" because
+an offline run did not look). Both build that part of the decision with
 `fromStoredEvidence(tool, { asOf, maxAgeDays })` — the findings above, plus the
 `evidence` and `trust` facts the `trust/*` rows read — and the same shelf
 lives (`maxAgeForPolicy`). Before, `verify --offline` checked pins only: on the

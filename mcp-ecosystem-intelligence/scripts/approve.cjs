@@ -148,6 +148,16 @@ function main(argv) {
   const artifactId = tool ? subjectFacts(tool).artifact_id : null;
   const subj = tool ? subjectForTool(tool) : subject.artifact({ entry: opts.server });
 
+  // The policy that governs this approval, loaded and checked before
+  // anything is written: an invalid one is not a policy, and approving under
+  // it would change mcp.lock.json on a bar nobody set.
+  const loaded = loadEffectivePolicy(opts.cwd);
+  if (!loaded.ok) {
+    process.stderr.write(`approve: policy error in ${loaded.path || '.mcp-vault.policy.json'}:\n`);
+    for (const e of loaded.errors) process.stderr.write(`  - ${e}\n`);
+    return 2;
+  }
+
   const seen = observe(opts);
   if (seen.error) { process.stderr.write(`approve: ${seen.error}\n`); return 2; }
   const { observation, source } = seen;
@@ -175,7 +185,6 @@ function main(argv) {
   }
 
   // What is pending now, as findings, and the policy's answer to it.
-  const loaded = loadEffectivePolicy(opts.cwd);
   const model = toolApprovalModel({
     subject: subj, server: opts.server, approved: result ? result.record : before,
     observation, currentArtifactId: artifactId, asOf: now,

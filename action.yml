@@ -109,6 +109,7 @@ runs:
         set -euo pipefail
         if [ -z "$VAULT_VERSION" ]; then
           echo "cli=$GITHUB_ACTION_PATH/bin/mcp-vault.cjs" >> "$GITHUB_OUTPUT"
+          echo "mode=checkout" >> "$GITHUB_OUTPUT"
           echo "mcp-vault: running this action's own checkout ($(node -p "require(process.env.GITHUB_ACTION_PATH + '/package.json').version"))"
           exit 0
         fi
@@ -132,12 +133,15 @@ runs:
         fi
         tar -xzf "$tgz" -C "$dir"
         echo "cli=$dir/package/bin/mcp-vault.cjs" >> "$GITHUB_OUTPUT"
+        echo "mode=package" >> "$GITHUB_OUTPUT"
 
     - name: Verify MCP configs
       id: verify
       shell: bash
       env:
         VAULT_CLI: ${{ steps.cli.outputs.cli }}
+        VAULT_MODE: ${{ steps.cli.outputs.mode }}
+        VAULT_ACTION_REF: ${{ github.action_ref }}
         VAULT_PATHS: ${{ inputs.paths }}
         VAULT_POLICY: ${{ inputs.policy }}
         VAULT_FAIL_ON: ${{ inputs.fail-on }}
@@ -153,6 +157,33 @@ runs:
         out="$RUNNER_TEMP/mcp-vault"
         mkdir -p "$out"
         report="$out/report.json"
+
+        # Where the DB's integrity comes from. The npm tarball ships the
+        # release signature, and the CLI checks it strictly. This action's own
+        # checkout never has one: the .sig is made at release (release.yml)
+        # and is not in git, and GitHub unpacks `uses:` without .git, so the
+        # CLI would take the checkout for an installed package and refuse.
+        # There the DB is the bytes of the commit `uses:` names, exactly as
+        # the code that checks it is — the pin is the integrity. So, for this
+        # step only and only while no .sig is present, a missing signature is
+        # allowed; a .sig that is present still has to verify.
+        cli_root="$(dirname "$(dirname "$VAULT_CLI")")"
+        db_sig="$cli_root/mcp-ecosystem-intelligence/assets/tools_database.json.sig"
+        if [ "$VAULT_MODE" = "checkout" ] && [ ! -e "$db_sig" ]; then
+          export MCP_VAULT_ALLOW_UNSIGNED_DB=1
+          if [[ "$VAULT_ACTION_REF" =~ ^[0-9a-f]{40}$ ]]; then
+            db_integrity="pinned by action SHA $VAULT_ACTION_REF"
+          elif [ -n "$VAULT_ACTION_REF" ]; then
+            db_integrity="pinned by action ref $VAULT_ACTION_REF — not a commit SHA, so it can move; pin \`uses:\` to a full SHA"
+            echo "::warning::mcp-vault: uses: @$VAULT_ACTION_REF is not a commit SHA — the gate and its DB can change under you"
+          else
+            db_integrity="this repository's own checkout (uses: ./)"
+          fi
+        else
+          unset MCP_VAULT_ALLOW_UNSIGNED_DB
+          db_integrity="Ed25519 signature, checked by the CLI"
+        fi
+        echo "mcp-vault: DB integrity: $db_integrity"
 
         configs=()
         for match in $VAULT_PATHS; do
@@ -184,6 +215,8 @@ runs:
             echo "## mcp-vault"
             echo
             echo "No MCP config found among: \`$listed\` — nothing to check."
+            echo
+            echo "DB integrity: $db_integrity"
           } >> "$GITHUB_STEP_SUMMARY"
           echo "exit-code=0" >> "$GITHUB_OUTPUT"
           exit 0
@@ -212,6 +245,7 @@ runs:
         " "$report" >> "$GITHUB_STEP_SUMMARY"; then
           echo "mcp-vault: no readable JSON report (exit $code)" >> "$GITHUB_STEP_SUMMARY"
         fi
+        printf '\nDB integrity: %s\n' "$db_integrity" >> "$GITHUB_STEP_SUMMARY"
         node -e "
           const doc = JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'));
           for (const d of (doc.findings && doc.findings.decisions) || []) {
