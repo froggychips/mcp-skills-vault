@@ -1,6 +1,6 @@
 {
   "$schema": "mcp-vault/capabilities@1",
-  "generated_at": "2026-09-30T11:05:13.813Z",
+  "generated_at": "2026-10-01T06:50:31.677Z",
   "note": "Capability presence with evidence, per package version. `found` is a fact; absence is never recorded — see lib/capabilities.cjs.",
   "packages": {
     "npm:@agent-infra/mcp-server-browser@1.2.29": {
@@ -4094,6 +4094,90 @@
         "escape_heavy_files": 0,
         "caveat": "a pattern scan can show presence, never absence",
         "tarball_bytes": 15248,
+        "truncated": false
+      }
+    },
+    "npm:@yoda.digital/gitlab-mcp-server@0.9.1": {
+      "checked_at": "2026-10-01",
+      "found": {
+        "network": [
+          {
+            "file": "package/dist/gitlab-api.js",
+            "line": 41,
+            "match": "fetch("
+          },
+          {
+            "file": "package/dist/gitlab-api.test.js",
+            "line": 2,
+            "match": "node-fetch"
+          },
+          {
+            "file": "package/dist/transport.js",
+            "line": 5,
+            "match": "from \"http\""
+          }
+        ],
+        "env_access": [
+          {
+            "file": "package/dist/index.js",
+            "line": 33,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/transport.js",
+            "line": 75,
+            "match": "process.env"
+          },
+          {
+            "file": "package/dist/transport.test.js",
+            "line": 58,
+            "match": "process.env"
+          }
+        ],
+        "fs_read": [
+          {
+            "file": "package/e2e/src/setup/global-setup.ts",
+            "line": 34,
+            "match": "readFileSync("
+          },
+          {
+            "file": "package/e2e/src/scripts/teardown-fixtures.ts",
+            "line": 27,
+            "match": "readFileSync("
+          }
+        ],
+        "fs_write": [
+          {
+            "file": "package/e2e/src/scripts/provision-fixtures.ts",
+            "line": 208,
+            "match": "writeFileSync("
+          },
+          {
+            "file": "package/e2e/src/scripts/teardown-fixtures.ts",
+            "line": 44,
+            "match": "unlinkSync("
+          }
+        ],
+        "install_script": [
+          {
+            "file": "package.json",
+            "line": null,
+            "match": "prepare: npm run build"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 46,
+        "other_files": 2,
+        "bytes": 1137129,
+        "longest_line": 1417,
+        "avg_line_length": 37,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 376897,
         "truncated": false
       }
     },
