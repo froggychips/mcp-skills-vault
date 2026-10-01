@@ -114,6 +114,11 @@ const secretRules = [
   },
 ];
 
+// The entry rules (licence, health, trust tier) judge a DB entry's fields. A
+// subject with no entry behind it — a bare name (#125) — has none of them to
+// be missing, so "no licence recorded" would be a claim about nothing.
+const hasEntry = (ctx) => Boolean(ctx.facts && ctx.facts.entry);
+
 // ── rules over findings (any command) ──────────────────────────────────────
 
 const findingRules = [
@@ -281,7 +286,7 @@ const policyRules = [
     id: 'policy/license', status: 'active', thresholded: false, views: ['explain', 'policy-line'],
     evaluate(ctx) {
       const p = ctx.policy;
-      if (!p.licenses) return [];
+      if (!p.licenses || !hasEntry(ctx)) return [];
       const license = entryOf(ctx).license || null;
       if (!license) return [out('warn', 'no license recorded for this entry')];
       if (p.licenses.deny && p.licenses.deny.includes(license)) return [out('deny', `license ${license} is on this policy's deny list`)];
@@ -293,7 +298,7 @@ const policyRules = [
     id: 'policy/health', status: 'active', thresholded: false, views: ['explain', 'policy-line'],
     evaluate(ctx) {
       const p = ctx.policy;
-      if (p.minHealthScore === null || p.minHealthScore === undefined) return [];
+      if (p.minHealthScore === null || p.minHealthScore === undefined || !hasEntry(ctx)) return [];
       const score = Number(entryOf(ctx).health_score);
       if (!Number.isFinite(score)) return [out('warn', 'no health score recorded for this entry')];
       return score < p.minHealthScore
@@ -304,7 +309,7 @@ const policyRules = [
     id: 'policy/trust', status: 'active', thresholded: false, views: ['explain', 'policy-line'],
     evaluate(ctx) {
       const p = ctx.policy;
-      if (!p.trust) return [];
+      if (!p.trust || !hasEntry(ctx)) return [];
       const trust = entryOf(ctx).trust || null;
       return !trust || !p.trust.includes(trust)
         ? [out('deny', `trust tier ${trust || '(none)'} is not accepted by this policy (accepts: ${p.trust.join(', ')})`)] : [];
@@ -511,6 +516,10 @@ const orgRules = [
     doc: 'every tool the server offers approved in mcp.lock.json, for the artifact it launches',
     evaluate(ctx) {
       if (!ctx.policy.policy_rules || ctx.policy.toolApproval !== 'require') return [];
+      // A bare name (#125: a lookalike nobody launched from the vault) has no
+      // server behind it whose tools could be approved; the question is not
+      // asked of it, as no other org/* row reads facts it does not have.
+      if (ctx.subject && ctx.subject.type === 'name') return [];
       const ta = ctx.facts && ctx.facts.org && ctx.facts.org.tool_approval;
       const fs = ctx.findings.filter((f) => f.rule === 'org/tool-approval');
       // `toolApproval: require` asks for an approved surface to be on record:
@@ -620,6 +629,26 @@ const toolScanRules = [
   },
 ];
 
+// ── names shaped like a vault entry's (#125, lib/lookalike.cjs) ─────────────
+
+const lookalikeRules = [
+  {
+    id: 'lookalike/*', status: 'active', thresholded: true, views: ['explain'],
+    doc: 'A name shaped like a vault entry: refused when a person asks for it by name (install, explain); '
+      + 'a warning when a host config launches it, so it fails under --strict; allowed, still reported, '
+      + 'when --allow-lookalike names it. One outcome per finding, named lookalike/<technique>.',
+    evaluate(ctx) {
+      const l = (ctx.facts && ctx.facts.lookalike) || {};
+      const allow = new Set(l.allow || []);
+      const vouched = (l.names || []).find((n) => allow.has(n));
+      return ctx.findings.filter((f) => f.rule.startsWith('lookalike/') && f.state === 'observed').map((f) => {
+        if (vouched) return out('allow', `${f.message} (allowed by --allow-lookalike ${vouched})`, [f.id], f.rule);
+        return out(l.intent === 'requested' ? 'deny' : 'warn', f.message, [f.id], f.rule);
+      });
+    },
+  },
+];
+
 // ── reserved for the open feature PRs ──────────────────────────────────────
 //
 // Claimed here so that each lands as a row in this table — with this id in
@@ -627,7 +656,6 @@ const toolScanRules = [
 
 const reserved = (id, owner, doc) => ({ id, status: 'reserved', owner, doc, thresholded: false, views: [], evaluate: () => [] });
 const reservedRules = [
-  reserved('lookalike/*', '#125', 'a name one edit away from a vault entry'),
 ];
 
 // ── #121: the DB signature and audits ─────────────────────────────────────
@@ -679,7 +707,7 @@ const signatureRules = [
   },
 ];
 
-const RULES = Object.freeze([...explainRules, ...policyRules, ...secretRules, ...findingRules, ...toolScanRules, ...orgRules, ...setupRules, ...reservedRules, ...signatureRules].map((r) => Object.freeze(r)));
+const RULES = Object.freeze([...explainRules, ...policyRules, ...secretRules, ...findingRules, ...lookalikeRules, ...toolScanRules, ...orgRules, ...setupRules, ...reservedRules, ...signatureRules].map((r) => Object.freeze(r)));
 const RULE_BY_ID = new Map(RULES.map((r) => [r.id, r]));
 
 // Evaluation order, per mode. It is the order the legacy views have always
@@ -696,6 +724,7 @@ const ORDER = Object.freeze({
     'gate/fail', 'gate/unverified', 'tool-scan/*', 'behaviour/*', 'budget/over', ...SETUP_ORDER,
     'secrets/*',
     'gate/require-provenance', 'gate/fail-dep-advisories', 'finding/severity', 'finding/incomplete',
+    'lookalike/*',
     'audits/recorded',
     'db/signature', 'audits/import',
   ]),
@@ -708,6 +737,7 @@ const ORDER = Object.freeze({
     'gate/fail', 'gate/unverified', 'tool-scan/*', 'behaviour/*', 'budget/over', ...SETUP_ORDER,
     'secrets/*',
     'gate/require-provenance', 'gate/fail-dep-advisories', 'finding/severity', 'finding/incomplete',
+    'lookalike/*',
     'audits/recorded',
     'db/signature', 'audits/import',
   ]),

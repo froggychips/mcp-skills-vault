@@ -44,6 +44,10 @@ const TAG_MODEL = Object.freeze({
   // dependencyAdvisories) are what turn them into a refusal.
   DEPHOOK:    { rule: 'dependencies/install-hook',      severity: 'low',    state: 'observed' },
   DEPCVE:     { rule: 'dependencies/advisory',          severity: 'low',    state: 'observed' },
+  // A rendering of a `lookalike/<technique>` finding on the server's *name*
+  // (lib/lookalike.cjs), written after the decision. Read back from a report,
+  // the technique is gone, so the family is all the tag can say.
+  LOOKALIKE:  { rule: 'lookalike/name',                 severity: 'low',    state: 'observed' },
   NOTE:       { rule: 'verify/note',                    severity: 'info',   state: 'observed' },
   SKIP:       { rule: 'verify/skipped',                 severity: 'info',   state: 'not-run' },
 });

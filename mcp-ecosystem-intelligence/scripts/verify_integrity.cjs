@@ -32,6 +32,10 @@
  *   node scripts/verify_integrity.cjs --entry NAME  check a single DB entry by name
  *   node scripts/verify_integrity.cjs --installed  check the servers local hosts launch
  *                                                  (.mcp.json, ~/.claude.json, Cursor, …)
+ *                                                  and flag names shaped like a DB entry's
+ *   node scripts/verify_integrity.cjs --installed --allow-lookalike NAME
+ *                                                  a lookalike you know is yours: still
+ *                                                  reported, no longer fails --strict
  *   node scripts/verify_integrity.cjs --fail-unverified  UNVERIFIED → hard failure
  *   node scripts/verify_integrity.cjs --deps       resolve and check dependency trees
  *   node scripts/verify_integrity.cjs --no-policy  ignore .mcp-vault.policy.json
@@ -67,6 +71,7 @@ const {
   verifyRegistrySignature, provenanceClaim, checkProvenance, keysUrl,
 } = require('./lib/npm_signatures.cjs');
 const { readInstalledServers } = require('./lib/installed.cjs');
+const lookalike = require('./lib/lookalike.cjs');
 const {
   resolveNpmTreeCached, pypiDirectDependencies, summarizeTree,
 } = require('./lib/deps.cjs');
@@ -1450,8 +1455,13 @@ async function main() {
       return exitAfterFlush(0);
     }
     const byName = new Map(allTools.map((t) => [t.name, t]));
+    const lookalikeIndex = lookalike.buildIndex(allTools);
     scope = servers.map((srv) => {
       const known = byName.get(srv.name) || null;
+      // Registry checks answer "is this the artifact it claims to be". A
+      // typosquat is exactly that — a real, signed, unvulnerable package — so
+      // the gate passed it. What it is not is the package the user meant.
+      const look = lookalike.checkServer(srv, lookalikeIndex, { dbName: known ? known.name : null });
       const pinnedVersion = versionFromInstallCmd(srv.install_cmd);
       const sameVersion = known && pinnedVersion && known.version === pinnedVersion;
       return {
@@ -1469,6 +1479,7 @@ async function main() {
           kind: srv.remote ? 'remote' : (srv.install_cmd ? 'registry' : 'local'),
           command: srv.command,
         },
+        _lookalike: look,
       };
     });
     // A config that exists but does not parse is a finding: it may be the file
@@ -1680,6 +1691,31 @@ async function main() {
   // Process docker.
   for (const { tool } of dockerTools) await processDocker(tool, results);
 
+  // Lookalike names (lib/lookalike.cjs), as findings on the server's *name*.
+  // The registry checks answer "is this the artifact it claims to be", and a
+  // typosquat is — a real, signed, unvulnerable package — so they passed it.
+  // What it means is decided below with everything else: the `lookalike/*`
+  // row warns (a failure only under --strict, because a default does not get
+  // stricter in a minor, docs/COMPATIBILITY.md), and `--allow-lookalike` is an
+  // input to that row, not a branch here.
+  const lookalikeRun = { byResult: new Map(), findings: [], facts: {} };
+  {
+    const allow = [...lookalike.allowFromArgv(process.argv)];
+    results.forEach((r, i) => {
+      const look = r.tool && r.tool._lookalike;
+      const f = look && lookalike.toFinding(look, { scope: 'installed' });
+      if (!f) return;
+      r.lookalike = look;
+      lookalikeRun.byResult.set(i, f);
+      if (!lookalikeRun.findings.some((x) => x.id === f.id)) lookalikeRun.findings.push(f);
+      // Two keys launching one package are one subject; either key vouches.
+      const facts = lookalike.factsFor(look, { intent: 'configured', allow });
+      const prev = lookalikeRun.facts[f.subject.id];
+      if (prev) facts.lookalike.names = [...new Set([...prev.lookalike.names, ...facts.lookalike.names])].sort();
+      lookalikeRun.facts[f.subject.id] = facts;
+    });
+  }
+
   // Evidence: what this run established, dated, per dimension. Written only on
   // request — a scan is read-only unless asked otherwise.
   if (RECORD_EVIDENCE) {
@@ -1774,7 +1810,8 @@ async function main() {
   // lib/policy_rules.cjs). What this run saw becomes findings; the entry's
   // own fields — licence, health, the trust this run derived — are facts.
   const model = fromVerifyResults(results, { asOf: AS_OF, maxAgeDays: evidenceMaxAge(), scope: INSTALLED ? 'installed' : 'database' });
-  const facts = {};
+  model.findings.push(...lookalikeRun.findings);
+  const facts = { ...lookalikeRun.facts };
   // Offline, nothing is re-checked — so what the DB already knows about each
   // entry is the rest of the evidence, and the decision applies it: a known
   // advisory against the pinned version, a yanked release, a claim past its
@@ -1816,7 +1853,9 @@ async function main() {
     model.findings.push(...stored.findings);
     storedFindings[i] = stored.findings;
   });
-  const decisions = decide(model.findings, EP, AS_OF, { subjects: model.subjects.filter(Boolean), facts });
+  const decisions = decide(model.findings, EP, AS_OF, {
+    subjects: [...model.subjects.filter(Boolean), ...lookalikeRun.findings.map((f) => f.subject)], facts,
+  });
   const decisionOf = new Map(decisions.map((d) => [d.subject.id, d]));
 
   // The stored findings, rendered as report lines — a view of the decision,
@@ -1871,6 +1910,24 @@ async function main() {
         if (v.effect === 'deny') results[i].failures = (results[i].failures || 0) + 1;
       }
       if (results[i].failures > 0) results[i].status = 'FAIL';
+    }
+  }
+
+  // The lookalike decisions, rendered on the server they were found on: a
+  // LOOKALIKE line (counted as a failure when the decision fails the run), or
+  // a NOTE when the user vouched for the name.
+  for (const [i, f] of lookalikeRun.byResult) {
+    const d = decisionOf.get(f.subject.id);
+    const o = d && d.rules.find((x) => x.findings.includes(f.id));
+    const r = results[i];
+    r.lines = r.lines || [];
+    if (!o || o.effect === 'allow') { r.lines.push(['NOTE', o ? o.detail : f.message]); continue; }
+    r.lines.push(['LOOKALIKE', `${f.message} If you meant the vetted server: mcp-vault install ${r.lookalike.matches[0].db_name}`, { decided_by: o.rule }]);
+    if (d.fails) {
+      r.failures = (r.failures || 0) + 1;
+      r.status = 'FAIL';
+    } else if (r.status === 'OK') {
+      r.status = 'WARN';
     }
   }
 

@@ -17,6 +17,7 @@
  *   FAIL, CVE        → error    (hard failures)
  *   UNVERIFIED, MISS → warning  (nothing was compared; error under --fail-unverified)
  *   WARN, HOOK       → warning
+ *   LOOKALIKE        → warning  (not in the vault, shaped like an entry that is; error under --strict)
  *   NOTE, DIGEST     → note
  */
 
@@ -29,6 +30,7 @@ const TAG_LEVEL = {
   MISS:       'warning',
   WARN:       'warning',
   HOOK:       'warning',
+  LOOKALIKE:  'warning',
   DIGEST:     'note',
   DEEP:       'note',
   SIG:        'note',
@@ -51,6 +53,7 @@ const TAG_RULE = {
   MISS:       'missing-pin',
   WARN:       'metadata-mismatch',
   HOOK:       'install-hook',
+  LOOKALIKE:  'lookalike-name',
   DIGEST:     'unpinned-image',
   DEEP:       'deep-verified',
   SIG:        'signature-verified',
@@ -70,6 +73,7 @@ const RULE_HELP = {
   'unverified-entry':   'Nothing about this entry was compared against a registry — the feed was unreachable, the install command was not parsable, or there is no artifact to hash. Not a pass.',
   'missing-pin':        'The entry has no pinned version or no stored integrity hash, so there is nothing to compare.',
   'metadata-mismatch':  'Registry metadata disagrees with the DB (repository URL, license).',
+  'lookalike-name':     'The server is not in the vault, but its package or name is shaped like a vault entry\u2019s (a typo, look-alike characters, a swapped scope or registry, an added suffix) — the pattern of a typosquat. Check which one you meant.',
   'install-hook':       'The package runs code at install time (preinstall/install/postinstall/prepare/prepack).',
   'unpinned-image':     'A container image is referenced by tag rather than by @sha256 digest.',
   'deep-verified':      'The artifact was downloaded and hashed locally; the bytes match both the registry metadata and the DB pin.',
@@ -125,6 +129,13 @@ function toJsonReport({ results = [], meta = {}, asOf } = {}) {
       install_cmd: tool.install_cmd ?? null,
       failures:  r.failures || 0,
       findings,
+      // Structured, for a caller that wants the vault entry it resembles
+      // rather than a sentence about it. Absent when there is nothing to say.
+      ...(r.lookalike ? { lookalike: {
+        candidate: r.lookalike.candidate,
+        kind:      r.lookalike.kind,
+        matches:   r.lookalike.matches,
+      } } : {}),
     };
   });
 

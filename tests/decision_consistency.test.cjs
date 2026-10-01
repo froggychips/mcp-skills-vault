@@ -695,3 +695,54 @@ test('no code outside lib/finding.cjs and lib/policy_rules.cjs writes an effect'
     'an effect is being produced outside decide(). Add a row to lib/policy_rules.cjs and render the Decision instead.');
   assert.ok(stringTokens("a === 'deny'; b = 'deny' // 'deny'\n/* 'deny' */").filter((t) => t.value === 'deny').length === 2, 'the lexer skips comments');
 });
+
+// ── lookalike names (#125) ─────────────────────────────────────────────────
+//
+// A name that is not in the vault is decided like anything else: its
+// `lookalike/*` finding and the facts the row reads are in the document, and
+// every command that answers about it — install, explain, audit, verify
+// --installed — prints decisions that are decide() of that document.
+
+test('lookalike: install, explain, audit and verify --installed print decide()\'s decisions', () => {
+  const SQUAT = { memory: { command: 'npx', args: ['-y', 'mcp-server-memmory@1.0.0'] }, mine: { command: 'npx', args: ['-y', 'my-own-thing@1.0.0'] } };
+  const BIN = path.join(ROOT, 'bin', 'mcp-vault.cjs');
+  for (const [pname, dir] of Object.entries(DIRS)) {
+    fs.writeFileSync(path.join(dir, '.mcp.json'), JSON.stringify({ mcpServers: SQUAT }));
+    const g = path.join(dir, 'global.json');
+    fs.writeFileSync(g, '{}');
+
+    const inst = spawnSync(process.execPath, [BIN, 'install', 'mcp-server-memmory', '--cwd', dir, '--json'], { encoding: 'utf8', env: ENV, cwd: TMP });
+    const idoc = JSON.parse(inst.stdout);
+    assert.equal(idoc.schema, 'mcp-vault/findings@1', pname);
+    assert.deepEqual(recompute(idoc), idoc.decisions, `${pname} install: the printed decision is not decide()'s`);
+    assert.equal(idoc.decisions[0].effect, 'deny', pname);
+    assert.equal(inst.status, 2, `${pname} install: nothing installed, "not in the DB" exit`);
+
+    const ex = run('explain.cjs', ['mcp-server-memmory', '--json', '--cwd', dir, '--as-of', AS_OF]);
+    const rec = JSON.parse(ex.stdout);
+    assert.deepEqual(recompute(rec.findings), rec.findings.decisions, `${pname} explain: the printed decision is not decide()'s`);
+    const [d] = rec.findings.decisions;
+    assert.equal(rec.decision, d.effect === 'deny' ? 'deny' : 'allow', pname);
+    assert.deepEqual(rec.blocking, d.rules.filter((o) => o.effect === 'deny').map((o) => o.rule), pname);
+    assert.equal(ex.status, d.fails ? 1 : 0, pname);
+
+    for (const flags of [[], ['--strict'], ['--strict', '--allow-lookalike', 'memory']]) {
+      const label = `${pname} ${flags.join(' ') || '(no flags)'}`;
+      const au = run('audit_setup.cjs', ['--cwd', dir, '--global-config', g, '--json', '--as-of', AS_OF, ...flags]);
+      const adoc = JSON.parse(au.stdout).model;
+      assert.deepEqual(recompute(adoc), adoc.decisions, `${label} audit: the printed decision is not decide()'s`);
+      assert.equal(au.status === 1, F.exitCode(adoc.decisions) === 1, `${label} audit: exit ${au.status}`);
+
+      const vr = run('verify_integrity.cjs', ['--installed', '--offline', '--json', '--cwd', dir, '--as-of', AS_OF, ...flags]);
+      const report = JSON.parse(vr.stdout);
+      const vdoc = report.findings;
+      assert.deepEqual(recompute(vdoc), vdoc.decisions, `${label} verify --installed: the printed decisions are not decide()'s`);
+      assert.doesNotMatch(vr.stderr, /internal:/, `${label}: the decision and the gate's counters disagree`);
+      assert.equal(vr.status, F.exitCode(vdoc.decisions), `${label}: the exit code is not the decisions'`);
+      const names = vdoc.decisions.filter((x) => x.subject.type === 'name');
+      assert.equal(names.length, 1, label);
+      const e = report.entries.find((x) => x.name === 'memory');
+      assert.equal(e.findings.some((x) => x.tag === 'LOOKALIKE'), names[0].effect !== 'allow', `${label}: the LOOKALIKE line is not the decision's`);
+    }
+  }
+});

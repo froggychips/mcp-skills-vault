@@ -32,7 +32,8 @@
  * Exit codes — the gate's, for this entry (`verify` with the same policy,
  * flags and --as-of exits the same way):
  *   0  the decision does not fail at the policy's fail_on
- *   1  it does (deny always; unknown under `unverified: fail` /
+ *   1  it does (deny always — including a name not in the vault but shaped
+ *      like an entry that is; unknown under `unverified: fail` /
  *      --fail-unverified; warn under --strict)
  *   2  the entry could not be found / bad arguments
  */
@@ -59,6 +60,7 @@ const { readLocalAudits, loadImportedAudits, auditsFor, auditObservations } = re
 const flows = require('./lib/flows.cjs');
 const { finding } = require('./lib/finding.cjs');
 const { evalRowFindings } = require('./lib/tool_scan.cjs');
+const lookalike = require('./lib/lookalike.cjs');
 
 const DB_PATH    = path.resolve(__dirname, '../assets/tools_database.json');
 const EVAL_PATH  = path.resolve(__dirname, '../assets/eval_results.json');
@@ -319,6 +321,23 @@ function decide({ tool, policy, gateEntry, gateDoc = null, trust, behav, budget,
   };
 }
 
+/**
+ * A name that is not in the vault, as a model: the lookalike finding on the
+ * name, and the Decision decide() makes of it — or null when it resembles no
+ * entry. A person asking about this name is asking to use it (`requested`).
+ */
+function lookalikeModel(name, tools, { policy, asOf }) {
+  const hit = lookalike.checkName(name, name.includes('/') && !name.startsWith('@') ? 'oci' : 'npm', lookalike.buildIndex(tools));
+  const f = lookalike.toFinding(hit, { scope: 'database' });
+  if (!f) return null;
+  const ep = asEffective(policy);
+  const facts = { [f.subject.id]: lookalike.factsFor(hit, { intent: 'requested' }) };
+  // The threshold is the policy's fail_on, as for an entry (#131).
+  const [decision] = decideFindings([f], ep, asOf, { subjects: [f.subject], facts });
+  const document = toJson(findingsDocument({ asOf, findings: [f], decisions: [decision], scope: 'database', policy: ep, facts }));
+  return { hit, finding: f, decision, document };
+}
+
 function main(argv) {
   const opts = parseArgs(argv);
   if (opts.error) { process.stderr.write(`explain: ${opts.error}\n\n${HELP}`); return 2; }
@@ -329,8 +348,47 @@ function main(argv) {
   const tool = (db.tools || []).find((t) => t.name === opts.name)
     || (db.tools || []).find((t) => t.name.toLowerCase().includes(opts.name.toLowerCase()));
   if (!tool) {
-    process.stderr.write(`explain: no entry matching "${opts.name}"\n`);
-    return 2;
+    // Not in the vault — but "no entry matching" is a poor answer for a name
+    // one letter away from an entry that is. That one gets a decision, made
+    // like any other: a `lookalike/*` finding on the name, and decide().
+    const m = lookalikeModel(opts.name, db.tools || [], { policy: loadEffectivePolicy(opts.cwd).policy, asOf: opts.asOf });
+    if (!m) {
+      process.stderr.write(`explain: no entry matching "${opts.name}"\n`);
+      return 2;
+    }
+    const rules = m.decision.rules
+      .filter((r) => { const row = rowFor(r.rule); return row && row.views.includes('explain'); })
+      .map((r) => ({ rule: r.rule, outcome: r.effect, detail: r.detail }));
+    const record = {
+      schema:       'mcp-vault/decision@1',
+      evaluated_at: opts.asOfIso,
+      as_of:        opts.asOfIso,
+      subject:  { name: opts.name, artifact_id: null, launch: null, trust_field: null, in_vault: false },
+      decision: m.decision.effect === 'deny' ? 'deny' : 'allow',
+      blocking: rules.filter((r) => r.outcome === 'deny').map((r) => r.rule),
+      rules,
+      unevaluated: rules.filter((r) => r.outcome === 'unknown').map((r) => r.rule),
+      lookalike: { candidate: m.hit.candidate, kind: m.hit.kind, matches: m.hit.matches },
+      findings: m.document,
+    };
+    if (opts.record) {
+      try { fs.appendFileSync(opts.record, `${JSON.stringify(record)}\n`); }
+      catch (e) { process.stderr.write(`${YL}explain: could not write ${opts.record}: ${e.message}${RS}\n`); }
+    }
+    if (opts.json) {
+      process.stdout.write(`${JSON.stringify(record, null, 2)}\n`);
+      return m.decision.fails ? 1 : 0;
+    }
+    const head = record.decision === 'deny' ? `${RD}DENIED${RS}` : `${GN}ALLOWED${RS}`;
+    process.stdout.write(`\n${head}  ${B}${opts.name}${RS}  ${DM}not in the vault · as of ${opts.asOfIso}${RS}\n\n`);
+    for (const r of rules) {
+      process.stdout.write(`  ${r.outcome === 'deny' ? `${RD}✗` : `${YL}!`} ${r.rule.padEnd(30)}${RS} ${r.detail}\n`);
+    }
+    for (const x of m.hit.matches) {
+      process.stdout.write(`    ${DM}${x.confidence.padEnd(6)} ${x.technique.padEnd(18)} ${x.db_name}${x.package ? `  ${x.package}` : ''}${RS}\n`);
+    }
+    process.stdout.write(`\nIf you meant the vetted server: mcp-vault explain ${m.hit.matches[0].db_name}\n`);
+    return m.decision.fails ? 1 : 0;
   }
 
   // The same loader every command uses (lib/policy_rules.cjs): `policy` is
@@ -568,4 +626,4 @@ if (require.main === module) {
   exitAfterFlush(main(process.argv.slice(2)));
 }
 
-module.exports = { parseArgs, decide, explainModel, runGate, policyFromEvidence, setupFindings };
+module.exports = { parseArgs, decide, explainModel, lookalikeModel, runGate, policyFromEvidence, setupFindings };
