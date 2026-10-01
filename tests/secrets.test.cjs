@@ -281,8 +281,10 @@ test('audit --json and status --json carry the findings and never the values', (
   const fx = fixture();
   const audit = run('audit_setup.cjs', ['--json', '--global-config', path.join(fx.home, '.claude.json')], fx);
   assertNoLeak(audit.stdout + audit.stderr, 'audit --json');
-  const secrets = JSON.parse(audit.stdout).findings.filter((f) => f.category === 'secret');
+  const out = JSON.parse(audit.stdout);
+  const secrets = out.findings.findings.filter((f) => f.rule.startsWith('secrets/')).map((f) => out.details[f.id]);
   assert.ok(secrets.length >= 15, `audit reported ${secrets.length} secret findings`);
+  assert.ok(secrets.every((d) => d && d.category === 'secret'));
   assert.ok(secrets.some((f) => f.path.startsWith('projects[')), 'local-scope servers in ~/.claude.json are scanned');
 
   const text = run('audit_setup.cjs', ['--global-config', path.join(fx.home, '.claude.json')], fx);
@@ -291,8 +293,9 @@ test('audit --json and status --json carry the findings and never the values', (
   const status = run('status.cjs', ['--json'], fx);
   assertNoLeak(status.stdout + status.stderr, 'status --json');
   const s = JSON.parse(status.stdout);
-  assert.ok(s.secrets.findings.length >= 15);
-  assert.match(s.verdict.notable[0], /secrets? in plain text in host configs/);
+  assert.ok(s.secrets.count >= 15);
+  assert.ok(s.findings.findings.filter((f) => f.rule.startsWith('secrets/')).length >= 15);
+  assert.match(s.verdict.blocking[0], /secrets? in plain text in host configs/);
   assertNoLeak(run('status.cjs', [], fx).stdout, 'status (text)');
 });
 
@@ -353,19 +356,28 @@ test('exit codes: 0 clean, 1 found, 2 unreadable, and a finding outranks an unre
   assert.equal(run('check_secrets.cjs', ['--no-git'], { cwd: broken, home }).status, 1);
 });
 
-test('audit and status: default exit unchanged, --strict fails on a plain-text secret', () => {
+test('audit and status decide a plain-text secret as `secrets` does: it refuses, by default', () => {
+  // One subject, one answer (docs/adr/0001): the host-config line holding the
+  // credential is denied by the secrets/* row in every command that reads it.
+  // Pre-1.0 change: audit and status used to fail on it only under --strict.
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-secrets-home-'));
   const cwd  = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-secrets-'));
   fs.writeFileSync(path.join(cwd, '.mcp.json'), JSON.stringify({ mcpServers: {
     'mcp-server-fetch': { command: 'uvx', args: ['mcp-server-fetch'], env: { MY_API_KEY: T.heuristic } },
   } }));
   const g = ['--global-config', path.join(home, '.claude.json')];
-  assert.equal(run('audit_setup.cjs', g, { cwd, home }).status, 0);
-  assert.equal(run('audit_setup.cjs', [...g, '--strict'], { cwd, home }).status, 1);
-  const st = JSON.parse(run('status.cjs', ['--json'], { cwd, home }).stdout);
-  assert.equal(st.verdict.blocking.some((l) => /secret/.test(l)), false, 'a secret is not a blocker by default');
-  assert.match(st.verdict.notable[0], /1 secret in plain text/, 'it is the first notable line, so --strict fails on it');
-  assert.equal(run('status.cjs', ['--strict'], { cwd, home }).status, 1);
+  const secretDecision = (doc) => doc.decisions.find((d) => d.rules.some((o) => o.rule.startsWith('secrets/')));
+  const au = run('audit_setup.cjs', [...g, '--json'], { cwd, home });
+  assert.equal(au.status, 1);
+  const sc = run('check_secrets.cjs', ['--json'], { cwd, home });
+  assert.equal(sc.status, 1);
+  const st = run('status.cjs', ['--json'], { cwd, home });
+  assert.equal(st.status, 1);
+  const [a, x, t] = [JSON.parse(au.stdout).findings, JSON.parse(sc.stdout).findings, JSON.parse(st.stdout).findings].map(secretDecision);
+  for (const d of [a, t]) {
+    assert.deepEqual([d.subject.id, d.effect, d.decided_by, d.fails], [x.subject.id, x.effect, x.decided_by, x.fails]);
+  }
+  assert.match(JSON.parse(st.stdout).verdict.blocking[0], /1 secret in plain text/);
 });
 
 // ── git ────────────────────────────────────────────────────────────────────
