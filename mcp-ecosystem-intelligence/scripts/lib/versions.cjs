@@ -38,6 +38,7 @@
  *   comparatorFor(ecosystem)   -> function | null
  *   maxVersion(list, compare)  -> string | null
  *   isPrerelease(v, ecosystem) -> boolean
+ *   sameVersion(a, b, ecosystem) -> true | false | null   (one release, spelled either way)
  */
 
 const SEMVER_RE = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/;
@@ -241,7 +242,40 @@ function isPrerelease(v, ecosystem = 'npm') {
   return Boolean(p && (p.pre !== null || p.dev !== null));
 }
 
+/**
+ * Do two pins name the same release? The one equality status, check and
+ * audit share (lib/entry_match.cjs). PyPI by PEP 440: `1.0` == `1.0.0`,
+ * case, a `v` prefix, `-`/`_`/`.` separators, `alpha`→`a`, `post`/`rev`/`r`,
+ * leading zeros — and a local label (`+abc`) is part of the release here (it is
+ * ignored only for ordering). npm by semver: `v1.2.3` == `1.2.3`, build
+ * metadata ignored. OCI digests and anything else compare as written. null
+ * when either side is not a version this can read: "cannot tell", never "same".
+ */
+function sameVersion(a, b, ecosystem) {
+  if (a === null || a === undefined || b === null || b === undefined) return null;
+  const x = String(a).trim();
+  const y = String(b).trim();
+  if (ecosystem === 'npm') {
+    const c = compareSemver(x, y);
+    return c === null ? null : c === 0;
+  }
+  if (ecosystem === 'pypi' || ecosystem === 'PyPI') {
+    const strip = (v) => v.replace(/^v(?=\d)/i, '');
+    const c = comparePep440(strip(x), strip(y));
+    if (c === null) return null;
+    if (c !== 0) return false;
+    const local = (v) => {
+      const i = v.indexOf('+');
+      return i === -1 ? '' : v.slice(i + 1).toLowerCase().split(/[-_.]/)
+        .map((part) => (/^\d+$/.test(part) ? part.replace(/^0+(?=\d)/, '') : part)).join('.');
+    };
+    return local(x) === local(y);
+  }
+  return x === y;
+}
+
 module.exports = {
+  sameVersion,
   compareSemver, comparePep440, comparatorFor, maxVersion, isPrerelease,
   parseSemver, parsePep440,
 };

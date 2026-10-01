@@ -46,7 +46,7 @@ const { loadEffectivePolicy, flagsFromArgv } = require('./lib/policy_rules.cjs')
 const { subject, finding } = require('./lib/finding.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { toInstallCmd, serverLine } = require('./lib/installed.cjs');
-const { entryForLaunch } = require('./lib/entry_match.cjs');
+const { entryForLaunch, matchLaunch } = require('./lib/entry_match.cjs');
 const { evalIndex } = require('./lib/tiers.cjs');
 const { evalResultsAsOf } = require('./lib/evidence.cjs');
 const { decideRun, unanswered } = require('./lib/run_decision.cjs');
@@ -375,7 +375,11 @@ function audit({ project, global, settings, db, evals = null }) {
 
       // drift: DB pins a version, user is on a different one
       const dbVersion = parseDbVersion(tool.install_cmd);
-      if (dbVersion && installedVer && dbVersion !== installedVer) {
+      // The same release spelled another way (`1.0.27.0`, `Pkg_Name==1.0.27`)
+      // is not drift: the version is compared as status and check compare it
+      // (lib/entry_match.cjs, PEP 440 / semver via lib/versions.cjs).
+      const sameRelease = matchLaunch(db.tools, toInstallCmd(entry)).version_match === 'same';
+      if (dbVersion && installedVer && !sameRelease && dbVersion !== installedVer) {
         findings.push({
           category:    'drift',
           server:      name,

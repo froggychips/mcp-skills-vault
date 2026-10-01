@@ -196,6 +196,37 @@ test('entry_match: one matcher — status, flows, budget, audit and org rules al
   assert.equal(budget.matchDbEntry({ name: 'mcp-server-aws', command: 'node', args: ['./innocent.js'] }, db), null);
 });
 
+test('one version equality: PEP 440 / PEP 503 spellings of a release are that release — in status, check and audit alike', () => {
+  const { sameVersion } = require('../mcp-ecosystem-intelligence/scripts/lib/versions.cjs');
+  for (const [a, b] of [['1.0', '1.0.0'], ['1.0.27.0', '1.0.27'], ['V1.0RC1', '1.0rc1'], ['1.0-post1', '1.0.post1'],
+    ['1.0.dev0', '1.0.dev'], ['1.0alpha1', '1.0a1'], ['1.0.r2', '1.0.post2'], ['01.002', '1.2']]) {
+    assert.equal(sameVersion(a, b, 'pypi'), true, `${a} == ${b}`);
+  }
+  for (const [a, b] of [['1.0', '1.0.1'], ['1.0+abc', '1.0'], ['1.0a1', '1.0b1'], ['1.0.post1', '1.0']]) {
+    assert.equal(sameVersion(a, b, 'pypi'), false, `${a} != ${b}`);
+  }
+  assert.equal(sameVersion('v1.2.3', '1.2.3', 'npm'), true);
+  assert.equal(sameVersion('1.2.3', '1.2.4', 'npm'), false);
+  assert.equal(sameVersion('latest', '1.2.3', 'npm'), null, 'a tag is not a version: cannot tell, never "same"');
+
+  const db = { tools: [{
+    name: 'mcp-server-aws', category: 'cloud', trust: 'verified', est_tools_count: 4,
+    install_cmd: 'uvx awslabs.core-mcp-server==1.0.27', version: '1.0.27',
+  }] };
+  for (const args of [['awslabs-core-mcp-server==1.0.27.0'], ['Awslabs_Core_MCP_Server==1.0.27'], ['awslabs.core-mcp-server==1.0.27']]) {
+    const cmd = `uvx ${args[0]}`;
+    assert.equal(match.matchLaunch(db.tools, cmd).version_match, 'same', cmd);
+    const findings = auditSetup.audit({
+      project: { cloud: { command: 'uvx', args } }, global: {}, settings: { enabled: null, allowedTools: [] }, db,
+    });
+    assert.ok(!findings.some((f) => f.category === 'drift'), `${cmd}: audit reported drift for the same release`);
+  }
+  const moved = auditSetup.audit({
+    project: { cloud: { command: 'uvx', args: ['awslabs.core-mcp-server==1.0.28'] } }, global: {}, settings: { enabled: null, allowedTools: [] }, db,
+  });
+  assert.ok(moved.some((f) => f.category === 'drift'), 'another release is still drift');
+});
+
 test('check: an aged-out vault record is one context line per server — said, in text, JSON and SARIF, and never the answer', (t) => {
   const tree = skillTree();
   const LATE = '2026-10-20T12:00:00Z';   // every claim of absence past its shelf life

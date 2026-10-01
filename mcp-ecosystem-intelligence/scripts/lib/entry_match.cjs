@@ -33,10 +33,12 @@
  *                                               version_match, pinned }
  *   entryForLaunch(tools, installCmd)      -> the entry, or null
  *   sameArtifactEntry(tools, installCmd)   -> the entry when version_match is 'same', else null
+ *   sameArtifact(artifact, entry)          -> does the entry pin exactly this artifact
  */
 
 const { toTypedEntry, artifactId, comparableArtifactId, packageKey, isExactArtifact } = require('./entry_model.cjs');
 const { currentArtifactId } = require('./tiers.cjs');
+const { sameVersion } = require('./versions.cjs');
 
 function typedOf(tool) {
   try { return toTypedEntry(tool); } catch { return null; }
@@ -71,7 +73,7 @@ function matchLaunch(tools, installCmd) {
   if (!key) return none;
   const candidates = entriesFor(tools, key);
   const comparable = comparableArtifactId(typed.artifact);
-  const entry = candidates.find((t) => comparable && currentArtifactId(t) === comparable) || candidates[0] || null;
+  const entry = candidates.find((t) => sameArtifact(typed.artifact, t)) || candidates[0] || null;
   const installedId = artifactId(typed.artifact);
   const pinned = isExactArtifact(typed.artifact);
   if (!entry) return { ...none, package: key, installed_artifact: installedId, pinned };
@@ -81,8 +83,26 @@ function matchLaunch(tools, installCmd) {
   // Equality is necessary and not sufficient: both sides must also *resolve*
   // to one artifact. `npx -y pkg` equals `npx -y pkg` and names nothing.
   const version_match = (!comparable || !vaultId) ? 'unknown'
-    : (pinned && vaultPinned && comparable === vaultId ? 'same' : 'different');
+    : (pinned && vaultPinned && sameArtifact(typed.artifact, entry) ? 'same' : 'different');
   return { entry, package: key, installed_artifact: installedId, vault_artifact: vaultId, version_match, pinned };
+}
+
+/**
+ * Does `entry` pin exactly `artifact` (same package already)? Versions by
+ * lib/versions.cjs sameVersion — PEP 440 for PyPI, semver for npm — the one
+ * equality every command uses; an OCI digest, or an id this cannot read,
+ * compares as its comparable id.
+ */
+function sameArtifact(artifact, entry) {
+  const vaultId = currentArtifactId(entry);
+  if (!vaultId) return false;
+  const t = typedOf(entry);
+  if (!t || packageKey(t.artifact) !== packageKey(artifact)) return false;
+  if (artifact.ecosystem === 'npm' || artifact.ecosystem === 'pypi') {
+    const same = sameVersion(artifact.version, t.artifact.version, artifact.ecosystem);
+    if (same !== null) return same;
+  }
+  return comparableArtifactId(artifact) === vaultId;
 }
 
 const entryForLaunch = (tools, installCmd) => matchLaunch(tools, installCmd).entry;
@@ -92,4 +112,4 @@ function sameArtifactEntry(tools, installCmd) {
   return m.version_match === 'same' ? m.entry : null;
 }
 
-module.exports = { launchKey, matchLaunch, entryForLaunch, sameArtifactEntry };
+module.exports = { launchKey, matchLaunch, entryForLaunch, sameArtifactEntry, sameArtifact };
