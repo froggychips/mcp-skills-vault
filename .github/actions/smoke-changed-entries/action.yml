@@ -21,8 +21,10 @@ inputs:
     default: MCP eval (sandboxed, changed entries)
   gate:
     description: >
-      exit non-zero when a changed entry comes back CRASH or NO_TOOLS. Advisory
-      by default — a maintainer reads the table and decides.
+      exit non-zero when a changed entry regressed against the base ref's
+      eval_results.json (was PASS, now CRASH/FAIL/NO_TOOLS, or lost tools at
+      the same version). Entries that were already failing do not trip it.
+      Advisory by default — a maintainer reads the table and decides.
     required: false
     default: 'false'
 
@@ -54,29 +56,18 @@ runs:
       if: always()
       shell: bash
       env:
+        BASE_REF: ${{ inputs.base }}
         SECTION_TITLE: ${{ inputs.title }}
         GATE: ${{ inputs.gate }}
+      # Verdicts are relative to the base ref's eval_results.json: only an entry
+      # that used to PASS and no longer does (or lost tools at the same version)
+      # is breaking. One that never booted in the sandbox — it wants a token or
+      # a kubeconfig — is still failing, and is reported rather than gated on.
+      # Rows unchecked for want of a launcher are called out as "not a pass".
       run: |
         [ -s "$RUNNER_TEMP/pr_eval.ndjson" ] || { echo "no results to report"; exit 0; }
-        node -e '
-          const fs = require("fs");
-          // mcp_eval --json pretty-prints, so this is a stream of multi-line
-          // documents, not NDJSON: split where a new top-level object opens.
-          const runs = fs.readFileSync(process.env.RUNNER_TEMP + "/pr_eval.ndjson","utf8").trim().split(/\n(?=\{)/).filter(Boolean).map(JSON.parse);
-          const rows = runs.flatMap(r => r.results || []);
-          const out = ["## " + process.env.SECTION_TITLE, "", "| entry | status | tools | class | sandboxed |", "|---|---|---|---|---|"];
-          for (const r of rows) out.push("| " + r.name + " | " + r.status + " | " + (r.tool_count ?? "-") + " | " + (r.failure_class ?? "-") + " | " + r.sandboxed + " |");
-          // A launcher missing on the runner is a CI gap, not a verdict on the
-          // server — call it out so an all-skip table cannot read as a pass.
-          const noLauncher = rows.filter(r => /^launcher unavailable: /.test(r.error_code || ""));
-          if (noLauncher.length) {
-            out.push("", "> " + noLauncher.length + " entr" + (noLauncher.length === 1 ? "y" : "ies") +
-              " went unchecked — launcher missing on this runner. Not a pass.");
-          }
-          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, out.join("\n") + "\n");
-          const breaking = rows.filter(r => r.failure_class === "CRASH" || r.failure_class === "NO_TOOLS");
-          if (breaking.length) {
-            console.error("breaking: " + breaking.map(r => r.name + "(" + r.failure_class + ")").join(", "));
-            if (process.env.GATE === "true") process.exit(1);
-          }
-        '
+        gate=()
+        if [ "$GATE" = "true" ]; then gate=(--gate); fi
+        node mcp-ecosystem-intelligence/scripts/smoke_compare.cjs \
+          --runs "$RUNNER_TEMP/pr_eval.ndjson" --base "$BASE_REF" \
+          --title "$SECTION_TITLE" "${gate[@]}"
