@@ -58,6 +58,7 @@ const { asOfFromArgv } = require('./lib/clock.cjs');
 const { readLocalAudits, loadImportedAudits, auditsFor, auditObservations } = require('./lib/audits.cjs');
 const flows = require('./lib/flows.cjs');
 const { finding } = require('./lib/finding.cjs');
+const { evalRowFindings } = require('./lib/tool_scan.cjs');
 
 const DB_PATH    = path.resolve(__dirname, '../assets/tools_database.json');
 const EVAL_PATH  = path.resolve(__dirname, '../assets/eval_results.json');
@@ -235,7 +236,7 @@ function setupFindings({ tool, subject: s, db, evalBy, capabilities, installed }
  * from the evidence and — with `--verify` — from the live gate, and the one
  * Decision `decide()` makes over them. explain renders it; it decides nothing.
  */
-function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, behav, budget, evidence = null, asOf, maxAgeDays = DEFAULT_MAX_AGE_DAYS, org = null, audits = [], setup = [] }) {
+function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, behav, budget, evidence = null, evalRow = null, asOf, maxAgeDays = DEFAULT_MAX_AGE_DAYS, org = null, audits = [], setup = [] }) {
   const ep = asEffective(policy);
   const s = subjectForTool(tool);
   // The stored part of the decision, from the one producer verify --offline
@@ -257,6 +258,14 @@ function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, b
   const aud = auditObservations(audits, s);
   // What the configured set would do with it (rows flows/*, shadowing/*).
   const findings = [...ev.findings, ...gateFindings, ...(orgPart ? orgPart.findings : []), ...aud.findings, ...setup];
+  // What the tool list tells the model (#124), from the eval row: findings on
+  // the server's tools, held as a fact of this artifact so the `tool-scan/*`
+  // row judges them here exactly as `mcp-vault tool-scan` does. No row, or a
+  // run that never listed tools, says nothing; a row listed before the scan
+  // existed is `not-run`, never clean.
+  const scan = evalRow ? evalRowFindings(evalRow, {
+    asOf, maxAgeDays: typeof maxAgeDays === 'number' ? maxAgeDays : (maxAgeDays || DEFAULT_MAX_AGE_DAYS).tool_descriptions,
+  }) : null;
   const facts = {
     [s.id]: {
       mode: gateEntry ? 'gate' : 'evidence',
@@ -272,6 +281,7 @@ function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, b
       behaviour: behav ? { state: behav.state, reason: behav.reason } : null,
       budget: budget || null,
       ...(orgPart ? { org: orgPart.facts } : {}),
+      tool_scan: scan ? { ...scan.facts, subject: scan.subject.id, findings: scan.findings } : null,
     },
   };
   // The threshold is the effective policy's fail_on — the one verify uses —
@@ -289,8 +299,8 @@ function explainModel({ tool, policy, gateEntry = null, gateDoc = null, trust, b
  * words explain has always used, because the useful part of a denial is
  * which rule denied it.
  */
-function decide({ tool, policy, gateEntry, gateDoc = null, trust, behav, budget, evidence = null, asOf, maxAgeDays, org = null, audits = [], setup = [] }) {
-  const m = explainModel({ tool, policy, gateEntry, gateDoc, trust, behav, budget, evidence, asOf, maxAgeDays, org, audits, setup });
+function decide({ tool, policy, gateEntry, gateDoc = null, trust, behav, budget, evidence = null, evalRow = null, asOf, maxAgeDays, org = null, audits = [], setup = [] }) {
+  const m = explainModel({ tool, policy, gateEntry, gateDoc, trust, behav, budget, evidence, evalRow, asOf, maxAgeDays, org, audits, setup });
   const rules = m.decision.rules
     .filter((r) => { const row = rowFor(r.rule); return row && row.views.includes('explain'); })
     .map((r) => ({ rule: r.rule, outcome: r.effect, detail: r.detail }));
@@ -341,7 +351,8 @@ function main(argv) {
 
   const evals  = evalResultsAsOf(readJson(EVAL_PATH, { results: [] }).results || [], opts.asOf);
   const evalBy = new Map(evals.map((r) => [r.name, r]));
-  const behav  = behaviour(evalBy.get(tool.name) || null);
+  const evalRow = evalBy.get(tool.name) || null;
+  const behav  = behaviour(evalRow);
 
   // Budget, if the policy has an opinion about context.
   const unreadableConfigs = [];
@@ -391,7 +402,7 @@ function main(argv) {
   });
   const verdict = decide({
     tool, policy: loaded.policy, gateEntry, gateDoc: gate && gate.ok ? gate.report.findings : null,
-    trust, behav, budget, evidence, asOf: opts.asOf, maxAgeDays: maxAge, org, audits, setup: setup.findings,
+    trust, behav, budget, evidence, evalRow, asOf: opts.asOf, maxAgeDays: maxAge, org, audits, setup: setup.findings,
   });
   const m = verdict.model;
   const trace = toJson(findingsDocument({
@@ -536,7 +547,8 @@ function main(argv) {
   }
   process.stdout.write(`${verdict.decision === 'deny' ? RD : DM}Decided by ${verdict.decided_by}${RS}\n`);
   if (verdict.unevaluated.length) {
-    process.stdout.write(`${DM}Not evaluated without a gate run: ${verdict.unevaluated.join(', ')}${RS}\n`);
+    // Most of these need a gate run; `tool-scan/*` ones need a fresh eval.
+    process.stdout.write(`${DM}Not evaluated: ${verdict.unevaluated.join(', ')}${RS}\n`);
   }
   // The chain behind the decision: which rule decided, on which findings, and
   // the dated observations those rest on — current or past their shelf life

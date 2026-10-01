@@ -117,6 +117,7 @@ Every JSON document this tool writes carries a schema identifier of the form
 | `mcp-vault/secrets@1` | `mcp-vault secrets --json` — an envelope for what is not a finding (the masked shape of each value, the recommendation and suggested edit, keyed by finding id); the findings and decisions are `findings@1` under `findings` |
 | `mcp-vault/status@1` | `mcp-vault status --json` |
 | `mcp-vault/token-budget@1` | `mcp-vault budget --json` |
+| `mcp-vault/tool-scan-rules@1` | `mcp-vault tool-scan --rules --json` |
 | `mcp-vault/upgrade-plan@1` | `mcp-vault upgrade --json` |
 | `mcp-vault/verify-report@1` | `mcp-vault verify --json` |
 

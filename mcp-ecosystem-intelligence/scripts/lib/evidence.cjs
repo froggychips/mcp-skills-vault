@@ -57,6 +57,7 @@ const DIMENSIONS = [
   'advisories',      // nothing known against this version
   'dependencies',    // what the tree contains
   'smoke',           // it starts and lists tools
+  'tool_descriptions', // what those tools tell the model (lib/tool_scan.cjs)
 ];
 
 // How long each kind of claim stays meaningful, in days. An advisory result is
@@ -77,6 +78,9 @@ const DEFAULT_MAX_AGE_DAYS = {
   advisories:     7,
   dependencies:   14,
   smoke:          30,
+  // A description is served at runtime and can change without a release, so
+  // it ages as fast as the smoke that read it.
+  tool_descriptions: 30,
 };
 
 const { requireAsOf } = require('./clock.cjs');
@@ -110,6 +114,9 @@ const POSITIVE_BY_DIMENSION = {
   license:            new Set(['osi']),
   smoke:              new Set(['pass']),
   repository_posture: new Set(['clean']),
+  // `clean` here means no rule at high or medium fired — not that the text is
+  // benign. `suspicious` is not positive: it is a thing to read.
+  tool_descriptions:  new Set(['clean']),
 };
 
 /** Is `status` an affirmative result *for this dimension*? */
