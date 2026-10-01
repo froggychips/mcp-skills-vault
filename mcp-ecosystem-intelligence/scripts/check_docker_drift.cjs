@@ -20,7 +20,9 @@
  *   node scripts/check_docker_drift.cjs --strict  exit 1 on any drift
  *   node scripts/check_docker_drift.cjs --write   update the drifted pins in the DB
  *
- * Exit codes:
+ * Exit codes (a Decision per entry, docs/adr/0001 — mode observe; a registry
+ * that could not be read fails closed, so this command asks with
+ * --fail-unverified always on):
  *   0  all pins match upstream (or --strict not set and only drifts found)
  *   1  --strict + at least one drift, or a hard error during fetch (any mode —
  *      a registry we couldn't read is not a registry that agrees with us), or
@@ -37,6 +39,10 @@ const path  = require('path');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { dockerImageRef, ociIntegrity } = require('./lib/install_cmd.cjs');
 const { writeDb } = require('./lib/db_io.cjs');
+const { readWallClock } = require('./lib/clock.cjs');
+const { subject, finding } = require('./lib/finding.cjs');
+const { subjectForTool } = require('./lib/findings_from.cjs');
+const { commandPolicy, decideRun, unanswered } = require('./lib/run_decision.cjs');
 // The registry client, allowlist included, now lives in lib/oci.cjs —
 // verify --deep needs the same auth dance to hash a manifest.
 const {
@@ -66,17 +72,46 @@ const WRITE   = argv.includes('--write');
  * and a reader of the exit status could not tell "your pins moved" from "we
  * could not reach a registry".
  */
+/**
+ * The run as findings, decided (docs/adr/0001). Each list holds
+ * `{ subject, message }`:
+ *
+ *   drifts     the tag moved: medium (warn — fails under --strict). Under
+ *              --write a moved pin is a diff to review, not a failure, so
+ *              the caller passes the drifts it could not write as `unapplied`
+ *   unapplied  --write found a drift and could not move the pin: high. It
+ *              used to be swallowed with the rest of the drift count, so the
+ *              job exited 0, the stale pin stayed, and the workflow (which
+ *              opens a PR only when something was updated) did nothing
+ *   errors     a registry that could not be read: not-run, which fails
+ *              closed (this command's policy has fail_unverified on) — a
+ *              registry we couldn't read is not a registry that agrees with
+ *              us; when every checked entry errored and nothing drifted,
+ *              scope/unanswered (2): nothing was compared at all
+ */
+function driftDecision({ drifts = [], errors = [], unapplied = [], checked = null, strict = false, asOf = 0 } = {}) {
+  const nothing = errors.length > 0 && checked !== null && drifts.length === 0 && errors.length >= checked;
+  const findings = [
+    ...drifts.map((x) => finding({ rule: 'drift/docker-digest', subject: x.subject, scope: 'docker-drift', severity: 'medium', message: x.message })),
+    ...unapplied.map((x) => finding({ rule: 'drift/docker-unapplied', subject: x.subject, scope: 'docker-drift', severity: 'high', message: x.message })),
+    ...errors.map((x) => (nothing
+      ? unanswered({ subject: x.subject, scope: 'docker-drift', message: x.message })
+      : finding({ rule: 'drift/registry-error', subject: x.subject, scope: 'docker-drift', severity: 'medium', state: 'not-run', message: x.message }))),
+  ];
+  return decideRun({
+    findings, subjects: [...drifts, ...unapplied, ...errors].map((x) => x.subject),
+    mode: 'observe', scope: 'docker-drift', asOf, policy: commandPolicy({ strict, failUnverified: true }),
+  });
+}
+
+/**
+ * The exit code for counts alone — driftDecision over placeholder subjects,
+ * so the counts and the run are judged by the same rows. Nothing here ages,
+ * so the instant is immaterial and defaults to the epoch.
+ */
 function driftExitCode({ drifts = 0, errors = 0, unapplied = 0, checked = null, strict = false } = {}) {
-  if (strict && drifts > 0) return 1;
-  // --write found a drift and could not move the pin: an unresolved finding.
-  // It used to be swallowed with the rest of the drift count, so the job
-  // exited 0, the stale pin stayed, and the workflow (which opens a PR only
-  // when something was updated) did nothing.
-  if (unapplied > 0) return 1;
-  // Nothing was read at all: an unanswered question.
-  if (errors > 0 && checked !== null && drifts === 0 && errors >= checked) return 2;
-  if (errors > 0) return 1;
-  return 0;
+  const n = (k, count) => Array.from({ length: count }, (_, i) => ({ subject: subject.artifact({ entry: `${k}-${i + 1}` }), message: k }));
+  return driftDecision({ drifts: n('drift', drifts), errors: n('error', errors), unapplied: n('unapplied', unapplied), checked, strict }).exit;
 }
 
 /**
@@ -138,7 +173,7 @@ async function main() {
   for (const tool of db.tools) {
     if (!/^docker\s+run/.test(tool.install_cmd)) continue;
     const ref = dockerImageRef(tool.install_cmd);
-    if (!ref) { items.push({ name: tool.name, status: 'SKIP', reason: 'cannot parse image reference' }); continue; }
+    if (!ref) { items.push({ name: tool.name, status: 'SKIP', reason: 'cannot parse image reference', _tool: tool }); continue; }
 
     const parsed = parseImageRef(ref);
     if (!ALLOWED_REGISTRIES.has(parsed.registry)) {
@@ -146,11 +181,12 @@ async function main() {
         name: tool.name, status: 'ERROR',
         registry: parsed.registry, repo: parsed.repo, tag: tool.tracked_tag || 'latest',
         reason: `registry "${parsed.registry}" is not in the supported allowlist`,
+        _tool: tool,
       });
       continue;
     }
     if (!parsed.digest) {
-      items.push({ name: tool.name, status: 'SKIP', reason: 'image not pinned by digest (verify_integrity flags this)' });
+      items.push({ name: tool.name, status: 'SKIP', reason: 'image not pinned by digest (verify_integrity flags this)', _tool: tool });
       continue;
     }
 
@@ -162,6 +198,7 @@ async function main() {
         name: tool.name, status: 'ERROR',
         registry: parsed.registry, repo: parsed.repo, tag: trackedTag,
         reason: result.error,
+        _tool: tool,
       });
       continue;
     }
@@ -195,6 +232,24 @@ async function main() {
     if (updated.length) writeDb(DB_PATH, db);
   }
 
+  // The verdict is a Decision. With --write the drift has been turned into a
+  // diff, so it is no longer a failure — the review is the gate. A drift
+  // --write could NOT turn into a diff still fails, and so do errors: an
+  // unreachable registry means nothing was compared.
+  const subj = (name) => {
+    const it = items.find((i) => i.name === name);
+    return subjectForTool((it && it._tool) || { name });
+  };
+  const run = driftDecision({
+    drifts: WRITE ? [] : drifts.map((i) => ({ subject: subj(i.name), message: `${i.repo}:${i.tag} moved: pinned ${i.pinned}, upstream ${i.upstream}` })),
+    unapplied: unapplied.map((u) => ({ subject: subj(u.name), message: `${u.repo}:${u.tag}: ${u.reason} — the old pin is still in the DB` })),
+    errors: errors.map((i) => ({ subject: subj(i.name), message: `${i.registry}/${i.repo}:${i.tag} — ${i.reason}` })),
+    checked: items.length,
+    strict: STRICT,
+    // When this run looked; the decision is made at the same instant.
+    asOf: readWallClock(),
+  });
+
   if (AS_JSON) {
     process.stdout.write(JSON.stringify({
       schema: 'mcp-vault/docker-drift@1',
@@ -202,6 +257,8 @@ async function main() {
       updated,
       unapplied,
       items: items.map(({ _tool, ...rest }) => rest),
+      // Additive (mcp-vault/findings@1): each entry's Decision.
+      findings: run.document,
     }, null, 2) + '\n');
   } else {
     for (const i of items) {
@@ -234,17 +291,7 @@ async function main() {
     }
   }
 
-  // With --write the drift has been turned into a diff, so it is no longer a
-  // failure — the review is the gate. A drift --write could NOT turn into a
-  // diff still fails, and so do errors: an unreachable registry means nothing
-  // was compared.
-  exitAfterFlush(driftExitCode({
-    drifts:    WRITE ? 0 : drifts.length,
-    unapplied: unapplied.length,
-    errors:    errors.length,
-    checked: items.length,
-    strict:  STRICT,
-  }));
+  exitAfterFlush(run.exit);
 }
 
 if (require.main === module) {
@@ -258,6 +305,7 @@ module.exports = {
   apiHostFor,
   realmAllowed,
   driftExitCode,
+  driftDecision,
   applyDriftUpdate,
   writeDrifts,
   REGISTRY_API_HOST,
