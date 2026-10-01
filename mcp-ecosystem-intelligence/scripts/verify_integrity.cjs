@@ -96,7 +96,7 @@ const { writeDb } = require('./lib/db_io.cjs');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 // install_cmd parsing lives in one place — see lib/install_cmd.cjs for why.
 const {
-  npmPkgName, pypiPkgName, dockerImageRef, dockerDigestPinned, dockerIntegrityMismatch,
+  npmPkgName, pypiPkgName, dockerImageRef, dockerDigestPinned, dockerIntegrityMismatch, parseLaunch,
 } = require('./lib/install_cmd.cjs');
 const { toJsonReport, toSarif, dbLineIndex } = require('./lib/report.cjs');
 const { asOfFromArgv } = require('./lib/clock.cjs');
@@ -521,17 +521,9 @@ function versionFromInstallCmd(cmd) {
     const m = ref && ref.match(/@(sha256:[a-f0-9]{64})$/);
     return m ? m[1] : null;
   }
-  const npm = npmPkgName(cmd);
-  if (npm) {
-    const token = cmd.split(/\s+/).find((t) => t === npm || t.startsWith(`${npm}@`));
-    return token && token !== npm ? token.slice(npm.length + 1) : null;
-  }
-  const py = pypiPkgName(cmd);
-  if (py) {
-    const token = cmd.split(/\s+/).find((t) => t.startsWith(`${py}==`));
-    return token ? token.slice(py.length + 2) : null;
-  }
-  return null;
+  // Read the way the runner reads it (`-p pkg@1 bin`, options in any order).
+  const l = parseLaunch(cmd);
+  return l && !l.error && l.package ? (l.version || null) : null;
 }
 
 // npm's signing keys. One request per run, cached for a day — they rotate on
@@ -1614,15 +1606,21 @@ async function main() {
     });
   };
 
+  // Why a registry launch could not be read, in the parser's words: an option
+  // that changes the registry, a git source, an option we do not know.
+  const unreadable = (cmd, fallback) => {
+    const l = parseLaunch(cmd);
+    return l && l.error ? `${fallback}: ${l.error}` : fallback;
+  };
   for (const tool of scope) {
-    if (/^npx\s+-y/.test(tool.install_cmd)) {
+    if (/^npx\s/.test(tool.install_cmd)) {
       const p = npmPkgName(tool.install_cmd);
       if (p) npmTools.push({ tool, pkg: p });
-      else unroutable(tool, 'cannot parse npm pkg name');
+      else unroutable(tool, unreadable(tool.install_cmd, 'cannot parse npm pkg name'));
     } else if (/^uvx/.test(tool.install_cmd)) {
       const p = pypiPkgName(tool.install_cmd);
       if (p) pypiTools.push({ tool, pkg: p });
-      else unroutable(tool, 'uvx --from / git URL not verifiable');
+      else unroutable(tool, unreadable(tool.install_cmd, 'uvx --from / git URL not verifiable'));
     } else if (/^docker\s+run/.test(tool.install_cmd)) {
       dockerTools.push({ tool });
     } else {

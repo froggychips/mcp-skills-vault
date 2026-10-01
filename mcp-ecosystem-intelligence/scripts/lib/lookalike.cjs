@@ -440,10 +440,9 @@ function checkName(value, kind, index, { limit = 3 } = {}) {
 
 /** The package a launch command names, as { kind, value }, or null. */
 function packageOf(installCmd) {
-  // `npx --yes pkg` is `npx -y pkg`; toInstallCmd keeps the long form, and the
-  // gate's parser reads only the short one. Read here as the same command, or
-  // a vault-named key launching `npx --yes other` would pass as unreadable.
-  const cmd = (typeof installCmd === 'string' ? installCmd.trim() : '').replace(/^npx\s+--yes(?=\s)/, 'npx -y');
+  // The shared parser reads npx options in any order (`--yes`, `-p pkg bin`),
+  // so a vault-named key launching `npx --yes other` is read, not skipped.
+  const cmd = typeof installCmd === 'string' ? installCmd.trim() : '';
   const kind = /^npx\s/.test(cmd) ? 'npm' : (/^uvx\s/.test(cmd) ? 'pypi' : (/^docker\s+run/.test(cmd) ? 'oci' : null));
   const value = kind === 'npm' ? npmPkgName(cmd)
     : kind === 'pypi' ? pypiPkgName(cmd)

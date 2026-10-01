@@ -29,6 +29,7 @@
 const fs   = require('fs');
 const path = require('path');
 const os   = require('os');
+const { parseLaunch, canonicalInstallCmd, launcherOf } = require('./install_cmd.cjs');
 
 /**
  * Codex keeps TOML. Rather than take on a TOML parser, this reads the one shape
@@ -170,22 +171,36 @@ function parseConfig(doc, origin = {}, onInvalid = null) {
 }
 
 /**
- * Rebuild the `install_cmd` string for a configured server.
+ * Rebuild the `install_cmd` string for a configured server, in the canonical
+ * shape the gate reads (lib/install_cmd.cjs canonicalInstallCmd).
+ *
+ * Every npm-registry runner is a registry launch, not a local command: `npx`
+ * in any option order, `npm exec`, `pnpx` / `pnpm dlx`, `bunx`, `yarn dlx`;
+ * for PyPI `uvx`, `uv tool run`, `pipx run`. They become `npx -y …` / `uvx …`
+ * so the same checks apply; `launch` (on readInstalledServers' records) keeps
+ * what was actually written.
+ *
+ * A registry launcher whose package cannot be read (an unknown option, a
+ * `--registry`, a git source) still comes back under the runner the gate
+ * routes on, so the gate says *why* it cannot check it instead of calling it
+ * a local command.
  *
  * Returns null for anything with no package to look up: a remote URL, a local
  * script (`node ./server.js`), a binary on PATH.
  */
 function toInstallCmd(server) {
   if (!server || server.remote || !server.command) return null;
-  const cmd = path.basename(server.command).replace(/\.(cmd|exe|bat)$/i, '');
-  if (cmd !== 'npx' && cmd !== 'uvx' && cmd !== 'docker') return null;
-  const args = (server.args || []).join(' ');
-  // `npx pkg` without -y is equivalent for our purposes, but the shared parser
-  // expects the flag, so normalise it in.
-  if (cmd === 'npx' && !/(^|\s)-y(\s|$)/.test(args) && !/(^|\s)--yes(\s|$)/.test(args)) {
-    return `npx -y ${args}`.trim();
+  const args = (server.args || []).map(String);
+  const launch = parseLaunch({ command: server.command, args });
+  if (launch) {
+    const canonical = canonicalInstallCmd(launch);
+    if (canonical) return canonical;
+    const head = launch.family === 'npm' ? 'npx -y' : 'uvx';
+    return `${head} ${launcherOf(server.command, args).rest.join(' ')}`.trim();
   }
-  return `${cmd} ${args}`.trim();
+  const cmd = path.basename(server.command).replace(/\.(cmd|exe|bat)$/i, '');
+  if (cmd !== 'docker') return null;
+  return `${cmd} ${args.join(' ')}`.trim();
 }
 
 /**
@@ -237,7 +252,14 @@ function readInstalledServers({ cwd = process.cwd(), home = os.homedir(), platfo
       continue;
     }
     for (const server of parseConfig(doc, loc, onUnreadable)) {
-      servers.push({ ...server, line: serverLine(raw, server.name), install_cmd: toInstallCmd(server) });
+      servers.push({
+        ...server,
+        line: serverLine(raw, server.name),
+        install_cmd: toInstallCmd(server),
+        // What the config asked for, as written: runner, package, requested
+        // version (or none) and whether that is an exact pin.
+        launch: server.remote ? null : parseLaunch({ command: server.command, args: server.args }),
+      });
     }
   }
   return servers;

