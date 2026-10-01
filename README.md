@@ -30,35 +30,35 @@ Needs: database, infra, ci-cd, pm
 
 $ npx -y @froggychips/mcp-vault verify --offline
 …
-FAIL  mcp-searxng@1.0.3 (npm offline pin present for mcp-searxng)
-        [CVE] stored evidence: advisories: vulnerable (observed 2026-09-17)
+FAIL  mcp-server-aws@1.0.27 (PyPI offline pin present for awslabs.core-mcp-server)
+        [FAIL] stored evidence: availability: yanked (observed 2026-09-17)
 …
-114 entries checked — 9 failure(s)
+112 entries checked — 1 failure(s)
 ```
 
 ## Without this vault vs. with it
 
 | | Without | With |
 |---|---|---|
-| **Discoverability** | search GitHub, hope the README isn't lying | curated DB of **114 entries** with health scores, license, category, est-tools-count |
-| **Trust** | unknown publisher, unknown last commit | `trust` is **derived from dated evidence**, not typed by hand: **101 verified / 1 candidate / 12 unverified** as of 2026-09-17 (the date of the newest evidence in the DB). The 12 are eight entries with an advisory against the pinned version, two whose repository disagrees with the registry's, one yanked and one unpublished (see [Install-Hook Policy](./CONTRIBUTING.md#install-hook-policy)) |
+| **Discoverability** | search GitHub, hope the README isn't lying | curated DB of **113 entries** with health scores, license, category, est-tools-count |
+| **Trust** | unknown publisher, unknown last commit | `trust` is **derived from dated evidence**, not typed by hand: **107 verified / 1 candidate / 4 unverified** as of 2026-09-30 (the date of the newest evidence in the DB). The 4 are one entry with an advisory recorded against the pinned version, two whose repository disagrees with the registry's, and one yanked (see [Install-Hook Policy](./CONTRIBUTING.md#install-hook-policy)) |
 | **Integrity** | `npx -y whatever@latest` runs whatever ships today | sha512/sha256/Docker `@sha256:` pinned + re-verified against the live registry on every check |
 | **Vulnerabilities** | `npm audit` after the fact, if you remember | 4 advisory feeds merged: npm bulk + OSV.dev + GHSA + Snyk† — checked *before* the install command is written |
 | **Depth** | the package you asked for | `--deps` resolves the whole tree without installing it: **19,377 transitive packages** across the DB, 25 entries whose *dependencies* run install scripts, 38 with a high/critical advisory somewhere in the tree |
-| **Is the hash even yours?** | trust `dist.integrity` from the host serving the tarball | `--deep` downloads and hashes the bytes; npm's registry signature is verified on every run (**100/102** npm entries today), and provenance claims are read and compared with `source_url` |
+| **Is the hash even yours?** | trust `dist.integrity` from the host serving the tarball | `--deep` downloads and hashes the bytes; npm's registry signature is verified on every run (**100/101** npm entries today), and provenance claims are read and compared with `source_url` |
 | **"Verified" as a word** | a label someone typed once | dated evidence per dimension — a hash match holds for 90 days, "no advisories" for 7 — and `trust` is computed from it, dropped when the version moves |
 | **Context cost** | unknown until the window fills | `budget` totals what your configured servers inject on every request, each number stating whether it was measured or estimated |
 | **Which host** | Claude Code | `install --host` writes Claude Code, Claude Desktop, Cursor, VS Code, or prints a TOML block for Codex |
 | **Is it still there?** | a 404 looks like a network blip | `availability` tells *gone* / *version-gone* / *yanked* / *deprecated* apart, and an unpublished name is treated as what it is: claimable by somebody else |
 | **Who published it** | whatever `repository.url` says | cross-referenced with the official MCP registry, whose namespaces are **ownership-verified** at publish (`io.github.<owner>/…`) |
-| **Does it run?** | find out after installing | behavioural eval, and the result caps the recommendation: **40 of 113** complete a handshake, and an entry nothing has seen start cannot read as "recommended" |
-| **What can it do?** | read the source, if it isn't minified | `capabilities` records what each package is able to do with a file and a line — 35 of 99 can shell out, 84 read `process.env` — and reports what a new version **gained** |
+| **Does it run?** | find out after installing | behavioural eval, and the result caps the recommendation: **40 of 112** complete a handshake, and an entry nothing has seen start cannot read as "recommended" |
+| **What can it do?** | read the source, if it isn't minified | `capabilities` records what each package is able to do with a file and a line — 38 of the 105 package versions scanned can shell out, 90 read `process.env` — and reports what a new version **gained** |
 | **Did the tools change?** | invisible | every passing eval fingerprints the tool surface per tool and records what ran, so a later run can say whether a change came with a new artifact, came without one (**unexplained**), or cannot be attributed at all |
-| **So what do I install instead?** | read four advisories | `upgrade` computes the shortest version that clears all of them (8 entries today, all with a safe path) |
+| **So what do I install instead?** | read four advisories | `upgrade` computes the shortest version that clears all of them (1 entry today, with a safe path) |
 | **Why was it denied?** | read four outputs | `explain` prints the evidence with dates, the policy in force, every rule with its outcome, and the rule that decided it |
 | **What runs, exactly** | `npx` re-resolves the tree at every start | `lock` freezes npm's own lockfile per server; `--vendor` installs it so nothing resolves at launch |
 | **Stack matching** | manual reading of awesome-lists | detects 40+ env-key patterns + 14 file paths + docker-compose images → suggests what to install |
-| **Offline use** | doesn't | `--offline` makes no network calls: it validates stored pins and applies the stored, dated evidence (a recorded advisory fails, as in `explain`); `--no-audit` still checks live registries but skips advisory APIs |
+| **Offline use** | doesn't | `--offline` makes no network calls and validates stored pins; `--no-audit` still checks live registries but skips advisory APIs |
 | **What actually launches** | `npx -y pkg` resolves `latest` at every start — not the artifact anyone reviewed | `install` writes the version the gate hashed (`pkg@1.2.3`, `pkg==1.2.3`, `image@sha256:…`), and refuses to write an unpinned command without `--allow-unpinned` |
 | **Telemetry** | varies | none. Ever. |
 
@@ -205,8 +205,7 @@ Flags:
 | `--record-evidence` | Write what this run established back into the DB, dated per dimension (`trust_evidence`), and recompute `trust` from it |
 | `--no-policy` | Ignore `.mcp-vault.policy.json` |
 | `--show-policy` | Print the policy in force and the switches it implies |
-| `--offline` | True offline mode; no network calls. Validates stored DB pins and applies the stored evidence — see [The offline gate](#the-offline-gate) |
-| `--fail-families <a,b>` | Only outcomes of these rule families fail the run (by the deciding rule or a finding it rests on); everything is still decided and reported |
+| `--offline` | True offline mode; no network calls, validates stored DB pins only |
 | `--fail-unverified` | Treat `UNVERIFIED` (registry unreachable, unparsable install command, wheel-only PyPI release) as a hard failure. Implied by `--strict` |
 | `--entry <name>` | Check a single DB entry instead of all of them |
 | `--installed` | Verify what the local hosts are configured to launch (`.mcp.json`, `~/.claude.json`, Claude Desktop, Cursor, VS Code, Codex) instead of the DB. Unpinned launch commands, servers not in the vault, and remote endpoints are each reported as what they are |
@@ -216,34 +215,6 @@ Flags:
 | `--require-signatures` | An npm release with no verifiable registry signature is a failure |
 | `--require-provenance` | An npm release with no provenance attestation is a failure |
 
-### The offline gate
-
-`verify --offline` makes no network calls, so it cannot learn anything new
-about an artifact — but the DB already knows things, dated: what the weekly
-refresh recorded per dimension (`trust_evidence`). The offline gate applies
-that record, through the same function `explain` uses, so the two give one
-answer for one entry:
-
-- **A found problem fails, at any age.** A known advisory against the pinned
-  version, a yanked or unpublished release, a hash that did not match: facts
-  about the artifact, which do not become less true with time. The line says
-  when it was observed — `[CVE] stored evidence: advisories: vulnerable
-  (observed 2026-09-17)`.
-- **A claim of absence ages.** "No advisories" and "still published" hold for
-  seven days; past that they are `unknown`, not `allow` and not `deny`. That
-  fails the run under `--fail-unverified` (or `unverified: fail` in the
-  policy) and is reported otherwise.
-- **A narrower question is a flag, not a switched-off gate.** CI's seeded-DB
-  smoke asks whether the DB is *consistent* — pinned, cross-consistent,
-  digest-pinned, within policy — and runs
-  `verify --offline --fail-families integrity,pin,oci,verify,policy`. The
-  stored advisories are still decided, printed and uploaded as SARIF; they are
-  just not that job's exit code.
-
-This was a pre-1.0 tightening of a default (`verify --offline` exits `1` on the
-entries with a recorded advisory); see
-[docs/COMPATIBILITY.md](./docs/COMPATIBILITY.md#2-exit-codes).
-
 This project publishes itself with npm provenance (`npm publish --provenance`,
 signed against a GitHub OIDC token — which works on a self-hosted runner, since
 the token comes from GitHub rather than the runner). If provenance cannot be
@@ -251,7 +222,7 @@ produced, the publish stops rather than shipping without it.
 
 Every npm entry's registry signature is checked on every run: npm signs
 `<name>@<version>:<integrity>` with a published ECDSA key, so a response with a
-swapped `dist.integrity` cannot pass. 100 of the DB's 102 npm entries verify
+swapped `dist.integrity` cannot pass. 99 of the DB's 100 npm entries verify
 today; 45 also publish a provenance attestation, whose claimed source
 repository is compared against `source_url`. Provenance is reported as a claim,
 not a proof — verifying the sigstore bundle itself (Fulcio chain, Rekor
@@ -370,15 +341,15 @@ The weekly refresh job records evidence as part of its run. The eight
 dimensions it fills for this DB today:
 
 ```
-availability   present 104, deprecated 4, yanked 1, gone 1
-artifact       verified 112, unverified 2
+availability   present 104, deprecated 4, yanked 1
+artifact       verified 112, unverified 1
 signature      verified 100, absent 1
-provenance     bound 45, absent 56
+provenance     bound 45, absent 55
 source_binding verified 98, unverified 9, mismatch 2
-registry       listed 11, unlisted 102
-advisories     clean 100, vulnerable 8, advisories-present 1
-posture        clean 1, weak 3        (Scorecard covers 4 of 114 repositories)
-→ trust:       verified 101, candidate 1, unverified 12
+registry       listed 11, unlisted 101
+advisories     clean 107, vulnerable 1, advisories-present 1
+posture        clean 1, weak 3        (Scorecard covers 4 of 113 repositories)
+→ trust:       verified 108, candidate 1, unverified 4
 ```
 
 ### Is it still there? (`availability`)
@@ -421,9 +392,9 @@ official registry  →  who published it, under a name they proved they own
 mcp-vault          →  supply-chain evidence, policy, behaviour
 ```
 
-11 entries are listed as of 2026-09-17 and all of them agree; a verified namespace under a
+11 entries are listed as of 2026-09-30 and all of them agree; a verified namespace under a
 different owner is the finding worth having. **Being unlisted is explicitly not
-a finding** — listing is opt-in and 102 entries simply are not listed.
+a finding** — listing is opt-in and 101 entries simply are not listed.
 
 This check replaced a field. The DB used to carry `in_registry`, a hand-set
 boolean worth 30 points of health score that had never been compared with
@@ -446,7 +417,7 @@ The checks are recorded individually rather than as Scorecard's 0–10 average �
 an average puts "there is a SECURITY.md" and "a fork can trigger the release
 workflow" into one number. Scorecard's `-1` ("could not run this check") is
 recorded as `unknown`, never as a failure. Coverage is stated rather than
-implied: **4 of 114** entries have a report, and the other 110 read "no
+implied: **4 of 113** entries have a report, and the other 109 read "no
 report".
 
 ### What can it do, and what did it gain? (`capabilities`)
@@ -462,17 +433,18 @@ mcp-vault capabilities --all --write   # rebuild the baseline
 ```
 
 The published tarball is read in memory (nothing is unpacked to disk) and every
-match is recorded with a file and a line. Across the 99 npm entries it can
-read:
+match is recorded with a file and a line. Across the 105 package versions
+scanned so far — every npm entry's current pin, plus the six pins those entries
+moved off, kept as the baseline their delta is computed against — it can read:
 
 ```
-env_access  84    shell           35    dynamic_code      15
-network     74    install_script  31    dynamic_require    8
-fs_read     58    fs_write        39    credential_paths   3
+env_access  89    shell           38    dynamic_code      16
+network     79    install_script  32    dynamic_require    8
+fs_read     62    fs_write        41    credential_paths   5
 ```
 
-28 of those packages can both run other programs and reach the network. 18 of
-99 ship at least one minified file, where a pattern scan can show presence and
+31 of those packages can both run other programs and reach the network. 20 of
+104 ship at least one minified file, where a pattern scan can show presence and
 nothing else.
 
 Two rules make this honest rather than theatrical:
@@ -548,11 +520,6 @@ decided it. `--json` emits a decision record and `--record` appends it as one
 line — "allowed on this date, under that policy, on this evidence" is what a
 policy engine gets asked for six months later and otherwise cannot
 reconstruct.
-
-The exit code is the gate's for this entry: `explain` holds the decision to
-the same `fail_on` as `verify` — from the policy file and `--strict` /
-`--fail-unverified` — so under `unverified: fail` stale evidence exits `1`
-from both, not "allowed" from one and "failed" from the other.
 
 ### What actually runs (`lock`)
 
@@ -649,7 +616,7 @@ Drift = upstream rebuilt the tag under a new digest. The weekly CI job (`docker-
 
 [`scripts/mcp_eval.cjs`](./mcp-ecosystem-intelligence/scripts/mcp_eval.cjs) — closes the "did the artifact actually start?" gap. The integrity gate verifies the *file* you downloaded; this script verifies that spawning the server produces a usable tool surface.
 
-**What the last full run found.** 40 of the 113 entries with a runnable launch command complete a handshake in a clean container; 39 of them list at least one tool, listing 1,021 tools between them, ≈294k tokens of `tools/list` payload if every one were enabled at once. The rest fail for their own reasons — 62 crash, 7 exceed a 90-second deadline, 2 want network access they are not given, 1 wants credentials, 1 needs an argument you have to supply by hand. Those results live in [`assets/eval_results.json`](./mcp-ecosystem-intelligence/assets/eval_results.json) and feed the `behaviour` axis of a recommendation: an entry nothing has ever seen start cannot read as "recommended". 8 entries report a tool count that differs from the DB's (`tool_count_drift`), which is a reviewer's decision rather than an automatic correction.
+**What the last full run found.** 40 of the 111 entries with a runnable launch command complete a handshake in a clean container; 39 of them list at least one tool, listing 1,021 tools between them, ≈294k tokens of `tools/list` payload if every one were enabled at once. The rest fail for their own reasons — 62 crash, 7 exceed a 90-second deadline, 2 want network access they are not given, 1 wants credentials, 1 needs an argument you have to supply by hand. Those results live in [`assets/eval_results.json`](./mcp-ecosystem-intelligence/assets/eval_results.json) and feed the `behaviour` axis of a recommendation: an entry nothing has ever seen start cannot read as "recommended". 8 entries report a tool count that differs from the DB's (`tool_count_drift`), which is a reviewer's decision rather than an automatic correction.
 
 Each passing run also records a **tool-surface fingerprint** — every tool's name with its description and input schema hashed separately (hashes only: a tool description is attacker-controlled text, and it reaches the model's system prompt) — together with the **identity of what ran**: the artifact id, its integrity value, the DB version and a digest of the launch contract. `tool_count` alone never saw a rename or a rewritten description.
 
@@ -774,7 +741,7 @@ database](#vetted-database).
 
 ### Vetted database
 
-`mcp-ecosystem-intelligence/assets/tools_database.json` — **114 entries** across ~26 categories, all with pinned versions, integrity hashes (npm sha512 / PyPI sha256 / Docker @sha256), SPDX license, and `trust` field.
+`mcp-ecosystem-intelligence/assets/tools_database.json` — **112 entries** across ~26 categories, all with pinned versions, integrity hashes (npm sha512 / PyPI sha256 / Docker @sha256), SPDX license, and `trust` field.
 
 ```
 ai        browser   ci-cd      cms       communication   crm
@@ -783,7 +750,11 @@ maps      memory    meta       mobile     observability   payments
 pm        reasoning search     testing    utility         vcs       web-scraping
 ```
 
-Distribution as of 2026-09-17 (the date of the newest evidence in the DB): **0 Core / 99 Recommended / 6 Experimental / 9 Deprecated**.
+Distribution as of 2026-09-30 (the date of the newest evidence in the DB): **0 Core / 10 Recommended / 101 Experimental / 1 Deprecated**.
+On that date only the nine entries re-checked that day carry fresh evidence. The
+rest hold evidence from 2026-09-17, and wherever it includes `availability` or
+`advisories` (a seven-day shelf life) it has aged out, so those 101 read
+Experimental until the next refresh.
 That is a snapshot, not today's split: evidence has a shelf life, so an entry
 whose claims have aged out reads as Experimental on a later day even though no
 commit touched it. `mcp-vault list` (whole DB) and `mcp-vault status` (what you
@@ -866,11 +837,9 @@ per step, so a later edit cannot quietly add an unjailed one. See
 
 - **unit-tests** — `node --test tests/*.test.cjs` on every PR / push. Jailed on
   PRs, direct in trusted contexts.
-- **smoke** — `verify_integrity.cjs --offline --fail-families
-  integrity,pin,oci,verify,policy` on every PR / push ("is the DB consistent";
-  stored advisories are reported, not this job's exit code — see
-  [The offline gate](#the-offline-gate)), plus a SARIF upload so each finding
-  lands on the `tools_database.json` line that caused it instead of in a log.
+- **smoke** — `verify_integrity.cjs --offline` on every PR / push, plus a SARIF
+  upload so each finding lands on the `tools_database.json` line that caused it
+  instead of in a log.
 - **refresh-hashes** — Monday cron. The evidence-collecting job: refreshes
   `version` + `pkg_integrity` from live registries, re-verifies with `--deep
   --record-evidence`, then runs `availability`, `identity`, `posture` and
@@ -960,7 +929,7 @@ Still judgement, not script — deliberately: the reject heuristics (5-Minute
 Rule, Bloat, Duplication) and promoting a candidate to `trust: verified`. And
 still open: PyPI capability scanning (sdists and wheels need a zip reader), a
 capability delta across the *dependency* tree rather than the top-level package,
-and Scorecard's coverage, which is 4 of 114 repositories and not something this
+and Scorecard's coverage, which is 4 of 113 repositories and not something this
 repo can fix. The
 typed `artifact`/`launch` model exists in
 [`lib/entry_model.cjs`](./mcp-ecosystem-intelligence/scripts/lib/entry_model.cjs)
@@ -971,7 +940,7 @@ the string, and moving them over is the next step.
 
 ## Token cost management
 
-Every active MCP server injects its full tool list into Claude's system prompt (~200–500 tokens per tool). With 114 servers in the DB the spread is wide: `mcp-server-fetch` = 1 tool vs. `gitlab-mcp` = 153 tools.
+Every active MCP server injects its full tool list into Claude's system prompt (~200–500 tokens per tool). With 112 servers in the DB the spread is wide: `mcp-server-fetch` = 1 tool vs. `gitlab-mcp` = 153 tools.
 
 **First, measure.** `mcp-vault budget` reads your host configs and totals the
 surface, stating where each number came from:
@@ -1061,7 +1030,7 @@ Running the suite locally:
 
 ```bash
 node --test tests/*.test.cjs        # unit tests (offline)
-npm run verify                      # DB smoke, no network (verify --offline --fail-families …)
+mcp-vault verify --offline          # DB smoke, no network
 mcp-vault site-registry             # regenerate docs/site/registry.html
 ```
 

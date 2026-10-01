@@ -1,13 +1,13 @@
 {
-  "generated_at": "2026-09-18T05:26:14.994Z",
-  "as_of": "2026-09-18T05:26:14.994Z",
-  "count": 114,
+  "generated_at": "2026-09-30T11:19:50.799Z",
+  "as_of": "2026-09-30T11:19:50.799Z",
+  "count": 112,
   "entries": [
     {
       "name": "@last9/mcp-server",
       "category": "ai",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 77.78,
@@ -53,8 +53,8 @@
     {
       "name": "lsp-mcp-server",
       "category": "ai",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 53.22,
@@ -100,8 +100,8 @@
     {
       "name": "codex-mcp-server",
       "category": "ai",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Unknown",
       "health_score": 50,
@@ -147,8 +147,8 @@
     {
       "name": "@browserstack/mcp-server",
       "category": "browser",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "AGPL-3.0",
       "health_score": 80,
@@ -194,8 +194,8 @@
     {
       "name": "playwright-mcp",
       "category": "browser",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 80,
@@ -241,8 +241,8 @@
     {
       "name": "chrome-devtools-mcp",
       "category": "browser",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 75,
@@ -291,7 +291,7 @@
       "classification": "Recommended",
       "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
       "trust": "verified",
-      "license": "NOASSERTION",
+      "license": "BUSL-1.1",
       "health_score": 70,
       "est_tools_count": null,
       "install_cmd": "npx -y fsb-mcp-server",
@@ -299,31 +299,31 @@
       "evidence": {
         "availability": {
           "status": "present",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "artifact": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "signature": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "provenance": {
           "status": "absent",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "source_binding": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "registry": {
           "status": "unlisted",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "advisories": {
           "status": "clean",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         }
       },
       "smoke": {
@@ -335,8 +335,8 @@
     {
       "name": "@agent-infra/mcp-server-browser",
       "category": "browser",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 55,
@@ -382,8 +382,8 @@
     {
       "name": "@circleci/mcp-server-circleci",
       "category": "ci-cd",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "NOASSERTION",
       "health_score": 69.4,
@@ -429,8 +429,8 @@
     {
       "name": "teamcity-mcp",
       "category": "ci-cd",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 54.47,
@@ -476,42 +476,42 @@
     {
       "name": "@contentful/mcp-server",
       "category": "cms",
-      "classification": "Deprecated",
-      "tier_reason": "advisories: vulnerable (as of 2026-09-17)",
-      "trust": "unverified",
+      "classification": "Recommended",
+      "tier_reason": "did not complete a handshake in a clean sandbox (TIMEOUT, timeout)",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 77.71,
       "est_tools_count": null,
-      "install_cmd": "npx -y @contentful/mcp-server",
+      "install_cmd": "npx -y @contentful/mcp-server@1.7.19",
       "source_url": "https://github.com/contentful/contentful-mcp-server",
       "evidence": {
         "availability": {
           "status": "present",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "artifact": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "signature": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "provenance": {
           "status": "absent",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "source_binding": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "registry": {
           "status": "unlisted",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "advisories": {
-          "status": "vulnerable",
-          "checked_at": "2026-09-17"
+          "status": "clean",
+          "checked_at": "2026-09-30"
         }
       },
       "smoke": {
@@ -523,8 +523,8 @@
     {
       "name": "slack-mcp-server",
       "category": "communication",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 75,
@@ -568,41 +568,10 @@
       }
     },
     {
-      "name": "@diskd-ai/email-mcp",
-      "category": "communication",
-      "classification": "Deprecated",
-      "tier_reason": "availability: gone (as of 2026-09-17)",
-      "trust": "unverified",
-      "license": "LGPL-3.0",
-      "health_score": 59.4,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @diskd-ai/email-mcp",
-      "source_url": "https://github.com/codefuturist/email-mcp",
-      "evidence": {
-        "availability": {
-          "status": "gone",
-          "checked_at": "2026-09-17"
-        },
-        "artifact": {
-          "status": "unverified",
-          "checked_at": "2026-09-17"
-        },
-        "registry": {
-          "status": "unlisted",
-          "checked_at": "2026-09-17"
-        }
-      },
-      "smoke": {
-        "status": "fail",
-        "tools": null,
-        "checked_at": "2026-09-17"
-      }
-    },
-    {
       "name": "@salesforce/mcp",
       "category": "crm",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 137)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 80,
@@ -667,8 +636,8 @@
     {
       "name": "mcp-server-mysql",
       "category": "database",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 80,
@@ -714,8 +683,8 @@
     {
       "name": "mcp-server-neon",
       "category": "database",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (TIMEOUT, timeout)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 80,
@@ -761,8 +730,8 @@
     {
       "name": "mongodb-mcp-server",
       "category": "database",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (TIMEOUT, timeout)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 80,
@@ -808,8 +777,8 @@
     {
       "name": "@supabase/mcp-server-supabase",
       "category": "database",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 75,
@@ -855,8 +824,8 @@
     {
       "name": "mcp-clickhouse",
       "category": "database",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 75,
@@ -894,8 +863,8 @@
     {
       "name": "supabase-mcp",
       "category": "database",
-      "classification": "Recommended",
-      "tier_reason": "will not start without network access",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 60,
@@ -933,8 +902,8 @@
     {
       "name": "mcp-server-everything",
       "category": "demo",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 75,
@@ -980,8 +949,8 @@
     {
       "name": "@anyproto/anytype-mcp",
       "category": "docs",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 80,
@@ -1027,8 +996,8 @@
     {
       "name": "@professional-wiki/mediawiki-mcp-server",
       "category": "docs",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 80,
@@ -1074,8 +1043,8 @@
     {
       "name": "context7",
       "category": "docs",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 80,
@@ -1121,34 +1090,34 @@
     {
       "name": "mcp-atlassian",
       "category": "docs",
-      "classification": "Deprecated",
-      "tier_reason": "advisories: vulnerable (as of 2026-09-17)",
-      "trust": "unverified",
+      "classification": "Recommended",
+      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 75,
       "est_tools_count": 72,
-      "install_cmd": "uvx mcp-atlassian==0.21.1",
+      "install_cmd": "uvx mcp-atlassian==0.22.0",
       "source_url": "https://github.com/sooperset/mcp-atlassian",
       "evidence": {
         "availability": {
           "status": "present",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "artifact": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "source_binding": {
           "status": "unverified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "registry": {
           "status": "unlisted",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "advisories": {
-          "status": "vulnerable",
-          "checked_at": "2026-09-17"
+          "status": "clean",
+          "checked_at": "2026-09-30"
         }
       },
       "smoke": {
@@ -1160,8 +1129,8 @@
     {
       "name": "notion-mcp-server",
       "category": "docs",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 75,
@@ -1207,8 +1176,8 @@
     {
       "name": "mcp-server-filesystem",
       "category": "filesystem",
-      "classification": "Recommended",
-      "tier_reason": "the launch command takes an argument you have to supply",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 75,
@@ -1254,8 +1223,8 @@
     {
       "name": "dataforseo-mcp-server",
       "category": "http",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 137)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 80,
@@ -1301,8 +1270,8 @@
     {
       "name": "mcp-server-fetch",
       "category": "http",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 75,
@@ -1340,8 +1309,8 @@
     {
       "name": "@azure-devops/mcp",
       "category": "infra",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 80,
@@ -1387,8 +1356,8 @@
     {
       "name": "mcp-server-cloudflare",
       "category": "infra",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 80,
@@ -1434,42 +1403,42 @@
     {
       "name": "mcp-server-kubernetes",
       "category": "infra",
-      "classification": "Deprecated",
-      "tier_reason": "advisories: vulnerable (as of 2026-09-17)",
-      "trust": "unverified",
+      "classification": "Recommended",
+      "tier_reason": "did not complete a handshake in a clean sandbox (TIMEOUT, timeout)",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 80,
       "est_tools_count": 24,
-      "install_cmd": "npx -y mcp-server-kubernetes@3.5.1",
+      "install_cmd": "npx -y mcp-server-kubernetes@3.7.0",
       "source_url": "https://github.com/Flux159/mcp-server-kubernetes",
       "evidence": {
         "availability": {
           "status": "present",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "artifact": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "signature": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "provenance": {
           "status": "bound",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "source_binding": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "registry": {
           "status": "unlisted",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "advisories": {
-          "status": "vulnerable",
-          "checked_at": "2026-09-17"
+          "status": "clean",
+          "checked_at": "2026-09-30"
         }
       },
       "smoke": {
@@ -1481,8 +1450,8 @@
     {
       "name": "@azure/mcp",
       "category": "infra",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 75,
@@ -1528,8 +1497,8 @@
     {
       "name": "@google-cloud/observability-mcp",
       "category": "infra",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 75,
@@ -1575,8 +1544,8 @@
     {
       "name": "kubernetes-mcp-server",
       "category": "infra",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 75,
@@ -1692,8 +1661,8 @@
     {
       "name": "@mapbox/mcp-server",
       "category": "maps",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (TIMEOUT, timeout)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 80,
@@ -1739,8 +1708,8 @@
     {
       "name": "mcp-server-memory",
       "category": "memory",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 75,
@@ -1786,8 +1755,8 @@
     {
       "name": "mcp-installer",
       "category": "meta",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 40,
@@ -1833,8 +1802,8 @@
     {
       "name": "ios-simulator-mcp",
       "category": "mobile",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 50,
@@ -1880,42 +1849,42 @@
     {
       "name": "@dynatrace-oss/dynatrace-mcp-server",
       "category": "observability",
-      "classification": "Deprecated",
-      "tier_reason": "advisories: vulnerable (as of 2026-09-17)",
-      "trust": "unverified",
+      "classification": "Recommended",
+      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 80,
       "est_tools_count": null,
-      "install_cmd": "npx -y @dynatrace-oss/dynatrace-mcp-server",
+      "install_cmd": "npx -y @dynatrace-oss/dynatrace-mcp-server@2.1.1",
       "source_url": "https://github.com/dynatrace-oss/dynatrace-mcp",
       "evidence": {
         "availability": {
           "status": "deprecated",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "artifact": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "signature": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "provenance": {
           "status": "bound",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "source_binding": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "registry": {
           "status": "unlisted",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "advisories": {
-          "status": "vulnerable",
-          "checked_at": "2026-09-17"
+          "status": "clean",
+          "checked_at": "2026-09-30"
         }
       },
       "smoke": {
@@ -1927,8 +1896,8 @@
     {
       "name": "sentry-mcp",
       "category": "observability",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "FSL-1.1-ALv2",
       "health_score": 65,
@@ -1974,8 +1943,8 @@
     {
       "name": "datadog-mcp",
       "category": "observability",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 60,
@@ -2021,8 +1990,8 @@
     {
       "name": "prometheus-mcp",
       "category": "observability",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 44.47,
@@ -2068,8 +2037,8 @@
     {
       "name": "stripe-agent-toolkit",
       "category": "payments",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 75,
@@ -2115,8 +2084,8 @@
     {
       "name": "@phantom/mcp-server",
       "category": "payments",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 137)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 50,
@@ -2162,8 +2131,8 @@
     {
       "name": "@delorenj/mcp-server-trello",
       "category": "pm",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 80,
@@ -2210,7 +2179,7 @@
       "name": "@mondaydotcomorg/monday-api-mcp",
       "category": "pm",
       "classification": "Experimental",
-      "tier_reason": "source_binding: mismatch (as of 2026-09-17)",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "unverified",
       "license": "MIT",
       "health_score": 80,
@@ -2254,57 +2223,10 @@
       }
     },
     {
-      "name": "@taazkareem/clickup-mcp-server",
-      "category": "pm",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
-      "trust": "verified",
-      "license": "NOASSERTION",
-      "health_score": 66.99,
-      "est_tools_count": null,
-      "install_cmd": "npx -y @taazkareem/clickup-mcp-server",
-      "source_url": "https://github.com/taazkareem/clickup-mcp-server",
-      "evidence": {
-        "availability": {
-          "status": "present",
-          "checked_at": "2026-09-17"
-        },
-        "artifact": {
-          "status": "verified",
-          "checked_at": "2026-09-17"
-        },
-        "signature": {
-          "status": "verified",
-          "checked_at": "2026-09-17"
-        },
-        "provenance": {
-          "status": "absent",
-          "checked_at": "2026-09-17"
-        },
-        "source_binding": {
-          "status": "verified",
-          "checked_at": "2026-09-17"
-        },
-        "registry": {
-          "status": "unlisted",
-          "checked_at": "2026-09-17"
-        },
-        "advisories": {
-          "status": "clean",
-          "checked_at": "2026-09-17"
-        }
-      },
-      "smoke": {
-        "status": "fail",
-        "tools": null,
-        "checked_at": "2026-09-17"
-      }
-    },
-    {
       "name": "@roychri/mcp-server-asana",
       "category": "pm",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 60,
@@ -2350,8 +2272,8 @@
     {
       "name": "todoist-mcp",
       "category": "pm",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 58.13,
@@ -2398,7 +2320,7 @@
       "name": "linear-mcp-server",
       "category": "pm",
       "classification": "Experimental",
-      "tier_reason": "source_binding: mismatch (as of 2026-09-17)",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "unverified",
       "license": "MIT",
       "health_score": 40,
@@ -2444,8 +2366,8 @@
     {
       "name": "mcp-server-sequentialthinking",
       "category": "reasoning",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 75,
@@ -2491,8 +2413,8 @@
     {
       "name": "@brave/brave-search-mcp-server",
       "category": "search",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 80,
@@ -2538,8 +2460,8 @@
     {
       "name": "duckduckgo-mcp-server",
       "category": "search",
-      "classification": "Recommended",
-      "tier_reason": "will not start without network access",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 80,
@@ -2577,8 +2499,8 @@
     {
       "name": "exa-mcp-server",
       "category": "search",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 80,
@@ -2624,8 +2546,8 @@
     {
       "name": "clinicaltrialsgov-mcp-server",
       "category": "search",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 79.24,
@@ -2671,8 +2593,8 @@
     {
       "name": "tavily-mcp",
       "category": "search",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 75,
@@ -2718,8 +2640,8 @@
     {
       "name": "brave-search-mcp",
       "category": "search",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "GPL-3.0-or-later",
       "health_score": 60,
@@ -2765,8 +2687,8 @@
     {
       "name": "obsidian-mcp-server",
       "category": "search",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 60,
@@ -2812,8 +2734,8 @@
     {
       "name": "linkup-mcp-server",
       "category": "search",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 54.77,
@@ -2886,8 +2808,8 @@
     {
       "name": "@eslint/mcp",
       "category": "testing",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 80,
@@ -2933,8 +2855,8 @@
     {
       "name": "@postman/postman-mcp-server",
       "category": "testing",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 80,
@@ -2980,8 +2902,8 @@
     {
       "name": "@qase/mcp-server",
       "category": "testing",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 75.05,
@@ -3027,8 +2949,8 @@
     {
       "name": "@bitwarden/mcp-server",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "GPL-3.0",
       "health_score": 80,
@@ -3074,8 +2996,8 @@
     {
       "name": "@cap-js/mcp-server",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 80,
@@ -3121,8 +3043,8 @@
     {
       "name": "@drawio/mcp",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 80,
@@ -3168,8 +3090,8 @@
     {
       "name": "@instantdb/mcp",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 80,
@@ -3215,8 +3137,8 @@
     {
       "name": "@knip/mcp",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "ISC",
       "health_score": 80,
@@ -3262,8 +3184,8 @@
     {
       "name": "@pandacss/mcp",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 80,
@@ -3309,8 +3231,8 @@
     {
       "name": "@regle/mcp-server",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 80,
@@ -3356,8 +3278,8 @@
     {
       "name": "@socketsecurity/mcp",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 80,
@@ -3403,8 +3325,8 @@
     {
       "name": "@softeria/ms-365-mcp-server",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 80,
@@ -3450,8 +3372,8 @@
     {
       "name": "@vibeframe/mcp-server",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 137)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 80,
@@ -3497,8 +3419,8 @@
     {
       "name": "deepl-mcp-server",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 80,
@@ -3544,8 +3466,8 @@
     {
       "name": "hostinger-api-mcp",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 80,
@@ -3591,42 +3513,42 @@
     {
       "name": "mcp-searxng",
       "category": "utility",
-      "classification": "Deprecated",
-      "tier_reason": "advisories: vulnerable (as of 2026-09-17)",
-      "trust": "unverified",
+      "classification": "Recommended",
+      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 80,
       "est_tools_count": null,
-      "install_cmd": "npx -y mcp-searxng",
+      "install_cmd": "npx -y mcp-searxng@1.12.0",
       "source_url": "https://github.com/ihor-sokoliuk/mcp-searxng",
       "evidence": {
         "availability": {
           "status": "present",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "artifact": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "signature": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "provenance": {
           "status": "bound",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "source_binding": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "registry": {
           "status": "listed",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "advisories": {
-          "status": "vulnerable",
-          "checked_at": "2026-09-17"
+          "status": "clean",
+          "checked_at": "2026-09-30"
         }
       },
       "smoke": {
@@ -3638,8 +3560,8 @@
     {
       "name": "touchdesigner-mcp-server",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 80,
@@ -3685,8 +3607,8 @@
     {
       "name": "@ui5/mcp-server",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 79.82,
@@ -3732,8 +3654,8 @@
     {
       "name": "@heroku/mcp-server",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 79.08,
@@ -3779,8 +3701,8 @@
     {
       "name": "@tocharianou/mcp-server-kibana",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 78.86,
@@ -3826,8 +3748,8 @@
     {
       "name": "@transloadit/mcp-server",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 78.69,
@@ -3877,8 +3799,8 @@
     {
       "name": "@esaio/esa-mcp-server",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 77.92,
@@ -3924,8 +3846,8 @@
     {
       "name": "@renseiai/agentfactory-mcp-server",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 77.85,
@@ -3971,8 +3893,8 @@
     {
       "name": "@upstash/mcp-server",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 77.56,
@@ -4018,8 +3940,8 @@
     {
       "name": "@kintone/mcp-server",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 77.24,
@@ -4065,8 +3987,8 @@
     {
       "name": "@contextlint/mcp-server",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 76.23,
@@ -4112,8 +4034,8 @@
     {
       "name": "@tankpkg/mcp-server",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 75.68,
@@ -4159,8 +4081,8 @@
     {
       "name": "@penpot/mcp",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MPL-2.0",
       "health_score": 75,
@@ -4210,8 +4132,8 @@
     {
       "name": "@sap-ux/fiori-mcp-server",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 75,
@@ -4257,8 +4179,8 @@
     {
       "name": "@theia/ai-mcp-server",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "EPL-2.0",
       "health_score": 75,
@@ -4308,8 +4230,8 @@
     {
       "name": "@voltagent/mcp-server",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 75,
@@ -4355,8 +4277,8 @@
     {
       "name": "argocd-mcp",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 75,
@@ -4402,8 +4324,8 @@
     {
       "name": "mcp-server-time",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 75,
@@ -4441,8 +4363,8 @@
     {
       "name": "@growthbook/mcp",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 73.98,
@@ -4488,8 +4410,8 @@
     {
       "name": "@currents/mcp",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 73.01,
@@ -4535,8 +4457,8 @@
     {
       "name": "@memberjunction/ai-mcp-server",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (TIMEOUT, timeout)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "ISC",
       "health_score": 69.62,
@@ -4585,7 +4507,7 @@
       "classification": "Recommended",
       "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 137)",
       "trust": "verified",
-      "license": "NOASSERTION",
+      "license": "Elastic-2.0",
       "health_score": 68.75,
       "est_tools_count": null,
       "install_cmd": "npx -y @skillsmith/mcp-server",
@@ -4593,31 +4515,31 @@
       "evidence": {
         "availability": {
           "status": "present",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "artifact": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "signature": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "provenance": {
           "status": "absent",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "source_binding": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "registry": {
           "status": "unlisted",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "advisories": {
           "status": "clean",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         }
       },
       "smoke": {
@@ -4629,8 +4551,8 @@
     {
       "name": "openapi-mcp-generator",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 60,
@@ -4676,8 +4598,8 @@
     {
       "name": "@translated/lara-mcp",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 59.78,
@@ -4723,8 +4645,8 @@
     {
       "name": "@alchemy/mcp-server",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 59.49,
@@ -4770,8 +4692,8 @@
     {
       "name": "@vapi-ai/mcp-server",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 57.56,
@@ -4817,8 +4739,8 @@
     {
       "name": "godot-mcp-server",
       "category": "utility",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 50,
@@ -4864,8 +4786,8 @@
     {
       "name": "@cyanheads/git-mcp-server",
       "category": "vcs",
-      "classification": "Recommended",
-      "tier_reason": "a run started and listed tools, but it did not record which artifact it launched",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "Apache-2.0",
       "health_score": 80,
@@ -4911,42 +4833,42 @@
     {
       "name": "gitlab-mcp",
       "category": "vcs",
-      "classification": "Deprecated",
-      "tier_reason": "advisories: vulnerable (as of 2026-09-17)",
-      "trust": "unverified",
+      "classification": "Recommended",
+      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 80,
       "est_tools_count": 153,
-      "install_cmd": "npx -y @zereight/mcp-gitlab@2.1.10",
+      "install_cmd": "npx -y @zereight/mcp-gitlab@2.1.30",
       "source_url": "https://github.com/zereight/gitlab-mcp",
       "evidence": {
         "availability": {
           "status": "present",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "artifact": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "signature": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "provenance": {
           "status": "bound",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "source_binding": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "registry": {
           "status": "unlisted",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "advisories": {
-          "status": "vulnerable",
-          "checked_at": "2026-09-17"
+          "status": "clean",
+          "checked_at": "2026-09-30"
         }
       },
       "smoke": {
@@ -5032,8 +4954,8 @@
     {
       "name": "mcp-server-git",
       "category": "vcs",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 75,
@@ -5071,8 +4993,8 @@
     {
       "name": "@nexus2520/bitbucket-mcp-server",
       "category": "vcs",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 73.98,
@@ -5118,42 +5040,42 @@
     {
       "name": "actors-mcp-server",
       "category": "web-scraping",
-      "classification": "Deprecated",
-      "tier_reason": "advisories: vulnerable (as of 2026-09-17)",
-      "trust": "unverified",
+      "classification": "Recommended",
+      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 75,
       "est_tools_count": 21,
-      "install_cmd": "npx -y @apify/actors-mcp-server@0.10.1",
+      "install_cmd": "npx -y @apify/actors-mcp-server@0.10.11",
       "source_url": "https://github.com/apify/apify-mcp-server",
       "evidence": {
         "availability": {
           "status": "present",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "artifact": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "signature": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "provenance": {
           "status": "bound",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "source_binding": {
           "status": "verified",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "registry": {
           "status": "unlisted",
-          "checked_at": "2026-09-17"
+          "checked_at": "2026-09-30"
         },
         "advisories": {
-          "status": "vulnerable",
-          "checked_at": "2026-09-17"
+          "status": "clean",
+          "checked_at": "2026-09-30"
         }
       },
       "smoke": {
@@ -5165,8 +5087,8 @@
     {
       "name": "firecrawl-mcp-server",
       "category": "web-scraping",
-      "classification": "Recommended",
-      "tier_reason": "did not complete a handshake in a clean sandbox (CRASH, exit 1)",
+      "classification": "Experimental",
+      "tier_reason": "past its shelf life: availability, advisories",
       "trust": "verified",
       "license": "MIT",
       "health_score": 75,

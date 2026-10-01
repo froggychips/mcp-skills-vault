@@ -470,7 +470,7 @@
     {
       "name": "mcp-atlassian",
       "category": "docs",
-      "install_cmd": "uvx mcp-atlassian==0.21.1",
+      "install_cmd": "uvx mcp-atlassian==0.22.0",
       "source_url": "https://github.com/sooperset/mcp-atlassian",
       "stars": 5679,
       "last_commit_days": 2,
@@ -478,36 +478,37 @@
       "health_score": 75,
       "est_tools_count": 72,
       "toolsets": null,
-      "version": "0.21.1",
-      "pkg_integrity": "sha256-dff6c81541506cb0cc80d7ac9900ffdcb246fec7808e41e8df73c09dd4a28074",
-      "trust": "unverified",
-      "notes": "PyPI declares no project_urls and no license metadata \u2014 both sourced manually from GitHub.",
+      "version": "0.22.0",
+      "pkg_integrity": "sha256-645522501661c04728cf9075aa3c3391f2073aec9335ea6844afd8dc078f0e3c",
+      "trust": "verified",
+      "notes": "PyPI declares no project_urls and no license metadata \u2014 both sourced manually from GitHub.\n\n[UPGRADE 2026-09-30] 0.21.1 \u2192 0.22.0 (`mcp-vault upgrade`): 29 advisories fixed in 0.22.0, among them GHSA-wrhw-j3f9-8vc6 (CRITICAL) and 18 HIGH. --deep: sdist hashed. PyPI: capabilities are not scanned (npm only), and there is no install-hook surface for uvx.",
       "license": "MIT",
       "trust_evidence": {
-        "artifact_id": "pypi:mcp-atlassian@0.21.1",
+        "artifact_id": "pypi:mcp-atlassian@0.22.0",
         "dimensions": {
           "availability": {
             "status": "present",
-            "checked_at": "2026-09-17",
-            "verified_at": "2026-09-17"
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           },
           "artifact": {
             "status": "verified",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "method": "deep-hash",
-            "verified_at": "2026-09-17"
+            "verified_at": "2026-09-30"
           },
           "source_binding": {
             "status": "unverified",
-            "checked_at": "2026-09-17"
+            "checked_at": "2026-09-30"
           },
           "registry": {
             "status": "unlisted",
-            "checked_at": "2026-09-17"
+            "checked_at": "2026-09-30"
           },
           "advisories": {
-            "status": "vulnerable",
-            "checked_at": "2026-09-17"
+            "status": "clean",
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           }
         }
       }
@@ -738,7 +739,7 @@
     {
       "name": "mcp-server-kubernetes",
       "category": "infra",
-      "install_cmd": "npx -y mcp-server-kubernetes@3.5.1",
+      "install_cmd": "npx -y mcp-server-kubernetes@3.7.0",
       "source_url": "https://github.com/Flux159/mcp-server-kubernetes",
       "stars": 1514,
       "last_commit_days": 2,
@@ -746,52 +747,54 @@
       "health_score": 80,
       "est_tools_count": 24,
       "toolsets": null,
-      "version": "3.5.1",
-      "pkg_integrity": "sha512-4+KxkNRJ8RGjK9083Zy/FtmG6Oy0j9nDmVgePG41rLw5Fa6aB+elzJUxjcb7ctCvGo9gDPEFCEVTJztJDyU1sw==",
-      "trust": "unverified",
+      "version": "3.7.0",
+      "pkg_integrity": "sha512-9TpOyES1MVw9FLbP4fknaUIUqYVEQ28trfkgecI1L6AX4eGxKTa7xvU7dYjCF9u22RORC5XZmD7rl89MXm0QcQ==",
+      "trust": "verified",
       "license": "MIT",
       "trust_evidence": {
-        "artifact_id": "npm:mcp-server-kubernetes@3.5.1",
+        "artifact_id": "npm:mcp-server-kubernetes@3.7.0",
         "dimensions": {
           "availability": {
             "status": "present",
-            "checked_at": "2026-09-17",
-            "verified_at": "2026-09-17"
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           },
           "artifact": {
             "status": "verified",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "method": "deep-hash",
-            "verified_at": "2026-09-17"
+            "verified_at": "2026-09-30"
           },
           "signature": {
             "status": "verified",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
-            "verified_at": "2026-09-17"
+            "verified_at": "2026-09-30"
           },
           "provenance": {
             "status": "bound",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "repository": "https://github.com/Flux159/mcp-server-kubernetes",
-            "identity": "https://github.com/Flux159/mcp-server-kubernetes/.github/workflows/cd.yml@refs/tags/v3.5.1",
-            "verified_at": "2026-09-17"
+            "identity": "https://github.com/Flux159/mcp-server-kubernetes/.github/workflows/cd.yml@refs/tags/v3.7.0",
+            "verified_at": "2026-09-30"
           },
           "source_binding": {
             "status": "verified",
-            "checked_at": "2026-09-17",
-            "verified_at": "2026-09-17"
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           },
           "registry": {
             "status": "unlisted",
-            "checked_at": "2026-09-17"
+            "checked_at": "2026-09-30"
           },
           "advisories": {
-            "status": "vulnerable",
-            "checked_at": "2026-09-17"
+            "status": "clean",
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           }
         }
-      }
+      },
+      "notes": "[UPGRADE 2026-09-30] 3.5.1 \u2192 3.7.0 (`mcp-vault upgrade`: shortest version clearing every advisory): GHSA-cr22-wjx7-2w6m (HIGH, fixed 3.6.0), GHSA-6mx4-4h42-r8vh (MODERATE, fixed 3.7.0). --deep: bytes hashed, registry signature and provenance bound. No install hooks (prepublishOnly only, unchanged); capabilities: nothing new since 3.5.1 (env_access, shell, fs_write, network)."
     },
     {
       "name": "mcp-server-memory",
@@ -1482,7 +1485,7 @@
     {
       "name": "gitlab-mcp",
       "category": "vcs",
-      "install_cmd": "npx -y @zereight/mcp-gitlab@2.1.10",
+      "install_cmd": "npx -y @zereight/mcp-gitlab@2.1.30",
       "source_url": "https://github.com/zereight/gitlab-mcp",
       "stars": 1862,
       "last_commit_days": 1,
@@ -1490,50 +1493,51 @@
       "health_score": 80,
       "est_tools_count": 153,
       "toolsets": null,
-      "version": "2.1.10",
-      "pkg_integrity": "sha512-HHDxwge67zbyMREYOPTg821qBBe6ITlo1bs2sZg3UrBzmKORJSpS2yEgcdHDJc6tmjpDHLrz/p+EeeGUXkoxMg==",
-      "trust": "unverified",
-      "notes": "Comprehensive GitLab platform API (MRs, issues, pipelines, wiki, releases, tags, milestones); supports self-hosted instances and PAT/OAuth. Top community choice; gitlab-org/* has no equivalent open-source MCP.",
+      "version": "2.1.30",
+      "pkg_integrity": "sha512-DSLZ0oJWsr/FOg5UZevT27YHKn3woKeyGYyPFGsue3qeJPTf+BeGcZAcPvAy8A5o/smk52C3n9hpN0QzwU8a/g==",
+      "trust": "verified",
+      "notes": "Comprehensive GitLab platform API (MRs, issues, pipelines, wiki, releases, tags, milestones); supports self-hosted instances and PAT/OAuth. Top community choice; gitlab-org/* has no equivalent open-source MCP.\n\n[UPGRADE 2026-09-30] 2.1.10 \u2192 2.1.30 (`mcp-vault upgrade`): GHSA-2h44-8472-frjj (CRITICAL), GHSA-cv3r-c5h8-f4g5 (CRITICAL), GHSA-vmp7-252j-cwp7 (CRITICAL), GHSA-5648-rgj9-v224 (HIGH). --deep: bytes hashed, registry signature and provenance bound. Hooks unchanged (`prepare: npm run build`, as in 2.1.10); capabilities: nothing new since 2.1.10, but one file is now minified, so the comparison is weaker than usual.",
       "license": "MIT",
       "trust_evidence": {
-        "artifact_id": "npm:@zereight/mcp-gitlab@2.1.10",
+        "artifact_id": "npm:@zereight/mcp-gitlab@2.1.30",
         "dimensions": {
           "availability": {
             "status": "present",
-            "checked_at": "2026-09-17",
-            "verified_at": "2026-09-17"
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           },
           "artifact": {
             "status": "verified",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "method": "deep-hash",
-            "verified_at": "2026-09-17"
+            "verified_at": "2026-09-30"
           },
           "signature": {
             "status": "verified",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
-            "verified_at": "2026-09-17"
+            "verified_at": "2026-09-30"
           },
           "provenance": {
             "status": "bound",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "repository": "https://github.com/zereight/gitlab-mcp",
-            "identity": "https://github.com/zereight/gitlab-mcp/.github/workflows/npm-publish.yml@refs/tags/v2.1.10",
-            "verified_at": "2026-09-17"
+            "identity": "https://github.com/zereight/gitlab-mcp/.github/workflows/npm-publish.yml@refs/tags/v2.1.30",
+            "verified_at": "2026-09-30"
           },
           "source_binding": {
             "status": "verified",
-            "checked_at": "2026-09-17",
-            "verified_at": "2026-09-17"
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           },
           "registry": {
             "status": "unlisted",
-            "checked_at": "2026-09-17"
+            "checked_at": "2026-09-30"
           },
           "advisories": {
-            "status": "vulnerable",
-            "checked_at": "2026-09-17"
+            "status": "clean",
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           }
         }
       }
@@ -1541,7 +1545,7 @@
     {
       "name": "actors-mcp-server",
       "category": "web-scraping",
-      "install_cmd": "npx -y @apify/actors-mcp-server@0.10.1",
+      "install_cmd": "npx -y @apify/actors-mcp-server@0.10.11",
       "source_url": "https://github.com/apify/apify-mcp-server",
       "stars": 2395,
       "last_commit_days": 0,
@@ -1549,50 +1553,51 @@
       "health_score": 75,
       "est_tools_count": 21,
       "toolsets": null,
-      "version": "0.10.1",
-      "pkg_integrity": "sha512-pj5bN9KV5A+QN+K9eAOcP5t/z7WwTtw1qhtMgi4D7Rp98eeOFGBV8XWzE9NmjP9Myhbyj/O98fyp6g2fO898Ww==",
-      "trust": "unverified",
-      "notes": "GitHub repo is apify/apify-mcp-server (npm field); actors-mcp-server is the npm package name.",
+      "version": "0.10.11",
+      "pkg_integrity": "sha512-E3QNtQRH/eGr+37MzBuNj1XXx4cIQx1SJyd83cXJHN/MFbQpop9HhDm7bVg8K9M9jGhcy2FPg/8RLPpTX5tLCw==",
+      "trust": "verified",
+      "notes": "GitHub repo is apify/apify-mcp-server (npm field); actors-mcp-server is the npm package name.\n\n[UPGRADE 2026-09-30] 0.10.1 \u2192 0.10.11 (`mcp-vault upgrade`): GHSA-6gr2-qh89-hxwm (HIGH). --deep: bytes hashed, registry signature and provenance bound. No install hooks; capabilities: nothing new since 0.10.1 (dynamic_code stopped matching \u2014 not counted as an improvement).",
       "license": "MIT",
       "trust_evidence": {
-        "artifact_id": "npm:@apify/actors-mcp-server@0.10.1",
+        "artifact_id": "npm:@apify/actors-mcp-server@0.10.11",
         "dimensions": {
           "availability": {
             "status": "present",
-            "checked_at": "2026-09-17",
-            "verified_at": "2026-09-17"
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           },
           "artifact": {
             "status": "verified",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "method": "deep-hash",
-            "verified_at": "2026-09-17"
+            "verified_at": "2026-09-30"
           },
           "signature": {
             "status": "verified",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
-            "verified_at": "2026-09-17"
+            "verified_at": "2026-09-30"
           },
           "provenance": {
             "status": "bound",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "repository": "https://github.com/apify/apify-mcp-server",
             "identity": "https://github.com/apify/apify-mcp-server/.github/workflows/manual_publish_to_npm.yaml@refs/heads/master",
-            "verified_at": "2026-09-17"
+            "verified_at": "2026-09-30"
           },
           "source_binding": {
             "status": "verified",
-            "checked_at": "2026-09-17",
-            "verified_at": "2026-09-17"
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           },
           "registry": {
             "status": "unlisted",
-            "checked_at": "2026-09-17"
+            "checked_at": "2026-09-30"
           },
           "advisories": {
-            "status": "vulnerable",
-            "checked_at": "2026-09-17"
+            "status": "clean",
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           }
         }
       }
@@ -1716,58 +1721,59 @@
     {
       "name": "@dynatrace-oss/dynatrace-mcp-server",
       "category": "observability",
-      "install_cmd": "npx -y @dynatrace-oss/dynatrace-mcp-server",
+      "install_cmd": "npx -y @dynatrace-oss/dynatrace-mcp-server@2.1.1",
       "source_url": "https://github.com/dynatrace-oss/dynatrace-mcp",
-      "version": "1.8.5",
-      "pkg_integrity": "sha512-HXaNyjyf7MY5PYE+KkK0SH0dpeiDgQNXM8IEIBiKJNeXwMfkZQCzfd81smmeZs872PmW/IgGn7QWVyarHltn0g==",
-      "trust": "unverified",
+      "version": "2.1.1",
+      "pkg_integrity": "sha512-6V0Ux/HD18ZFmEoMCWRdgt+oSL34V8VXjwjVY4CTb9BlvfsLgMzEYWv805TGnAA82Ud+gscGCcl1/cR8p+vkOQ==",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 80,
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Model Context Protocol (MCP) server for Dynatrace\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\".",
+      "notes": "Model Context Protocol (MCP) server for Dynatrace\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\".\n\n[UPGRADE 2026-09-30] 1.8.5 \u2192 2.1.1 and pinned (install_cmd was unpinned) (`mcp-vault upgrade`): GHSA-p7w7-4929-vpj5 (HIGH), GHSA-xrmj-5g4g-8987 (MODERATE), GHSA-pqh8-p93p-2rx7 (MODERATE), GHSA-pc2w-4mq8-32qw (LOW). --deep: bytes hashed, registry signature and provenance bound. No install hooks. CAPABILITY GAINED: credential_paths (package/index.js:119244) \u2014 2.x stores its own OAuth token in the OS keychain (service \"dynatrace-mcp\") through a new dependency, @napi-rs/keyring@1.2.0 (native, no install hooks). DEPRECATED upstream: every version is npm-deprecated and the repository is archived; the README names 2.1.2 as the final release and points to the Dynatrace Remote MCP Server / dtctl. Candidate for removal rather than further upgrades.",
       "stars": 133,
       "last_commit_days": 7,
       "open_issues": 1,
       "trust_evidence": {
-        "artifact_id": "npm:@dynatrace-oss/dynatrace-mcp-server@1.8.5",
+        "artifact_id": "npm:@dynatrace-oss/dynatrace-mcp-server@2.1.1",
         "dimensions": {
           "availability": {
             "status": "deprecated",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "detail": "Package no longer supported. Contact Support at https://www.npmjs.com/support for more info."
           },
           "artifact": {
             "status": "verified",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "method": "deep-hash",
-            "verified_at": "2026-09-17"
+            "verified_at": "2026-09-30"
           },
           "signature": {
             "status": "verified",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
-            "verified_at": "2026-09-17"
+            "verified_at": "2026-09-30"
           },
           "provenance": {
             "status": "bound",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "repository": "https://github.com/dynatrace-oss/dynatrace-mcp",
-            "identity": "https://github.com/dynatrace-oss/dynatrace-mcp/.github/workflows/release.yml@refs/tags/v1.8.5",
-            "verified_at": "2026-09-17"
+            "identity": "https://github.com/dynatrace-oss/dynatrace-mcp/.github/workflows/release.yml@refs/tags/v2.1.1",
+            "verified_at": "2026-09-30"
           },
           "source_binding": {
             "status": "verified",
-            "checked_at": "2026-09-17",
-            "verified_at": "2026-09-17"
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           },
           "registry": {
             "status": "unlisted",
-            "checked_at": "2026-09-17"
+            "checked_at": "2026-09-30"
           },
           "advisories": {
-            "status": "vulnerable",
-            "checked_at": "2026-09-17"
+            "status": "clean",
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           }
         }
       }
@@ -2761,60 +2767,61 @@
     {
       "name": "mcp-searxng",
       "category": "utility",
-      "install_cmd": "npx -y mcp-searxng",
+      "install_cmd": "npx -y mcp-searxng@1.12.0",
       "source_url": "https://github.com/ihor-sokoliuk/mcp-searxng",
-      "version": "1.0.3",
-      "pkg_integrity": "sha512-lX7YeZyuzax28s5IR0AgEWqDhm+O6ah9+CKFlQzSs/WeDQ+yTWiQGvy4C4Jia6VEpm7n0Vllo7tnrhu0LBpUmg==",
-      "trust": "unverified",
+      "version": "1.12.0",
+      "pkg_integrity": "sha512-QE/IufDh/C9nSWq++bEXOqZbr6C41BnAIoja8O/WlYUtlmqFESFrgJVgvXas9Es6JGTV83gN/nsht8YOd7VULw==",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 80,
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for SearXNG integration\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\".",
+      "notes": "MCP server for SearXNG integration\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\".\n\n[UPGRADE 2026-09-30] 1.0.3 \u2192 1.12.0 and pinned (install_cmd was unpinned) (`mcp-vault upgrade`): GHSA-mrvx-jmjw-vggc (HIGH), GHSA-xcqx-9jf5-w339 (HIGH), GHSA-hjwh-xvfw-qrwj (MODERATE), GHSA-q87f-qc2r-2gw4 (MODERATE), GHSA-wppf-h75h-6pm6 (MODERATE). --deep: bytes hashed, registry signature and provenance bound. No install hooks; capabilities: nothing new since 1.0.3 (scanned code grew 70 KB \u2192 178 KB).",
       "stars": 1089,
       "last_commit_days": 0,
       "open_issues": 6,
       "trust_evidence": {
-        "artifact_id": "npm:mcp-searxng@1.0.3",
+        "artifact_id": "npm:mcp-searxng@1.12.0",
         "dimensions": {
           "availability": {
             "status": "present",
-            "checked_at": "2026-09-17",
-            "verified_at": "2026-09-17"
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           },
           "artifact": {
             "status": "verified",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "method": "deep-hash",
-            "verified_at": "2026-09-17"
+            "verified_at": "2026-09-30"
           },
           "signature": {
             "status": "verified",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
-            "verified_at": "2026-09-17"
+            "verified_at": "2026-09-30"
           },
           "provenance": {
             "status": "bound",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "repository": "https://github.com/ihor-sokoliuk/mcp-searxng",
-            "identity": "https://github.com/ihor-sokoliuk/mcp-searxng/.github/workflows/npm-publish.yml@refs/tags/v1.0.3",
-            "verified_at": "2026-09-17"
+            "identity": "https://github.com/ihor-sokoliuk/mcp-searxng/.github/workflows/npm-publish.yml@refs/tags/v1.12.0",
+            "verified_at": "2026-09-30"
           },
           "source_binding": {
             "status": "verified",
-            "checked_at": "2026-09-17",
-            "verified_at": "2026-09-17"
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           },
           "registry": {
             "status": "listed",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "server_id": "io.github.ihor-sokoliuk/mcp-searxng",
-            "verified_at": "2026-09-17"
+            "verified_at": "2026-09-30"
           },
           "advisories": {
-            "status": "vulnerable",
-            "checked_at": "2026-09-17"
+            "status": "clean",
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           }
         }
       }
@@ -4244,55 +4251,56 @@
     {
       "name": "@contentful/mcp-server",
       "category": "cms",
-      "install_cmd": "npx -y @contentful/mcp-server",
+      "install_cmd": "npx -y @contentful/mcp-server@1.7.19",
       "source_url": "https://github.com/contentful/contentful-mcp-server",
-      "version": "1.7.15",
-      "pkg_integrity": "sha512-lNC8ybethkCVKoIS1nQZ52uFV1X7phkWf5Air7mOagDZTqoyXyFSHm5VUPqUaM6M0tLdfqHmW5EAYQZoAsyIBQ==",
-      "trust": "unverified",
+      "version": "1.7.19",
+      "pkg_integrity": "sha512-7UDnaVDH0o7P3PngwPRYmYhvoAlNmmKX8KhzgWkkno0tkLPK0KY0aoeHZgldns5Jcs2SAapnF+/IrY8N9H5j9Q==",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 77.71,
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "Contentful MCP Server - Model Context Protocol server for Contentful\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\".",
+      "notes": "Contentful MCP Server - Model Context Protocol server for Contentful\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\".\n\n[UPGRADE 2026-09-30] 1.7.15 \u2192 1.7.19 and pinned (install_cmd was unpinned) (`mcp-vault upgrade`): GHSA-2xhg-73j7-rrgx (HIGH). --deep: bytes hashed, registry signature verified; no provenance attestation (as in 1.7.15). No install hooks; capabilities: nothing new since 1.7.15 (env_access).",
       "stars": 58,
       "last_commit_days": 0,
       "open_issues": 20,
       "trust_evidence": {
-        "artifact_id": "npm:@contentful/mcp-server@1.7.15",
+        "artifact_id": "npm:@contentful/mcp-server@1.7.19",
         "dimensions": {
           "availability": {
             "status": "present",
-            "checked_at": "2026-09-17",
-            "verified_at": "2026-09-17"
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           },
           "artifact": {
             "status": "verified",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "method": "deep-hash",
-            "verified_at": "2026-09-17"
+            "verified_at": "2026-09-30"
           },
           "signature": {
             "status": "verified",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
-            "verified_at": "2026-09-17"
+            "verified_at": "2026-09-30"
           },
           "provenance": {
             "status": "absent",
-            "checked_at": "2026-09-17"
+            "checked_at": "2026-09-30"
           },
           "source_binding": {
             "status": "verified",
-            "checked_at": "2026-09-17",
-            "verified_at": "2026-09-17"
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           },
           "registry": {
             "status": "unlisted",
-            "checked_at": "2026-09-17"
+            "checked_at": "2026-09-30"
           },
           "advisories": {
-            "status": "vulnerable",
-            "checked_at": "2026-09-17"
+            "status": "clean",
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           }
         }
       }
@@ -4650,42 +4658,6 @@
             "status": "clean",
             "checked_at": "2026-09-17",
             "verified_at": "2026-09-17"
-          }
-        }
-      }
-    },
-    {
-      "name": "@diskd-ai/email-mcp",
-      "category": "communication",
-      "install_cmd": "npx -y @diskd-ai/email-mcp",
-      "source_url": "https://github.com/codefuturist/email-mcp",
-      "version": "0.3.8",
-      "pkg_integrity": "sha512-LLGiI9Silqacj4uvhjxp6pXqg7woouzNvH9Kkh+SpB4xIFRyBZ1lFemFd5+jc51eGqZjyx/fbOtN8adqi01y+Q==",
-      "trust": "unverified",
-      "license": "LGPL-3.0",
-      "health_score": 59.4,
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": "Email MCP server with IMAP + SMTP support\n\n[TRIAGE 2026-05-14 \u2014 revert] prepare: `lefthook install || true` \u2014 git-hooks runner. Audit.\n\n[HOLD 2026-05-22] npm view 2026-05-22 confirms `prepare: lefthook install || true` unchanged.",
-      "stars": 86,
-      "last_commit_days": 71,
-      "open_issues": 29,
-      "trust_evidence": {
-        "artifact_id": "npm:@diskd-ai/email-mcp@0.3.8",
-        "dimensions": {
-          "availability": {
-            "status": "gone",
-            "checked_at": "2026-09-17",
-            "detail": "@diskd-ai/email-mcp returns 404 from the npm registry \u2014 unpublished, renamed or taken down; the name is claimable"
-          },
-          "artifact": {
-            "status": "unverified",
-            "checked_at": "2026-09-17",
-            "method": "registry-404"
-          },
-          "registry": {
-            "status": "unlisted",
-            "checked_at": "2026-09-17"
           }
         }
       }
@@ -5825,11 +5797,11 @@
       "version": "0.9.0",
       "pkg_integrity": "sha512-w/+joT2EiNkf6ueeCkihViaqtWwVpQo2n1erJsNe6n9IHvVzIPDLjULPOrqTx9Kp17t35ksju7MJ52vHGj6Pvw==",
       "trust": "verified",
-      "license": "NOASSERTION",
+      "license": "BUSL-1.1",
       "health_score": 70,
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "FSB Browser Automation MCP Server\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\".",
+      "notes": "FSB Browser Automation MCP Server\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\".\n\n[LICENSE 2026-09-30] NOASSERTION \u2192 BUSL-1.1 (non-OSI, source-available). Sources: npm `license` of fsb-mcp-server@0.9.0 is \"BUSL-1.1\"; the repository's LICENSE was Business Source License 1.1 (Additional Use Grant: None, Change Date 2028-03-29, Change License Apache-2.0) until commit 10a9621a7b of 2026-08-23 relicensed it to MIT \u2014 after 0.9.0 was published (2026-05-12). 0.11.0 declares MIT; moving to it is a separate upgrade. The \"license OSI\" in the [VERIFIED 2026-05-14] line above was not true: the field then read NOASSERTION. Kept per CONTRIBUTING's reject criterion (non-OSI needs an explanation, not removal); health_score already carried the \u221210 non-OSI/unknown penalty, so the score does not move.",
       "stars": 186,
       "last_commit_days": 7,
       "open_issues": 1,
@@ -5838,38 +5810,38 @@
         "dimensions": {
           "availability": {
             "status": "present",
-            "checked_at": "2026-09-17",
-            "verified_at": "2026-09-17"
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           },
           "artifact": {
             "status": "verified",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "method": "deep-hash",
-            "verified_at": "2026-09-17"
+            "verified_at": "2026-09-30"
           },
           "signature": {
             "status": "verified",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
-            "verified_at": "2026-09-17"
+            "verified_at": "2026-09-30"
           },
           "provenance": {
             "status": "absent",
-            "checked_at": "2026-09-17"
+            "checked_at": "2026-09-30"
           },
           "source_binding": {
             "status": "verified",
-            "checked_at": "2026-09-17",
-            "verified_at": "2026-09-17"
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           },
           "registry": {
             "status": "unlisted",
-            "checked_at": "2026-09-17"
+            "checked_at": "2026-09-30"
           },
           "advisories": {
             "status": "clean",
-            "checked_at": "2026-09-17",
-            "verified_at": "2026-09-17"
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           }
         }
       }
@@ -5882,11 +5854,11 @@
       "version": "0.5.1",
       "pkg_integrity": "sha512-MRtsEuPWqG7MIYlrWFKUDCNGJh5MNQ07PKSK0kO/pBupz5W2M9L2Pkfsn3r0YPddTzDHJmlrJDtRY1k8aKwdtQ==",
       "trust": "verified",
-      "license": "NOASSERTION",
+      "license": "Elastic-2.0",
       "health_score": 68.75,
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for Skillsmith skill discovery\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\".",
+      "notes": "MCP server for Skillsmith skill discovery\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\".\n\n[LICENSE 2026-09-30] NOASSERTION \u2192 Elastic-2.0 (non-OSI, source-available: no providing it as a managed service, no circumventing licence keys). Sources: npm `license` of @skillsmith/mcp-server@0.5.1 is \"Elastic-2.0\"; its README's License section and the repository LICENSE say Elastic License 2.0 (adopted 2026-01-11, before 0.5.1 on 2026-05-07). GitHub reports NOASSERTION only because it cannot classify ELv2. The \"license OSI\" in the [VERIFIED 2026-05-14] line above was not true. Kept per CONTRIBUTING's reject criterion (non-OSI needs an explanation, not removal); health_score already carried the \u221210 penalty.",
       "stars": 74,
       "last_commit_days": 0,
       "open_issues": 38,
@@ -5895,95 +5867,38 @@
         "dimensions": {
           "availability": {
             "status": "present",
-            "checked_at": "2026-09-17",
-            "verified_at": "2026-09-17"
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           },
           "artifact": {
             "status": "verified",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "method": "deep-hash",
-            "verified_at": "2026-09-17"
+            "verified_at": "2026-09-30"
           },
           "signature": {
             "status": "verified",
-            "checked_at": "2026-09-17",
+            "checked_at": "2026-09-30",
             "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
-            "verified_at": "2026-09-17"
+            "verified_at": "2026-09-30"
           },
           "provenance": {
             "status": "absent",
-            "checked_at": "2026-09-17"
+            "checked_at": "2026-09-30"
           },
           "source_binding": {
             "status": "verified",
-            "checked_at": "2026-09-17",
-            "verified_at": "2026-09-17"
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           },
           "registry": {
             "status": "unlisted",
-            "checked_at": "2026-09-17"
+            "checked_at": "2026-09-30"
           },
           "advisories": {
             "status": "clean",
-            "checked_at": "2026-09-17",
-            "verified_at": "2026-09-17"
-          }
-        }
-      }
-    },
-    {
-      "name": "@taazkareem/clickup-mcp-server",
-      "category": "pm",
-      "install_cmd": "npx -y @taazkareem/clickup-mcp-server",
-      "source_url": "https://github.com/taazkareem/clickup-mcp-server",
-      "version": "0.14.4",
-      "pkg_integrity": "sha512-66ti6ENoiQYcC+bUka7trnOhrIYDs0FYz+aiAT+/RllPJX2NsRVTnrxcuXC80sQyFOvpCuWPPhd+U8TWzo6olQ==",
-      "trust": "verified",
-      "license": "NOASSERTION",
-      "health_score": 66.99,
-      "est_tools_count": null,
-      "toolsets": null,
-      "notes": "ClickUp MCP Server - Powering AI Agents with full ClickUp task, document, and chat management capabilities.\n\n[VERIFIED 2026-05-14] Strict-mode verify_integrity (--strict) returned OK: no install hooks, no repo-URL mismatch, license OSI, hash matches the live registry. Batched promote per CONTRIBUTING.md \u00a7\"Triage checklist\".",
-      "stars": 49,
-      "last_commit_days": 0,
-      "open_issues": 3,
-      "trust_evidence": {
-        "artifact_id": "npm:@taazkareem/clickup-mcp-server@0.14.4",
-        "dimensions": {
-          "availability": {
-            "status": "present",
-            "checked_at": "2026-09-17",
-            "verified_at": "2026-09-17"
-          },
-          "artifact": {
-            "status": "verified",
-            "checked_at": "2026-09-17",
-            "method": "deep-hash",
-            "verified_at": "2026-09-17"
-          },
-          "signature": {
-            "status": "verified",
-            "checked_at": "2026-09-17",
-            "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
-            "verified_at": "2026-09-17"
-          },
-          "provenance": {
-            "status": "absent",
-            "checked_at": "2026-09-17"
-          },
-          "source_binding": {
-            "status": "verified",
-            "checked_at": "2026-09-17",
-            "verified_at": "2026-09-17"
-          },
-          "registry": {
-            "status": "unlisted",
-            "checked_at": "2026-09-17"
-          },
-          "advisories": {
-            "status": "clean",
-            "checked_at": "2026-09-17",
-            "verified_at": "2026-09-17"
+            "checked_at": "2026-09-30",
+            "verified_at": "2026-09-30"
           }
         }
       }
