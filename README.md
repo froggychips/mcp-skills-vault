@@ -3,7 +3,7 @@
 [![npm](https://img.shields.io/npm/v/@froggychips/mcp-vault.svg)](https://www.npmjs.com/package/@froggychips/mcp-vault)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![runtime deps: 0](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](./package.json)
-[![tests: 1230 passing](https://img.shields.io/badge/tests-1230%20passing-brightgreen.svg)](./tests)
+[![tests: 1253 passing](https://img.shields.io/badge/tests-1253%20passing-brightgreen.svg)](./tests)
 
 **Offline security check for MCP configs in CI.**
 
@@ -49,9 +49,11 @@ lines in code scanning. All inputs, outputs and the pre-commit hook:
 On [`examples/insecure/.mcp.json`](./examples/insecure/.mcp.json):
 
 ```text
-$ npx -y @froggychips/mcp-vault check examples/insecure/.mcp.json --as-of 2026-09-30T12:00:00Z
+$ npx -y @froggychips/mcp-vault check examples/insecure/.mcp.json --as-of 2026-10-01T12:00:00Z
 examples/insecure/.mcp.json
   (the config as a whole)
+    ! untrusted content + private data + outward sink across aws, browser [flows/lethal-trifecta: warn]
+      fix: keep browser and aws in separate profiles (different project configs or hosts), or drop the outward tools of browser
     ! browser alone reads untrusted content and can run destructive actions [flows/untrusted-destructive: warn]
       fix: require approval for browser's destructive tools (browser_drop, browser_evaluate, browser_run_code_unsafe), or scope them out (DB hint: --caps core)
   :3 browser
@@ -66,15 +68,22 @@ examples/insecure/.mcp.json
     ! this config launches @modelcontextprotocol/server-postgres from a source other than the public registry: installs from another registry (--registry). [config/launch-source-override: unknown; so verify/unverified: unknown]
       fix: launch it from the public registry, or verify that source yourself
   :14 postgres
-    ✗ postgres connection string with a password in plain text at mcpServers.postgres.env.DATABASE_URL (15 chars, …) [secrets/connection-string: deny, fails]
-      fix: replace it with mcpServers.postgres.env.DATABASE_URL: "postgres://app:${DATABASE_URL}@db.internal:5432/app" and set the value in the environment
+    ✗ postgres connection string with a password in plain text at mcpServers.postgres.env.DATABASE_URL (15 chars, …); the file is tracked by git, so the value is in history [secrets/connection-string: deny, fails]
+      fix: replace it with mcpServers.postgres.env.DATABASE_URL: "postgres://app:${DATABASE_URL}@db.internal:5432/app" and set the value in the environment; it is in git history, so rotate it
+  :16 aws
+    ✗ availability: yanked (observed 2026-10-01) [finding/severity ← evidence/availability: deny, fails]
+      fix: the vault recorded this against the exact release launched here: move to a release without it (mcp-vault explain mcp-server-aws)
+    ✗ availability is yanked (as of 2026-10-01) [trust/availability: deny, fails]
+      fix: the vault recorded this against the exact release launched here: move to a release without it (mcp-vault explain mcp-server-aws)
 
-FAIL — 1 failing, 5 to look at · 3 servers in 1 config · fail on deny · offline
+FAIL — 3 failing, 6 to look at · 4 servers in 1 config · fail on deny · offline
 ```
 
 Exit `1`. The password is never printed — only its type, location and length.
-With `--strict`, or `--fail-on unknown` as the Action uses by default, the
-other five fail too.
+`aws` is recognised as the vault's `mcp-server-aws` by what it launches (the
+key is only a label), and that exact release is recorded as yanked, so it
+fails. With `--fail-on unknown`, the Action's default, 6 fail; with
+`--strict`, all 9.
 
 ## What it catches
 
@@ -84,7 +93,7 @@ other five fail too.
 | Plaintext secret | a token, API key, `Bearer …` or database password in `env`, `args`, `headers` or `url` | move it to the environment and reference it (`${VAR}`, `${env:VAR}`, `${input:id}` — the syntax your host documents) |
 | Typosquat / lookalike | `mcp-server-memmory`, a homoglyph, a swapped or dropped npm scope, an added `-official` | use the real package, or `--allow-lookalike <name>` if it is yours |
 | Package source override | `--registry`, `--userconfig`, a uv index, `npm_config_registry` in the server's env | launch from the public registry, or verify that source yourself |
-| Known server, other version | a server the vault knows, launched on a version the vault never verified; with `--online`, a hash that differs from the registry's or a live advisory | move to the version the vault verified (`mcp-vault upgrade` computes the shortest safe one when an advisory applies) |
+| Known server, bad release | a server the vault knows, launched on a release recorded as yanked or with an advisory against it (deny), or on a version the vault never verified (`unknown`); with `--online`, the registry's hash and live advisories too | move to the version the vault verified (`mcp-vault upgrade` computes the shortest one that clears the advisories) |
 | Tool poisoning | a tool description with hidden Unicode, ANSI escapes, "ignore previous instructions", credential paths — via `mcp-vault tool-scan` on a captured `tools/list`, or `eval --installed --sandbox` for your own servers. `check` applies stored scans; the eval snapshot shipped today carries none yet | drop or replace the server; report it upstream |
 | Toxic flows, shadowing | one config that reads untrusted content, reaches private data and can send outward; two servers exposing the same tool name | split servers into separate configs, or scope out the tools (the fix line names them) |
 | Organisation policy | a server outside your allowlist, a denied licence or capability, an unapproved tool change | add it to the allowlist, or `mcp-vault approve <server>` |
@@ -101,7 +110,8 @@ npx -y @froggychips/mcp-vault check path/to/.mcp.json --strict
 
 `check` reads exactly those files and nothing from your home directory, so the
 answer is the same on every machine. Offline by default; `--online` adds the
-live registries and advisory feeds. As a pre-commit hook:
+live registries and advisory feeds. Servers are matched to the vault by what
+they launch; the config key is just a label. As a pre-commit hook:
 
 ```yaml
 # .pre-commit-config.yaml
@@ -111,6 +121,10 @@ repos:
     hooks:
       - id: mcp-vault
 ```
+
+pre-commit installs the commit `rev:` names, which carries no release
+signature, so — as with the Action's SHA — the pin is the DB's integrity; the
+hook says `DB integrity: pinned by pre-commit rev`. Pin `rev:` to a full SHA.
 
 ## Your own machine: `status`
 
@@ -160,9 +174,10 @@ The checks above work on any config. For servers the vault knows — a curated D
 and hash (npm sha512, PyPI sha256, Docker `@sha256`), recorded advisories,
 availability (yanked, unpublished), the npm registry signature, provenance
 bound to the artifact digest, and a behavioural smoke run. Each claim is dated
-and expires. `check` compares a launched version with that pin (and with
-`--online` re-checks hash and advisories live); `status` and `explain` also
-apply the stored evidence. A server the DB does not know is reported as *not
+and expires. `check`, `status` and `explain` apply it to what a config
+launches: a recorded problem (yanked, advisory) fails at any age; on a config
+line an aged-out "nothing found" is shown as context and does not change the
+exit code ([why](./docs/HOW-IT-DECIDES.md#two-modes-a-config-line-and-the-db)). A server the DB does not know is reported as *not
 in the vault* — `unknown`, not clean. The DB ships signed (Ed25519) in the npm
 package. [What is in it](./docs/DATABASE.md).
 

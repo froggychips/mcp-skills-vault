@@ -463,9 +463,9 @@ For npm/PyPI servers without an upstream image, the verifier still catches integ
 
 **Default: project-scoped `.mcp.json`** in the repository root. This keeps the server active only in that project and avoids injecting unused tools into unrelated conversations.
 
-`orchestrate.cjs --install` writes it for you, and writes the version the gate
-verified rather than the entry's command verbatim — `npx -y pkg` resolves
-`latest` at every start, which is not the artifact that was checked. Other hosts:
+`orchestrate.cjs --install` writes it for you, and writes the exact version the gate
+verified (every DB entry is pinned; a bare `npx -y pkg` would resolve `latest`
+at every start, which is not the artifact that was checked). Other hosts:
 `--host cursor|vscode|claude-desktop|codex` (`--list-hosts` to see them, and
 Codex gets a TOML block to paste rather than a rewritten config).
 

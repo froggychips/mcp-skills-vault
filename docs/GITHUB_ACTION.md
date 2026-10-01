@@ -75,11 +75,35 @@ records which of the two it was (`DB integrity: pinned by action SHA …`).
 `mcp-vault check` over the configs: launches with no exact version, package
 sources overridden away from the public registry, plaintext secrets (the value
 is never printed), lookalike names, what the servers of one config can do
-together, versions of known servers the vault never verified, and your policy
-— one decision per finding, one exit code. The job summary is a table of every
+together, known servers launched on a release the vault recorded as yanked or
+with an advisory (deny) or on a version it never verified (`unknown`), and your
+policy — one decision per finding, one exit code. Servers are matched to the
+vault by what they launch; the config key is a label. The job summary is a table of every
 decision: its effect, the rule that decided it (`decided_by`), the config line
 and why. It is rendered from the report's `mcp-vault/findings@1` decisions;
-the summary and the SARIF judge nothing themselves.
+the summary and the SARIF judge nothing themselves. On
+[`examples/insecure/.mcp.json`](../examples/insecure/.mcp.json) with the
+default `fail-on: unverified` (rendered by the action's own
+`lib/job_summary.cjs` from `check --json --as-of 2026-10-01T12:00:00Z`; the
+*Why* column shortened here):
+
+> **FAIL** — 7 servers checked, 5 failing, 4 unverified (fail on: unknown, mode: offline, as of 2026-10-01T12:00:00.000Z).
+>
+> | Server | Effect | Decided by | Config | Why |
+> |---|---|---|---|---|
+> | postgres | deny (fails) | secrets/connection-string | examples/insecure/.mcp.json:14 | postgres connection string with a password in plain text … |
+> | aws | deny (fails) | trust/availability | examples/insecure/.mcp.json:16 | availability is yanked (as of 2026-10-01) … |
+> | browser | unknown (fails) | finding/incomplete | examples/insecure/.mcp.json:3 | the config names no exact version … |
+> | memory | unknown (fails) | finding/incomplete | examples/insecure/.mcp.json:7 | the config names no exact version … |
+> | postgres | unknown (fails) | finding/incomplete | examples/insecure/.mcp.json:11 | the package source is overridden … |
+> | mcp-server-memmory | warn | lookalike/doubled-letter | | looks like mcp-server-memory … |
+> | examples/insecure/.mcp.json#session | unknown | flows/no-data | | lethal trifecta across aws, browser; memory, postgres not in the vault … |
+
+A known server whose stored "nothing found" (advisories, availability) has
+aged past its shelf life is not failed for it: the summary and the text output
+say how old the vault's record is, and the exit code does not change —
+otherwise every repository would go red a week after each vault release.
+[Why](HOW-IT-DECIDES.md#two-modes-a-config-line-and-the-db).
 
 Offline by default: no network call, no token read, and the same commit gives
 the same answer on every run.
@@ -138,6 +162,16 @@ repos:
 ```
 
 Runs `mcp-vault check --fail-on unknown` on staged `.mcp.json`,
-`.vscode/mcp.json` and `.cursor/mcp.json`, offline. The package has no
+`.vscode/mcp.json` and `.cursor/mcp.json`, offline (the hook's entry is
+`mcp-vault-pre-commit`, which runs exactly that). The package has no
 dependencies and no install scripts, so pre-commit's `npm install` of it runs
 nothing but a copy.
+
+**Trust model: the `rev:` pin.** pre-commit installs the commit `rev:` names,
+which carries no release signature (that is made at release and is not in
+git). As with the Action's SHA, the pin is the DB's integrity, and the hook
+says so: `mcp-vault: DB integrity: pinned by pre-commit rev`. This is granted
+only to pre-commit's own install of the hook, from a clone whose DB is those
+exact bytes; a `.sig` that is present still has to verify, and `mcp-vault`
+installed from npm still requires one. Pin `rev:` to a full SHA
+(`pre-commit autoupdate --freeze`); a tag can move.

@@ -27,13 +27,13 @@ The code is CommonJS on Node built-ins only, no build step. The pieces:
 |---|---|
 | [`bin/mcp-vault.cjs`](bin/mcp-vault.cjs) | the CLI: command table, DB signature check, pass-through to a script |
 | [`scripts/check_configs.cjs`](mcp-ecosystem-intelligence/scripts/check_configs.cjs) | `check` |
-| [`scripts/lib/installed.cjs`](mcp-ecosystem-intelligence/scripts/lib/installed.cjs), [`lib/install_cmd.cjs`](mcp-ecosystem-intelligence/scripts/lib/install_cmd.cjs) | reading host configs and launch commands |
+| [`scripts/lib/installed.cjs`](mcp-ecosystem-intelligence/scripts/lib/installed.cjs), [`lib/install_cmd.cjs`](mcp-ecosystem-intelligence/scripts/lib/install_cmd.cjs), [`lib/entry_match.cjs`](mcp-ecosystem-intelligence/scripts/lib/entry_match.cjs) | reading host configs and launch commands; matching a launch to its vault entry by package identity |
 | [`scripts/lib/secrets.cjs`](mcp-ecosystem-intelligence/scripts/lib/secrets.cjs), [`lib/lookalike.cjs`](mcp-ecosystem-intelligence/scripts/lib/lookalike.cjs), [`lib/flows.cjs`](mcp-ecosystem-intelligence/scripts/lib/flows.cjs), [`lib/tool_scan.cjs`](mcp-ecosystem-intelligence/scripts/lib/tool_scan.cjs) | the detectors |
 | [`scripts/lib/finding.cjs`](mcp-ecosystem-intelligence/scripts/lib/finding.cjs) | findings, `decide()`, the findings@1 document, SARIF |
 | [`scripts/lib/policy_rules.cjs`](mcp-ecosystem-intelligence/scripts/lib/policy_rules.cjs), [`lib/policy.cjs`](mcp-ecosystem-intelligence/scripts/lib/policy.cjs), [`lib/org_policy.cjs`](mcp-ecosystem-intelligence/scripts/lib/org_policy.cjs) | the one rule table and the policy files |
 | [`scripts/verify_integrity.cjs`](mcp-ecosystem-intelligence/scripts/verify_integrity.cjs) | the integrity gate over the DB or over host configs |
 | [`scripts/lib/evidence.cjs`](mcp-ecosystem-intelligence/scripts/lib/evidence.cjs), [`lib/tiers.cjs`](mcp-ecosystem-intelligence/scripts/lib/tiers.cjs), [`lib/clock.cjs`](mcp-ecosystem-intelligence/scripts/lib/clock.cjs) | dated evidence, derived trust and tier, `--as-of` |
-| [`action.yml`](action.yml), [`.pre-commit-hooks.yaml`](.pre-commit-hooks.yaml), [`lib/job_summary.cjs`](mcp-ecosystem-intelligence/scripts/lib/job_summary.cjs) | the Action and the hook |
+| [`action.yml`](action.yml), [`.pre-commit-hooks.yaml`](.pre-commit-hooks.yaml), [`bin/mcp-vault-pre-commit.cjs`](bin/mcp-vault-pre-commit.cjs), [`lib/job_summary.cjs`](mcp-ecosystem-intelligence/scripts/lib/job_summary.cjs) | the Action and the hook |
 
 Rules for a change to a check:
 
@@ -59,7 +59,7 @@ Running it:
 
 ```bash
 node --test tests/*.test.cjs                 # offline; includes the docs-vs-data checks
-node bin/mcp-vault.cjs check examples/insecure/.mcp.json --as-of 2026-09-30T12:00:00Z
+node bin/mcp-vault.cjs check examples/insecure/.mcp.json --as-of 2026-10-01T12:00:00Z
 node bin/mcp-vault.cjs verify --offline      # the DB, no network
 ```
 

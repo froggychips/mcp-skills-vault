@@ -45,13 +45,14 @@ not stored and not a threshold on `health_score`.
 | Experimental | too little is known — a required check never happened, a claim aged out, or the stored evidence is about a different artifact than this entry now installs |
 | Deprecated | do not install — nothing to install, bytes that are not the bytes we verified, or an advisory against this version |
 
-Distribution as of 2026-09-30 (the date of the newest evidence in the DB): **0 Core / 10 Recommended / 101 Experimental / 1 Deprecated**.
-On that date only the entries re-checked that day carry fresh evidence; the
-rest hold evidence from 2026-09-17, and wherever it includes `availability` or
-`advisories` (a seven-day shelf life) it has aged out, so they read
-Experimental until the next refresh. That is a snapshot, not today's split:
-`mcp-vault list` and `mcp-vault status` classify against now, or against
-`--as-of`.
+Distribution as of 2026-10-01 (the date of the newest evidence in the DB): **0 Core / 110 Recommended / 1 Experimental / 1 Deprecated**.
+All evidence was refreshed that day. The Deprecated entry is `mcp-server-aws`
+(its pinned release is yanked); the Experimental one is `linear-mcp-server`
+(its repository disagrees with the one npm declares). That is a snapshot, not
+today's split: `availability` and `advisories` have a seven-day shelf life, so
+a week later most entries read Experimental until the next refresh even though
+no commit touched them. `mcp-vault list` and `mcp-vault status` classify
+against now, or against `--as-of`.
 
 **Core is empty, and that is the tier working.** No row in the eval snapshot
 yet records *which artifact it launched*, and a pass for `x@1` is not a
@@ -75,9 +76,9 @@ dimension with the date it was established:
 "trust_evidence": {
   "artifact_id": "npm:@mapbox/mcp-server@0.11.0",
   "dimensions": {
-    "artifact":       { "status": "verified", "checked_at": "2026-09-17", "method": "deep-hash" },
-    "signature":      { "status": "verified", "checked_at": "2026-09-17", "keyid": "SHA256:…" },
-    "source_binding": { "status": "verified", "checked_at": "2026-09-17" }
+    "artifact":       { "status": "verified", "checked_at": "2026-10-01", "method": "deep-hash" },
+    "signature":      { "status": "verified", "checked_at": "2026-10-01", "keyid": "SHA256:…" },
+    "source_binding": { "status": "verified", "checked_at": "2026-10-01" }
   }
 }
 ```
@@ -89,23 +90,29 @@ writing "clean". Each dimension has its own shelf life (advisories and
 availability 7 days, a hash 90), overridable with `maxEvidenceAgeDays`;
 evidence past it is `unknown`, never "still verified".
 
-Derived trust: **107 verified / 1 candidate / 4 unverified** as of 2026-09-30.
-The four unverified are one yanked release (`mcp-server-aws`), one advisory
-against the pinned version, and two whose repository disagrees with the one
-npm declares.
+Derived trust: **110 verified / 0 candidate / 2 unverified** as of 2026-10-01.
+The two unverified are the yanked release (`mcp-server-aws`) and the
+repository mismatch (`linear-mcp-server`).
 
-What the stored evidence says, per dimension (2026-09-30):
+What the stored evidence says, per dimension (2026-10-01):
 
 ```
-availability   present 103, deprecated 4, yanked 1
-artifact       verified 111, unverified 1
+availability   present 104, deprecated 4, yanked 1
+artifact       verified 112
 signature      verified 99, absent 1
-provenance     bound 45, absent 55
-source_binding verified 97, unverified 9, mismatch 2
-registry       listed 11, unlisted 100
-advisories     clean 106, vulnerable 1, advisories-present 1
+provenance     bound 46, absent 54
+source_binding verified 99, unverified 9, mismatch 1
+registry       listed 11, unlisted 101
+advisories     clean 108, advisories-present 1
+dependencies   advisories-present 1
 posture        clean 1, weak 3        (Scorecard covers 4 of 112 repositories)
 ```
+
+`advisories-present` is an advisory below the failing severity
+(`chrome-devtools-mcp`, two MODERATE ones; `mcp-vault upgrade` gives the
+version that clears them) and, in the dependency tree, `@mondaydotcomorg/monday-api-mcp`.
+Every entry's `install_cmd` is pinned to an exact version or digest; a test
+asserts it.
 
 The npm registry signature is checked for each of the DB's 100 npm entries on
 every live run; provenance is `bound` only when npm's own key signed a
@@ -115,13 +122,12 @@ statement whose subject digest is this artifact (see
 The offline gate over the whole DB, replayed at that date:
 
 ```text
-$ mcp-vault verify --offline --as-of 2026-09-30T12:00:00Z
+$ mcp-vault verify --offline --as-of 2026-10-01T12:00:00Z
 …
 FAIL  mcp-server-aws@1.0.27 (PyPI offline pin present for awslabs.core-mcp-server)
-        [UNVERIFIED] stored evidence has aged out: advisories 13d old (max 7) (use --fail-unverified to fail closed)
-        [FAIL] stored evidence: availability: yanked (observed 2026-09-17)
+        [FAIL] stored evidence: availability: yanked (observed 2026-10-01)
 …
-112 entries checked — 1 failure(s), 97 unverified
+112 entries checked — 1 failure(s)
 ```
 
 ## Who published it (official registry)
@@ -129,7 +135,7 @@ FAIL  mcp-server-aws@1.0.27 (PyPI offline pin present for awslabs.core-mcp-serve
 The [official MCP registry](https://registry.modelcontextprotocol.io) verifies
 namespace ownership at publish (`io.github.<owner>/…` requires authenticating
 as that account). `mcp-vault identity` cross-checks the DB against it.
-11 entries are listed as of 2026-09-30 and all of them agree; a verified namespace under a
+11 entries are listed as of 2026-10-01 and all of them agree; a verified namespace under a
 different owner would be the finding. Being unlisted is not a finding — listing
 is opt-in.
 
@@ -155,13 +161,13 @@ file and line, what the package is able to do. Across the scanned package
 versions:
 
 ```
-env_access  89    shell           38    dynamic_code      16
-network     78    install_script  32    dynamic_require    8
-fs_read     62    fs_write        41    credential_paths   5
+env_access  91    shell           38    dynamic_code      16
+network     79    install_script  33    dynamic_require    8
+fs_read     63    fs_write        42    credential_paths   5
 ```
 
 31 of those packages can both run other programs and reach the network. 20 of
-104 ship at least one minified file, where a pattern scan can show presence
+106 ship at least one minified file, where a pattern scan can show presence
 and nothing else. `found` is a fact; absence is never recorded. A capability
 that appears in a new version is a finding; one that disappears is not an
 improvement. PyPI and Docker entries report `unsupported`.

@@ -42,11 +42,18 @@ What it checks, per configured server:
 | `config/unpinned-launch` | no exact version: none, `@latest`, a range (`^1.2`, `>=1.2`, `~=1.2`; only `==X` pins on PyPI) |
 | `config/launch-source-override` | the package comes from somewhere else than the public registry: `--registry`, `--userconfig`, a uv index, `--find-links`, `npm_config_registry` / `UV_INDEX_URL` in the server's env, … Reported as `unknown`, never checked against the public registry as if it came from there |
 | `pin/*`, `verify/*` | a launch of a known server compared with the vault's pin (another version → `unknown`, no stored hash for it); not in the vault → `unknown`. With `--online`, the registry's hash, install hooks and the advisory feeds too |
+| `evidence/*`, `trust/*` | what the vault recorded about **that exact release**: yanked, an advisory, a mismatch → deny, at any age; a clean known server → `trust/ok`. An aged-out "nothing found" is a context line, `i vault evidence for <pkg>@<v> is N days old (…)` (`evidence/vault-age`), which never changes the exit code — [why](HOW-IT-DECIDES.md#two-modes-a-config-line-and-the-db) |
 | `secrets/*` | a credential in plain text in `env`, `args`, `headers` or `url` — deny. The value is never printed |
 | `lookalike/*` | a name shaped like a vault entry: typo, homoglyph, scope swap, affix |
 | `flows/*`, `shadowing/*` | what the servers of one config can do together (toxic flows, tool shadowing) |
 | `tool-scan/*` | stored tool-description scans for servers the eval has seen (the snapshot shipped with 0.16.0 carries none yet; run `tool-scan` on a captured `tools/list`) |
 | `org/*`, `policy/*` | your policy file, if any |
+
+A server is matched to the vault **by what it launches** — the package
+identity, with the version compared separately — not by its config key. The
+key is a label: `"aws": uvx awslabs.core-mcp-server==1.0.27` is the vault's
+`mcp-server-aws`. Only the lookalike check reads the key, as a claim: a vault
+entry's name on another package is impersonation.
 
 Launches are read the way their runner reads them: `npx` options in any order
 (`--yes`, `-q`, `--`, `-p pkg bin`, several `-p`), `npm exec`, `pnpx` /
@@ -242,9 +249,19 @@ rewritten safely without a TOML parser, so `install` prints the lines to paste.
 
 ### `upgrade`
 
-```bash
-mcp-vault upgrade --entry chrome-devtools-mcp
+```text
+$ mcp-vault upgrade --entry chrome-devtools-mcp
+UPGRADE  chrome-devtools-mcp chrome-devtools-mcp@0.26.0
+  MODERATE  GHSA-3pvj-jv98-qhjq — fixed in 1.1.0
+            Chrome DevTools for agents: daemon.pid write follows symlinks in /tmp fallback runtime directory
+  MODERATE  GHSA-8qf9-62x2-82pp — fixed in 1.1.0
+            chrome-devtools-mcp: validatePath() does not canonicalize symlinks before enforcing roots
+  → chrome-devtools-mcp@1.1.0 clears 2 of 2  (latest is 1.10.1)
+  verify_integrity.cjs --update will re-pin and re-hash it
 ```
+
+<sub>Run against OSV.dev on 2026-10-01; `upgrade` asks OSV live and has no
+`--as-of`, so this output is dated, not replayable.</sub>
 
 For a pin with advisories against it, computes the shortest version that
 clears **all** of them (OSV's `fixed` versions), then checks that candidate too

@@ -34,7 +34,8 @@ range, nothing); package sources overridden away from the public registry
 (`--registry`, a uv index, `npm_config_registry` in the server's env);
 plaintext credentials in `env`, `args`, `headers` or `url`; names that look
 like a known server's (typo, homoglyph, scope swap, added `-official`);
-versions of known servers the vault never verified; and, across the config,
+known servers launched on a release recorded as yanked or with an advisory,
+or on a version the vault never verified; and, across the config,
 servers that together read untrusted content, reach private data and can send
 data out, or expose the same tool name. Plus your policy, if you have one.
 [Full list](REFERENCE.md#checking-a-repository-check).
@@ -83,9 +84,11 @@ looks at runtime.)
 
 Extra signal for servers it knows: the version and hash the vault verified,
 recorded advisories, whether the release was yanked, the npm registry
-signature, provenance, whether it starts in a sandbox. `status` and `explain`
-use all of it; `check` compares the launched version with the pin, and with
-`--online` re-checks hash and advisories. It is not a catalogue to browse.
+signature, provenance, whether it starts in a sandbox. `check`, `status` and
+`explain` apply it to what a config launches, matched by package, not by the
+config key: a release recorded as yanked or with an advisory fails. An
+aged-out "nothing found" is reported as context in `check` and does not fail
+it ([why](HOW-IT-DECIDES.md#two-modes-a-config-line-and-the-db)). It is not a catalogue to browse.
 [What is in it](DATABASE.md).
 
 ## How is the database kept current, and can I trust the copy I have?
@@ -93,7 +96,8 @@ use all of it; `check` compares the launched version with the pin, and with
 A weekly job refreshes versions, hashes and evidence and opens a PR that a
 person reviews; nothing is auto-merged. The DB in the npm package is signed
 (Ed25519) and the CLI refuses to read it if the signature does not verify; in
-the Action's default mode the SHA pin of `uses:` is the integrity.
+the Action's default mode the SHA pin of `uses:` is the integrity, and for the
+pre-commit hook the `rev:` pin.
 [SECURITY.md](../SECURITY.md#signed-db).
 
 ## Can my organisation enforce an allowlist?

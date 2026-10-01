@@ -47,6 +47,7 @@ Node's own `crypto`.
   | the npm package (`npx`, `npm i -g`, the Action with `version:`) | **strict**: a missing, malformed, unknown-key, revoked or out-of-window signature, or changed content → the command does not run |
   | a git checkout (development, CI of this repo) | a missing `.sig` is allowed; one that is present must verify. `MCP_VAULT_REQUIRE_SIGNED_DB=1` makes a checkout strict |
   | the GitHub Action in its default mode (its own checkout) | GitHub unpacks `uses:` without `.git` and without the release `.sig`, so the action allows a missing signature for that step only. The DB is the bytes of the commit `uses:` names, exactly as the code that checks it is: **the SHA pin is the integrity**. Pin `uses:` to a full SHA; the action warns otherwise |
+  | the pre-commit hook (`mcp-vault-pre-commit`) | pre-commit installs the commit `rev:` names as a package, without `.git` or `.sig`. The hook lets the CLI take **`rev:` as the integrity** only on positive evidence of pre-commit's own install (`PRE_COMMIT=1`, its store layout, a clone of this repository whose DB is byte-identical to the one read) and prints `DB integrity: pinned by pre-commit rev`. `mcp-vault` itself never relaxes. Pin `rev:` to a full SHA |
 
   The signal for "checkout" is a `.git` entry **at the package root itself**:
   npm never packs `.git`, so no tarball can produce it, and creating it inside

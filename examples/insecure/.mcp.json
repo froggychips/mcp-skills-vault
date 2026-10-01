@@ -12,6 +12,10 @@
       "command": "npx",
       "args": ["-y", "--registry", "https://npm.example.internal", "@modelcontextprotocol/server-postgres@0.6.2"],
       "env": { "DATABASE_URL": "postgres://app:s3cr3t-Passw0rd@db.internal:5432/app" }
+    },
+    "aws": {
+      "command": "uvx",
+      "args": ["awslabs.core-mcp-server==1.0.27"]
     }
   }
 }
