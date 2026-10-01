@@ -21,6 +21,19 @@
  *   isGithubUrl(url)      -> boolean
  *   normalizeGitUrl(url)  -> canonical https URL | null
  *   githubRepoUrl(url)    -> "https://github.com/owner/repo" | null
+ *   repoKey(url)          -> comparable identity: "github.com/owner/repo"
+ *                            (lowercased) for GitHub, else the normalised URL
+ *                            without scheme, lowercased | null
+ *   sourceBinding(stored, declared, { aliases })
+ *                         -> { state: 'verified'|'mismatch'|'unverified', alias? }
+ *                            does a registry's repository field name the
+ *                            repository the DB records? (see below)
+ *   aliasAwareRepoKey(sourceUrl, aliases)
+ *                         -> (url) => repoKey, with a recorded earlier name
+ *                            of `sourceUrl` keyed as `sourceUrl` itself
+ *   resolveRepoAlias(tool, declaredUrl, { get, now, token })
+ *                         -> alias added to tool.source_aliases | null
+ *                            (the one networked helper here; `get` is injected)
  */
 
 // Anchored at both ends. The forms that appear in real package metadata:
@@ -28,15 +41,21 @@
 //   https://github.com/o/r.git      https://github.com/o/r/tree/main/pkg
 //   git+https://github.com/o/r.git  git+ssh://git@github.com/o/r.git
 //   git@github.com:o/r.git          ssh://git@github.com/o/r
+//   git://github.com/o/r.git        github:o/r   (npm shorthand)
 //
 // A trailing path (`/tree/main/x`, `#readme`, `?tab=readme`) is allowed and
 // ignored, because monorepo entries legitimately point at a subdirectory. What
 // is *not* allowed is anything before the host.
-const GITHUB_URL = /^(?:git\+)?(?:(?:https?|ssh):\/\/)?(?:git@)?(?:www\.)?github\.com[:/]+([A-Za-z0-9](?:[A-Za-z0-9-]{0,38})?)\/([A-Za-z0-9._-]+?)(?:\.git)?(?:[/#?].*)?$/i;
+const GITHUB_URL = /^(?:git\+)?(?:(?:https?|ssh|git):\/\/)?(?:git@)?(?:www\.)?github\.com[:/]+([A-Za-z0-9](?:[A-Za-z0-9-]{0,38})?)\/([A-Za-z0-9._-]+?)(?:\.git)?(?:[/#?].*)?$/i;
+
+// npm's `repository: "github:owner/repo"` shorthand. Anchored like the above;
+// the bare `owner/repo` form is not accepted, because outside package.json it
+// is indistinguishable from a relative path.
+const GITHUB_SHORTHAND = /^github:([A-Za-z0-9](?:[A-Za-z0-9-]{0,38})?)\/([A-Za-z0-9._-]+?)(?:\.git)?(?:#.*)?$/i;
 
 function match(url) {
   if (!url || typeof url !== 'string') return null;
-  const m = GITHUB_URL.exec(url.trim());
+  const m = GITHUB_URL.exec(url.trim()) || GITHUB_SHORTHAND.exec(url.trim());
   if (!m) return null;
   // A repository cannot be named `.` or `..`, and npm metadata does contain
   // odd values; refusing them here keeps them out of API paths.
@@ -81,8 +100,122 @@ function normalizeGitUrl(url) {
     .replace(/^git\+https:\/\//, 'https://')
     .replace(/^git\+/, '')
     .replace(/^git@github\.com:/, 'https://github.com/')
+    .replace(/^(?:git|http):\/\//, 'https://')
+    .replace(/[#?].*$/, '')                             // `#master`, `#readme`, `?tab=…`
+    .replace(/\/+$/, '')
     .replace(/\.git$/, '')
-    .replace(/\/issues\/?$/, '');                       // Bug Tracker URLs
+    .replace(/\/issues$/, '')                           // Bug Tracker URLs
+    .replace(/\/(?:-\/)?(?:tree|blob)\/.*$/, '');        // monorepo subdirectory (GitHub, GitLab)
 }
 
-module.exports = { githubSlug, githubOwner, isGithubUrl, githubRepoUrl, normalizeGitUrl, GITHUB_URL };
+/**
+ * What to compare two repository URLs by. For GitHub that is the slug — the
+ * only part that names the repository; a subdirectory, a branch fragment, a
+ * `.git` suffix and letter case all name the same one. Elsewhere it is the
+ * normalised URL, because nothing here can resolve a slug for a GitLab or a
+ * self-hosted host, and two spellings of *those* still deserve to compare.
+ */
+function repoKey(url) {
+  const slug = githubSlug(url);
+  if (slug) return `github.com/${slug}`;
+  const n = normalizeGitUrl(url);
+  return n ? n.replace(/^https?:\/\//, '').toLowerCase() : null;
+}
+
+/**
+ * Does the repository a package registry declares (npm `repository.url`, a
+ * PyPI project URL) name the repository the DB records as `source_url`?
+ *
+ * `aliases` are earlier names of the recorded repository — a GitHub rename or
+ * transfer that published releases still carry in their metadata. Each one is
+ * `{ slug, resolved_to, resolved_at, via }`, written by a refresh that asked
+ * GitHub (`verify_integrity.cjs --update`), never inferred here: this function
+ * does no I/O, so an offline check gives the same answer as an online one. An
+ * alias counts only while `resolved_to` is still the recorded repository — a
+ * source_url changed afterwards does not inherit it.
+ */
+function sourceBinding(stored, declared, { aliases = [] } = {}) {
+  const ours = repoKey(stored);
+  const theirs = repoKey(declared);
+  if (!ours || !theirs) return { state: 'unverified' };
+  if (ours === theirs) return { state: 'verified' };
+  const theirSlug = githubSlug(declared);
+  const ourSlug = githubSlug(stored);
+  if (theirSlug && ourSlug) {
+    const alias = (Array.isArray(aliases) ? aliases : []).find((a) => a
+      && String(a.slug || '').toLowerCase() === theirSlug
+      && String(a.resolved_to || '').toLowerCase() === ourSlug);
+    if (alias) return { state: 'verified', alias: theirSlug };
+  }
+  return { state: 'mismatch' };
+}
+
+/**
+ * `repoKey`, except that an earlier name of `sourceUrl` recorded in `aliases`
+ * keys as `sourceUrl` itself. For comparisons that cannot take an alias list —
+ * the provenance check compares a certificate's repository through a
+ * normaliser, and a release attested before a rename names the old slug.
+ */
+function aliasAwareRepoKey(sourceUrl, aliases) {
+  const ours = githubSlug(sourceUrl);
+  const list = Array.isArray(aliases) ? aliases : [];
+  return (url) => {
+    const slug = githubSlug(url);
+    if (ours && slug && slug !== ours && list.some((a) => a
+      && String(a.slug || '').toLowerCase() === slug
+      && String(a.resolved_to || '').toLowerCase() === ours)) {
+      return repoKey(sourceUrl);
+    }
+    return repoKey(url);
+  };
+}
+
+/**
+ * Refresh only: when a registry names a different GitHub repository than the
+ * DB, ask the GitHub API whether it is the same one under an earlier name.
+ * GitHub answers a renamed or transferred repository's old /repos path with a
+ * 301 to /repositories/<id>; the redirect is followed (`maxRedirects`) and the
+ * far end's `full_name` decides. A confirmed answer is stored on the entry as
+ * a dated alias, so offline comparisons can use it. Returns the alias added,
+ * or null (nothing to resolve, already known, or GitHub said otherwise).
+ *
+ * `get` is lib/http.cjs getJson or a stand-in; `now` is the run's instant.
+ */
+async function resolveRepoAlias(tool, declaredUrl, { get, now, token = null, cacheTtlMs = 0 } = {}) {
+  if (typeof get !== 'function') throw new TypeError('resolveRepoAlias: get is required');
+  const theirs = githubSlug(declaredUrl);
+  const ours = githubSlug(tool && tool.source_url);
+  if (!theirs || !ours || theirs === ours) return null;
+  const known = Array.isArray(tool.source_aliases) ? tool.source_aliases : [];
+  if (known.some((a) => a && String(a.slug).toLowerCase() === theirs && String(a.resolved_to).toLowerCase() === ours)) return null;
+  const res = await get(`https://api.github.com/repos/${theirs}`, {
+    headers: {
+      'Accept':     'application/vnd.github+json',
+      'User-Agent': 'mcp-vault-verify',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    cacheTtlMs,
+    maxRedirects: 3,
+  });
+  if (!res || !res.ok) return null;
+  // The far end of a redirect must still be the GitHub API.
+  if (res.url) {
+    let host = null;
+    try { host = new URL(res.url).hostname; } catch { host = null; }
+    if (host !== 'api.github.com') return null;
+  }
+  const current = String((res.data && res.data.full_name) || '').toLowerCase();
+  if (current !== ours) return null;
+  const alias = {
+    slug: theirs, resolved_to: ours,
+    resolved_at: new Date(now).toISOString().slice(0, 10),
+    via: 'github-api',
+  };
+  tool.source_aliases = [...known.filter((a) => !(a && String(a.slug).toLowerCase() === theirs)), alias];
+  return alias;
+}
+
+module.exports = {
+  githubSlug, githubOwner, isGithubUrl, githubRepoUrl, normalizeGitUrl, repoKey, sourceBinding,
+  aliasAwareRepoKey, resolveRepoAlias, GITHUB_URL,
+};

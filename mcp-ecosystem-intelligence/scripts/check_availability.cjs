@@ -73,7 +73,7 @@ const { finding } = require('./lib/finding.cjs');
 const { subjectForTool } = require('./lib/findings_from.cjs');
 const { commandPolicy, decideRun, unanswered } = require('./lib/run_decision.cjs');
 // One definition of what a repository URL names, anchored: see lib/repo_url.cjs.
-const { githubSlug: repoSlug } = require('./lib/repo_url.cjs');
+const { githubSlug: repoSlug, sourceBinding } = require('./lib/repo_url.cjs');
 
 const DB_PATH     = path.resolve(__dirname, '../assets/tools_database.json');
 const CONCURRENCY = 8;
@@ -241,7 +241,8 @@ async function checkPypi(tool, pkg, { get = getJson } = {}) {
 /**
  * Did the source repository move?
  *
- * GitHub follows renames and transfers transparently, answering 200 with the
+ * GitHub follows renames and transfers: the old path answers 301 to
+ * /repositories/<id> (followed below), and that answers 200 with the
  * *current* full_name — which is exactly what makes it a usable relocation
  * detector: a mismatch between what we stored and what it answers is a move
  * that happened without anyone updating the entry.
@@ -257,6 +258,9 @@ async function checkRepo(tool, { get = getJson } = {}) {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     cacheTtlMs: CACHE_TTL_MS,
+    // A renamed or transferred repository answers its old path with a 301 to
+    // /repositories/<id>; without following it a move read as "lookup failed".
+    maxRedirects: 3,
   });
   if (res.status === 404) return { state: 'repo-gone', detail: `${tool.source_url} returns 404 from the GitHub API` };
   if (!res.ok) return { state: 'unknown', detail: `GitHub lookup failed: ${res.error || `HTTP ${res.status}`}` };
@@ -303,7 +307,8 @@ async function checkEntry(tool, opts, { get = getJson } = {}) {
   if (registryRepo && tool.source_url) {
     const a = repoSlug(registryRepo);
     const b = repoSlug(tool.source_url);
-    if (a && b && a !== b) {
+    // A confirmed earlier name of the recorded repository is not a move.
+    if (a && b && sourceBinding(tool.source_url, registryRepo, { aliases: tool.source_aliases }).state === 'mismatch') {
       row.identity = {
         state:  'relocated',
         detail: `${eco === 'pypi' ? 'PyPI' : 'npm'} points at ${a}, the entry records ${b}`,

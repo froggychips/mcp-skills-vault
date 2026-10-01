@@ -97,6 +97,7 @@ const { exitAfterFlush } = require('./lib/exit.cjs');
 // install_cmd parsing lives in one place — see lib/install_cmd.cjs for why.
 const {
   npmPkgName, pypiPkgName, dockerImageRef, dockerDigestPinned, dockerIntegrityMismatch, parseLaunch,
+  repinInstallCmd,
 } = require('./lib/install_cmd.cjs');
 const { toJsonReport, toSarif, dbLineIndex } = require('./lib/report.cjs');
 const { asOfFromArgv } = require('./lib/clock.cjs');
@@ -259,16 +260,37 @@ function progress(line) {
   else                     process.stdout.write(line);
 }
 
+// Which repository a registry's `repository` field names, and whether it is the
+// one the DB records — one implementation, lib/repo_url.cjs. This file had its
+// own copy that compared whole URLs: `…/monday-ai/tree/master/packages/x` on
+// the npm side, a `#master` fragment, or a renamed repository all read as a
+// different project.
+const {
+  normalizeGitUrl, sourceBinding, aliasAwareRepoKey, resolveRepoAlias: resolveAlias,
+} = require('./lib/repo_url.cjs');
 
-function normalizeGitUrl(url) {
-  if (!url || typeof url !== 'string') return null;
-  return url
-    .replace(/^git\+ssh:\/\/git@github\.com\//, 'https://github.com/')
-    .replace(/^git\+https:\/\//, 'https://')
-    .replace(/^git\+/, '')
-    .replace(/^git@github\.com:/, 'https://github.com/')
-    .replace(/\.git$/, '')
-    .replace(/\/issues\/?$/, '');                       // strip /issues from Bug Tracker URLs
+// --update only (see lib/repo_url.cjs resolveRepoAlias): a rename the registry
+// still carries is resolved once against GitHub and stored as a dated alias.
+function resolveRepoAlias(tool, declaredUrl) {
+  return resolveAlias(tool, declaredUrl, {
+    get: getJson,
+    now: AS_OF,
+    token: process.env.GITHUB_TOKEN || process.env.GH_TOKEN || null,
+    cacheTtlMs: CACHE_TTL_MS,
+  });
+}
+
+/**
+ * --update: the refreshed version and hash, and an install_cmd that launches
+ * that version. Moving `version` without the command left the published
+ * launch running the old release (or latest) while the evidence described
+ * the new one.
+ */
+function applyRefresh(tool, { version, integrity }) {
+  tool.version = version;
+  tool.pkg_integrity = integrity;
+  repinInstallCmd(tool);
+  return tool;
 }
 
 // Registry and feed transport. Both wrappers keep the old contract — a null
@@ -830,13 +852,11 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
   const npmVersion   = meta.version;
   const npmIntegrity = meta.dist?.integrity ?? null;
   const npmRepoRaw   = typeof meta.repository === 'string' ? meta.repository : (meta.repository?.url ?? null);
-  const npmRepo      = normalizeGitUrl(npmRepoRaw);
-  const storedRepo   = normalizeGitUrl(tool.source_url);
 
   if (UPDATE) {
-    tool.version = npmVersion;
-    tool.pkg_integrity = npmIntegrity;
-    results.push({ tool, status: 'UPD', msg: `${tool.name}@${npmVersion}` });
+    applyRefresh(tool, { version: npmVersion, integrity: npmIntegrity });
+    const alias = await resolveRepoAlias(tool, npmRepoRaw);
+    results.push({ tool, status: 'UPD', msg: `${tool.name}@${npmVersion}${alias ? ` (source alias ${alias.slug} → ${alias.resolved_to})` : ''}` });
     return;
   }
 
@@ -860,16 +880,17 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
     checks.artifact = { state: 'verified', method: 'registry-metadata' };
   }
 
-  // Repo URL — suppress monorepo subdirectory paths
-  if (!npmRepo) {
+  // Repo URL — compared by repository (GitHub slug), not by spelling.
+  const npmBinding = sourceBinding(tool.source_url, npmRepoRaw, { aliases: tool.source_aliases });
+  if (!normalizeGitUrl(npmRepoRaw)) {
     lines.push(['NOTE', 'npm declares no repository.url']);
     checks.source_binding = { state: 'unverified' };
-  } else if (storedRepo && npmRepo.toLowerCase() !== storedRepo.toLowerCase() && !storedRepo.includes('/tree/')) {
+  } else if (npmBinding.state === 'mismatch') {
     lines.push(['WARN', `repo mismatch\n        source_url: ${tool.source_url}\n        npm repo  : ${npmRepoRaw}`]);
     checks.source_binding = { state: 'mismatch' };
     if (STRICT) failures++;
   } else {
-    checks.source_binding = { state: 'verified' };
+    checks.source_binding = npmBinding;
   }
 
   // An installed server with no version in its launch command resolves `latest`
@@ -935,7 +956,9 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
       // certificate inside a bundle is not validated against a trust root, so
       // the digest half of a binding has to rest on npm's own key.
       keys,
-      normalizeRepo: normalizeGitUrl,
+      // A release attested before a rename names the old slug in its
+      // certificate; a recorded alias makes that the same repository.
+      normalizeRepo: aliasAwareRepoKey(tool.source_url, tool.source_aliases),
     });
 
     if (prov.state === 'unreadable') {
@@ -1157,13 +1180,11 @@ async function processPypi(tool, pkg, meta, advisoriesForTool, degraded, results
   const pyVersion = meta.info.version;
   const pySha256  = pypiSdistSha256(meta);
   const pySrc     = pypiSourceUrl(meta.info);
-  const pyRepo    = normalizeGitUrl(pySrc);
-  const storedRepo = normalizeGitUrl(tool.source_url);
 
   if (UPDATE) {
-    tool.version       = pyVersion;
-    tool.pkg_integrity = pySha256 ? `sha256-${pySha256}` : null;
-    results.push({ tool, status: 'UPD', msg: `${tool.name}@${pyVersion}` });
+    applyRefresh(tool, { version: pyVersion, integrity: pySha256 ? `sha256-${pySha256}` : null });
+    const alias = await resolveRepoAlias(tool, pySrc);
+    results.push({ tool, status: 'UPD', msg: `${tool.name}@${pyVersion}${alias ? ` (source alias ${alias.slug} → ${alias.resolved_to})` : ''}` });
     return;
   }
 
@@ -1224,15 +1245,16 @@ async function processPypi(tool, pkg, meta, advisoriesForTool, degraded, results
   }
 
   // Source URL
-  if (!pyRepo) {
+  const pyBinding = sourceBinding(tool.source_url, pySrc, { aliases: tool.source_aliases });
+  if (!normalizeGitUrl(pySrc)) {
     lines.push(['NOTE', 'PyPI declares no project_urls source — source unverifiable']);
     checks.source_binding = { state: 'unverified' };
-  } else if (storedRepo && pyRepo.toLowerCase() !== storedRepo.toLowerCase() && !storedRepo.includes('/tree/')) {
+  } else if (pyBinding.state === 'mismatch') {
     lines.push(['WARN', `repo mismatch\n        source_url: ${tool.source_url}\n        pypi src  : ${pySrc}`]);
     checks.source_binding = { state: 'mismatch' };
     if (STRICT) failures++;
   } else {
-    checks.source_binding = { state: 'verified' };
+    checks.source_binding = pyBinding;
   }
 
   // License — NOTE when PyPI omits it but DB has a value (e.g. sourced from GitHub)
@@ -2302,6 +2324,7 @@ if (require.main === module) {
 
 module.exports = {
   normalizeGitUrl,
+  applyRefresh,
   npmPkgName,
   pypiPkgName,
   dockerImageRef,

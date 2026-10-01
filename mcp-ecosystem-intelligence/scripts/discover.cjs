@@ -57,7 +57,7 @@ const path  = require('path');
 const { execFileSync } = require('child_process');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { readWallClock } = require('./lib/clock.cjs');
-const { githubSlug, isGithubUrl } = require('./lib/repo_url.cjs');
+const { githubSlug, isGithubUrl, githubRepoUrl, normalizeGitUrl } = require('./lib/repo_url.cjs');
 const { snapshotAsRegistryPage } = require('./lib/registry_snapshot.cjs');
 
 const DB_PATH      = path.resolve(__dirname, '../assets/tools_database.json');
@@ -124,16 +124,12 @@ function httpsGet(url, timeoutMs = 15000) {
   });
 }
 
+// The dedupe key for a candidate's repository. One parser (lib/repo_url.cjs):
+// a GitHub URL collapses to its canonical browse URL (no /tree/…, no #…, no
+// .git), anything else to its normalised spelling.
 function normalizeRepoUrl(url) {
-  if (!url) return null;
-  let u = url.trim()
-    .replace(/^git\+/, '')
-    .replace(/\.git$/, '')
-    .replace(/\/$/, '')
-    .replace(/^http:/, 'https:');
-  // Strip /tree/branch/path suffixes — collapse to bare repo.
-  const m = u.match(/^(https:\/\/github\.com\/[^/]+\/[^/]+)/);
-  return m ? m[1] : u;
+  if (!url || typeof url !== 'string') return null;
+  return githubRepoUrl(url) || normalizeGitUrl(url);
 }
 
 function ownerRepoFromUrl(url) {

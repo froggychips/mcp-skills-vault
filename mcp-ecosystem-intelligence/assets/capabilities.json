@@ -2233,6 +2233,32 @@
         "truncated": false
       }
     },
+    "npm:@mondaydotcomorg/monday-api-mcp@3.3.1": {
+      "checked_at": "2026-10-01",
+      "found": {
+        "env_access": [
+          {
+            "file": "package/dist/utils/args/args.service.js",
+            "line": 27,
+            "match": "process.env"
+          }
+        ]
+      },
+      "coverage": {
+        "code_files": 9,
+        "other_files": 1,
+        "bytes": 15197,
+        "longest_line": 233,
+        "avg_line_length": 42,
+        "minified": false,
+        "minified_files": [],
+        "base64_bytes": 0,
+        "escape_heavy_files": 0,
+        "caveat": "a pattern scan can show presence, never absence",
+        "tarball_bytes": 6909,
+        "truncated": false
+      }
+    },
     "npm:@neondatabase/mcp-server-neon@0.6.5": {
       "checked_at": "2026-09-17",
       "found": {
