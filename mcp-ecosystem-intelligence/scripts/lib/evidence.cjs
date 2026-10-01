@@ -175,7 +175,11 @@ function buildEvidence(checks, { now, artifactId = null } = {}) {
     if (c.provenance.identity) extra.identity = c.provenance.identity;
     put('provenance', c.provenance.state, extra);
   }
-  if (c.source_binding) put('source_binding', c.source_binding.state);
+  if (c.source_binding) {
+    // `alias`: the registry named an earlier name of the recorded repository
+    // (a confirmed GitHub rename, lib/repo_url.cjs sourceBinding).
+    put('source_binding', c.source_binding.state, c.source_binding.alias ? { alias: c.source_binding.alias } : {});
+  }
   if (c.repository_posture) {
     const extra = {};
     if (c.repository_posture.checks)      extra.checks = c.repository_posture.checks;

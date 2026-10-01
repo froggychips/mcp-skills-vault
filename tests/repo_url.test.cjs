@@ -106,3 +106,85 @@ test('no script matches github.com in an unanchored pattern', () => {
   }
   assert.deepEqual(offenders, [], `unanchored github.com patterns outside lib/repo_url.cjs:\n${offenders.join('\n')}`);
 });
+
+// ── source_binding: does a registry's repository field name our repository? ──
+//
+// verify_integrity.cjs used to compare whole normalised URLs with its own copy
+// of the normaliser, which kept `/tree/<branch>/<path>` and `#fragment` on the
+// npm side. Every monorepo package whose npm metadata points into a
+// subdirectory read as "repo mismatch" — and that word makes trust unverified.
+
+test('repoKey / githubSlug: the npm spellings seen in the DB name one repository', () => {
+  assert.equal(r.githubSlug('https://github.com/mondaycom/monday-ai/tree/master/packages/monday-api-mcp'), 'mondaycom/monday-ai');
+  assert.equal(r.githubSlug('git+https://github.com/mondaycom/mcp.git#master'), 'mondaycom/mcp');
+  assert.equal(r.githubSlug('git@github.com:o/r.git'), 'o/r');
+  assert.equal(r.githubSlug('github:o/r'), 'o/r');
+  assert.equal(r.githubSlug('github:O/R.git#main'), 'o/r');
+  assert.equal(r.githubSlug('git://github.com/o/r.git'), 'o/r');
+  // The shorthand is anchored like everything else.
+  assert.equal(r.githubSlug('xgithub:o/r'), null);
+  assert.equal(r.githubSlug('github:o'), null);
+  assert.equal(r.repoKey('https://GitHub.com/O/R/tree/main/x'), 'github.com/o/r');
+  // Not GitHub: still compared, by normalised spelling.
+  assert.equal(r.repoKey('git+https://gitlab.com/Acme/Server.git#v1'), 'gitlab.com/acme/server');
+  assert.equal(r.repoKey('https://gitlab.com/acme/server/-/tree/main/pkg'), 'gitlab.com/acme/server');
+  assert.equal(r.repoKey(null), null);
+});
+
+test('sourceBinding: subdirectory, fragment, ssh, shorthand and case are the same repository', () => {
+  const stored = 'https://github.com/mondaycom/mcp';
+  for (const declared of [
+    'git+https://github.com/mondaycom/mcp.git#master',
+    'https://github.com/mondaycom/mcp/tree/master/packages/monday-api-mcp',
+    'git@github.com:mondaycom/mcp.git',
+    'github:mondaycom/mcp',
+    'https://github.com/MondayCom/MCP',
+    'https://github.com/mondaycom/mcp?tab=readme-ov-file',
+  ]) {
+    assert.deepEqual(r.sourceBinding(stored, declared), { state: 'verified' }, declared);
+  }
+  assert.deepEqual(r.sourceBinding('https://github.com/o/r/tree/main/pkg', 'git+https://github.com/o/r.git'), { state: 'verified' });
+  assert.equal(r.sourceBinding(stored, 'https://github.com/someone-else/mcp').state, 'mismatch');
+  assert.equal(r.sourceBinding(stored, 'https://evil.example/github.com/mondaycom/mcp').state, 'mismatch');
+  assert.equal(r.sourceBinding(stored, null).state, 'unverified');
+  assert.equal(r.sourceBinding(null, stored).state, 'unverified');
+});
+
+test('sourceBinding: a renamed repository matches only through a recorded alias that resolves to it', () => {
+  const stored = 'https://github.com/mondaycom/mcp';
+  const old = 'https://github.com/mondaycom/monday-ai/tree/master/packages/monday-api-mcp';
+  // No network here: without a recorded alias a rename is a mismatch.
+  assert.equal(r.sourceBinding(stored, old).state, 'mismatch');
+  const aliases = [{ slug: 'mondaycom/monday-ai', resolved_to: 'mondaycom/mcp', resolved_at: '2026-10-01', via: 'github-api' }];
+  assert.deepEqual(r.sourceBinding(stored, old, { aliases }), { state: 'verified', alias: 'mondaycom/monday-ai' });
+  assert.deepEqual(r.sourceBinding('https://github.com/MondayCom/MCP', 'git+https://github.com/MONDAYCOM/monday-ai.git', { aliases }),
+    { state: 'verified', alias: 'mondaycom/monday-ai' });
+  // An alias recorded for a different repository is not inherited when
+  // source_url changes: it named an earlier name of *that* repository.
+  assert.equal(r.sourceBinding('https://github.com/fork/mcp', old, { aliases }).state, 'mismatch');
+  // Malformed alias lists are ignored, not trusted.
+  assert.equal(r.sourceBinding(stored, old, { aliases: 'mondaycom/monday-ai' }).state, 'mismatch');
+  assert.equal(r.sourceBinding(stored, old, { aliases: [null, { slug: 'mondaycom/monday-ai' }] }).state, 'mismatch');
+});
+
+test('one URL normaliser: no script outside lib/repo_url.cjs defines its own', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const roots = [
+    path.resolve(__dirname, '../mcp-ecosystem-intelligence/scripts'),
+    path.resolve(__dirname, '../mcp-ecosystem-intelligence/scripts/lib'),
+    path.resolve(__dirname, '../.github/scripts'),
+    path.resolve(__dirname, '../bin'),
+  ];
+  const offenders = [];
+  for (const dir of roots) {
+    if (!fs.existsSync(dir)) continue;
+    for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.cjs'))) {
+      if (f === 'repo_url.cjs') continue;
+      const src = fs.readFileSync(path.join(dir, f), 'utf8');
+      // A normaliser is a chain that strips `.git` from a URL.
+      if (/\.replace\(\/\\\.git\$\//.test(src)) offenders.push(path.relative(path.resolve(__dirname, '..'), path.join(dir, f)));
+    }
+  }
+  assert.deepEqual(offenders, []);
+});

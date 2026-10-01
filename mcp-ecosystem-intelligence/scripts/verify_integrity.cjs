@@ -259,16 +259,41 @@ function progress(line) {
   else                     process.stdout.write(line);
 }
 
+// Which repository a registry's `repository` field names, and whether it is the
+// one the DB records — one implementation, lib/repo_url.cjs. This file had its
+// own copy that compared whole URLs: `…/monday-ai/tree/master/packages/x` on
+// the npm side, a `#master` fragment, or a renamed repository all read as a
+// different project.
+const { normalizeGitUrl, githubSlug, repoKey, sourceBinding } = require('./lib/repo_url.cjs');
 
-function normalizeGitUrl(url) {
-  if (!url || typeof url !== 'string') return null;
-  return url
-    .replace(/^git\+ssh:\/\/git@github\.com\//, 'https://github.com/')
-    .replace(/^git\+https:\/\//, 'https://')
-    .replace(/^git\+/, '')
-    .replace(/^git@github\.com:/, 'https://github.com/')
-    .replace(/\.git$/, '')
-    .replace(/\/issues\/?$/, '');                       // strip /issues from Bug Tracker URLs
+/**
+ * --update only: when the registry names a different GitHub repository than
+ * the DB, ask GitHub once whether it is the same one under an older name (a
+ * rename or transfer — GitHub answers the old path with the current
+ * full_name). A confirmed answer is stored on the entry as a dated alias, so
+ * the offline comparison can use it without the network. Returns the alias
+ * added, or null.
+ */
+async function resolveRepoAlias(tool, declaredUrl) {
+  const theirs = githubSlug(declaredUrl);
+  const ours = githubSlug(tool.source_url);
+  if (!theirs || !ours || theirs === ours) return null;
+  const known = Array.isArray(tool.source_aliases) ? tool.source_aliases : [];
+  if (known.some((a) => a && String(a.slug).toLowerCase() === theirs && String(a.resolved_to).toLowerCase() === ours)) return null;
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || null;
+  const res = await getJson(`https://api.github.com/repos/${theirs}`, {
+    headers: {
+      'Accept':     'application/vnd.github+json',
+      'User-Agent': 'mcp-vault-verify',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    cacheTtlMs: CACHE_TTL_MS,
+  });
+  const now = res && res.ok ? String(res.data?.full_name || '').toLowerCase() : '';
+  if (now !== ours) return null;
+  const alias = { slug: theirs, resolved_to: ours, resolved_at: new Date(AS_OF).toISOString().slice(0, 10), via: 'github-api' };
+  tool.source_aliases = [...known.filter((a) => !(a && String(a.slug).toLowerCase() === theirs)), alias];
+  return alias;
 }
 
 // Registry and feed transport. Both wrappers keep the old contract — a null
@@ -830,13 +855,12 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
   const npmVersion   = meta.version;
   const npmIntegrity = meta.dist?.integrity ?? null;
   const npmRepoRaw   = typeof meta.repository === 'string' ? meta.repository : (meta.repository?.url ?? null);
-  const npmRepo      = normalizeGitUrl(npmRepoRaw);
-  const storedRepo   = normalizeGitUrl(tool.source_url);
 
   if (UPDATE) {
     tool.version = npmVersion;
     tool.pkg_integrity = npmIntegrity;
-    results.push({ tool, status: 'UPD', msg: `${tool.name}@${npmVersion}` });
+    const alias = await resolveRepoAlias(tool, npmRepoRaw);
+    results.push({ tool, status: 'UPD', msg: `${tool.name}@${npmVersion}${alias ? ` (source alias ${alias.slug} → ${alias.resolved_to})` : ''}` });
     return;
   }
 
@@ -860,16 +884,17 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
     checks.artifact = { state: 'verified', method: 'registry-metadata' };
   }
 
-  // Repo URL — suppress monorepo subdirectory paths
-  if (!npmRepo) {
+  // Repo URL — compared by repository (GitHub slug), not by spelling.
+  const npmBinding = sourceBinding(tool.source_url, npmRepoRaw, { aliases: tool.source_aliases });
+  if (!normalizeGitUrl(npmRepoRaw)) {
     lines.push(['NOTE', 'npm declares no repository.url']);
     checks.source_binding = { state: 'unverified' };
-  } else if (storedRepo && npmRepo.toLowerCase() !== storedRepo.toLowerCase() && !storedRepo.includes('/tree/')) {
+  } else if (npmBinding.state === 'mismatch') {
     lines.push(['WARN', `repo mismatch\n        source_url: ${tool.source_url}\n        npm repo  : ${npmRepoRaw}`]);
     checks.source_binding = { state: 'mismatch' };
     if (STRICT) failures++;
   } else {
-    checks.source_binding = { state: 'verified' };
+    checks.source_binding = npmBinding;
   }
 
   // An installed server with no version in its launch command resolves `latest`
@@ -935,7 +960,7 @@ async function processNpm(tool, pkg, fetched, advisoriesForTool, degraded, resul
       // certificate inside a bundle is not validated against a trust root, so
       // the digest half of a binding has to rest on npm's own key.
       keys,
-      normalizeRepo: normalizeGitUrl,
+      normalizeRepo: repoKey,
     });
 
     if (prov.state === 'unreadable') {
@@ -1157,13 +1182,12 @@ async function processPypi(tool, pkg, meta, advisoriesForTool, degraded, results
   const pyVersion = meta.info.version;
   const pySha256  = pypiSdistSha256(meta);
   const pySrc     = pypiSourceUrl(meta.info);
-  const pyRepo    = normalizeGitUrl(pySrc);
-  const storedRepo = normalizeGitUrl(tool.source_url);
 
   if (UPDATE) {
     tool.version       = pyVersion;
     tool.pkg_integrity = pySha256 ? `sha256-${pySha256}` : null;
-    results.push({ tool, status: 'UPD', msg: `${tool.name}@${pyVersion}` });
+    const alias = await resolveRepoAlias(tool, pySrc);
+    results.push({ tool, status: 'UPD', msg: `${tool.name}@${pyVersion}${alias ? ` (source alias ${alias.slug} → ${alias.resolved_to})` : ''}` });
     return;
   }
 
@@ -1224,15 +1248,16 @@ async function processPypi(tool, pkg, meta, advisoriesForTool, degraded, results
   }
 
   // Source URL
-  if (!pyRepo) {
+  const pyBinding = sourceBinding(tool.source_url, pySrc, { aliases: tool.source_aliases });
+  if (!normalizeGitUrl(pySrc)) {
     lines.push(['NOTE', 'PyPI declares no project_urls source — source unverifiable']);
     checks.source_binding = { state: 'unverified' };
-  } else if (storedRepo && pyRepo.toLowerCase() !== storedRepo.toLowerCase() && !storedRepo.includes('/tree/')) {
+  } else if (pyBinding.state === 'mismatch') {
     lines.push(['WARN', `repo mismatch\n        source_url: ${tool.source_url}\n        pypi src  : ${pySrc}`]);
     checks.source_binding = { state: 'mismatch' };
     if (STRICT) failures++;
   } else {
-    checks.source_binding = { state: 'verified' };
+    checks.source_binding = pyBinding;
   }
 
   // License — NOTE when PyPI omits it but DB has a value (e.g. sourced from GitHub)

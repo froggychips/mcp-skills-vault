@@ -21,6 +21,13 @@
  *   isGithubUrl(url)      -> boolean
  *   normalizeGitUrl(url)  -> canonical https URL | null
  *   githubRepoUrl(url)    -> "https://github.com/owner/repo" | null
+ *   repoKey(url)          -> comparable identity: "github.com/owner/repo"
+ *                            (lowercased) for GitHub, else the normalised URL
+ *                            without scheme, lowercased | null
+ *   sourceBinding(stored, declared, { aliases })
+ *                         -> { state: 'verified'|'mismatch'|'unverified', alias? }
+ *                            does a registry's repository field name the
+ *                            repository the DB records? (see below)
  */
 
 // Anchored at both ends. The forms that appear in real package metadata:
@@ -28,15 +35,21 @@
 //   https://github.com/o/r.git      https://github.com/o/r/tree/main/pkg
 //   git+https://github.com/o/r.git  git+ssh://git@github.com/o/r.git
 //   git@github.com:o/r.git          ssh://git@github.com/o/r
+//   git://github.com/o/r.git        github:o/r   (npm shorthand)
 //
 // A trailing path (`/tree/main/x`, `#readme`, `?tab=readme`) is allowed and
 // ignored, because monorepo entries legitimately point at a subdirectory. What
 // is *not* allowed is anything before the host.
-const GITHUB_URL = /^(?:git\+)?(?:(?:https?|ssh):\/\/)?(?:git@)?(?:www\.)?github\.com[:/]+([A-Za-z0-9](?:[A-Za-z0-9-]{0,38})?)\/([A-Za-z0-9._-]+?)(?:\.git)?(?:[/#?].*)?$/i;
+const GITHUB_URL = /^(?:git\+)?(?:(?:https?|ssh|git):\/\/)?(?:git@)?(?:www\.)?github\.com[:/]+([A-Za-z0-9](?:[A-Za-z0-9-]{0,38})?)\/([A-Za-z0-9._-]+?)(?:\.git)?(?:[/#?].*)?$/i;
+
+// npm's `repository: "github:owner/repo"` shorthand. Anchored like the above;
+// the bare `owner/repo` form is not accepted, because outside package.json it
+// is indistinguishable from a relative path.
+const GITHUB_SHORTHAND = /^github:([A-Za-z0-9](?:[A-Za-z0-9-]{0,38})?)\/([A-Za-z0-9._-]+?)(?:\.git)?(?:#.*)?$/i;
 
 function match(url) {
   if (!url || typeof url !== 'string') return null;
-  const m = GITHUB_URL.exec(url.trim());
+  const m = GITHUB_URL.exec(url.trim()) || GITHUB_SHORTHAND.exec(url.trim());
   if (!m) return null;
   // A repository cannot be named `.` or `..`, and npm metadata does contain
   // odd values; refusing them here keeps them out of API paths.
@@ -81,8 +94,56 @@ function normalizeGitUrl(url) {
     .replace(/^git\+https:\/\//, 'https://')
     .replace(/^git\+/, '')
     .replace(/^git@github\.com:/, 'https://github.com/')
+    .replace(/^(?:git|http):\/\//, 'https://')
+    .replace(/[#?].*$/, '')                             // `#master`, `#readme`, `?tab=…`
+    .replace(/\/+$/, '')
     .replace(/\.git$/, '')
-    .replace(/\/issues\/?$/, '');                       // Bug Tracker URLs
+    .replace(/\/issues$/, '')                           // Bug Tracker URLs
+    .replace(/\/(?:-\/)?(?:tree|blob)\/.*$/, '');        // monorepo subdirectory (GitHub, GitLab)
 }
 
-module.exports = { githubSlug, githubOwner, isGithubUrl, githubRepoUrl, normalizeGitUrl, GITHUB_URL };
+/**
+ * What to compare two repository URLs by. For GitHub that is the slug — the
+ * only part that names the repository; a subdirectory, a branch fragment, a
+ * `.git` suffix and letter case all name the same one. Elsewhere it is the
+ * normalised URL, because nothing here can resolve a slug for a GitLab or a
+ * self-hosted host, and two spellings of *those* still deserve to compare.
+ */
+function repoKey(url) {
+  const slug = githubSlug(url);
+  if (slug) return `github.com/${slug}`;
+  const n = normalizeGitUrl(url);
+  return n ? n.replace(/^https?:\/\//, '').toLowerCase() : null;
+}
+
+/**
+ * Does the repository a package registry declares (npm `repository.url`, a
+ * PyPI project URL) name the repository the DB records as `source_url`?
+ *
+ * `aliases` are earlier names of the recorded repository — a GitHub rename or
+ * transfer that published releases still carry in their metadata. Each one is
+ * `{ slug, resolved_to, resolved_at, via }`, written by a refresh that asked
+ * GitHub (`verify_integrity.cjs --update`), never inferred here: this function
+ * does no I/O, so an offline check gives the same answer as an online one. An
+ * alias counts only while `resolved_to` is still the recorded repository — a
+ * source_url changed afterwards does not inherit it.
+ */
+function sourceBinding(stored, declared, { aliases = [] } = {}) {
+  const ours = repoKey(stored);
+  const theirs = repoKey(declared);
+  if (!ours || !theirs) return { state: 'unverified' };
+  if (ours === theirs) return { state: 'verified' };
+  const theirSlug = githubSlug(declared);
+  const ourSlug = githubSlug(stored);
+  if (theirSlug && ourSlug) {
+    const alias = (Array.isArray(aliases) ? aliases : []).find((a) => a
+      && String(a.slug || '').toLowerCase() === theirSlug
+      && String(a.resolved_to || '').toLowerCase() === ourSlug);
+    if (alias) return { state: 'verified', alias: theirSlug };
+  }
+  return { state: 'mismatch' };
+}
+
+module.exports = {
+  githubSlug, githubOwner, isGithubUrl, githubRepoUrl, normalizeGitUrl, repoKey, sourceBinding, GITHUB_URL,
+};

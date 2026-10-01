@@ -35,7 +35,7 @@
  */
 
 const { getJson } = require('./http.cjs');
-const { githubSlug } = require('./repo_url.cjs');
+const { githubSlug, sourceBinding } = require('./repo_url.cjs');
 
 const REGISTRY = 'https://registry.modelcontextprotocol.io';
 const META_KEY = 'io.modelcontextprotocol.registry/official';
@@ -166,7 +166,11 @@ function identityFindings({ record, tool }) {
   const theirs   = repoSlug(server.repository && server.repository.url);
 
   // The registry's own record of where the code lives.
-  if (ours && theirs && ours.repo !== theirs.repo) {
+  // Same comparison as verify's source_binding: by slug, and a confirmed
+  // earlier name of the recorded repository (`source_aliases`) is not a
+  // contradiction.
+  if (ours && theirs
+    && sourceBinding(tool.source_url, server.repository.url, { aliases: tool.source_aliases }).state === 'mismatch') {
     findings.push(`the registry lists this server's repository as ${server.repository.url}, the entry records ${tool.source_url}`);
   }
   // The proved part: a `io.github.<owner>` namespace and a repo under a

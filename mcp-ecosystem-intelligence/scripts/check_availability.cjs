@@ -73,7 +73,7 @@ const { finding } = require('./lib/finding.cjs');
 const { subjectForTool } = require('./lib/findings_from.cjs');
 const { commandPolicy, decideRun, unanswered } = require('./lib/run_decision.cjs');
 // One definition of what a repository URL names, anchored: see lib/repo_url.cjs.
-const { githubSlug: repoSlug } = require('./lib/repo_url.cjs');
+const { githubSlug: repoSlug, sourceBinding } = require('./lib/repo_url.cjs');
 
 const DB_PATH     = path.resolve(__dirname, '../assets/tools_database.json');
 const CONCURRENCY = 8;
@@ -303,7 +303,8 @@ async function checkEntry(tool, opts, { get = getJson } = {}) {
   if (registryRepo && tool.source_url) {
     const a = repoSlug(registryRepo);
     const b = repoSlug(tool.source_url);
-    if (a && b && a !== b) {
+    // A confirmed earlier name of the recorded repository is not a move.
+    if (a && b && sourceBinding(tool.source_url, registryRepo, { aliases: tool.source_aliases }).state === 'mismatch') {
       row.identity = {
         state:  'relocated',
         detail: `${eco === 'pypi' ? 'PyPI' : 'npm'} points at ${a}, the entry records ${b}`,
