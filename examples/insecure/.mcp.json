@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "browser": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    },
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "mcp-server-memmory"]
+    },
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "--registry", "https://npm.example.internal", "@modelcontextprotocol/server-postgres@0.6.2"],
+      "env": { "DATABASE_URL": "postgres://app:s3cr3t-Passw0rd@db.internal:5432/app" }
+    }
+  }
+}

@@ -1,403 +1,173 @@
 # Security Policy
 
-## Supported Versions
+## Reporting a vulnerability
 
-| Component | Supported |
-|---|---|
-| `tools_database.json` (current) | ✅ |
-| `scripts/verify_integrity.cjs` (current) | ✅ |
-| `scripts/orchestrate.cjs` (current) | ✅ |
-| `scripts/refresh_scores.cjs` (current) | ✅ |
-| Pinned `version` entries in DB | ✅ integrity-gated |
-
-Older commits are not patched — update to `HEAD` of `master`.
-
-## What `bound` means for provenance
-
-`verify` reports provenance as `bound` when **all** of the following hold:
-
-1. npm's own registry signing key — the same key `dist.signatures` is checked
-   against — signed a DSSE statement whose subject digest is the artifact this
-   run verified. That signature is checked, not assumed.
-2. A signing certificate in the bundle claims the repository the DB records, via
-   the SAN identity Fulcio puts there (`https://github.com/<owner>/<repo>/<workflow>@<ref>`).
-3. The builder id is a GitHub Actions runner, matched anchored rather than as a
-   substring.
-
-What `bound` does **not** mean, and the output never says otherwise:
-
-- **The certificate chain is not validated** against Fulcio's root, and the
-  Rekor inclusion proof is not checked. Anyone can mint a certificate with any
-  SAN in it, so (2) is a *claim about* a repository rather than proof of one.
-  That is exactly why (1) must rest on npm's key: the digest half of the binding
-  has to hold even when the identity half is forgeable.
-- A statement verified **only** against the bundle's own certificate reaches
-  `claimed`, not `bound`, and says why. In practice npm publishes both
-  attestations, so this costs nothing for real packages while refusing a forged
-  document that carries only the forgeable half.
-- Nothing here establishes that the code in the artifact is benign.
-
-Validating the Fulcio chain (with a pinned root) is the obvious next step and is
-not done yet.
-
-## Our own releases
-
-`@froggychips/mcp-vault` is published from
-[.github/workflows/release.yml](.github/workflows/release.yml), which refuses to
-publish without an npm provenance attestation unless the refusal is overridden
-explicitly (`allow_unprovenanced`). A tool that argues for provenance should
-ship with it.
-
-**Every version published since that refusal existed — 0.14.0, 0.14.1, 0.15.1
-and 0.15.2 — went out with the override, and therefore has no provenance
-attestation. 0.15.0 was never published at all** — its tag and GitHub Release
-are public, the publish job refused, and the next release went out instead, so
-the registry goes 0.14.1 → 0.15.1 with nothing between them.
-
-The scope of that sentence is the gate, not the lock, and the two do not line
-up. The billing lock is older: npm publishing moved to the self-hosted runner
-on 2026-06-20 (`8be08dd`) because hosted runners would not start. The gate
-that demands provenance, and the `allow_unprovenanced` escape from it, arrived
-on 2026-09-17 (`927ffd7`). Versions published in between — 0.12.0 on
-2026-06-20, by hand — have no attestation either, but not because anyone
-overrode anything: nothing was asking for one yet.
-
-Why the override keeps being needed, which is not a choice:
-
-- npm accepts a provenance bundle only from a **GitHub-hosted** runner
-  (`Unsupported GitHub Actions runner environment: "self-hosted"`, HTTP 422).
-- Every job in this repository runs on a self-hosted runner, because
-  GitHub-hosted runners do not start on this account — the account is locked
-  over a failed card authorization, and a hosted job dies with zero steps and
-  the annotation *"The job was not started because your account is locked due to
-  a billing issue."*
-
-So the two constraints exclude each other, and each of those versions was
-published unprovenanced on purpose rather than silently. What is still true for
-them: npm's **registry signature** over `name@version:integrity` is present, as
-it is for every version, and `npm audit signatures` verifies it. What is absent
-is `dist.attestations`, and the registry metadata says so plainly — there is no
-version of this package where it is present, and nothing here claims otherwise.
-
-The publish job now runs on `ubuntu-latest` — the fix this section has
-prescribed all along, which the job itself had not taken, because a comment
-sitting on it argued that a self-hosted runner works since the OIDC token comes
-from GitHub. That reasoning is about where the *token* comes from and npm's
-check is about where the *build* ran. It cost 0.15.0 a publish.
-
-What that leaves: while the account is locked, the hosted job does not start,
-so the job queues and npm gets nothing. That is the intended failure — a stalled
-release rather than a quiet one.
-
-**2026-09-24 is what that looks like in practice.** Merging the 0.15.1 release
-PR created the tag and the GitHub Release, and the publish job died in three
-seconds with no steps at all, carrying the annotation *"The job was not started
-because your account is locked due to a billing issue."* 0.15.1 then went out
-through the override — `workflow_dispatch` with `allow_unprovenanced=true`,
-which routes to the self-hosted runner — and the sequence there is worth
-recording exactly, because it is the same one that cost 0.15.0 its publish:
-
-1. `npm publish --provenance` builds the bundle and **signs it first**. The
-   statement reaches the sigstore transparency log before npm ever looks at it:
-   [logIndex 2931732566](https://search.sigstore.dev/?logIndex=2931732566).
-2. npm then rejects the bundle — HTTP 422, *"Unsupported GitHub Actions runner
-   environment: self-hosted"*.
-3. The fallback publishes the same tarball without provenance.
-
-So there is a public, signed statement about a tarball that is on the registry
-without a provenance attestation attached to it. 0.15.2 followed the same three
-steps later the same day. The statements, and what each one describes:
-
-| version | sigstore | the tarball it describes |
-|---|---|---|
-| 0.15.0 | [logIndex 2883447939](https://search.sigstore.dev/?logIndex=2883447939) | never published — not on the registry at all |
-| 0.15.1 | [logIndex 2931732566](https://search.sigstore.dev/?logIndex=2931732566) | on the registry, no attestation attached |
-| 0.15.2 | [logIndex 2932476094](https://search.sigstore.dev/?logIndex=2932476094) | on the registry, no attestation attached |
-
-None of these is a vulnerability; all three are the kind of loose end that is
-worse when it is discovered than when it is written down. Expect one more row
-per release for as long as the lock holds — which is the argument for clearing
-it rather than for a longer table.
-
-Provenance returns when the billing lock is cleared: the publish job needs no
-change, only a hosted runner that starts.
-
-That override runs on the **self-hosted** runner, and has to: a dispatch saying
-"publish without provenance" has given up the only thing the hosted runner was
-for, and routing it to a hosted runner would mean the documented way out of a
-billing lock is the one thing a billing lock stops. The refusal itself is still
-npm's to make — the job attempts `--provenance` first either way and falls back
-only on npm's own 422.
-
-## Signed DB
-
-`tools_database.json` is the trust anchor (see *Sensitive Attack Surfaces*),
-and until now the client trusted it for arriving in the npm tarball. The CLI
-now checks an Ed25519 signature before any command that reads it
-(`bin/mcp-vault.cjs` → `lib/db_signature.cjs`), offline, with Node's own
-`crypto`:
-
-- **What is signed**: the DB's canonical JSON (sorted keys, no whitespace,
-  UTF-8 — `lib/signing.cjs`), so line endings or re-indentation neither break
-  a signature nor hide a change. `tools_database.json.sig` carries the key id,
-  the algorithm, the sha256 of those canonical bytes and the signing date, all
-  inside the signed message.
-- **Who may sign**: the keys in `assets/trusted_keys.json`, shipped in the
-  package. Rotation: add the new key with `valid_from`, give the old one
-  `valid_until`; a signature must fall inside its key's window. `revoked: true`
-  verifies nothing whatever date is claimed — a window stops a retired key used
-  by mistake, not a stolen one backdating.
-- **Fail closed, in the installed package**: no `.sig`, a malformed one, an
-  unknown or revoked key, a key outside its window, or changed content → the
-  command does not run and says which. Every DB passed with `--db` (each
-  occurrence, `--db=` too) is held to the same bar.
-- **Required only where it can exist.** Signing happens at release, so a git
-  checkout — development, CI, every PR that touches the DB — never has a
-  `.sig`. The check therefore asks where it runs (`signatureContext` in
-  `lib/db_signature.cjs`): a `.git` entry (directory, or a worktree's file)
-  **at the package root itself** means a checkout, where a *missing* `.sig`
-  is allowed. Anything else is a package and requires one. Why that signal:
-  npm never packs `.git` (npm-packlist drops it unconditionally), so no
-  tarball and no `npm install` / `npx` can produce it; it is read at the
-  package root, not found by walking up, so a package inside somebody's
-  repository is still a package; the default is the strict answer — a copy, a
-  source zip or an image without `.git` requires a signature; and creating
-  `.git` inside an installed package takes write access to the very code that
-  runs this check. A `.sig` that *is* present must verify in a checkout too,
-  and an unreadable keyring refuses everywhere. `MCP_VAULT_REQUIRE_SIGNED_DB=1`
-  makes a checkout behave like a package (it only tightens).
-- **Development / forks without `.git`**: `--allow-unsigned-db` or
-  `MCP_VAULT_ALLOW_UNSIGNED_DB=1` turn the refusal into a warning, printed on
-  every run. `npm test` needs neither — the tests generate keys on the fly.
-- **One place decides.** The check is findings (`db/signature-verified`,
-  `-absent`, `-invalid`, `-not-configured`, `-keyring-invalid`) on the DB file,
-  and the `db/signature` row of `lib/policy_rules.cjs` decides them through
-  `decide()` ([ADR 0001](docs/adr/0001-findings-and-time.md),
-  [addendum](docs/adr/0001-addendum-121-signed-db.md)). `mcp-vault signature
-  --json` prints that `mcp-vault/findings@1` document.
-- **An empty keyring** (a build made without a key, or a fork) reports
-  `not-configured` — `unknown`, never `verified` — and lets commands run;
-  `signature --fail-unverified` fails on it. The shipped keyring lists the
-  release key `92cf62804f86a312` from 2026-09-30.
-
-What it does not cover: the keyring ships inside the same tarball as the code,
-so an attacker who can rewrite the package can rewrite the keyring too. The
-signature protects the DB wherever it travels without that code — a mirror, a
-copy handed over with `--db`, a vendored file — and ties it to a key the
-maintainer holds rather than to whoever controls the transport. Scripts run
-directly (`node mcp-ecosystem-intelligence/scripts/…`) are the development path
-and do not check it.
-
-### Setting up the release key (maintainer, once)
-
-```bash
-node mcp-ecosystem-intelligence/scripts/sign_db.cjs --keygen ~/mcp-vault-release.pem
-#   (equivalent: openssl genpkey -algorithm ed25519 -out ~/mcp-vault-release.pem)
-node mcp-ecosystem-intelligence/scripts/sign_db.cjs --public-entry --key-file ~/mcp-vault-release.pem
-gh secret set MCP_VAULT_SIGNING_KEY < ~/mcp-vault-release.pem
-```
-
-Paste the printed entry into `assets/trusted_keys.json` and merge that PR. From
-then on `release.yml` runs `sign_db.cjs --release`, which refuses to publish
-without the secret, or with a secret whose key the keyring does not list, and
-verifies the result the way a client will; then it packs the tarball, unpacks
-it where there is no `.git`, and runs `mcp-vault signature --strict` from
-there, before `npm publish`. Keep an
-offline copy of the private key; never commit it.
-
-Optional, as a second and independent statement: `cosign sign-blob
-tools_database.json` (keyless, recorded in Rekor) can be run by hand or added
-as a step later. It is not a dependency, and the client does not read it.
-
-### Imported audits
-
-`mcp-vault audits` exchanges audits in the cargo-vet model, signed with the
-same Ed25519 envelope. Sources are listed in `.mcp-vault.imports.json` with
-their public key and the criteria accepted from them, fetched only by
-`audits fetch`, and re-verified from `.mcp-vault.imports.lock.json` on every
-read against the key in the *config* — so an edited lock contributes nothing.
-Imports are not transitive: an export carries its author's own audits only, and
-a bundle carrying anything else is refused. An audit is an Observation with
-its source (`audit:local`, `audit:<key id>`), shown in `explain`'s trace
-through an `audits/recorded` finding; it is not an evidence dimension, so it
-cannot raise `trust`, and the `audits/recorded` row can only say `allow`, so it
-cannot lift a decision either: someone else having looked at a package is not
-a hash match.
-
-## Static analysis (CodeQL)
-
-CodeQL runs as **advanced setup** on the self-hosted runner
-([.github/workflows/codeql.yml](.github/workflows/codeql.yml)), analysing
-`javascript-typescript` and `actions` with the `security-extended` suite on
-pushes to master, on pull requests that touch code or workflows, and weekly.
-
-The default setup was **disabled**, not abandoned. It is hard-wired to
-GitHub-hosted runners, and this account's hosted minutes are blocked by a
-billing lock (see [runner-health.yml](.github/workflows/runner-health.yml)), so
-every "CodeQL Setup" run failed before executing a step — a red check that said
-nothing about the code. In a repository about supply-chain scanning, a scanner
-that cannot run is worse than one that is honestly absent.
-
-The `actions` language is the reason this is worth a runner slot: the CI
-problems fixed in this repo recently — a `pull_request_target` trust boundary, a
-job running with a token scoped far wider than it needed, unpinned third-party
-actions — are precisely what those queries look for, and all of them were found
-by a human reading the YAML.
-
-## Reporting a Vulnerability
-
-Please report privately — do **not** open a public GitHub issue for security matters.
+Please report privately — do **not** open a public GitHub issue for security
+matters.
 
 - **Telegram:** [@froggychips](https://t.me/froggychips)
 - **Email:** big@froggychips.xyz
 
-Include: reproduction steps, what you expected vs. what happened, and the SHA of the commit you're testing against.
+Include reproduction steps, what you expected and what happened, and the
+version or commit SHA you tested. A bypass of a check — something that should
+fail and passes — is treated as the most serious class of bug here.
 
-## Threat Model
+## Supported versions
+
+| Version | Supported |
+|---|---|
+| latest 0.16.x on npm, and `master` | yes |
+| anything older | no — upgrade |
+
+Before 1.0 there are no backports. The vault DB that ships with a version is
+signed and fixed; newer data comes with a newer release.
+
+## Signed DB
+
+`tools_database.json` decides what `install` writes and what `check` compares
+a launch against, so the CLI checks an Ed25519 signature over it before any
+command reads it (`bin/mcp-vault.cjs` → `lib/db_signature.cjs`), offline, with
+Node's own `crypto`.
+
+- **What is signed:** the DB's canonical JSON (sorted keys, no whitespace,
+  UTF-8 — `lib/signing.cjs`), so line endings or re-indentation neither break a
+  signature nor hide a change. `tools_database.json.sig` carries the key id,
+  the algorithm, the sha256 of the canonical bytes and the signing date, all
+  inside the signed message. It is made at release and is not in git.
+- **Who may sign:** the keys in
+  [`assets/trusted_keys.json`](mcp-ecosystem-intelligence/assets/trusted_keys.json),
+  shipped in the package. Today that is one release key, **`92cf62804f86a312`**,
+  valid from 2026-09-30. Rotation: add the new key with `valid_from`, give the
+  old one `valid_until`; `revoked: true` verifies nothing whatever date is
+  claimed.
+- **Where it is required:**
+
+  | How you run it | DB check |
+  |---|---|
+  | the npm package (`npx`, `npm i -g`, the Action with `version:`) | **strict**: a missing, malformed, unknown-key, revoked or out-of-window signature, or changed content → the command does not run |
+  | a git checkout (development, CI of this repo) | a missing `.sig` is allowed; one that is present must verify. `MCP_VAULT_REQUIRE_SIGNED_DB=1` makes a checkout strict |
+  | the GitHub Action in its default mode (its own checkout) | GitHub unpacks `uses:` without `.git` and without the release `.sig`, so the action allows a missing signature for that step only. The DB is the bytes of the commit `uses:` names, exactly as the code that checks it is: **the SHA pin is the integrity**. Pin `uses:` to a full SHA; the action warns otherwise |
+
+  The signal for "checkout" is a `.git` entry **at the package root itself**:
+  npm never packs `.git`, so no tarball can produce it, and creating it inside
+  an installed package takes write access to the code that runs the check.
+- **Forks and copies without `.git`:** `--allow-unsigned-db` or
+  `MCP_VAULT_ALLOW_UNSIGNED_DB=1` turn the refusal into a warning printed on
+  every run.
+- **One place decides:** the check is findings (`db/signature-verified`,
+  `-absent`, `-invalid`, `-not-configured`, `-keyring-invalid`) decided by the
+  `db/signature` row of the rule table
+  ([ADR 0001](docs/adr/0001-findings-and-time.md),
+  [addendum](docs/adr/0001-addendum-121-signed-db.md)).
+  `mcp-vault signature --json` prints that document.
+
+What it does not cover: the keyring ships in the same tarball as the code, so
+someone who can rewrite the package can rewrite the keyring. The signature
+protects the DB wherever it travels without that code — a mirror, a copy passed
+with `--db`, a vendored file — and ties it to a key the maintainer holds.
+
+### Release key (maintainer)
+
+```bash
+node mcp-ecosystem-intelligence/scripts/sign_db.cjs --keygen ~/mcp-vault-release.pem
+node mcp-ecosystem-intelligence/scripts/sign_db.cjs --public-entry --key-file ~/mcp-vault-release.pem
+gh secret set MCP_VAULT_SIGNING_KEY < ~/mcp-vault-release.pem
+```
+
+`release.yml` runs `sign_db.cjs --release`, which refuses to publish without
+the secret or with a key the keyring does not list, then packs the tarball,
+unpacks it where there is no `.git`, and runs `mcp-vault signature --strict`
+there before `npm publish`. Keep an offline copy of the private key; never
+commit it.
+
+## Provenance of this package
+
+`release.yml` publishes with `npm publish --provenance` and refuses to publish
+without an attestation unless a maintainer dispatches it with
+`allow_unprovenanced`.
+
+**No published version so far has a provenance attestation.** npm accepts a
+provenance bundle only from a GitHub-hosted runner, and hosted runners do not
+start on this account (a billing lock), so 0.14.0, 0.14.1, 0.15.1 and 0.15.2
+went out through the override, on purpose and in the open; 0.12.0 predates the
+requirement. 0.15.0 was never published (the registry goes 0.14.1 → 0.15.1).
+Every version does carry npm's registry signature over `name@version:integrity`
+(`npm audit signatures` verifies it); what is absent is `dist.attestations`,
+and `npm view @froggychips/mcp-vault@<version> dist.attestations` shows that
+plainly.
+
+The override path signs the statement before npm rejects it, so three sigstore
+log entries describe tarballs without an attestation attached:
+0.15.0 ([2883447939](https://search.sigstore.dev/?logIndex=2883447939), never
+published), 0.15.1 ([2931732566](https://search.sigstore.dev/?logIndex=2931732566))
+and 0.15.2 ([2932476094](https://search.sigstore.dev/?logIndex=2932476094)).
+Provenance returns when a hosted runner starts; the publish job needs no
+change. Until then the DB signature above is the integrity statement this
+project can make about its own data.
+
+## What `bound` means for provenance
+
+For the servers it checks, `verify` reports a server's provenance as `bound` when **all** of these hold:
+
+1. npm's own registry signing key — the key `dist.signatures` is checked
+   against — signed a DSSE statement whose subject digest is the artifact this
+   run verified;
+2. a signing certificate in the bundle names the repository the DB records
+   (the Fulcio SAN `https://github.com/<owner>/<repo>/<workflow>@<ref>`);
+3. the builder is a GitHub Actions runner, matched anchored.
+
+Not validated: the Fulcio certificate chain and the Rekor inclusion proof.
+Anyone can mint a certificate with any SAN, so (2) is a *claim about* a
+repository; that is why (1) must rest on npm's key. A statement verified only
+against the bundle's own certificate reaches `claimed`, not `bound`. Nothing
+here establishes that the code is benign.
+
+## Threat model
 
 ### In scope
 
-- A malicious or compromised entry in `tools_database.json` that causes `orchestrate.cjs --install` to write a tampered command into a project's `.mcp.json`
-- A bypass or logic error in `verify_integrity.cjs` that lets a hash-mismatched package pass the gate
-- A script vulnerability in `orchestrate.cjs` (e.g. shell injection via a crafted `install_cmd` field) that gains local code execution
-- A compromised weekly CI PR that silently ships a poisoned hash refresh without triggering reviewer attention
+- A config that `check` / the Action passes although it launches an unpinned,
+  lookalike or source-overridden server, or holds a plaintext secret.
+- A check that did not run being reported as one that passed — the recurring
+  bug shape in this kind of tool (a registry timeout counted as OK, a feed
+  outage read as "no advisories").
+- A tampered entry in `tools_database.json` leading `install` to write a
+  tampered command into a config.
+- A secret value from a host config appearing in any output.
+- Code execution through crafted input: a config, a DB entry, a policy file.
+- This repository's CI shipping a poisoned DB refresh without review.
 
 ### Out of scope
 
-- Vulnerabilities in the MCP servers themselves (report to their respective maintainers)
-- A locally malicious user who can already write to `tools_database.json` directly
-- Supply-chain attacks on npm/PyPI after the pinned hash passes — the hash pins a specific release artifact; it does not audit the code inside
-- GitHub Actions runner compromise (mitigated by `self-hosted` + human PR gate)
-
-## Sensitive Attack Surfaces
-
-### `tools_database.json` — the trust anchor
-
-Every `--install` command is derived from the `install_cmd` field. A tampered entry could write an arbitrary shell command into a project's `.mcp.json`.
-
-Mitigations in place:
-- All entries carry a pinned `version` and a `pkg_integrity` hash (npm sha512 / PyPI sha256 / Docker digest)
-- `verify_integrity.cjs` has two gates: `--offline` validates stored pins without network; default / `--no-audit` re-fetches live registry metadata before writing
-- The weekly CI PR is the **only** automated path to modify this file; it requires human review before merge
-
-Residual risk: a compromised npm/PyPI release that publishes under the same version number would pass — npm and PyPI version immutability is not guaranteed for all packages.
-
-### `verify_integrity.cjs` — the integrity gate
-
-A logic error here makes the entire pinning story worthless. The dangerous
-failure mode has a shape: **a check that did not happen must never be
-indistinguishable from a check that passed.** Every real instance found so far
-was a variant of it — a registry timeout recorded as `SKIP` and not counted, a
-wheel-only release where the comparison was skipped and the entry still read
-`OK`, an advisory severity that could not be parsed and therefore was not
-"hard", a feed outage coalescing into "no advisories".
-
-What the gate does today:
-- **Artifact** — the stored pin against the registry's metadata, and with
-  `--deep` against the bytes themselves (npm tarball sha512, PyPI sdist sha256,
-  OCI manifest sha256, hashed locally)
-- **Signature** — npm signs `<name>@<version>:<integrity>` with a published
-  ECDSA key; verified on every run, so a response with a swapped
-  `dist.integrity` cannot pass
-- **Provenance** — the attestation is read and its claimed repository compared
-  with `source_url`. Reported as a *claim*: verifying the sigstore bundle
-  (Fulcio chain, Rekor inclusion) is not something this tool does
-- **Advisories** — four feeds merged, severity taken from the worst any of them
-  reported, CVSS vectors scored rather than pattern-matched
-- **Dependencies** — with `--deps`, the resolved tree's install scripts and its
-  packages against OSV
-- **Source binding, install hooks, licence, digest pinning** — as before
-
-Anything the gate could not establish is `UNVERIFIED`: reported, counted, and a
-hard failure under `--fail-unverified` (which `--strict` implies, and which
-`install` passes). Evidence written back to the DB records *what was checked*,
-per dimension, with the date — so "verified" cannot quietly mean "verified
-eight months ago, by a run that skipped this part".
-
-Mitigations:
-- 535 tests, including the fail-closed paths and the CI manifests themselves
-- Smoke job on every PR (`--offline`), network-free, plus a SARIF upload so a
-  finding lands on the DB line that caused it
-- `--strict` treats WARNs as failures; `--fail-unverified` treats "could not
-  check" as one
-
-### Weekly hash refresh PR
-
-`.github/workflows/security-scan.yml`'s `refresh-hashes` job opens a PR every Monday with updated `version` + `pkg_integrity` from live registries. If an attacker can poison the registry during this window AND get the PR merged without review, they win.
-
-Mitigations:
-- PR is opened, never auto-merged
-- Diff is reviewable per-entry (one JSON field per line in the formatted DB)
-- The verify-integrity smoke runs on the refresh PR — it will fail if a refreshed hash diverges from what verify_integrity computes when run a second time
-- Reviewer responsibility: skim the diff and look for entries where MORE than the version+hash changed (e.g., `install_cmd` shouldn't move during a refresh)
-
-### Docker drift
-
-`scripts/check_docker_drift.cjs` compares pinned `@sha256:` against the registry digest for `tracked_tag`. The `docker-drift` weekly job fails on any drift. A maintainer reviews the upstream change BEFORE refreshing the pin — a routine rebuild and a registry hijack look identical from here, and the human gate is the differentiator.
+- Vulnerabilities in the MCP servers themselves (report to their maintainers).
+- What a server does at runtime. mcp-vault reads configs and metadata before
+  anything runs; it is not a sandbox and not a runtime monitor.
+- A local user who can already write to the installed package or the DB.
+- A malicious release published under a version number after its hash was
+  pinned: the hash pins bytes, it does not audit them.
 
 ## CI isolation model
 
-This project's own CI is part of its attack surface, and for a while it was the
-weakest part of it: a supply-chain scanner whose pull-request builds ran
-attacker-authored code on a persistent machine.
-
-GitHub-hosted runners do not start on this account (billing lock, documented in
-`.github/workflows/runner-health.yml`), so every job runs on one self-hosted
-macOS machine. Isolation therefore happens *inside* that machine:
+GitHub-hosted runners do not start on this account, so every job of this
+repository runs on one self-hosted machine, and isolation happens inside it:
 
 | Input | Where it runs |
 |---|---|
 | PR-authored code (tests, scripts) | container: `--network none`, repo mounted read-only, `--cap-drop ALL`, `no-new-privileges`, no docker socket |
 | PR-authored data (`tools_database.json`) | evaluated by **base-commit** code; every docker launch is rebuilt from its pinned digest, so flags in an entry cannot reach the host |
-| Third-party MCP servers | always `mcp_eval --sandbox`; `--unsafe` is not used in CI |
+| Third-party MCP servers | always `eval --sandbox`; `--unsafe` is never used in CI |
 | Our own code (push, cron) | directly on the runner |
 
-Outputs are written under `RUNNER_TEMP`, never to a path inside the checkout: a
-redirect performed by the host shell follows whatever that path is, and a PR can
-commit a name as a symlink. Mounting the workspace read-only does not prevent
-that.
+Outputs go under `RUNNER_TEMP`, never inside the checkout (a PR can commit a
+path as a symlink). [`tests/ci_manifest.test.cjs`](tests/ci_manifest.test.cjs)
+asserts these properties per step, plus SHA-pinned actions, no `curl | sh` and
+a timeout on every job. The weekly DB refresh opens a PR and is never
+auto-merged; that PR is the only automated path into the DB.
 
-`tests/ci_manifest.test.cjs` asserts these properties against the manifests —
-per step, not per job — so a later one-line edit cannot quietly remove them.
-
-### Repository settings this relies on
-
-Two Actions settings matter here, and one of them is a single switch doing two
-jobs.
-
-- **Default `GITHUB_TOKEN` permission: read.** Jobs that need to write a branch,
-  a tag or a pull request declare it for themselves. Before this, every job in
-  every workflow started with write.
-- **"Allow GitHub Actions to create and approve pull requests": on.** The name
-  is the problem — it is one flag for both. Turning it off to prevent
-  self-approval also stops release-please, the weekly hash refresh, the
-  discovery inbox, the drift refresh and the eval snapshot from opening their
-  PRs, which is most of the automation. It is on, and the protection against a
-  bot approving its own work is that no workflow here requests a review — not
-  the flag.
-- **Fork pull requests require maintainer approval for all external
-  contributors.** This is the mitigation for the limitation below, and it is a
-  setting rather than code.
-- **SHA pinning required for actions.** Enforced by the platform as well as by
-  `tests/ci_manifest.test.cjs`.
-
-### Known limitation
-
-For a `pull_request` event, GitHub uses the workflow file **from the pull
-request**. The isolation is therefore described by the thing being isolated, and
-a test that greps the manifests is a regression check, not a security boundary.
-
-The mitigation is a repository setting rather than code: workflow runs from fork
-pull requests require maintainer approval (Settings → Actions → *Require
-approval for all external contributors*). Approve a run only after reading the
-diff, including changes to `.github/`.
-
-If GitHub-hosted runners become available on this account, the PR jobs should
-move to a disposable VM, and the container jail becomes defence in depth rather
-than the boundary.
-
-## What this project is NOT
-
-- Not a sandbox. Installing an MCP server runs whatever the server's `command` does, with whatever permissions Claude Code has. The integrity gate guarantees you ran the artifact you expected; it does not guarantee the artifact is benign.
-- Not a CVE database. Advisory feeds (npm bulk, OSV, GHSA, Snyk) are aggregated and surfaced, but the source of truth lives upstream.
-- Not a runtime monitor. The scanner runs at install time; runtime behavior of the installed server is out of scope.
+Repository settings this relies on: default `GITHUB_TOKEN` permission read;
+fork pull requests need maintainer approval before any workflow runs (for a
+`pull_request` event GitHub uses the workflow file *from the PR*, so the
+manifest test is a regression check, not a boundary); SHA pinning required for
+actions. CodeQL runs as advanced setup (`javascript-typescript` and `actions`,
+`security-extended`) on the self-hosted runner, because the default setup only
+runs on hosted runners.

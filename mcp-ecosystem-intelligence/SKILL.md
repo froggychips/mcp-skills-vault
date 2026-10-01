@@ -1,6 +1,6 @@
 ---
 name: mcp-ecosystem-intelligence
-description: Find, evaluate, and install MCP servers for a project. Use when the user asks "is there an MCP for X", "what MCP tools should I use here", "add MCP server for Y", "audit my MCP setup", "is package Z safe to install", or wants to wrap an existing CLI/API as MCP. Combines a seeded local database, registry-first discovery, a Health Score script, and a supply-chain security scanner gating every install (sha512/sha256 integrity, registry signatures, provenance bound to the artifact digest, 4 advisory feeds, install-hook and capability detection, Docker digest pinning, availability and ownership cross-checks), plus a behavioural smoke that decides whether a server is recommended at all, an upgrade planner for anything with an advisory, and a concrete install path for Claude Code, Claude Desktop, Cursor, VS Code or Codex.
+description: Check, find, evaluate, and install MCP servers for a project. Use when the user asks "check this repo's MCP config", "is my .mcp.json safe", "audit my MCP setup", "is package Z safe to install", "is there an MCP for X", "what MCP tools should I use here", "add MCP server for Y", or wants to wrap an existing CLI/API as MCP. `mcp-vault check` is the offline check of a repo's committed MCP configs (unpinned launches, plaintext secrets, lookalike names, overridden package sources, toxic flows, policy). Combines a seeded local database, registry-first discovery, a Health Score script, and a supply-chain security scanner gating every install (sha512/sha256 integrity, registry signatures, provenance bound to the artifact digest, 4 advisory feeds, install-hook and capability detection, Docker digest pinning, availability and ownership cross-checks), plus a behavioural smoke that decides whether a server is recommended at all, an upgrade planner for anything with an advisory, and a concrete install path for Claude Code, Claude Desktop, Cursor, VS Code or Codex.
 ---
 
 # MCP Ecosystem Intelligence
@@ -12,6 +12,9 @@ Pragmatic discovery agent for the MCP ecosystem. Optimised for token efficiency:
 Steps marked **[scripted]** have a dedicated script you call via Bash. Steps marked **[Claude]** are executed by Claude using available tools (Read, Bash, WebFetch) — no standalone script exists yet.
 
 ```
+0. Check repo configs   → [scripted] node scripts/check_configs.cjs [paths…]
+                                     (= mcp-vault check) .mcp.json, .vscode/mcp.json,
+                                     .cursor/mcp.json; offline; exit 0/1/2
 1. Detect stack         → [scripted] node scripts/orchestrate.cjs --cwd $CWD
                                      signals carry source + confidence
 2. Cache lookup         → [scripted] included in orchestrate.cjs output
@@ -107,9 +110,11 @@ node mcp-ecosystem-intelligence/scripts/audit_setup.cjs --cwd $CWD --json
 node mcp-ecosystem-intelligence/scripts/audit_setup.cjs --cwd $CWD --strict
 ```
 
-Diffs `<cwd>/.mcp.json` and the `mcpServers` key of `~/.claude.json` (NEVER any other key — auth tokens live elsewhere in that file) against `tools_database.json`. Emits findings in five categories: `drift` (version mismatch), `untrusted` (DB candidate in active use), `heavy-unbounded` (≥15 tools with no `--toolsets`/`--caps`/`allowedTools`/`enabledMcpjsonServers` scoping), `unknown` (custom server, informational), and `scope` (vcs/ci-cd/pm/infra category installed globally — usually belongs in project `.mcp.json`).
+Diffs `<cwd>/.mcp.json` and the `mcpServers` maps of `~/.claude.json` (NEVER any other key — auth tokens live elsewhere in that file) against `tools_database.json`. Finding categories: `drift` (version mismatch), `untrusted` (DB candidate in active use), `heavy-unbounded` (>15 tools, or unknown, with no `--toolsets`/`--caps`/`allowedTools`/`enabledMcpjsonServers` scoping), `unknown` (not in the DB), `scope` (vcs/ci-cd/pm/infra category installed globally — usually belongs in project `.mcp.json`), `secret` (plain-text credential; the value is never printed), `lookalike`, `toxic-flow` and `tool-shadowing`.
 
-Exit codes: `0` clean or info-only · `1` strict-mode triggered · `2` bad invocation.
+Exit codes: `0` clean or info-only · `1` a plain-text secret, or anything under `--strict` · `2` bad invocation or an unreadable config.
+
+For the user's whole machine in one screen, prefer `node scripts/status.cjs` (`mcp-vault status`). For a repository's committed configs — what CI sees — use `node scripts/check_configs.cjs` (`mcp-vault check`): it reads only the given or project-scoped files, never the home directory.
 
 ## 3. Discovery (only on cache miss)
 
@@ -238,14 +243,10 @@ evidence — see `scripts/lib/tiers.cjs` — and is not stored in the DB.
 
 The license penalty applies to FSL/BSL/SSPL/Elastic-2.0/Commons Clause and similar source-available licenses, plus packages with no published license. OSI-approved permissive (MIT/Apache/BSD/ISC/MPL) and copyleft (GPL/LGPL/AGPL) get no penalty — they're still open source.
 
-Tier mapping (matches `classify()` in `scripts/calculate_health.cjs`):
-
-| Score  | Tier         | Action                |
-|--------|--------------|-----------------------|
-| 85+    | Core         | recommend by default  |
-| 65–84  | Recommended  | recommend with note   |
-| 40–64  | Experimental | mention only on ask   |
-| < 40   | Deprecated   | hide unless asked     |
+There is no score-to-tier mapping. The tier comes from `scripts/lib/tiers.cjs`
+over the stored evidence (`mcp-vault list` shows it); see `docs/DATABASE.md`
+for what each tier means. Use the score only to rank candidates of the same
+tier.
 
 ## 6. Reject heuristics (taste, not just score)
 

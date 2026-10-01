@@ -1,7 +1,7 @@
 {
   "name": "@froggychips/mcp-vault",
   "version": "0.15.2",
-  "description": "Deterministic registry + integrity scanner for Model Context Protocol servers. Make MCP supply-chain boring.",
+  "description": "Offline security check for MCP configs in CI. A GitHub Action, pre-commit hook and CLI that flag unpinned MCP servers, plaintext secrets, typosquats, tool poisoning and toxic tool flows — offline, zero dependencies, no telemetry.",
   "bin": {
     "mcp-vault": "bin/mcp-vault.cjs",
     "mcp-vault-pre-commit": "bin/mcp-vault-pre-commit.cjs"
@@ -44,19 +44,22 @@
   "keywords": [
     "mcp",
     "model-context-protocol",
-    "claude",
+    "mcp-security",
     "claude-code",
-    "anthropic",
-    "supply-chain",
+    "cursor",
+    "vscode",
+    "github-action",
+    "pre-commit",
+    "ci",
+    "supply-chain-security",
+    "secret-scanning",
+    "typosquatting",
+    "prompt-injection",
+    "tool-poisoning",
+    "sarif",
     "security",
-    "registry",
-    "integrity",
-    "sha512",
-    "sha256",
-    "osv",
-    "ghsa",
-    "audit",
-    "offline-first"
+    "offline-first",
+    "devsecops"
   ],
   "publishConfig": {
     "access": "public"

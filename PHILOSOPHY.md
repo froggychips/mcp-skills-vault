@@ -1,59 +1,90 @@
 # Philosophy
 
-Five constraints that shape every decision in this repo. They're not aspirations — they're rules. If a PR breaks one, that's grounds to reject it independent of how useful the feature is.
+The rules every change in this repository is held to. They are not
+aspirations: a PR that breaks one is rejected however useful the feature is.
 
 ## 1. Offline-first
 
-Every gate the user cares about must run with no network. `verify_integrity.cjs --offline` is the canonical example: DB pin-shape validation over stored versions, hashes, source URLs, and Docker digests. `--no-audit` is intentionally different: it skips advisory feeds but still checks live registry metadata. The advisory feed calls (npm bulk, OSV, GHSA, Snyk) are an *additive* layer that runs when network is available — they make the gate stricter, never looser.
+The check people put in CI runs with no network. `mcp-vault check`, the
+GitHub Action and the pre-commit hook make no network call unless asked
+(`--online`, `offline: false`): the configs are compared with the pins in the
+vault DB shipped with that version. Network checks (live registry metadata,
+advisory feeds) are an **additive** layer — they can make an answer stricter,
+never looser. An air-gapped runner gets the same exit code as a connected one.
 
-Concretely: the CI `smoke` job is offline. Air-gapped environments install with the same exit code as networked ones.
+## 2. Zero runtime dependencies
 
-## 2. Minimal
+Node built-ins only (`fs`, `https`, `child_process`, `path`, `crypto`). No
+build step, no bundler, no transpiler. The supply-chain surface of a
+supply-chain checker is exactly Node's, and `git clone` + `node
+bin/mcp-vault.cjs` runs the same code `npx` does — which is also why the
+GitHub Action can run its own checkout and install nothing.
 
-Zero runtime dependencies for the scripts. Node built-ins only (`fs`, `https`, `child_process`, `path`, `crypto`). The supply-chain attack surface for *this* repo is exactly Node's, no more.
+## 3. Deterministic
 
-The DB is a single JSON file. There are 16 command scripts and 16 small
-libraries beside them, all CommonJS, all Node built-ins — the count has grown
-with what the gate checks, the dependency-free part has not. No build step, no
-transpilation, no bundler. `npx -y @froggychips/mcp-vault scan` works on day one — and so does `git clone` + `node scripts/orchestrate.cjs` for users who prefer to inspect first.
+The answer is a function of its inputs, and time is one of them:
 
-## 3. Inspectable
+```
+result = f(db, evidence, policy, asOf, rules_version)
+```
 
-Every output is machine-readable (`--json`) and human-readable (default). Every entry in the DB carries its full audit trail in `notes`: `[VERIFIED YYYY-MM-DD]` and `[TRIAGE YYYY-MM-DD]` prefixes are greppable. Every promotion / demotion is a git commit with the reasoning in the message.
+- `db` — the vault DB the version ships with;
+- `evidence` — dated observations, each with a shelf life (a hash match holds
+  for 90 days, "no advisories" for 7);
+- `policy` — the effective `.mcp-vault.policy.json`, organisation policy
+  included;
+- `asOf` — the instant the evidence is judged at: read once from the clock at
+  the command's entry point, or given with `--as-of`. Nothing below the entry
+  point reads the clock (`tests/no_wall_clock.test.cjs`);
+- `rules_version` — the version of the rule table, i.e. of the package.
 
-You can audit this project by reading the JSON, the scripts, and the CHANGELOG. No telemetry, no remote-fetched code, no plugins. What's in the repo is what runs.
+Every `--json` document records `as_of`, `rules_version`, the policy and the
+facts it was decided on, so its decisions can be recomputed from the document
+alone. The same inputs print the same bytes. No randomness, no LLM in the
+decision path: the bundled Claude skill is a *consumer* of this output.
 
-## 4. Deterministic
+## 4. One logic of decisions
 
-The same DB at the same commit produces the same recommendations. `orchestrate.cjs --json` against a fixed `cwd` is reproducible. `verify_integrity.cjs --offline` against a fixed DB returns the same exit code every run.
+Detectors produce **findings**; exactly one function, `decide()` in
+[`lib/finding.cjs`](mcp-ecosystem-intelligence/scripts/lib/finding.cjs), turns
+findings and policy into decisions, using one rule table
+([`lib/policy_rules.cjs`](mcp-ecosystem-intelligence/scripts/lib/policy_rules.cjs)).
+`check`, `verify`, `explain`, `status`, `audit`, the Action's job summary and
+SARIF are views of those decisions. Two commands cannot disagree about the
+same subject, because neither of them decides — see
+[ADR 0001](docs/adr/0001-findings-and-time.md).
 
-No randomness, no LLM in the critical path. The Claude skill is a *consumer* of
-this project's output — Claude reads what `orchestrate.cjs` prints, doesn't
-replace it.
+## 5. Fail closed; no data is not clean
 
-One qualification, added because the code now depends on it: evidence is dated,
-and dates age. A stored verification has a shelf life — a hash match holds for
-90 days, "no advisories" for 7 — and past it the entry reports `UNVERIFIED`.
-That is time-dependence on purpose: the alternative is a verdict that keeps
-claiming to be current long after anyone checked.
+A check that did not run must never look like a check that passed.
 
-So time is an input, named like the others:
+- A finding has a state: `observed`, `not-run`, `no-data`, `stale`. Only
+  `observed` is a statement about the subject. The others decide to
+  `unknown` — never `allow`.
+- `unknown` outranks `warn`: "nobody looked" is not softer than "somebody
+  looked and did not like it".
+- `null` means "not established". It is never replaced by a default, a
+  `false` or an empty string.
+- Exit `2` means "could not answer" and never "clean". A real finding outranks
+  an unreadable input.
+- An unknown policy key is an error: a typo that silently enforces nothing is
+  worse than no policy.
 
-    result = f(db, evidence, policy, asOf, rules_version)
+## 6. Inspectable, and no telemetry
 
-The clock is read once, at the command's entry point, or given with
-`--as-of`; nothing below it reads the clock on its own, and every `--json`
-document says which instant it was judged at. The same DB, policy and
-`--as-of` at the same version print the same bytes. Without `--as-of` the
-instant is now, as it always was. See
-[docs/adr/0001](docs/adr/0001-findings-and-time.md).
+Every output is human-readable by default and machine-readable with `--json`
+(and SARIF where it lands on a line). Every DB entry carries its dated evidence;
+every change to the DB is a reviewed commit. No telemetry, no remote-fetched
+code, no plugins: what is in the repository is what runs. That also means the
+project cannot see who uses it — the only signal is a person saying so.
 
-## 5. Boring
+## 7. Boring
 
-The most explicit goal. MCP supply-chain tooling should not be exciting. It should be the kind of thing you forget exists between releases. New features earn their place by reducing what users have to think about, not by adding capability for its own sake. `--strict` mode is a feature; `--ai-suggest-fixes` would not be.
-
-If a change makes a maintainer's life harder (more configs, more steps, more decisions per PR), it pays a cost. The triage workflow in CONTRIBUTING.md exists because *not* having it forced thinking every time.
+Supply-chain tooling should be the thing you forget exists between releases.
+A feature earns its place by reducing what a user has to think about, not by
+adding capability: `--strict` is a feature; an `--ai-suggest-fixes` would not
+be. A change that adds configuration, steps or decisions per PR pays for it.
 
 ---
 
-These five constraints are what differentiate this project from "another curated list" or "another security scanner." Anything competing on **excitement** is a different product.
+Anything competing on excitement is a different product.

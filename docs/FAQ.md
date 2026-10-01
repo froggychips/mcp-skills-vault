@@ -1,169 +1,126 @@
-# mcp-skills-vault — FAQ
-
-Quick answers for Claude Code users who wonder if this is worth installing.
-
----
+# FAQ
 
 ## What is this?
 
-A vetted database of 114 MCP servers (94 hand-verified + 20 candidates), a supply-chain security scanner, and a CLI that wires them together.
+An offline security check for MCP configs in CI: a GitHub Action, a
+pre-commit hook and a CLI (`mcp-vault check`) that read the MCP configs
+committed to a repository — `.mcp.json`, `.vscode/mcp.json`,
+`.cursor/mcp.json` — and fail the build on unpinned servers, plaintext
+secrets, typosquats, overridden package sources, risky combinations of
+servers and violations of your policy.
 
-When you want to add an MCP server to a project, this gives you:
-- A curated list of known-good servers with health scores (not the 1000+ entry official registry)
-- A hash verification check before anything is written to your config
-- A single command that detects what tools your project probably needs
+## How do I add it?
 
----
+One step in a workflow, pinned by SHA:
 
-## Why not just install MCP servers manually?
-
-You can. But two problems:
-
-**Quality signal.** The official MCP registry lists everything. This project lists what's worth using — 114 entries, all scored by recency, stars, license, and whether the install actually works.
-
-**Token cost.** Every active MCP server injects its full tool list into Claude's context. Some servers have 100+ tools. That's thousands of tokens on every message, even if you never use those tools. The database includes `est_tools_count` for every entry so you can make informed decisions before installing.
-
----
-
-## What does the hash check actually verify?
-
-For npm: re-fetches `dist.integrity` from the registry for the pinned version and compares it byte-for-byte with the stored hash.  
-For PyPI: sha256 of the sdist tarball.  
-For Docker: the image must be pinned by `@sha256:<digest>`.
-
-If the hash doesn't match — the install is blocked. If there's a known CVE — it's flagged via OSV.dev / npm advisory API.
-
-**The important caveat:** a matching hash means the artifact is identical to what was published at that version. It does not mean the code is safe — only that it hasn't changed since the hash was recorded.
-
----
-
-## Does it check the dependencies too?
-
-With `--deps`, yes. The tree is resolved with `npm install --package-lock-only
---ignore-scripts` — nothing is installed and no package code runs — and every
-distinct package in it goes to OSV. This matters more than it sounds: across the
-shipped DB that is 19,377 transitive packages, 25 entries whose *dependencies*
-run install scripts, and 38 with a high or critical advisory somewhere in the
-tree. A one-level check is a check at the wrong depth.
-
-## What does `trust: "verified"` mean, exactly?
-
-It is computed, not typed. Each dimension — artifact, signature, provenance,
-source binding, advisories, dependencies, smoke — carries its own status and the
-date it was established, and each has a shelf life: a hash match holds for 90
-days, "no advisories" for 7, because disclosures do not wait. `trust` is derived
-from that, and evidence is keyed to the artifact including its version, so it is
-dropped rather than inherited when the version moves.
-
-A run records only what it examined. A `--no-audit` run writes nothing about
-advisories rather than writing "clean".
-
-## Can I make it stricter without remembering seven flags?
-
-`.mcp-vault.policy.json`, resolved from the working directory upwards. It sets
-the bar once — `unverified: fail`, `signatures: require`, licence allow/deny
-lists, a minimum health score, acceptable trust tiers — and CI and your shell
-then enforce the same one. A policy can only raise the bar; an explicit flag
-still wins. An unknown key is a hard error, because a policy with a typo that
-silently enforces nothing is worse than no policy.
-
-## What do Core / Recommended / Experimental mean?
-
-Servers are scored by a formula:
-
-```
-score = min(20, 10·log10(stars+1))   # popularity, capped
-      + {40|20|10|0}                  # recency: <30d / <90d / <180d / older
-      + 30 if in public registry
-      + 15 if install command is documented
-      − 10 if license is non-OSI or unknown
+```yaml
+- uses: froggychips/mcp-skills-vault@<sha>   # v0.16.0
 ```
 
-| Tier | Score | What happens |
-|---|---|---|
-| Core | 85+ | Recommended by default |
-| Recommended | 65–84 | Recommended with a note |
-| Experimental | 40–64 | Mentioned only if you ask |
-| Deprecated | < 40 | Hidden unless you ask |
+The full workflow and every input: [GITHUB_ACTION.md](GITHUB_ACTION.md).
+Locally: `npx -y @froggychips/mcp-vault check`.
 
----
+## Does it need network access or a token?
 
-## How do I actually use it?
+No. By default it makes no network call and reads no token: the configs are
+compared with the pins in the vault DB shipped with that version.
+`--online` (`offline: false` in the Action) adds live registry and advisory
+checks.
 
-```bash
-# What does my project need?
-npx -y @froggychips/mcp-vault scan --cwd /path/to/project
+## What does it check?
 
-# Keyword search
-mcp-vault scan --query kubernetes
+Per server in each config: launches without an exact version (`@latest`, a
+range, nothing); package sources overridden away from the public registry
+(`--registry`, a uv index, `npm_config_registry` in the server's env);
+plaintext credentials in `env`, `args`, `headers` or `url`; names that look
+like a known server's (typo, homoglyph, scope swap, added `-official`);
+versions of known servers the vault never verified; and, across the config,
+servers that together read untrusted content, reach private data and can send
+data out, or expose the same tool name. Plus your policy, if you have one.
+[Full list](REFERENCE.md#checking-a-repository-check).
 
-# Install — runs integrity check, then writes .mcp.json
-mcp-vault install github-mcp-server
-```
+## Does it only work for servers in its database?
 
-Or drop the skill folder into `~/.claude/skills/mcp-ecosystem-intelligence/` and ask Claude naturally: *"What MCP tools should I add for this Next.js project?"*
+No. Every check except the version comparison works on any server. A server
+the vault DB does not know is reported as *not in the vault* — `unknown`,
+which fails under `--fail-on unknown` (the Action's default) and passes with
+a note under `--fail-on deny`. It is never reported as clean.
 
----
+## What about remote (HTTP/SSE) servers?
 
-## Does it read my .env values?
+Checked weakly, and the output says so. A remote server ships no artifact,
+so there is nothing to pin or hash. It is checked for secrets in its URL and
+headers and for flows, and is otherwise `unknown`. If you use remote servers
+on purpose, run the Action with `fail-on: error`.
 
-Key names only. The scanner uses the regex `/^([A-Z0-9_]+)=/` — it reads `GITHUB_TOKEN=` and stops at the `=`. Values are never captured, stored, or printed. If you find a code path where a value leaks, that's a security bug worth reporting.
+## Will it print my secrets?
 
----
+No. A secret finding is the type, file, key path, length and at most a
+four-character public prefix (`ghp_`), in every output format. A `${VAR}`
+reference is not a finding.
 
-## Where does `--install` write the config?
+## Why did it fail on something it "could not check"?
 
-By default: `.mcp.json` in your project root (project-scoped). The server is active only in that project, invisible everywhere else.
+Because "could not check" is not "fine". The Action and the pre-commit hook
+use `--fail-on unknown`: a server not in the vault, a remote server or an
+overridden source fails until you decide otherwise — with a policy, with
+`fail-on: error`, or by pinning the server to a version the vault knows.
+[How it decides](HOW-IT-DECIDES.md).
 
-To install globally (cross-project tools like `mcp-server-memory`):
-```bash
-mcp-vault install mcp-server-memory --global
-```
+## What do the exit codes mean?
 
-Global installs go to `~/.claude.json`.
+`0` nothing fails, `1` something fails, `2` could not answer (unreadable
+config or policy, bad arguments). `2` never means clean.
 
-Other hosts work too — `--host cursor`, `--host vscode`, `--host claude-desktop`,
-and `--host codex` (which prints a TOML block to paste, because rewriting
-someone's TOML without a parser destroys their comments). `--list-hosts` shows
-what exists. An existing config is backed up before it is touched, unrelated
-keys survive, and a config that exists but does not parse is refused rather than
-replaced.
+## Is it a sandbox or a runtime monitor?
 
-Whatever the host, the command written is the version the gate verified:
-`pkg@1.2.3`, `pkg==1.2.3`, `image@sha256:…`. Writing `npx -y pkg` would mean the
-thing that runs is not the thing that was checked.
+Neither. It reads configs and metadata before anything runs; it does not
+watch what a server does. A matching hash says you got the bytes that were
+reviewed, not that they are safe. (mcp-trace, an experimental sister project,
+looks at runtime.)
 
----
+## What is the database for, then?
 
-## How is the database kept up to date?
+Extra signal for servers it knows: the version and hash the vault verified,
+recorded advisories, whether the release was yanked, the npm registry
+signature, provenance, whether it starts in a sandbox. `status` and `explain`
+use all of it; `check` compares the launched version with the pin, and with
+`--online` re-checks hash and advisories. It is not a catalogue to browse.
+[What is in it](DATABASE.md).
 
-A GitHub Actions workflow runs every Monday:
-1. Re-fetches hashes from npm/PyPI for all 114 entries
-2. Refreshes GitHub metrics (stars, last commit, open issues)
-3. Opens a PR — **human review required before merge**
+## How is the database kept current, and can I trust the copy I have?
 
-The PR is the only automated path to modify `tools_database.json`. Version bumps are never auto-merged. Reviewers check for unexplained major-version jumps that could indicate a compromised release.
+A weekly job refreshes versions, hashes and evidence and opens a PR that a
+person reviews; nothing is auto-merged. The DB in the npm package is signed
+(Ed25519) and the CLI refuses to read it if the signature does not verify; in
+the Action's default mode the SHA pin of `uses:` is the integrity.
+[SECURITY.md](../SECURITY.md#signed-db).
 
----
+## Can my organisation enforce an allowlist?
 
-## How is this different from the official MCP registry?
+Yes: an organisation policy with `"default": "deny"` and allow rules by npm
+scope, GitHub owner, registry namespace, entry or pinned artifact; projects
+inherit it and can only tighten it. [Policy](HOW-IT-DECIDES.md#policy).
 
-The official registry lists what exists (~1000+ entries). This project lists what's worth using (114 entries), verifies the hash didn't change since review, and scores by health. It's a curated shortlist, not a directory.
+## Does it send any data anywhere?
 
----
+No telemetry. Offline mode makes no network call. `--online` calls public
+APIs (npm registry, PyPI, OSV.dev, GitHub's advisory database), which reveals
+the package names and versions being checked — the same as installing them.
 
-## Can I suggest a new server?
+## Why 0.16 and not 1.0?
 
-Open an issue. To be added, a server needs: a pinned version, a hash fetchable from a public registry, a working install command, and a health score above 40.
+Because nobody outside the project has used it yet. The JSON schemas, rule
+names and defaults may still change after feedback from the first users;
+[COMPATIBILITY.md](COMPATIBILITY.md) says what is stable already.
 
----
+## What about my own machine, not the repository?
 
-## Does this send any data anywhere?
-
-No telemetry. The integrity checker calls public APIs (npm registry, PyPI, OSV.dev) — those calls reveal the package name and version being checked, same as running `npm install` directly.
-
----
+`npx -y @froggychips/mcp-vault status` reads every MCP host config on the
+machine (Claude Code, Claude Desktop, Cursor, VS Code, Codex) and prints one
+screen: what is installed, what is wrong, what is missing. No network calls.
 
 ## Where do I report a bug?
 
-[GitHub Issues](https://github.com/froggychips/mcp-skills-vault/issues) or Telegram [@froggychips](https://t.me/froggychips).
+[GitHub Issues](https://github.com/froggychips/mcp-skills-vault/issues).
+Security issues privately: [SECURITY.md](../SECURITY.md#reporting-a-vulnerability).

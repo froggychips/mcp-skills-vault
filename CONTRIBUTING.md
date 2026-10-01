@@ -1,186 +1,167 @@
 # Contributing
 
-Thanks for considering a contribution. This file covers the two things that come up most: **adding an entry to `tools_database.json`** and **promoting an entry from `trust: candidate` to `trust: verified`**.
+Thanks for looking. The most useful contribution right now is not code.
 
-For security-sensitive changes (scripts in `mcp-ecosystem-intelligence/scripts/`, anything touching the integrity gate), read [SECURITY.md](./SECURITY.md) first — that file is the source of truth for what counts as a regression.
+## What helps most
 
----
+mcp-vault has no users outside the project yet ([ADOPTION.md](docs/ADOPTION.md)),
+so the most valuable thing is a report from a real config:
 
-## Adding a new MCP server to the database
+- **You ran `check` (or the Action) and it was wrong.** A false positive, a
+  missed unpinned launch, a launch shape it could not read, a secret format it
+  did not catch, a fix line that did not help. Paste the config line (with the
+  secret removed) and the output.
+- **You ran it and it was right, but noisy.** Which findings did you ignore,
+  and why?
+- **You stopped using it.** Why. That is the hardest answer to get and the most
+  useful one.
 
-### Quick path
+Open an [issue](https://github.com/froggychips/mcp-skills-vault/issues). Security
+problems go privately — see [SECURITY.md](SECURITY.md).
 
-1. Run `mcp-vault discover --source npm --out /tmp/cands.json` and pick from the output. The script handles dedup against the DB, health scoring, and reject heuristics.
-2. Append the chosen entry to `mcp-ecosystem-intelligence/assets/tools_database.json` with `trust: "candidate"` (see schema below).
-3. Run `mcp-vault verify --update` — fills `version` + `pkg_integrity` from the live registry.
-4. Run `mcp-vault verify --no-audit` — must exit 0.
-5. Open a PR using the template at `.github/PULL_REQUEST_TEMPLATE/new-mcp-entry.md`.
+## Changing a check
 
-### Entry schema
+The code is CommonJS on Node built-ins only, no build step. The pieces:
+
+| Where | What |
+|---|---|
+| [`bin/mcp-vault.cjs`](bin/mcp-vault.cjs) | the CLI: command table, DB signature check, pass-through to a script |
+| [`scripts/check_configs.cjs`](mcp-ecosystem-intelligence/scripts/check_configs.cjs) | `check` |
+| [`scripts/lib/installed.cjs`](mcp-ecosystem-intelligence/scripts/lib/installed.cjs), [`lib/install_cmd.cjs`](mcp-ecosystem-intelligence/scripts/lib/install_cmd.cjs) | reading host configs and launch commands |
+| [`scripts/lib/secrets.cjs`](mcp-ecosystem-intelligence/scripts/lib/secrets.cjs), [`lib/lookalike.cjs`](mcp-ecosystem-intelligence/scripts/lib/lookalike.cjs), [`lib/flows.cjs`](mcp-ecosystem-intelligence/scripts/lib/flows.cjs), [`lib/tool_scan.cjs`](mcp-ecosystem-intelligence/scripts/lib/tool_scan.cjs) | the detectors |
+| [`scripts/lib/finding.cjs`](mcp-ecosystem-intelligence/scripts/lib/finding.cjs) | findings, `decide()`, the findings@1 document, SARIF |
+| [`scripts/lib/policy_rules.cjs`](mcp-ecosystem-intelligence/scripts/lib/policy_rules.cjs), [`lib/policy.cjs`](mcp-ecosystem-intelligence/scripts/lib/policy.cjs), [`lib/org_policy.cjs`](mcp-ecosystem-intelligence/scripts/lib/org_policy.cjs) | the one rule table and the policy files |
+| [`scripts/verify_integrity.cjs`](mcp-ecosystem-intelligence/scripts/verify_integrity.cjs) | the integrity gate over the DB or over host configs |
+| [`scripts/lib/evidence.cjs`](mcp-ecosystem-intelligence/scripts/lib/evidence.cjs), [`lib/tiers.cjs`](mcp-ecosystem-intelligence/scripts/lib/tiers.cjs), [`lib/clock.cjs`](mcp-ecosystem-intelligence/scripts/lib/clock.cjs) | dated evidence, derived trust and tier, `--as-of` |
+| [`action.yml`](action.yml), [`.pre-commit-hooks.yaml`](.pre-commit-hooks.yaml), [`lib/job_summary.cjs`](mcp-ecosystem-intelligence/scripts/lib/job_summary.cjs) | the Action and the hook |
+
+Rules for a change to a check:
+
+1. **A detector produces findings; it does not decide.** Whether a finding
+   blocks is a row in `lib/policy_rules.cjs`, evaluated by `decide()`
+   ([ADR 0001](docs/adr/0001-findings-and-time.md)). A second place that
+   computes an effect is how two commands start disagreeing.
+2. **Test the failure path.** The recurring bug in this kind of tool has one
+   shape: a check that did not run reported like a check that passed. A test
+   that only asserts the happy path would have caught none of the past ones.
+   "Could not read" is `unknown` or exit `2`, never clean.
+3. **No clock below the entry point.** Time comes in as `asOf`;
+   `tests/no_wall_clock.test.cjs` enforces it.
+4. **Say what can no longer pass.** The PR description names what the change
+   makes fail that passed before — even if the answer is "nothing, this only
+   adds a check".
+5. **Machine-readable changes are listed** in
+   [COMPATIBILITY.md](docs/COMPATIBILITY.md); `tests/compatibility.test.cjs`
+   fails when a schema id is written but not listed.
+6. **No dependencies.** The supply-chain surface of this tool is Node's.
+
+Running it:
+
+```bash
+node --test tests/*.test.cjs                 # offline; includes the docs-vs-data checks
+node bin/mcp-vault.cjs check examples/insecure/.mcp.json --as-of 2026-09-30T12:00:00Z
+node bin/mcp-vault.cjs verify --offline      # the DB, no network
+```
+
+If you touched `.github/`, `node --test tests/ci_manifest.test.cjs` asserts the
+CI invariants: no PR code running unjailed on the runner, every action pinned
+to a SHA, no `curl | sh`, every job timed out.
+
+## Adding or correcting a DB entry
+
+The DB is a supporting signal ([docs/DATABASE.md](docs/DATABASE.md)); a
+correction to an existing entry is as welcome as a new one.
+
+1. `mcp-vault discover --source npm --out /tmp/cands.json` and pick from the
+   output (it dedupes against the DB, scores and applies the reject
+   heuristics), or write the entry by hand.
+2. Append it to `mcp-ecosystem-intelligence/assets/tools_database.json`. When
+   editing programmatically, use `lib/db_io.cjs::writeDb()` — it keeps the
+   file's `\uXXXX` escape convention (`tests/db_io.test.cjs`).
+3. `mcp-vault verify --update --entry <name>` fills `version` and
+   `pkg_integrity` from the registry; `mcp-vault verify --entry <name>` must
+   then pass.
+4. Open a PR with
+   [`.github/PULL_REQUEST_TEMPLATE/new-mcp-entry.md`](.github/PULL_REQUEST_TEMPLATE/new-mcp-entry.md).
 
 ```jsonc
 {
-  "name":            "pkg-name",                       // npm / PyPI / docker image basename
-  "category":        "database",                       // see list below
-  "install_cmd":     "npx -y pkg-name@1.2.3",          // ALWAYS pinned to a version / digest
-  "source_url":      "https://github.com/owner/repo",  // canonical repo
+  "name":            "pkg-name",
+  "category":        "database",
+  "install_cmd":     "npx -y pkg-name@1.2.3",          // pinned to a version / digest
+  "source_url":      "https://github.com/owner/repo",
   "version":         "1.2.3",                          // filled by --update
   "pkg_integrity":   "sha512-…",                       // filled by --update
-  "trust":           "candidate",                      // start here; see promotion below
-  "license":         "MIT",                            // SPDX identifier; "Unknown" if missing
-  "health_score":    60.0,                             // from calculate_health.cjs (max 80)
-  "est_tools_count": 10,                               // count from server's ListToolsRequestSchema
-  "toolsets":        "--toolsets repos,issues",        // how to reduce tool count, or null
-  "tracked_tag":     "latest",                         // docker only; default "latest"
-  "notes":           "One-line context for the reviewer"
+  "license":         "MIT",                            // SPDX; "Unknown" if missing
+  "health_score":    60,                               // mcp-vault health …
+  "est_tools_count": 10,
+  "toolsets":        "--toolsets repos,issues",        // how to reduce the tool count, or null
+  "tracked_tag":     "latest",                         // docker only
+  "notes":           "One line of context for the reviewer"
 }
 ```
 
-There is no `classification` field, and no `in_registry` or `last_checked`.
-The tier is derived from measured evidence when anything reads the DB
-(`scripts/lib/tiers.cjs`), so a submitted entry cannot declare itself Core: it
-becomes Core when its artifact verifies and it starts in a sandbox. The other
-two were a hand-set registry flag that was wrong for 26 entries and a "last
-checked" date that stopped tracking anything — both replaced by dated evidence
-written by the check that established it.
+There is no `classification` and nothing you set makes an entry trusted:
+`trust` and the tier are **derived** from dated evidence that the checks write
+(`verify --record-evidence`, `availability`, `identity`, `eval`, …). An entry
+starts as `candidate` and becomes `verified` when its artifact verifies and
+its advisories are known and current
+([`lib/evidence.cjs`](mcp-ecosystem-intelligence/scripts/lib/evidence.cjs)).
 
-### Valid `category` values
-
-Current taxonomy in the DB (will grow):
+Valid categories today:
 
 ```
 ai · browser · ci-cd · cms · communication · crm · database · demo · docs ·
 filesystem · http · infra · maps · memory · meta · mobile · observability ·
-payments · pm · reasoning · search · testing · utility · vcs · web-scraping
+payments · pm · reasoning · search · streaming · testing · utility · vcs ·
+web-scraping
 ```
 
-`utility` is the catch-all — use a more specific category if one fits. Inventing a new category is fine if existing options genuinely don't fit; add it in the PR description so reviewers know it's intentional.
+### What a reviewer looks for
 
-### Reject criteria (the entry will not be merged)
+Judgement the scripts deliberately do not make:
 
-- `health_score < 40` (Deprecated tier) — unless there's a *very* good reason in the PR description
-- `<10` GitHub stars
-- `last_commit_days > 365`
-- Archived or fork of another repo
-- No license, or a non-OSI / source-available license, **and** the PR doesn't explain why
-- Install hook (`preinstall`, `install`, `postinstall`, `prepare`, `prepack`) without justification — these run on the user's machine
-- `install_cmd` not pinned to an explicit version / digest
+- `source_url` matches the registry's `repository.url`; the publisher is who
+  the repository says it is; no recent silent ownership transfer.
+- Reject: fewer than 10 stars, no commit in a year, archived, a fork, no
+  licence or a non-OSI licence without an explanation, an `install_cmd` that
+  is not pinned.
+- `est_tools_count` from a real smoke (`mcp-vault eval --name <name>
+  --sandbox`); `toolsets` filled in for heavy servers.
 
----
+### Install-Hook Policy
 
-## Promoting `trust: candidate` → `trust: verified`
+An npm package with `preinstall`, `install`, `postinstall` (runs arbitrary
+code during `npx -y`), `prepare`, `prepack`, `prepublish` or `prepublishOnly`
+gets a human look before it is accepted: the hash covers the tarball, not what
+its install script does. To accept one, read the hook in the published
+package and record it in `notes` (`[VERIFIED <date>] hook reviewed: …`).
+A project can set its own bar without touching the DB: `installHooks` and
+`dependencyHooks` in `.mcp-vault.policy.json` (`fail` / `warn` / `allow`), with
+`verify --deps` to see hooks in the dependency tree. PyPI (`uvx`) and Docker
+entries have no equivalent install-time execution surface.
 
-`candidate` means: "the integrity hash matches the artifact published to the registry." That's automatic.
+## Style and releases
 
-`verified` means: a human looked at the entry against the criteria below and signed off. It is **not** a stronger version of the integrity check — it's a separate, manual signal.
+- [Conventional Commits](https://www.conventionalcommits.org): `feat:` → minor,
+  `fix:` → patch (before 1.0, `BREAKING CHANGE` bumps the minor). release-please
+  reads them, opens a `chore(release)` PR with the changelog, and the merge
+  tags and publishes.
+- Imperative mood, about *why*; the diff says what.
+- The publish job signs the DB (`sign_db.cjs --release` with the
+  `MCP_VAULT_SIGNING_KEY` secret) and refuses to publish without it
+  ([SECURITY.md → Signed DB](SECURITY.md#signed-db)). A clone has no `.sig` and
+  does not need one.
 
-### Triage checklist
+## This repository's CI
 
-Promotion PR title format: `chore: promote <name> to trust:verified` — body must tick all of these.
-
-#### Publisher / repo provenance
-- [ ] `source_url` matches the `repository.url` from the registry (no monorepo subdirectory mismatch)
-- [ ] Publisher org on npm/PyPI matches what's in `source_url` (or vendor account is well-known: `@anthropic`, `@modelcontextprotocol`, `@github`, `@microsoft`, `@cloudflare`, …)
-- [ ] No recent owner transfer on the GitHub repo (check the repo's transfer log if it's a high-value entry)
-- [ ] Issue tracker is open and getting responses — not a dead repo with the npm version still ticking
-
-#### Install-time safety
-- [ ] No `preinstall` / `install` / `postinstall` / `prepack` hooks; `prepare` is allowed only if it's `npm run build` (verified by reading the published `package.json`)
-- [ ] No native binary downloads in install hooks
-- [ ] `est_tools_count` filled in from a real smoke — `node mcp-ecosystem-intelligence/scripts/mcp_eval.cjs --name <name> --sandbox --json` reports `tool_count`. `--sandbox` needs a container runtime; `--unsafe` runs the server on your machine, so use it only on something you have read
-
-#### Operational fit
-- [ ] `category` is specific (not `utility`) — or there's a note explaining why utility is right
-- [ ] `toolsets` filled in if `est_tools_count >= 30` (heavy-server flag in `orchestrate.cjs`) — otherwise the entry gets shown with a `⚠` and no mitigation
-- [ ] Server runs and answers a ListTools request (smoke check) — `mcp_eval.cjs --name <name> --sandbox` returns `status: pass`; a `failure_class` of `NEEDS_ENV`/`NEEDS_NET` is acceptable (couldn't boot without creds/net), but `CRASH`/`NO_TOOLS` blocks promotion
-
-#### Advisory sweep
-- [ ] `verify_integrity.cjs` (full audit, no `--no-audit`) reports no HIGH/CRITICAL CVEs for the pinned version
-- [ ] Server doesn't ship known-bad transitive deps (best-effort; run `npm audit` against a fresh install if in doubt)
-
-### When to demote `verified` → `candidate`
-
-- Publisher org changes hands silently
-- A HIGH/CRITICAL CVE is published and no fix is out within 14 days
-- The repo gets archived
-- `discover.cjs` health score drops below 65 (Recommended tier) on the weekly refresh
-
-Demotion is also done via PR — same template, opposite direction. Include the trigger in the PR body.
-
----
-
-## Install-Hook Policy
-
-A `trust: "candidate"` entry stays at candidate (does **not** auto-promote to `verified`) if its upstream package ships any of these npm scripts:
-
-- `preinstall`, `install`, `postinstall` — runs arbitrary code during `npm install` / `npx -y`
-- `prepare` — runs in dev installs; harmless in most cases, but flagged for review
-- `prepack`, `prepublish`, `prepublishOnly` — package-author hooks; usually fine but inspected
-
-This is a deliberate ceiling, not a backlog. The hooks may be perfectly legitimate (build native binaries, download a CLI shim, enforce a package manager) — but `npx -y` runs them automatically, and the integrity gate's hash check covers the tarball, not the side effects of executing arbitrary install scripts. As of the last triage pass, 18 of the 20 candidate entries are held here by install hooks (the other 2 were freshly promoted from discovery and are pending a verified smoke): `@last9/mcp-server` ships `postinstall: node bin/download-binary.js`, `@azure/mcp` ships `postinstall: node ./scripts/post-install-script.js`, `@postman/postman-mcp-server` ships `preinstall: …` that enforces pnpm, and so on.
-
-To promote a hooked candidate to `verified`, a maintainer must:
-
-1. Read the actual hook script in the published package — e.g. `npm view <pkg>@<ver> dist.tarball`, unpack, inspect.
-2. Document in the entry's `notes` field: `[VERIFIED <date>] hook reviewed: <one-line description of what it does>`.
-3. Open a PR that explains *why* this specific hook is acceptable. The promotion is opt-in per entry, not a class-wide carve-out.
-
-A project consuming the vault can set its own bar without touching the DB:
-`.mcp-vault.policy.json` has `installHooks` and `dependencyHooks` (`fail` /
-`warn` / `allow`), and `--deps` is what makes the second one answerable — an
-install hook is more often in a transitive dependency than in the package
-itself.
-
-PyPI (`uvx`) and Docker (`docker run`) entries are not subject to this policy because they have no equivalent automatic-execution surface at install time — `uvx` runs the entrypoint, not arbitrary build scripts; Docker images execute only their `CMD`/`ENTRYPOINT`.
-
-### Current hook-blocked candidates
-
-See [`mcp-ecosystem-intelligence/assets/triage_notes.md`](./mcp-ecosystem-intelligence/assets/triage_notes.md) for the running list of why each candidate is held (created by the batch-4 triage pass).
-
----
-
-## Modifying the integrity gate (`verify_integrity.cjs`)
-
-This file is the single most security-sensitive script in the repo. Changes require:
-
-1. Pass the existing self-checks in [SECURITY.md §`verify_integrity.cjs`](./SECURITY.md)
-2. Unit-test coverage for the change — and specifically for the failure path. The recurring bug in this file has one shape: a check that did not run being indistinguishable from a check that passed. A test that only asserts the happy path would have caught none of them.
-3. If the change adds a conclusion, it belongs in the typed `checks` a processor returns, not only in the report text. Evidence is built from `checks`; deriving it from prose is how a digest-pinned entry once recorded three verifications that never happened.
-3. CI smoke job must stay green on the same DB after the change
-4. PR description must call out *what specifically can no longer pass the gate* after this change — even if the answer is "nothing, this only adds a new check"
-
-A logic bug here is treated as Critical severity (48-hour patch SLA per SECURITY.md).
-
----
-
-## Style / housekeeping
-
-- Commit messages: [Conventional Commits](https://www.conventionalcommits.org). `feat:` → minor version bump, `fix:` → patch, `BREAKING CHANGE:` → major. PR titles are read by `release-please` to drive the next version.
-- Imperative mood, focused on *why* not *what*. Reviewers will read the diff for what.
-- Run `verify_integrity.cjs --no-audit` before every push if you touched `tools_database.json` or any script. `--deep` additionally hashes the artifacts; `--entry <name>` checks one entry instead of all 114.
-- If you touched anything under `.github/`, `node --test tests/ci_manifest.test.cjs` asserts the CI invariants: no PR code running unjailed on the runner, every action pinned to a SHA, no `curl | sh`, every job timed out.
-- When editing `tools_database.json` programmatically, use `mcp-ecosystem-intelligence/scripts/lib/db_io.cjs::writeDb()` — it preserves the file's `\uXXXX` escape convention for non-ASCII characters. A regression test in `tests/db_io.test.cjs` enforces this.
-- Don't add dependencies to the scripts — they intentionally use only Node built-ins so the supply-chain attack surface is the same as Node itself.
-- For UI / docs PRs, no need for triage checklist; just describe the change in plain English.
-
----
-
-## Releasing
-
-Two paths, both gated by human review:
-
-**Automatic** (default). `release-please` watches `master`, parses Conventional Commit types since the last tag, opens a `chore(release): vX.Y.Z` PR with the auto-generated CHANGELOG section. Merge the PR → release-please creates the git tag and GitHub release. No manual `gh release create` needed.
-
-**Manual** (override). For ad-hoc patches or backfilling: GitHub → Actions → `release` workflow → *Run workflow*, fill in `tag` (e.g. `v0.3.1`) and optional `notes`. The job validates the tag against semver, refuses to overwrite existing tags, and uses `gh release create --generate-notes` when notes are blank.
-
-Both paths use the same `release` workflow; see `.github/workflows/release.yml`.
-
-**DB signature.** The publish job signs `tools_database.json` with the
-`MCP_VAULT_SIGNING_KEY` secret (`sign_db.cjs --release`). Once
-`assets/trusted_keys.json` lists a key, a release without that secret stops
-before publishing. Key generation and rotation:
-[SECURITY.md → Signed DB](./SECURITY.md#signed-db). A clone has no `.sig`
-and does not need one: the signature is required only in an installed package
-(no `.git` at the package root). A `.sig` you made locally must still verify.
-
-If anything here looks wrong or out of date, open a PR — the doc itself follows the same review process.
+`.github/workflows/security-scan.yml`: unit tests and the offline DB smoke
+(with SARIF) on every PR and push; on Mondays the evidence refresh (versions,
+hashes, `--deep --record-evidence`, availability, identity, posture,
+capabilities, upgrade paths), Docker drift and licence drift, each opening a
+human-reviewed PR; on Thursdays the discovery inbox; a weekly sandboxed eval of
+the whole DB. `mcp-eval-pr.yml` smokes changed entries of a PR (advisory,
+base-commit scripts). `action-selftest.yml` runs the Action on the fixtures
+after merge. `codeql.yml` runs CodeQL. Everything runs on one self-hosted
+machine; PR code runs in a jailed container — see
+[SECURITY.md → CI isolation model](SECURITY.md#ci-isolation-model).

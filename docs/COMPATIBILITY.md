@@ -1,12 +1,86 @@
 # Compatibility promise
 
 This document says what will not change without a major version bump, and —
-just as importantly — what will. It takes effect at **1.0.0**. Until then the
-rules below are what we already try to follow, but a pre-1.0 minor release may
-break any of them if it has to; the changelog will say so.
+just as importantly — what will. The current release line is **0.16.x**, and
+the promise below takes effect at **1.0.0**. Until then the rules are what we
+already follow, but a 0.x minor release may break any of them if it has to;
+the changelog says so when it does.
 
 The short version: **the machine-readable surface is the contract. Everything
 a human reads is not.**
+
+## 0.x: what may still change before 1.0
+
+0.16 is the first release built around `check`, the GitHub Action and the
+pre-commit hook. Nobody outside the project has used it yet, so the shapes
+below are the maintainer's best guess, not something users have leaned on.
+Before 1.0, expect:
+
+- **JSON schemas may move.** `findings@1` and the per-command envelopes can
+  gain, rename or regroup fields — three fields of `audit@1` / `status@1`
+  already moved in 0.16 (see [section 3](#3---json-payloads)). A move is listed
+  in the changelog and here.
+- **Rule ids may be renamed or split** (`config/unpinned-launch`,
+  `flows/*`, …) when a first user shows that one id covers two different
+  things.
+- **Defaults may get stricter.** The Action's `fail-on` default, the effect
+  of a policy key, or which findings `check` reports by default.
+- **Policy keys may be added, renamed or merged.** An unknown key stays an
+  error, so a rename breaks loudly, never silently.
+- **Commands outside the CI path may be merged or dropped**, especially the
+  maintainer-facing ones (`discover`, `refresh`, `health`, `wrap`).
+
+What will **not** change before 1.0 either: exit code `2` never means clean;
+`null` never becomes a default; "could not check" never becomes a pass; the
+CLI gains no runtime dependency and no telemetry, and `check` makes no network
+call unless asked (`--online`). Those hold now.
+
+## 1.0 after feedback from first users
+
+1.0 is not a date. It comes after the first people outside the project have
+run `check` in their own CI and said what was wrong, missing or noisy
+([ADOPTION.md](ADOPTION.md)). From 1.0 on, every rule below holds and a
+breaking change needs a major version.
+
+## Commands and their machine-readable output
+
+The table covers every command in `mcp-vault --help` as of 0.16.0.
+
+| Command | `--json` schema (or file written) |
+|---|---|
+| `check` | `mcp-vault/findings@1`; `--sarif` SARIF 2.1.0 |
+| `status` | `mcp-vault/status@1` |
+| `audit` | `mcp-vault/audit@1` |
+| `secrets` | `mcp-vault/secrets@1`; `--sarif` |
+| `verify` | `mcp-vault/verify-report@1`; `--sarif` |
+| `install` | `mcp-vault/findings@1` when it refuses a lookalike name |
+| `explain` | `mcp-vault/decision@1` |
+| `list` / `ls` | `mcp-vault/entries@1` |
+| `scan` | `mcp-vault/scan@1` |
+| `doctor` | `mcp-vault/doctor@1` |
+| `budget` | `mcp-vault/token-budget@1` |
+| `lock` | `mcp-vault/lock-write@1`, `--check` `mcp-vault/lock-check@1`, `--vendor` `mcp-vault/lock-vendor@1`; file `mcp.lock.json` = `mcp-vault/lock@1` |
+| `approve` | `mcp-vault/approve@1` |
+| `sbom` | CycloneDX 1.6 (see below) |
+| `upgrade` | `mcp-vault/upgrade-plan@1` |
+| `availability` | `mcp-vault/availability@1` |
+| `identity` | `mcp-vault/identity@1` |
+| `posture` | `mcp-vault/posture@1` |
+| `capabilities` | `mcp-vault/capability-scan@1`; file `assets/capabilities.json` = `mcp-vault/capabilities@1` |
+| `tool-scan` | `mcp-vault/findings@1`; `--rules --json` `mcp-vault/tool-scan-rules@1`; `--sarif` |
+| `eval` | `mcp-vault/eval@1` |
+| `docker-drift` | `mcp-vault/docker-drift@1` |
+| `license-drift` | `mcp-vault/license-drift@1` |
+| `discover` | file `assets/discovery/candidates.json` = `mcp-vault/candidates@1` |
+| `refresh` | none (text; `--write` edits the DB) |
+| `health` | `mcp-vault/health@1` (its only output) |
+| `wrap` | none (generates a project) |
+| `badge` | `mcp-vault/badge@1`; `--write --json` `mcp-vault/badges@1` |
+| `site-registry` | files: `badges/index.json` = `mcp-vault/badges@1`, the export below |
+| `export-registry` | `mcp-vault/subregistry-export@1` |
+| `registry-ingest` | `mcp-vault/registry-ingest@1`; `--fetch --out` file = `mcp-vault/registry-snapshot@1` |
+| `signature` | `mcp-vault/findings@1` |
+| `audits` | `list` `mcp-vault/audit-list@1`, `add` `mcp-vault/audit-add@1`, `export` `mcp-vault/audit-export@1`, `keygen` `mcp-vault/keygen@1`, `fetch` / `check` `mcp-vault/findings@1` |
 
 ---
 
@@ -142,7 +216,7 @@ Every JSON document this tool writes carries a schema identifier of the form
 | `mcp-vault/doctor@1` | `mcp-vault doctor --json` |
 | `mcp-vault/entries@1` | `mcp-vault list --json` |
 | `mcp-vault/eval@1` | `mcp-vault eval --json` |
-| `mcp-vault/findings@1` | the `findings` field of every deciding command's `--json`: `verify`, `explain`, `lock --check`, `approve`, `secrets`, `status`, `audit`, `doctor`, `budget`, `availability`, `identity`, `posture`, `capabilities`, `upgrade`, `docker-drift`, `license-drift`, `eval` (see below); `install <lookalike> --json` |
+| `mcp-vault/findings@1` | the `findings` field of every deciding command's `--json`: `verify`, `explain`, `lock --check`, `approve`, `secrets`, `status`, `audit`, `doctor`, `budget`, `availability`, `identity`, `posture`, `capabilities`, `upgrade`, `docker-drift`, `license-drift`, `eval` (see below); the whole output of `check --json`, `tool-scan --json`, `signature --json` and `audits fetch|check --json`; `install <lookalike> --json` |
 | `mcp-vault/health@1` | `mcp-vault health` |
 | `mcp-vault/identity@1` | `mcp-vault identity --json` |
 | `mcp-vault/license-drift@1` | `mcp-vault license-drift --json` |
