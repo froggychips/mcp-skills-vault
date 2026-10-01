@@ -53,7 +53,7 @@ const F = require('./lib/finding.cjs');
 const { loadEffectivePolicy, flagsFromArgv, rowFor, RANK } = require('./lib/policy_rules.cjs');
 const { decideRun, outcomeClass, unanswered } = require('./lib/run_decision.cjs');
 const { asOfFromArgv } = require('./lib/clock.cjs');
-const { readInstalledServers, explicitConfigPaths, unpinnedLaunch } = require('./lib/installed.cjs');
+const { readInstalledServers, explicitConfigPaths, unpinnedLaunch, serverLine, parseCodexToml } = require('./lib/installed.cjs');
 const { HOSTS } = require('./lib/hosts.cjs');
 const secrets = require('./lib/secrets.cjs');
 const flows = require('./lib/flows.cjs');
@@ -235,15 +235,34 @@ const redactDeep = (v) => {
 };
 
 /** verify's findings, subjects and facts, with nothing of a secret left in them. */
-function fromVerify(doc) {
-  const findings = (doc.findings || []).map((f) => F.finding({
+function fromVerify(doc, drop = () => false) {
+  const findings = (doc.findings || []).filter((f) => !drop(f.subject)).map((f) => F.finding({
     rule: f.rule, subject: redactDeep(f.subject), scope: f.scope, severity: f.severity,
     confidence: f.confidence, state: f.state, refs: f.refs, message: secrets.redact(f.message),
   }));
-  const subjects = (doc.decisions || []).map((d) => redactDeep(d.subject));
+  const subjects = (doc.decisions || []).filter((d) => !drop(d.subject)).map((d) => redactDeep(d.subject));
   const facts = {};
   for (const s of subjects) facts[s.id] = { ...redactDeep((doc.facts || {})[s.id] || {}), mode: ((doc.facts || {})[s.id] || {}).mode || 'gate' };
   return { findings, subjects, facts };
+}
+
+/**
+ * The entries of a partly broken config that are not objects, with the line
+ * that names each — what lib/installed.cjs parseConfig skipped and reported
+ * as `partial`. Names only; nothing of a value is kept.
+ */
+function brokenEntries(file) {
+  let raw;
+  let doc;
+  try {
+    raw = fs.readFileSync(file, 'utf8');
+    doc = file.endsWith('.toml') ? parseCodexToml(raw) : JSON.parse(raw);
+  } catch { return []; }
+  const table = doc && (doc.mcpServers !== undefined ? doc.mcpServers : doc.servers);
+  if (!table || typeof table !== 'object' || Array.isArray(table)) return [];
+  return Object.entries(table)
+    .filter(([, spec]) => !spec || typeof spec !== 'object' || Array.isArray(spec))
+    .map(([name]) => ({ name, line: serverLine(raw, name) }));
 }
 
 function readJson(p) { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; } }
@@ -263,14 +282,27 @@ function model({ cwd, opts, asOf, iso, replay, policy }) {
     paths: explicitConfigPaths(configs, { cwd }),
     onUnreadable: (loc) => unreadable.push(loc),
   });
-  const bad = new Set(unreadable.map((u) => u.path));
+  // Only a file that could not be read at all is left out. One whose broken
+  // entries sit beside valid ones (`partial`) is still checked: its valid
+  // servers by every source, its broken entries as questions on their lines.
+  const bad = new Set(unreadable.filter((u) => !u.partial).map((u) => u.path));
+  const partial = new Set(unreadable.filter((u) => u.partial).map((u) => u.path));
   const readable = configs.filter((p) => !bad.has(p));
 
   const findings = [];
   const subjects = [];
   const facts = {};
   const advice = {};                      // finding id -> how to fix, from the source that knows
-  const addFacts = (id, f) => { facts[id] = { ...(facts[id] || {}), ...f }; };
+  // A subject two sources speak about (a secret on the line that launches an
+  // unpinned server) is decided once, over all its findings, in a mode whose
+  // rows include every row of each source's own: `gate` (lib/policy_rules.cjs
+  // ORDER.gate has every setup and observe row). Otherwise the later source's
+  // mode would drop the earlier one's rows, and a finding would go undecided.
+  const addFacts = (id, f) => {
+    const prev = facts[id] || {};
+    const mode = prev.mode && f.mode && prev.mode !== f.mode ? 'gate' : (f.mode || prev.mode);
+    facts[id] = { ...prev, ...f, ...(mode ? { mode } : {}) };
+  };
 
   // A config that is named and missing, or will not parse, is a question this
   // run could not answer: scope/unanswered, exit 2 unless something fails.
@@ -279,9 +311,23 @@ function model({ cwd, opts, asOf, iso, replay, policy }) {
     const key = `${u.path}\u0000${u.error}`;
     if (seenBad.has(key)) continue;
     seenBad.add(key);
+    const broken = u.partial ? brokenEntries(u.path) : [];
+    if (u.partial && broken.length) {
+      for (const b of broken) {
+        const f = unanswered({
+          subject: F.subject.hostConfig({ path: rel(u.path, cwd), line: b.line, host: u.host, scope: 'project', server: b.name }),
+          message: `${rel(u.path, cwd)}${b.line ? `:${b.line}` : ''}: server entry "${b.name}" is not an object — it was not checked`,
+          scope: 'config',
+        });
+        findings.push(f);
+        addFacts(f.subject.id, { mode: 'gate' });
+        advice[f.id] = 'make the entry an object ({ "command": …, "args": [ … ] } or { "url": … }); it is checked once it is';
+      }
+      continue;
+    }
     const f = unanswered({
       subject: F.subject.hostConfig({ path: rel(u.path, cwd), host: u.host, scope: 'project' }),
-      message: `${rel(u.path, cwd)}: ${safeReadError(u.error)} — nothing in it was checked`,
+      message: `${rel(u.path, cwd)}: ${safeReadError(u.error)} — ${u.partial ? 'some entries were not checked' : 'nothing in it was checked'}`,
       scope: 'config',
     });
     findings.push(f);
@@ -299,7 +345,10 @@ function model({ cwd, opts, asOf, iso, replay, policy }) {
     if (vp !== F.canonicalJson(JSON.parse(JSON.stringify(policy)))) {
       return { error: 'internal: verify decided under another policy than this run — refusing to merge its findings; please report this' };
     }
-    const fv = fromVerify(v.doc);
+    // verify reports a partly broken file as a whole ("could not be parsed");
+    // check has already said which entries, on their lines, and checked the rest.
+    const partialRefs = new Set([...partial].map((p) => rel(p, cwd)));
+    const fv = fromVerify(v.doc, (s) => s.type === 'host-config' && !s.line && partialRefs.has(s.path));
     findings.push(...fv.findings);
     subjects.push(...fv.subjects);
     for (const [id, f] of Object.entries(fv.facts)) addFacts(id, f);

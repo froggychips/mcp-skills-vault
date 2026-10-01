@@ -148,6 +148,52 @@ test('check: a plain-text secret is 1, and its value is in no output format', ()
   assert.match(text.trim().split('\n').pop(), /^FAIL — /);
 });
 
+test('check: a secret on the line of an unpinned launch — both causes are decided, and --strict fails', () => {
+  // One-line JSON: the secret's line is the server's line, so verify and
+  // secrets speak about one subject. Its decision rests on both.
+  const dir = project(JSON.stringify({ mcpServers: { browser: { command: 'npx', args: ['-y', '@playwright/mcp@latest'], env: { GITHUB_TOKEN: TOKEN } } } }));
+  const { status, doc } = json([], dir);
+  assert.equal(status, 1);
+  const d = decisionOf(doc, '.mcp.json:1');
+  assert.ok(d, doc.decisions.map((x) => x.subject.id).join(' '));
+  assert.equal(doc.facts['.mcp.json:1'].mode, 'gate');
+  assert.equal(d.effect, 'deny');
+  assert.equal(d.decided_by, 'secrets/github-token');
+  assert.ok(outcomes(d).includes('config/unpinned-launch:warn'), outcomes(d).join(' '));
+  assert.ok(outcomes(d).includes('secrets/github-token:deny'), outcomes(d).join(' '));
+  const text = check([], dir).stdout;
+  assert.match(text, /✗ GitHub token in plain text .* \[secrets\/github-token: deny, fails\]/);
+  assert.match(text, /this config launches @playwright\/mcp@latest, a tag rather than a version.* \[config\/unpinned-launch: warn; so pin\/missing: unknown\]/);
+  const strict = check(['--strict'], dir);
+  assert.equal(strict.status, 1);
+  assert.match(strict.stdout, /\[config\/unpinned-launch: warn; so pin\/missing: unknown, fails\]/);
+});
+
+test('check: a partly broken config — the valid entries are checked, the broken one is unanswered on its line', () => {
+  const dir = project({ mcpServers: {
+    broken: 'npx -y something',
+    'playwright-mcp': { command: 'npx', args: ['-y', '@playwright/mcp@0.0.75'] },
+  } });
+  const clean = json([], dir);
+  // Nothing fails, and a question is open: 2.
+  assert.equal(clean.status, 2, JSON.stringify(clean.doc.decisions.map((x) => [x.subject.id, x.effect])));
+  const open = decisionOf(clean.doc, '.mcp.json:3');
+  assert.equal(open.decided_by, 'scope/unanswered');
+  assert.equal(open.subject.server, 'broken');
+  assert.equal(decisionOf(clean.doc, '.mcp.json:4').effect, 'allow', 'the valid sibling was not checked');
+  assert.ok(!decisionOf(clean.doc, '.mcp.json'), 'the file as a whole is not "unreadable"');
+  assert.match(check([], dir).stdout, /\? \.mcp\.json:3: server entry "broken" is not an object — it was not checked/);
+  // A valid sibling's secret is found, and a finding outranks the open question.
+  const withSecret = project({ mcpServers: {
+    broken: 42,
+    browser: { command: 'npx', args: ['-y', '@playwright/mcp@0.0.75'], env: { GITHUB_TOKEN: TOKEN } },
+  } });
+  const s = json([], withSecret);
+  assert.equal(s.status, 1);
+  assert.ok(s.doc.findings.some((f) => f.rule === 'secrets/github-token'));
+  assert.ok(s.doc.findings.some((f) => f.rule === 'scope/unanswered' && f.subject.server === 'broken'));
+});
+
 test('check: a launch from an overridden source is unknown, with the reason', () => {
   const dir = project({ mcpServers: { tool: { command: 'npx', args: ['-y', '--registry', 'https://registry.example', 'some-pkg@1.0.0'] } } });
   const { status, doc } = json([], dir);
