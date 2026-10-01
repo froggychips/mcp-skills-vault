@@ -22,3 +22,7 @@ mcp-ecosystem-intelligence/assets/*.sig
 # does not commit its own generated output.
 docs/site/badges/
 docs/site/entry/
+
+# The sub-registry export (`mcp-vault export-registry`) is built by the site
+# repo (froggychips/mcp-site) from the npm release, not committed here.
+docs/site/v0.1/

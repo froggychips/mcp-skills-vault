@@ -115,9 +115,12 @@ Every JSON document this tool writes carries a schema identifier of the form
 | `mcp-vault/lock-write@1` | `mcp-vault lock --json` |
 | `mcp-vault/policy@1` | `.mcp-vault.policy.json` (read, not written) |
 | `mcp-vault/posture@1` | `mcp-vault posture --json` |
+| `mcp-vault/registry-ingest@1` | `mcp-vault registry-ingest --snapshot <file> --json` — the snapshot read, the match count and discovery candidates; withdrawals are findings, in its `findings` field (`findings@1`) |
+| `mcp-vault/registry-snapshot@1` | `mcp-vault registry-ingest --fetch --out <file>` |
 | `mcp-vault/scan@1` | `mcp-vault scan --json` |
 | `mcp-vault/secrets@1` | `mcp-vault secrets --json` — an envelope for what is not a finding (the masked shape of each value, the recommendation and suggested edit, keyed by finding id); the findings and decisions are `findings@1` under `findings` |
 | `mcp-vault/status@1` | `mcp-vault status --json` |
+| `mcp-vault/subregistry-export@1` | `mcp-vault export-registry --json`, and `v0.1/x/xyz.froggychips.mcp/export.json` in the export — files, digests, skips; `--json` adds every entry's findings and Decision as `findings` (`findings@1`) |
 | `mcp-vault/token-budget@1` | `mcp-vault budget --json` |
 | `mcp-vault/tool-scan-rules@1` | `mcp-vault tool-scan --rules --json` |
 | `mcp-vault/upgrade-plan@1` | `mcp-vault upgrade --json` |
@@ -138,6 +141,10 @@ someone else's schema:
   `$schema` string that is prose, not a version. It is an evidence stream a
   maintainer reads, the `--json` summary over it (`mcp-vault/eval@1`) is the
   interface, and rows gain fields as checks are added.
+- **The sub-registry export's server documents** (`mcp-vault export-registry`)
+  follow the official MCP Registry's `server.json` schema, named by their
+  `$schema`. What this project adds sits under `_meta["xyz.froggychips.mcp/vault"]`,
+  and that object follows the additive rule below.
 
 Within one schema major:
 

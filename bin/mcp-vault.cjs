@@ -57,6 +57,8 @@ const COMMANDS = {
   wrap:            "generate_wrapper.cjs",
   "site-registry": "generate_registry_page.cjs",
   badge:           "badge.cjs",
+  "export-registry": "export_subregistry.cjs",
+  "registry-ingest": "registry_ingest.cjs",
   budget:          "token_budget.cjs",
   lock:            "lock.cjs",
   approve:         "approve.cjs",
@@ -101,9 +103,14 @@ COMMANDS
   health <args>     Score a candidate by stars / recency / license / registry
   refresh           Refresh pinned versions + integrity hashes from registries
   wrap              Generate MCP wrapper boilerplate for a CLI / API tool
-  site-registry     Generate registry.html from tools_database.json, and every
-                    entry's badge + evidence page (--out <dir>, --base-url <url>)
+  site-registry     Generate registry.html from tools_database.json, every entry's
+                    badge + evidence page, and the sub-registry export below
+                    (--out <site root> --base-url <url>)
   badge <name>      README snippet for a "vetted by mcp-vault" badge, and what it says today
+  export-registry   The DB as a static MCP sub-registry: <out>/v0.1/ (API v0.1)
+                    (--out <site root, default docs/site> --base-url <url>)
+  registry-ingest   Official registry snapshot → withdrawn entries + new servers
+                    (--fetch --out <file> is the only networked step)
   budget            What your configured servers cost in context tokens
   sbom              CycloneDX bill of materials (--installed / --deps)
   lock              Freeze the verified dependency tree + tool surface (mcp.lock.json)

@@ -8,6 +8,9 @@
  *   3. npm search — keyword "mcp-server"
  *   4. MCP registry — registry.modelcontextprotocol.io/v0/servers (paginated)
  *   5. PyPI — `uvx`-installable servers (probe by name from /simple/ index)
+ *   6. MCP registry snapshot — a file saved by `registry-ingest --fetch`
+ *      (`--source registry-snapshot --snapshot <file>`); no registry request,
+ *      latest active versions only
  *
  * For each candidate:
  *   - skip if already in tools_database.json (matched by source_url or name)
@@ -28,7 +31,8 @@
  *
  * Usage:
  *   node scripts/discover.cjs --limit 50 [--out candidates.json]
- *                              [--source readme,gh,npm,registry,pypi | all]
+ *                              [--source readme,gh,npm,registry,pypi,registry-snapshot | all]
+ *                              [--snapshot <file>]         for registry-snapshot
  *                                                          default: readme,gh,npm
  *                              [--include-existing]        don't skip DB matches
  *                              [--max-health-checks N]     cap gh api calls
@@ -54,6 +58,7 @@ const { execFileSync } = require('child_process');
 const { exitAfterFlush } = require('./lib/exit.cjs');
 const { readWallClock } = require('./lib/clock.cjs');
 const { githubSlug, isGithubUrl } = require('./lib/repo_url.cjs');
+const { snapshotAsRegistryPage } = require('./lib/registry_snapshot.cjs');
 
 const DB_PATH      = path.resolve(__dirname, '../assets/tools_database.json');
 const CALC_HEALTH  = path.resolve(__dirname, 'calculate_health.cjs');
@@ -73,6 +78,7 @@ const SOURCES       = SOURCES_RAW === 'all'
   ? ['readme', 'gh', 'npm', 'registry', 'pypi']
   : SOURCES_RAW.split(',').map(s => s.trim()).filter(Boolean);
 const INCL_EXISTING = argv.includes('--include-existing');
+const SNAPSHOT      = ARG('--snapshot', null);
 
 // URLs are env-overridable so tests can stub them without monkey-patching.
 const REGISTRY_BASE = process.env.MCP_DISCOVER_REGISTRY_URL
@@ -274,6 +280,18 @@ async function fromMcpRegistry(opts = {}) {
   return out;
 }
 
+// ── MCP registry snapshot (file saved by registry-ingest --fetch) ─────────
+//
+// The same parser as the live source, over a file: the snapshot is the
+// registry as of one fetch, so a weekly discovery run and a reviewer see the
+// same list. Withdrawn servers are dropped before parsing — see
+// lib/registry_snapshot.cjs.
+function fromRegistrySnapshot(file) {
+  const snap = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const { entries } = parseRegistryPage(snapshotAsRegistryPage(snap));
+  return entries.map((e) => ({ ...e, source: 'mcp-registry-snapshot' }));
+}
+
 // ── PyPI (uvx-installable servers) ─────────────────────────────────────────
 //
 // PyPI deprecated its JSON search endpoint and the HTML /search/ now returns
@@ -464,12 +482,27 @@ async function main() {
 
   process.stderr.write(`Sources: ${SOURCES.join(', ')}\n`);
 
+  let snapshotList = null;
+  if (SOURCES.includes('registry-snapshot')) {
+    if (!SNAPSHOT) {
+      process.stderr.write('--source registry-snapshot needs --snapshot <file> (mcp-vault registry-ingest --fetch --out <file>)\n');
+      exitAfterFlush(2);
+      return;
+    }
+    try { snapshotList = fromRegistrySnapshot(SNAPSHOT); } catch (e) {
+      process.stderr.write(`cannot read the registry snapshot: ${e.message}\n`);
+      exitAfterFlush(2);
+      return;
+    }
+  }
+
   const seedLists = [];
   if (SOURCES.includes('readme'))   seedLists.push(await fromMcpServersReadme());
   if (SOURCES.includes('gh'))       seedLists.push(fromGhSearch());
   if (SOURCES.includes('npm'))      seedLists.push(fromNpmSearch());
   if (SOURCES.includes('registry')) seedLists.push(await fromMcpRegistry());
   if (SOURCES.includes('pypi'))     seedLists.push(await fromPyPI());
+  if (snapshotList)                 seedLists.push(snapshotList);
 
   // Merge and dedupe by repo URL when known, else by name+source-tag. Entries
   // from registry/pypi without a github repo still flow downstream so the
@@ -627,6 +660,7 @@ module.exports = {
   rejectReason,
   parseRegistryPage,
   fromMcpRegistry,
+  fromRegistrySnapshot,
   parsePypiSimpleIndex,
   parsePypiJson,
   fromPyPI,

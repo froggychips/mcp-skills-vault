@@ -910,6 +910,95 @@ mcp-vault site-registry --out <site root> --base-url https://mcp.froggychips.xyz
 
 [`.github/scripts/finding_reports.cjs`](./.github/scripts/finding_reports.cjs) drafts a short issue text for each entry with a real finding (advisory, repository mismatch, yanked or unpublished release, install scripts in the tree, tool surface changed without a release). It writes files only; nothing is opened in anyone's repository.
 
+### Sub-registry of the official MCP Registry (`export-registry`, `registry-ingest`)
+
+[`scripts/export_subregistry.cjs`](./mcp-ecosystem-intelligence/scripts/export_subregistry.cjs)
+writes the DB as a static [sub-registry](https://modelcontextprotocol.io/registry/registry-aggregators#acting-as-a-subregistry):
+the registry's own read API (v0.1) as files under `<out>/v0.1/`, so a host
+that already speaks it can point at the site's base URL — VS Code's
+`McpGalleryServiceUrl`, or ToolHive via `v0.1/x/xyz.froggychips.mcp/toolhive.json`.
+`site-registry` runs it too, with the same `--out` / `--base-url`, so the page
+and the API describe the same DB.
+
+The export is not committed to this repo. The site
+([mcp.froggychips.xyz](https://mcp.froggychips.xyz)) lives in
+`froggychips/mcp-site`, whose workflow installs a released
+`@froggychips/mcp-vault` from npm and runs the generators with the site's root
+as `--out`. Locally the default `--out` is `docs/site`, where `v0.1/` is
+git-ignored.
+
+```bash
+mcp-vault export-registry --out <site root> --base-url https://mcp.froggychips.xyz
+mcp-vault site-registry   --out <site root> --base-url https://mcp.froggychips.xyz   # page + export
+mcp-vault export-registry --out <site root> --check   # exit 1 if the tree there is stale
+mcp-vault registry-ingest --fetch --out snap.json      # the only networked step
+mcp-vault registry-ingest --snapshot snap.json         # exit 1: a pinned/latest version deleted upstream (--strict: deprecated too)
+mcp-vault discover --source registry-snapshot --snapshot snap.json
+```
+
+Each entry is a valid `server.json` (validated in the tests against the vendored
+2025-12-11 schema) with a pinned package — npm/PyPI by exact version, images as
+`oci` by `@sha256` digest — and our evidence under
+`_meta["xyz.froggychips.mcp/vault"]`: tier and why, pinned version and
+integrity, the date of each check, and how to ask `explain`. The `verdict`
+there is the entry's Decision — effect, the rule that decided it, why, as of
+when — made by `decide()` over the stored evidence exactly as `explain` makes
+it, under the vault's own rules only — like a badge, the export is the vault's
+public statement, so a `.mcp-vault.policy.json` in the directory it runs from
+is not applied; `tier_holds_until` is the first
+instant a piece of that evidence ages out. The name is the official one only
+when `identity` recorded it; everything else is published under
+`xyz.froggychips.mcp/…`, never under a namespace nobody proved. A denied entry,
+a Deprecated tier, or nothing pinned is not exported — a host that ignores
+`_meta` would offer it. Everything is judged as of one instant: now, or
+`--as-of` (`--check` replays the instant the export on disk was made at), and
+the same DB and instant give the same bytes; the manifest
+(`export.json`) hashes every file, and `--json` adds the findings@1 document.
+
+Both defaults are one constant each in
+[`lib/subregistry.cjs`](./mcp-ecosystem-intelligence/scripts/lib/subregistry.cjs):
+`NAMESPACE` (the `_meta` key, the names of unlisted entries and the `v0.1/x/…`
+directory) and `DEFAULT_BASE_URL`. Every absolute URL the export writes — the
+`explain.page` link in `_meta`, the ToolHive file's `meta.source` — is built from
+`--base-url`, and the manifest records it as `base_url`.
+
+What static hosting cannot do: `search`, `updated_since`, `version`,
+`include_deleted`, `limit` and `cursor` are ignored — every list request gets
+the whole list as one page with no `nextCursor`. Names are written both
+`%2F`-encoded and as subdirectories, because static hosts disagree about
+decoding `%2F`.
+
+Content-Type on GitHub Pages is chosen by extension, so the API paths come back
+as `text/html` (list endpoints are `index.html`, reached via a `301` from
+`/v0.1/servers` to `/v0.1/servers/`) and `application/octet-stream` (single
+versions have no extension). The bodies are JSON. The clients checked parse the
+body and ignore the header: VS Code's gallery (`asJson` is a bare `JSON.parse`)
+and ToolHive's registry client (`json.NewDecoder`, redirects followed). A client
+that insists on `application/json` can use the `.json` twin every endpoint has,
+same bytes:
+
+| API path (what a client builds from the base URL) | `.json` twin (`application/json`) |
+|---|---|
+| `/v0.1/servers` | `/v0.1/servers.json` |
+| `/v0.1/servers/<name>/versions` | `/v0.1/servers/<name>/versions.json` |
+| `/v0.1/servers/<name>/versions/latest` | `…/versions/latest.json` |
+| `/v0.1/servers/<name>/versions/<version>` | `…/versions/<version>.json` |
+| — | `/v0.1/x/xyz.froggychips.mcp/toolhive.json` (ToolHive, one file) |
+
+A client that needs the header on the API paths themselves needs a real server
+(or a proxy in front of Pages) — a static host cannot provide it.
+
+`registry-ingest` goes the other way. It saves a full snapshot of the official
+registry (all or nothing, deleted servers included), then offline reports DB
+entries whose server is `deprecated` or `deleted` — the latest version *or the
+exact version pinned here* (for images: the pinned digest, or the release
+version as tag) — and the listed servers the DB lacks. It never edits the DB.
+Withdrawals are findings (`registry/deleted-upstream`, high;
+`registry/deprecated-upstream`, medium; `registry/pinned-unseen`, not-run, when
+a latest-only snapshot cannot see the pin) and the exit code is `decide()`'s:
+`--strict` fails on a deprecation, `--fail-unverified` on an unseen pin, and
+`--as-of` replays a saved snapshot.
+
 ### Health scorer
 
 [`scripts/calculate_health.cjs`](./mcp-ecosystem-intelligence/scripts/calculate_health.cjs) — score any MCP candidate:
@@ -1110,6 +1199,7 @@ Everything in this table is scripted and tested; the column says where it lives.
 | Machine-readable report + SARIF | [`lib/report.cjs`](./mcp-ecosystem-intelligence/scripts/lib/report.cjs) |
 | Behavioural smoke in a rebuilt jail | [`mcp_eval.cjs`](./mcp-ecosystem-intelligence/scripts/mcp_eval.cjs), [`lib/mcp_stdio.cjs`](./mcp-ecosystem-intelligence/scripts/lib/mcp_stdio.cjs) |
 | Discovery pipeline (npm / gh / README) | [`discover.cjs`](./mcp-ecosystem-intelligence/scripts/discover.cjs) |
+| Static sub-registry export (MCP Registry API v0.1) + official-registry ingest | [`lib/subregistry.cjs`](./mcp-ecosystem-intelligence/scripts/lib/subregistry.cjs), [`lib/registry_snapshot.cjs`](./mcp-ecosystem-intelligence/scripts/lib/registry_snapshot.cjs) |
 | Wrapper generator (CLI/API → MCP) | [`generate_wrapper.cjs`](./mcp-ecosystem-intelligence/scripts/generate_wrapper.cjs) |
 | Provenance bound to the artifact digest, not just read | [`lib/npm_signatures.cjs`](./mcp-ecosystem-intelligence/scripts/lib/npm_signatures.cjs) |
 | Behaviour capping the recommendation | [`lib/scores.cjs`](./mcp-ecosystem-intelligence/scripts/lib/scores.cjs) |
@@ -1249,7 +1339,7 @@ Running the suite locally:
 ```bash
 node --test tests/*.test.cjs        # unit tests (offline)
 mcp-vault verify --offline          # DB smoke, no network
-mcp-vault site-registry             # regenerate docs/site/registry.html
+mcp-vault site-registry             # regenerate docs/site/registry.html (+ git-ignored v0.1/)
 ```
 
 ---

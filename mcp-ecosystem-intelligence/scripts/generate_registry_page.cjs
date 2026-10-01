@@ -1,5 +1,15 @@
 #!/usr/bin/env node
 // Generate a static browsable registry page from assets/tools_database.json.
+//
+//   node generate_registry_page.cjs [--out <site root>] [--base-url <url>] [--as-of <date>]
+//
+// --out       site root (default: docs/site); registry.html, registry.json, the
+//             badges and evidence pages (badges/, entry/) and the sub-registry
+//             export (v0.1/…) are written under it
+// --base-url  where that root is served (default: https://mcp.froggychips.xyz),
+//             passed to the badges and to export-registry for their absolute URLs
+// --as-of     judge tiers at this instant (lib/clock.cjs); default: now. The
+//             badges and the export get the same instant.
 
 "use strict";
 
@@ -12,7 +22,7 @@ const { dbAsOf, evalResultsAsOf } = require("./lib/evidence.cjs");
 const ROOT = path.resolve(__dirname, "..", "..");
 const DB_PATH = path.join(ROOT, "mcp-ecosystem-intelligence", "assets", "tools_database.json");
 const EVAL_PATH = path.join(ROOT, "mcp-ecosystem-intelligence", "assets", "eval_results.json");
-const OUT_DIR = path.join(ROOT, "docs", "site");
+const DEFAULT_OUT = path.join(ROOT, "docs", "site");
 
 function esc(s) {
   return String(s ?? "")
@@ -162,21 +172,21 @@ function buildEntries(db, evals, asOf) {
   );
 }
 
-const HELP = `site-registry — the browsable registry page, and every entry's badge
+const HELP = `site-registry — the browsable registry page, every entry's badge, and the sub-registry export
 
 USAGE
   mcp-vault site-registry [--out <dir>] [--base-url <url>] [--as-of <date>]
 
   --out       the site root to write into (default: docs/site in this checkout).
-              Writes registry.html, registry.json, badges/ and entry/ under it.
+              Writes registry.html, registry.json, badges/, entry/ and v0.1/ under it.
   --base-url  URL the site root is served at (default: https://mcp.froggychips.xyz);
-              passed through to the badges
+              passed through to the badges and the export
   --as-of     judge tiers and badges at this instant (YYYY-MM-DD or ISO-8601
-              with a zone; default: now). The badges get the same instant.
+              with a zone; default: now). The badges and the export get the same instant.
 `;
 
 function parseArgs(argv) {
-  const opts = { out: OUT_DIR, base: null, help: false };
+  const opts = { out: DEFAULT_OUT, base: null, help: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "-h" || a === "--help") opts.help = true;
@@ -215,10 +225,18 @@ function main(argv = process.argv.slice(2)) {
   // of one is a rebuild of the other — into the same root, for the same URL.
   const badgeArgs = ["--write", "--out", outDir, "--as-of", clock.iso];
   if (opts.base) badgeArgs.push("--base-url", opts.base);
-  const code = require("./badge.cjs").main(badgeArgs);
+  const badgeCode = require("./badge.cjs").main(badgeArgs);
+
+  // The same site carries the sub-registry export (<out>/v0.1/), so one
+  // regeneration keeps the page and the API files describing the same DB —
+  // with the same root, base URL and instant the badges were given.
+  const exportArgs = ["--out", outDir, "--as-of", clock.iso];
+  if (opts.base) exportArgs.push("--base-url", opts.base);
+  const exportCode = require("./export_subregistry.cjs").run(exportArgs);
+  const code = badgeCode || exportCode;
   if (code !== 0) process.exitCode = code;
 }
 
 if (require.main === module) main();
 
-module.exports = { slimEntry, renderHtml, buildEntries, parseArgs, main, DB_PATH, EVAL_PATH, OUT_DIR };
+module.exports = { slimEntry, renderHtml, buildEntries, parseArgs, main, DB_PATH, EVAL_PATH, OUT_DIR: DEFAULT_OUT };
