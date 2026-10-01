@@ -51,6 +51,7 @@ const TAG_MODEL = Object.freeze({
   // A rendering of `config/unpinned-launch` on the server's host-config line
   // (verify --installed / --config), written after the decision.
   UNPINNED:   { rule: 'config/unpinned-launch',         severity: 'medium', state: 'observed' },
+  OVERRIDE:   { rule: 'config/launch-source-override',  severity: 'medium', state: 'observed' },
   NOTE:       { rule: 'verify/note',                    severity: 'info',   state: 'observed' },
   SKIP:       { rule: 'verify/skipped',                 severity: 'info',   state: 'not-run' },
 });

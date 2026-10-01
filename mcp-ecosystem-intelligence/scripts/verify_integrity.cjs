@@ -526,6 +526,15 @@ function versionFromInstallCmd(cmd) {
   return l && !l.error && l.package ? (l.version || null) : null;
 }
 
+// The range a launch asks for (`^1.2.0`, `~0.25.0`, `>=1.2`, `<2`, `==1.*`),
+// or null for an exact version, a dist-tag (`latest`, `next`) or none.
+function rangeOf(cmd) {
+  const l = cmd ? parseLaunch(cmd) : null;
+  if (!l || l.error || !l.package || !l.version || l.exact) return null;
+  if (l.ecosystem === 'pypi') return l.version === 'latest' ? null : l.version;
+  return /^[A-Za-z][\w.-]*$/.test(l.version) ? null : l.version;
+}
+
 // npm's signing keys. One request per run, cached for a day — they rotate on
 // the order of years, and a run that cannot fetch them reports signatures as
 // unverified rather than as failures.
@@ -1549,7 +1558,14 @@ async function main() {
     }
     const byName = new Map(allTools.map((t) => [t.name, t]));
     const lookalikeIndex = lookalike.buildIndex(allTools);
-    scope = servers.map((srv) => {
+    // The vault entry for an npm package, by package (for the extra `-p`
+    // packages, which have no config key of their own).
+    const byNpmPackage = new Map();
+    for (const t of allTools) {
+      const p = typeof t.install_cmd === 'string' ? npmPkgName(t.install_cmd) : null;
+      if (p && !byNpmPackage.has(p)) byNpmPackage.set(p, t);
+    }
+    scope = servers.flatMap((srv) => {
       const known = byName.get(srv.name) || null;
       // Registry checks answer "is this the artifact it claims to be". A
       // typosquat is exactly that — a real, signed, unvulnerable package — so
@@ -1557,10 +1573,12 @@ async function main() {
       const look = lookalike.checkServer(srv, lookalikeIndex, { dbName: known ? known.name : null });
       const pinnedVersion = versionFromInstallCmd(srv.install_cmd);
       const sameVersion = known && pinnedVersion && known.version === pinnedVersion;
-      return {
+      const main = {
         name:          srv.name,
         install_cmd:   srv.install_cmd || `(${srv.remote ? `remote: ${srv.remote}` : srv.command || 'no command'})`,
-        version:       pinnedVersion,
+        // A range is not a version: reported as none (and as the range, in
+        // the gate's line and the UNPINNED finding).
+        version:       rangeOf(srv.install_cmd) ? null : pinnedVersion,
         // Only the DB's hash for the *same* version is evidence about this artifact.
         pkg_integrity: sameVersion ? known.pkg_integrity : null,
         source_url:    known ? known.source_url : null,
@@ -1572,14 +1590,41 @@ async function main() {
           // are about: the path as code scanning resolves it, and the line.
           ref: configRef(srv.source), line: srv.line || null,
           // What kind of thing this is decides what "unverifiable" means.
-          kind: srv.remote ? 'remote' : (srv.install_cmd ? 'registry' : 'local'),
+          kind: srv.remote ? 'remote' : (srv.source_override ? 'override' : (srv.install_cmd ? 'registry' : 'local')),
           command: srv.command,
+          // The package does not come from the public registry (a source
+          // option or environment variable): never checked as if it did.
+          override: srv.source_override || null,
+          launch: srv.launch || null,
         },
         _lookalike: look,
         // The config launches a registry package with no exact version: a
         // finding about the config line, decided by `config/unpinned-launch`.
-        _unpinned: srv.install_cmd ? unpinnedLaunch(srv, { dbTools: allTools }) : null,
+        _unpinned: srv.install_cmd && !srv.source_override ? unpinnedLaunch(srv, { dbTools: allTools }) : null,
       };
+      // `npx -p a -p b bin` installs and runs every -p package, so each is a
+      // subject of its own checks (pin, advisories, lookalike, unpinned), on
+      // the same config line — not only the one the binary belongs to.
+      const extras = (!srv.source_override && srv.launch && srv.launch.ecosystem === 'npm' && !srv.launch.error
+        ? (srv.launch.packages || []).filter((x) => x.name !== srv.launch.package) : [])
+        .map((x) => {
+          const cmd = `npx -y ${x.name}${x.version ? `@${x.version}` : ''}`;
+          const k = byNpmPackage.get(x.name) || null;
+          const v = versionFromInstallCmd(cmd);
+          return {
+            name:          `${srv.name} (-p ${x.name})`,
+            install_cmd:   cmd,
+            version:       v,
+            pkg_integrity: k && v && k.version === v ? k.pkg_integrity : null,
+            source_url:    k ? k.source_url : null,
+            trust:         k ? k.trust : 'not-in-vault',
+            license:       k ? k.license : null,
+            _installed: { ...main._installed, in_vault: !!k, extra_of: srv.name },
+            _lookalike: lookalike.checkServer({ name: null, install_cmd: cmd }, lookalikeIndex),
+            _unpinned: unpinnedLaunch(srv, { dbTools: allTools, only: x.name }),
+          };
+        });
+      return [main, ...extras];
     });
     // A config that exists but does not parse is a finding: it may be the file
     // that holds the servers nobody is checking. It used to vanish into a
@@ -1613,6 +1658,7 @@ async function main() {
       : inst.kind === 'remote' ? `remote server (${inst.remote}) — no artifact to verify, trust is in the endpoint`
       : inst.kind === 'unreadable' ? `host config could not be parsed (${tool._configError}) — the servers it lists were not checked`
       : inst.kind === 'local'  ? `launched from a local command (${inst.command}) — nothing published to verify against`
+      : inst.kind === 'override' ? `the package source is overridden (${inst.override}) — not checked against the public registry`
       : why;
     results.push({
       tool,
@@ -1630,6 +1676,16 @@ async function main() {
     return l && l.error ? `${fallback}: ${l.error}` : fallback;
   };
   for (const tool of scope) {
+    const inst = tool._installed;
+    if (inst && inst.kind === 'override') { unroutable(tool, 'source override'); continue; }
+    // A range is not a version: which release runs is decided at each start,
+    // so there is nothing exact to verify — never "version X" (and never
+    // quietly the latest release instead).
+    const range = inst && rangeOf(tool.install_cmd);
+    if (range) {
+      unroutable(tool, `the config asks for a range (${range}) — which release runs is decided at each start; nothing exact to verify`);
+      continue;
+    }
     if (/^npx\s/.test(tool.install_cmd)) {
       const p = npmPkgName(tool.install_cmd);
       if (p) npmTools.push({ tool, pkg: p });
@@ -1921,6 +1977,23 @@ async function main() {
   // it as a warning on that line; the effect is the `config/unpinned-launch`
   // row's (policy.unpinnedLaunch), which owns the finding.
   const unpinnedRun = new Map();
+  // A launch whose package source is overridden: its own finding on the
+  // config line, decided by `config/launch-source-override` (unknown — the
+  // gate did not check what runs, and says why).
+  const overrideRun = new Map();
+  results.forEach((r, i) => {
+    const inst = r.tool && r.tool._installed;
+    const s = model.subjects[i];
+    if (!inst || inst.kind !== 'override' || !s) return;
+    const pkg = inst.launch && inst.launch.package;
+    const f = finding({
+      rule: 'config/launch-source-override', subject: s, scope: 'installed', severity: 'medium', state: 'observed',
+      message: `this config launches ${pkg || 'a package'} from a source other than the public registry: ${inst.override}. `
+        + 'The gate does not check it against the registry; launch it from the registry, or verify that source yourself.',
+    });
+    overrideRun.set(i, f);
+    model.findings.push(f);
+  });
   results.forEach((r, i) => {
     const u = r.tool && r.tool._unpinned;
     const s = model.subjects[i];
@@ -2055,6 +2128,22 @@ async function main() {
       r.status = 'FAIL';
     } else if (r.status === 'OK') {
       r.status = 'WARN';
+    }
+  }
+
+  // The source-override decisions, rendered on the server: an OVERRIDE line.
+  // Its outcome is `unknown`, so it fails the run under --fail-unverified /
+  // --strict like any other check that did not run.
+  for (const [i, f] of overrideRun) {
+    const s = model.subjects[i];
+    const d = s && decisionOf.get(s.id);
+    const o = d && d.rules.find((x) => x.findings.includes(f.id));
+    const r = results[i];
+    r.lines = r.lines || [];
+    r.lines.push(['OVERRIDE', f.message, { decided_by: o ? o.rule : null }]);
+    if (o && outcomeFails(o, { threshold: d.fail_on, families: EP.fail_families, ruleOf: new Map([[f.id, f.rule]]), thresholded: true })) {
+      r.failures = (r.failures || 0) + 1;
+      r.status = 'FAIL';
     }
   }
 

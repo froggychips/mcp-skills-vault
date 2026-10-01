@@ -700,6 +700,19 @@ const configRules = [
     doc: 'A host config that launches a registry package without an exact version (none, a tag, a range); the level is policy.unpinnedLaunch.',
     evaluate: (ctx) => setJudged(ctx, (r) => r === 'config/unpinned-launch', 'unpinnedLaunch'),
   },
+  {
+    // A launch whose package comes from somewhere else than the public
+    // registry (--registry, an npmrc, a uv index/project, pipx --path, or the
+    // same through the environment). The gate did not check what runs, so
+    // the answer is `unknown`, with the reason — never `allow`, and never a
+    // check against the public registry standing in for the real source.
+    id: 'config/launch-source-override', status: 'active', thresholded: true, owns_findings: true, views: [],
+    doc: 'A host config that launches a package from an overridden source (registry, npmrc, index, local path): unknown, with the reason.',
+    evaluate(ctx) {
+      return ctx.findings.filter((f) => f.rule === 'config/launch-source-override')
+        .map((f) => out('unknown', f.message, [f.id], f.rule));
+    },
+  },
 ];
 
 // ── reserved for the open feature PRs ──────────────────────────────────────
@@ -777,7 +790,7 @@ const ORDER = Object.freeze({
     'gate/fail', 'gate/unverified', 'tool-scan/*', 'behaviour/*', 'budget/over', ...SETUP_ORDER,
     'secrets/*',
     'gate/require-provenance', 'gate/fail-dep-advisories', 'finding/severity', 'finding/incomplete',
-    'lookalike/*', 'config/unpinned-launch',
+    'lookalike/*', 'config/unpinned-launch', 'config/launch-source-override',
     'audits/recorded',
     'db/signature', 'audits/import',
   ]),
@@ -790,7 +803,7 @@ const ORDER = Object.freeze({
     'gate/fail', 'gate/unverified', 'tool-scan/*', 'behaviour/*', 'budget/over', ...SETUP_ORDER,
     'secrets/*',
     'gate/require-provenance', 'gate/fail-dep-advisories', 'finding/severity', 'finding/incomplete',
-    'lookalike/*', 'config/unpinned-launch',
+    'lookalike/*', 'config/unpinned-launch', 'config/launch-source-override',
     'audits/recorded',
     'db/signature', 'audits/import',
   ]),

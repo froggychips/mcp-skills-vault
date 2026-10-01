@@ -412,7 +412,9 @@ test('pinInstallCmd: refuses commands the gate itself cannot parse', () => {
 });
 
 test('pinInstallCmd: known npx options and --package are read, and the right token is pinned', () => {
-  assert.deepEqual(o.pinInstallCmd('npx -y --cache /tmp/c pkg', '1.2.3').parts, ['npx', '-y', '--cache', '/tmp/c', 'pkg@1.2.3']);
+  assert.deepEqual(o.pinInstallCmd('npx -y --loglevel silent pkg', '1.2.3').parts, ['npx', '-y', '--loglevel', 'silent', 'pkg@1.2.3']);
+  // A cache it is pointed at can supply the package: a source override, not pinnable.
+  assert.equal(o.pinInstallCmd('npx -y --cache /tmp/c pkg', '1.2.3').pinned, false);
   assert.deepEqual(o.pinInstallCmd('npx -y --package pkg server', '1.2.3').parts, ['npx', '-y', '--package', 'pkg@1.2.3', 'server']);
 });
 

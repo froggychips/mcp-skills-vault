@@ -19,6 +19,7 @@
  *   WARN, HOOK       → warning
  *   LOOKALIKE        → warning  (not in the vault, shaped like an entry that is; error under --strict)
  *   UNPINNED         → warning  (the config launches a package with no exact version; error under --strict)
+ *   OVERRIDE         → warning  (the package source is overridden — not checked; error under --fail-unverified)
  *   NOTE, DIGEST     → note
  */
 
@@ -33,6 +34,7 @@ const TAG_LEVEL = {
   HOOK:       'warning',
   LOOKALIKE:  'warning',
   UNPINNED:   'warning',
+  OVERRIDE:   'warning',
   DIGEST:     'note',
   DEEP:       'note',
   SIG:        'note',
@@ -57,6 +59,7 @@ const TAG_RULE = {
   HOOK:       'install-hook',
   LOOKALIKE:  'lookalike-name',
   UNPINNED:   'unpinned-launch',
+  OVERRIDE:   'launch-source-override',
   DIGEST:     'unpinned-image',
   DEEP:       'deep-verified',
   SIG:        'signature-verified',
@@ -78,6 +81,7 @@ const RULE_HELP = {
   'metadata-mismatch':  'Registry metadata disagrees with the DB (repository URL, license).',
   'lookalike-name':     'The server is not in the vault, but its package or name is shaped like a vault entry\u2019s (a typo, look-alike characters, a swapped scope or registry, an added suffix) — the pattern of a typosquat. Check which one you meant.',
   'unpinned-launch':    'The host config launches a registry package with no exact version (none, `@latest`, a range): each start runs whatever the registry resolves then, not what was reviewed. Pin the exact version.',
+  'launch-source-override': 'The host config launches the package from another source than the public registry (a registry or index option, an npmrc or uv config, a local path, or the same through the environment). The gate did not check what runs.',
   'install-hook':       'The package runs code at install time (preinstall/install/postinstall/prepare/prepack).',
   'unpinned-image':     'A container image is referenced by tag rather than by @sha256 digest.',
   'deep-verified':      'The artifact was downloaded and hashed locally; the bytes match both the registry metadata and the DB pin.',

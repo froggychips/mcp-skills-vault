@@ -33,9 +33,9 @@ test('npx: --yes, --yes=true, -y, -q and no flag at all name the same package', 
 });
 
 test('npx: a value-taking option is skipped with its value, never read as the package', () => {
-  assert.equal(launch('npx', '-y', '--cache', '/tmp/x', 'pkg@1.2.3').package, 'pkg');
+  assert.equal(launch('npx', '-y', '--node-options', '--max-old-space-size=512', 'pkg@1.2.3').package, 'pkg');
   assert.equal(launch('npx', '--loglevel', 'silent', '-y', 'pkg@1.2.3').package, 'pkg');
-  assert.equal(launch('npx', '--cache=/tmp/x', 'pkg@1.2.3').version, '1.2.3');
+  assert.equal(launch('npx', '--loglevel=silent', 'pkg@1.2.3').version, '1.2.3');
 });
 
 test('npx: arguments after the package belong to the server, flags included', () => {

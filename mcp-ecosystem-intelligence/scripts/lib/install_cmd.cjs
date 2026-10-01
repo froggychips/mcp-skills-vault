@@ -42,13 +42,16 @@
 // option we do not know might take a value, and then we cannot tell the
 // package from that value (`npx -y --cache /tmp/x pkg` once read as the
 // package "--cache"), so an unknown option is "cannot parse", never a guess.
-// Options that change *what* is fetched (`--registry`, an index URL, `-c`)
-// are refused with a reason: the artifact the gate would check is not the
-// one that runs.
+// Options that change *where* the package comes from (`--registry`, an npmrc
+// via `--userconfig`, an index URL, a uv project/config file, `pipx --path`)
+// are a *source override*: the launch is read (package, version, binary) but
+// marked `override` with the reason and returned with `error` set, so no
+// consumer checks it against the public registry as if it came from there.
+// A shell string (`-c`) is refused outright: there is no package to read.
 
 // npm exec / npx (npm ≥ 7) options. Value-taking ones consume the next token.
 const NPX_VALUE_FLAGS = new Set([
-  '-p', '--package', '--cache', '--userconfig', '--globalconfig', '--prefix',
+  '-p', '--package',
   '--loglevel', '--node-options', '-w', '--workspace', '--script-shell',
   '--shell', '--include', '--omit', '--before', '--location', '--color',
 ]);
@@ -59,33 +62,55 @@ const NPX_BOOL_FLAGS = new Set([
   '--no-audit', '--no-fund', '--no-update-notifier', '--ws', '--workspaces',
   '--include-workspace-root', '--foreground-scripts', '--no-color',
 ]);
-// These change the artifact or the command; the gate cannot vouch for either.
+// These run a shell string: there is no package to read.
 const NPX_REFUSED_FLAGS = {
-  '--registry': 'installs from another registry (--registry), not the one the gate checks',
   '-c':         'runs a shell string (-c), not a package binary',
   '--call':     'runs a shell string (--call), not a package binary',
 };
+// These change where the package comes from (each takes a value). npm reads
+// `registry` (and `@scope:registry`) from any npmrc it is pointed at, and a
+// cache or prefix it is pointed at can supply the package without the
+// registry: what runs is not what the public registry serves.
+const NPX_SOURCE_FLAGS = {
+  '--registry':     'installs from another registry (--registry)',
+  '--userconfig':   'reads another npmrc (--userconfig), which can set the registry',
+  '--globalconfig': 'reads another npmrc (--globalconfig), which can set the registry',
+  '--cache':        'uses another npm cache (--cache), which can supply the package',
+  '--prefix':       'uses another prefix (--prefix), whose installed packages can supply the binary',
+};
+// `--@scope:registry=<url>`: a registry for one scope.
+const SCOPED_REGISTRY_FLAG = /^--@[^:\s]+:registry$/;
 
 // The other npm-registry runners: same idea, their own option names.
 //   pnpm dlx / pnpx  https://pnpm.io/cli/dlx
 //   bunx / bun x     https://bun.sh/docs/cli/bunx
 //   yarn dlx (berry) https://yarnpkg.com/cli/dlx
 const NPM_RUNNERS = {
-  npx:  { value: NPX_VALUE_FLAGS, bool: NPX_BOOL_FLAGS, refused: NPX_REFUSED_FLAGS },
+  npx:  { value: NPX_VALUE_FLAGS, bool: NPX_BOOL_FLAGS, refused: NPX_REFUSED_FLAGS, source: NPX_SOURCE_FLAGS },
   pnpm: {
-    value: new Set(['--package', '--allow-build', '--reporter', '--dir', '-C']),
+    value: new Set(['--package', '--allow-build', '--reporter']),
     bool:  new Set(['--silent', '-s', '--yes', '-y']),
-    refused: { '-c': 'runs a shell string (pnpm dlx -c)', '--shell-mode': 'runs a shell string (pnpm dlx --shell-mode)', '--registry': NPX_REFUSED_FLAGS['--registry'] },
+    refused: { '-c': 'runs a shell string (pnpm dlx -c)', '--shell-mode': 'runs a shell string (pnpm dlx --shell-mode)' },
+    source: {
+      '--registry': NPX_SOURCE_FLAGS['--registry'],
+      '--dir': 'runs in another directory (--dir), whose .npmrc can set the registry',
+      '-C':    'runs in another directory (-C), whose .npmrc can set the registry',
+    },
   },
   bun: {
-    value: new Set(['-p', '--package', '--cwd']),
+    value: new Set(['-p', '--package']),
     bool:  new Set(['--bun', '--silent', '--verbose', '--no-install', '-y', '--yes']),
-    refused: { '--registry': NPX_REFUSED_FLAGS['--registry'] },
+    refused: {},
+    source: {
+      '--registry': NPX_SOURCE_FLAGS['--registry'],
+      '--cwd': 'runs in another directory (--cwd), whose bunfig/.npmrc can set the registry',
+    },
   },
   yarn: {
     value: new Set(['-p', '--package']),
     bool:  new Set(['-q', '--quiet']),
     refused: {},
+    source: {},
   },
 };
 
@@ -97,10 +122,13 @@ const NPM_SPEC = /^((?:@[\w.-]+\/)?[\w.-]+)(?:@([^\s@/]+))?$/;
 function splitNpmSpec(spec) {
   const m = String(spec || '').match(NPM_SPEC);
   if (!m || m[1].startsWith('-') || m[1].startsWith('.')) return null;
-  return { name: m[1], version: m[2] || null };
+  return { name: m[1], version: m[2] || null, spec: String(spec) };
 }
 
 const fail = (error) => ({ ecosystem: null, error });
+// A launch that was read, but whose package comes from somewhere the gate does
+// not check: kept readable (for the finding), never routable (`error`).
+const overridden = (r, reasons) => (reasons.length ? { ...r, override: reasons.join('; '), error: `launch source overridden: ${reasons.join('; ')}` } : r);
 
 /**
  * Walk an npm runner's arguments. `argv` excludes the runner itself.
@@ -109,6 +137,7 @@ const fail = (error) => ({ ecosystem: null, error });
 function parseNpmArgs(argv, runner = 'npx') {
   const table = NPM_RUNNERS[runner] || NPM_RUNNERS.npx;
   const packages = [];
+  const sources = [];
   let i = 0;
   for (; i < argv.length; i++) {
     const t = argv[i];
@@ -117,6 +146,11 @@ function parseNpmArgs(argv, runner = 'npx') {
     const eq = t.indexOf('=');
     const flag = eq === -1 ? t : t.slice(0, eq);
     if (table.refused[flag]) return fail(table.refused[flag]);
+    if (table.source[flag] || SCOPED_REGISTRY_FLAG.test(flag)) {
+      sources.push(table.source[flag] || `installs one scope from another registry (${flag})`);
+      if (eq === -1) i++;
+      continue;
+    }
     if (flag === '-p' || flag === '--package') {
       const v = eq === -1 ? argv[++i] : t.slice(eq + 1);
       if (v === undefined) return fail(`${flag} has no value`);
@@ -139,17 +173,17 @@ function parseNpmArgs(argv, runner = 'npx') {
     const bin = positional[0] || null;
     const base = (n) => n.replace(/^@[^/]+\//, '');
     const primary = (bin && specs.find((s) => s.name === bin || base(s.name) === bin)) || specs[0];
-    return { ecosystem: 'npm', runner, package: primary.name, version: primary.version, spec: packages[specs.indexOf(primary)], packages: specs, bin, args: positional.slice(1), error: null };
+    return overridden({ ecosystem: 'npm', runner, package: primary.name, version: primary.version, spec: primary.spec, packages: specs, bin, args: positional.slice(1), error: null }, sources);
   }
   const spec = splitNpmSpec(positional[0]);
   if (!spec) return fail(`${positional[0]} is not a registry package`);
-  return { ecosystem: 'npm', runner, package: spec.name, version: spec.version, spec: positional[0], packages: [spec], bin: null, args: positional.slice(1), error: null };
+  return overridden({ ecosystem: 'npm', runner, package: spec.name, version: spec.version, spec: positional[0], packages: [spec], bin: null, args: positional.slice(1), error: null }, sources);
 }
 
 // uvx / `uv tool run` options (https://docs.astral.sh/uv/reference/cli/#uv-tool-run).
 const UVX_VALUE_FLAGS = new Set([
-  '--python', '-p', '--python-preference', '--directory', '--project', '--env-file',
-  '--cache-dir', '--config-file', '--color', '--python-platform',
+  '--python', '-p', '--python-preference', '--env-file',
+  '--cache-dir', '--color', '--python-platform',
 ]);
 const UVX_BOOL_FLAGS = new Set([
   '-q', '--quiet', '-v', '--verbose', '--isolated', '--no-cache', '-n', '--offline',
@@ -158,34 +192,55 @@ const UVX_BOOL_FLAGS = new Set([
 ]);
 const UVX_REFUSED_FLAGS = {
   '--with':              'installs extra packages (--with) the gate does not check',
-  '--with-editable':     'installs a local editable package (--with-editable)',
   '--with-requirements': 'installs extra requirements (--with-requirements) the gate does not check',
-  '--index':             'installs from another index (--index), not PyPI',
-  '--index-url':         'installs from another index (--index-url), not PyPI',
-  '-i':                  'installs from another index (-i), not PyPI',
-  '--default-index':     'installs from another index (--default-index), not PyPI',
-  '--extra-index-url':   'adds another index (--extra-index-url) the gate does not check',
-  '--find-links':        'installs from --find-links, not PyPI',
-  '-f':                  'installs from --find-links, not PyPI',
+};
+// These change where the package comes from (each takes a value): another
+// index, local links, or a project / config file uv reads its index from.
+const UVX_SOURCE_FLAGS = {
+  '--index':           'installs from another index (--index)',
+  '--index-url':       'installs from another index (--index-url)',
+  '-i':                'installs from another index (-i)',
+  '--default-index':   'installs from another index (--default-index)',
+  '--extra-index-url': 'adds another index (--extra-index-url)',
+  '--find-links':      'installs from local links (--find-links)',
+  '-f':                'installs from local links (-f)',
+  '--with-editable':   'installs a local editable package (--with-editable)',
+  '--project':         'reads a project (--project) whose configuration can set the index',
+  '--directory':       'runs in a directory (--directory) whose configuration can set the index',
+  '--config-file':     'reads a uv config file (--config-file) that can set the index',
 };
 // pipx run (https://pipx.pypa.io/stable/docs/#pipx-run).
 const PIPX_VALUE_FLAGS = new Set(['--python']);
-const PIPX_BOOL_FLAGS  = new Set(['--no-cache', '--verbose', '-v', '--quiet', '-q', '--system-site-packages', '--path']);
-const PIPX_REFUSED_FLAGS = {
-  '--index-url': UVX_REFUSED_FLAGS['--index-url'], '-i': UVX_REFUSED_FLAGS['-i'],
-  '--pip-args':  'passes pip arguments (--pip-args) the gate cannot read',
-  '--editable':  'installs a local editable package', '-e': 'installs a local editable package',
+const PIPX_BOOL_FLAGS  = new Set(['--no-cache', '--verbose', '-v', '--quiet', '-q', '--system-site-packages']);
+const PIPX_REFUSED_FLAGS = {};
+const PIPX_SOURCE_FLAGS = {
+  '--index-url': 'installs from another index (--index-url)',
+  '-i':          'installs from another index (-i)',
+  '--pip-args':  'passes pip arguments (--pip-args), which can set the index',
+};
+// Boolean source overrides: no value to consume.
+const PIPX_SOURCE_BOOL = {
+  '--path':     'runs a local path (--path), not a PyPI package',
+  '--editable': 'installs a local editable package (--editable)',
+  '-e':         'installs a local editable package (-e)',
 };
 
 // PEP 508 name, optional extras, optional `==version` (or uv's `@version`).
-const PYPI_SPEC = /^([A-Za-z0-9](?:[\w.-]*[A-Za-z0-9])?)(\[[\w.,\s-]+\])?(?:(==|@)([\w.!+*-]+)|((?:>=|<=|~=|!=|>|<)[\w.!+*,<>=~-]+))?$/;
+// `===` (arbitrary equality) and `==` are pins; every other comparison is a
+// range and is kept as written (`>=1.2`, `~=1.2`, `<2`, `!=1.3`, `>=1,<2`).
+const PYPI_SPEC = /^([A-Za-z0-9](?:[\w.-]*[A-Za-z0-9])?)(\[[\w.,\s-]+\])?(?:(===|==|@)([\w.!+*-]+)|((?:>=|<=|~=|!=|>|<)[\w.!+*,<>=~-]+))?$/;
 
 function splitPypiSpec(spec) {
   const m = String(spec || '').match(PYPI_SPEC);
   if (!m) return null;
-  // `@latest` is uv's spelling of "no pin"; a comparison is a range.
-  const version = m[4] || m[5] || null;
-  return { name: m[1], extras: m[2] || null, version };
+  // `==X` / `===X` pin X (unless X has a wildcard: `==1.*` is a range).
+  // `@latest` is uv's spelling of "no pin". A comparison is a range, kept with
+  // its operator so nobody downstream reads it as "version X".
+  let version = null;
+  if (m[3] && /\*/.test(m[4])) version = `${m[3] === '@' ? '==' : m[3]}${m[4]}`;
+  else if (m[4]) version = m[4];
+  else if (m[5]) version = m[5];
+  return { name: m[1], extras: m[2] || null, version, range: Boolean(version && version !== 'latest' && !isExactVersion('uvx', version)) };
 }
 
 /**
@@ -197,7 +252,10 @@ function parsePypiArgs(argv, runner = 'uvx') {
   const valueFlags = pipx ? PIPX_VALUE_FLAGS : UVX_VALUE_FLAGS;
   const boolFlags  = pipx ? PIPX_BOOL_FLAGS : UVX_BOOL_FLAGS;
   const refused    = pipx ? PIPX_REFUSED_FLAGS : UVX_REFUSED_FLAGS;
+  const sourceFlags = pipx ? PIPX_SOURCE_FLAGS : UVX_SOURCE_FLAGS;
+  const sourceBool  = pipx ? PIPX_SOURCE_BOOL : {};
   const fromFlag   = pipx ? '--spec' : '--from';
+  const sources = [];
   let from = null;
   let i = 0;
   for (; i < argv.length; i++) {
@@ -207,6 +265,8 @@ function parsePypiArgs(argv, runner = 'uvx') {
     const eq = t.indexOf('=');
     const flag = eq === -1 ? t : t.slice(0, eq);
     if (refused[flag]) return fail(refused[flag]);
+    if (sourceFlags[flag]) { sources.push(sourceFlags[flag]); if (eq === -1) i++; continue; }
+    if (sourceBool[flag]) { sources.push(sourceBool[flag]); continue; }
     if (flag === fromFlag) {
       from = eq === -1 ? argv[++i] : t.slice(eq + 1);
       if (from === undefined) return fail(`${flag} has no value`);
@@ -220,13 +280,13 @@ function parsePypiArgs(argv, runner = 'uvx') {
   if (from !== null) {
     const spec = splitPypiSpec(from);
     // A git URL, a path or a wheel URL: source, not a PyPI release.
-    if (!spec) return { ecosystem: 'git', runner, package: null, version: null, source: from, bin: positional[0] || null, args: positional.slice(1), from, error: `${fromFlag} ${from} is a source install — no released artifact to verify` };
-    return { ecosystem: 'pypi', runner, package: spec.name, version: spec.version, spec: from, bin: positional[0] || null, args: positional.slice(1), from, error: null };
+    if (!spec) return { ecosystem: 'git', runner, package: null, version: null, source: from, bin: positional[0] || null, args: positional.slice(1), from, error: `${fromFlag} ${from} is a source install (a path, URL or VCS) — not a PyPI release, nothing to verify` };
+    return overridden({ ecosystem: 'pypi', runner, package: spec.name, version: spec.version, range: spec.range, spec: from, bin: positional[0] || null, args: positional.slice(1), from, error: null }, sources);
   }
   if (!positional.length) return fail('no package named');
   const spec = splitPypiSpec(positional[0]);
-  if (!spec) return { ecosystem: 'git', runner, package: null, version: null, source: positional[0], bin: null, args: positional.slice(1), from: null, error: `${positional[0]} is not a PyPI requirement — no released artifact to verify` };
-  return { ecosystem: 'pypi', runner, package: spec.name, version: spec.version, spec: positional[0], bin: null, args: positional.slice(1), from: null, error: null };
+  if (!spec) return { ecosystem: 'git', runner, package: null, version: null, source: positional[0], bin: null, args: positional.slice(1), from: null, error: `${positional[0]} is not a PyPI requirement (a path, URL or VCS) — not a PyPI release, nothing to verify` };
+  return overridden({ ecosystem: 'pypi', runner, package: spec.name, version: spec.version, range: spec.range, spec: positional[0], bin: null, args: positional.slice(1), from: null, error: null }, sources);
 }
 
 /**
@@ -295,7 +355,10 @@ function canonicalInstallCmd(launch) {
     return ['npx', '-y', ...head, ...launch.args].join(' ');
   }
   if (launch.ecosystem === 'pypi') {
-    const spec = `${launch.package}${launch.version && !/^[<>=!~]/.test(launch.version) ? (launch.version === 'latest' ? '' : `==${launch.version}`) : ''}`;
+    // A pin is written `==X`; a range keeps its operators (never dropped: a
+    // dropped range reads as "no version" and gets checked as latest).
+    const v = launch.version;
+    const spec = `${launch.package}${!v || v === 'latest' ? '' : /^[<>=!~]/.test(v) ? v : `==${v}`}`;
     return launch.from
       ? ['uvx', '--from', spec, ...(launch.bin ? [launch.bin] : []), ...launch.args].join(' ')
       : ['uvx', spec, ...launch.args].join(' ');

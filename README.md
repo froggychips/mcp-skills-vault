@@ -945,9 +945,16 @@ each row with its source) says which ones are; `@evil/playwright-mcp` and
 `verify --installed` / `--config` reads a launch the way its runner does: `npx`
 options in any order (`--yes`, `-q`, `--`, `-p pkg bin`, several `-p`), `npm exec`,
 `pnpx` / `pnpm dlx`, `bunx`, `yarn dlx`, and `uvx` (`--from pkg==1 bin`),
-`uv tool run`, `pipx run`. An option that changes what is fetched (`--registry`,
-an index URL, `--with`) or one it does not know is reported as such, never guessed
-past. A launch with no exact version — none, `@latest`, a range — is a
+`uv tool run`, `pipx run`. Every `-p` package is checked, not only the binary's.
+An option it does not know is reported as such, never guessed past. A launch
+whose package comes from somewhere else than the public registry — `--registry`,
+`--userconfig` / `--globalconfig`, `--cache`, `--prefix`, a uv index, project or
+config file, `--find-links`, `pipx run --path`, or the same through the server's
+environment (`npm_config_registry`, `UV_INDEX_URL`, …) — is a
+`config/launch-source-override` finding (unknown, with the reason) and is never
+checked against the public registry as if it came from there. A launch with no
+exact version — none, `@latest`, a range (`^1.2`, `>=1.2`, `~=1.2`; only `==X` /
+`===X` pin on PyPI) — is a
 `config/unpinned-launch` finding on the config line (`path:line`, also in SARIF):
 
 ```text
