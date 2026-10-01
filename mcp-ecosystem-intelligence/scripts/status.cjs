@@ -24,7 +24,7 @@
  *   0  nothing installed is blocked, and the environment can run this
  *   1  an installed server is blocked (gone / wrong bytes / live advisory),
  *      or a required environment check failed; with --strict, also drift,
- *      unvetted servers and stale evidence
+ *      unvetted servers, stale evidence and plain-text secrets in host configs
  *   2  bad arguments / the DB could not be read
  */
 
@@ -46,6 +46,7 @@ const budget               = require('./lib/budget.cjs');
 const { runDoctor }        = require('./doctor.cjs');
 const orchestrate          = require('./orchestrate.cjs');
 const auditSetup           = require('./audit_setup.cjs');
+const { scanHostConfigs, redact } = require('./lib/secrets.cjs');
 
 const DB_PATH   = path.resolve(__dirname, '../assets/tools_database.json');
 const EVAL_PATH = path.resolve(__dirname, '../assets/eval_results.json');
@@ -65,7 +66,8 @@ const HELP = `mcp-vault status — one screen: what is installed, what is wrong,
 
   --cwd      project to read (default: the current directory)
   --json     machine-readable (schema mcp-vault/status@1)
-  --strict   also exit 1 on drift, unvetted servers and stale evidence
+  --strict   also exit 1 on drift, unvetted servers, stale evidence and
+             plain-text secrets in host configs
   --as-of    judge the stored evidence as of this date (YYYY-MM-DD or an
              ISO-8601 instant) instead of now — for reproducing a past answer
 
@@ -158,7 +160,7 @@ function installed({ cwd, db, evals, asOf }) {
     const typed   = toTypedEntry(withCmd);
     const key     = typed ? packageKey(typed.artifact) : null;
     const entry   = key ? byPackage.get(key) || null : null;
-    const base    = { name: server.name, host: server.host, scope: server.scope || null, launches: withCmd.install_cmd || null };
+    const base    = { name: server.name, host: server.host, scope: server.scope || null, launches: redact(withCmd.install_cmd) || null };
 
     if (!entry) {
       rows.push({ ...base, in_db: false, package: key });
@@ -358,6 +360,20 @@ function project({ cwd, db, installedRows, asOf }) {
   };
 }
 
+/**
+ * Credentials written into the host configs in plain text. Same files as
+ * `installed()`, so an unreadable one is already reported there. Findings
+ * carry no value — type, file, path, length, a masked prefix.
+ */
+function secrets(cwd) {
+  const r = scanHostConfigs({ cwd });
+  return {
+    files_read: r.files.length,
+    tracked: r.findings.filter((f) => f.tracked === true).length,
+    findings: r.findings.map(({ fix_suggestion, ...f }) => f),
+  };
+}
+
 // ── verdict ─────────────────────────────────────────────────────────────────
 
 /**
@@ -367,7 +383,7 @@ function project({ cwd, db, installedRows, asOf }) {
  * server is a gap in *our* coverage, not a finding about the server, and a
  * default that failed on it would train people to pass --no-strict forever.
  */
-function verdict({ env, installedRows, auditFindings, auditUnreadable = [], strict }) {
+function verdict({ env, installedRows, auditFindings, auditUnreadable = [], secretsBlock = null, strict }) {
   const blocking   = [];   // something installed must not run  → 1
   const notable    = [];   // worth knowing, not a blocker      → 1 only with --strict
   const unanswered = [];   // a question we could not answer    → 2
@@ -416,6 +432,18 @@ function verdict({ env, installedRows, auditFindings, auditUnreadable = [], stri
     }
     if (r.tier === 'Deprecated') blocking.push(`${r.name}: ${r.tier_reason}`);
     else if (r.stale && r.stale.length) notable.push(`${r.name}: ${r.stale.length} claim(s) past their shelf life (${r.stale.join(', ')})`);
+  }
+
+  // One line, first among the notable ones. Not blocking: a token in a
+  // config says nothing about whether the server may run, and making the
+  // default stricter is a major release (docs/COMPATIBILITY.md). A tracked
+  // file is named, because there the value is already in git history.
+  if (secretsBlock && secretsBlock.findings.length) {
+    const n = secretsBlock.findings.length;
+    const trackedFiles = [...new Set(secretsBlock.findings.filter((f) => f.tracked).map((f) => path.basename(f.file)))];
+    notable.unshift(`${n} secret${n === 1 ? '' : 's'} in plain text in host configs`
+      + (trackedFiles.length ? ` — ${secretsBlock.tracked} in git-tracked ${trackedFiles.join(', ')}: rotate` : '')
+      + ' (mcp-vault secrets)');
   }
 
   for (const u of auditUnreadable) {
@@ -535,7 +563,8 @@ function printReport(r) {
   out(`\n${DM}Deeper:  verify --installed  re-hash what your hosts launch, live`);
   out(`\n         explain <name>      why one entry is allowed or denied`);
   out(`\n         scan                what to add for this stack`);
-  out(`\n         audit --strict      every drift and scope finding in full${RS}\n\n`);
+  out(`\n         audit --strict      every drift and scope finding in full`);
+  out(`\n         secrets             plain-text credentials in host configs${RS}\n\n`);
 }
 
 // ── main ────────────────────────────────────────────────────────────────────
@@ -594,8 +623,9 @@ function main(argv) {
     context:     context(installedRows, db, evals),
     project:     project({ cwd: opts.cwd, db, installedRows, asOf: opts.asOf }),
     audit:       auditFindings,
+    secrets:     secrets(opts.cwd),
   };
-  report.verdict = verdict({ env, installedRows, auditFindings, auditUnreadable, strict: opts.strict });
+  report.verdict = verdict({ env, installedRows, auditFindings, auditUnreadable, secretsBlock: report.secrets, strict: opts.strict });
 
   if (opts.json) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   else printReport(report);
@@ -607,4 +637,4 @@ if (require.main === module) {
   exitAfterFlush(main(process.argv.slice(2)));
 }
 
-module.exports = { parseArgs, environment, installed, context, project, verdict, main };
+module.exports = { parseArgs, environment, installed, context, project, secrets, verdict, main };

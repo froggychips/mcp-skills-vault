@@ -758,8 +758,46 @@ mcp-vault audit --strict   # exit 1 on drift/untrusted/heavy
 | `heavy-unbounded` | `est_tools_count > 15` (or unknown) and no `--toolsets`/`--caps`/`allowedTools`/`enabledMcpjsonServers` scoping |
 | `unknown` | installed but not in DB (legitimate custom servers ok — informational) |
 | `scope` | global install of a typically project-scoped category (`vcs`/`ci-cd`/`pm`/`infra`) |
+| `secret` | a credential written in plain text into a server's `env`/`args`/`headers`/`url` (see below) |
 
 Exit codes: `0` clean / info-only · `1` `--strict` triggered · `2` bad invocation. Closes the "Audit my MCP setup" use case without an LLM in the critical path.
+
+### Plain-text secrets in host configs (`secrets`)
+
+`claude mcp add -e GITHUB_TOKEN=ghp_…` writes the token into `~/.claude.json`;
+`.mcp.json` is a file teams commit. [`check_secrets.cjs`](./mcp-ecosystem-intelligence/scripts/check_secrets.cjs)
+reads every host config the rest of the tool reads (Claude Code, Claude Desktop,
+Cursor, VS Code, Codex TOML) — only the server maps, never the rest of
+`~/.claude.json` — and reports credentials in `env`, `args`, `headers` and `url`:
+known formats (GitHub, GitLab, AWS, Slack, OpenAI, Anthropic, Stripe, Google, JWT,
+PEM keys, database URLs with a password, Bearer, tokens in a query string) and
+literal high-entropy values under `*TOKEN*`/`*KEY*`/`*SECRET*`/`*PASSWORD*` names.
+A `${VAR}` / `${env:VAR}` / `${input:id}` reference is not a finding.
+
+```bash
+mcp-vault secrets                 # exit 1 if anything is found
+mcp-vault secrets --json          # mcp-vault/secrets@1, findings + decisions as findings@1
+mcp-vault secrets --sarif         # for code scanning (rule ids secrets/<rule>)
+mcp-vault secrets --fix-suggest   # a suggested edit per finding; nothing is changed
+mcp-vault secrets --explain       # the decision trace, rule → finding
+```
+
+Each hit is a `secrets/<rule>` finding on a host-config subject (`path:line`),
+and the verdict is the `secrets/*` row of the one rule table
+([ADR 0001](./docs/adr/0001-findings-and-time.md)): a plain-text secret is
+refused whether or not the file is tracked; an unreadable config is `unknown`
+(exit 2), never clean.
+
+**The value is never printed** — not in text, `--json`, findings@1, the trace or SARIF: a finding is the
+type, file, path to the key, length and a masked prefix of at most four
+characters (only a format's public prefix, like `ghp_`; nothing for a heuristic
+match). A config tracked by git (`git ls-files`) is severity `high`: the value
+is in history, so rotate it. The suggestion uses the syntax each host documents —
+`${VAR}` in `.mcp.json`, `${env:NAME}` in Cursor, `inputs` + `${input:id}` in VS
+Code, `env_vars` / `env_http_headers` in Codex — and says so where a host
+documents none (Claude Desktop, `~/.claude.json`). `audit` reports the same
+findings for Claude Code's two files (`--strict` fails on them); `status` shows
+one line and fails on it only with `--strict`.
 
 ### Public registry page
 
@@ -972,6 +1010,7 @@ Everything in this table is scripted and tested; the column says where it lives.
 | Context ceiling enforced where the set changes | [`lib/budget.cjs`](./mcp-ecosystem-intelligence/scripts/lib/budget.cjs) |
 | Tier derived from evidence, not from a score | [`lib/tiers.cjs`](./mcp-ecosystem-intelligence/scripts/lib/tiers.cjs) |
 | One command instead of six | [`status.cjs`](./mcp-ecosystem-intelligence/scripts/status.cjs) |
+| Plain-text secrets in host configs, never printed | [`lib/secrets.cjs`](./mcp-ecosystem-intelligence/scripts/lib/secrets.cjs), [`check_secrets.cjs`](./mcp-ecosystem-intelligence/scripts/check_secrets.cjs) |
 | The documented numbers checked against the data | [`tests/docs_numbers.test.cjs`](./tests/docs_numbers.test.cjs) |
 | What will not change without a major bump | [`docs/COMPATIBILITY.md`](./docs/COMPATIBILITY.md) |
 | One findings model and one place that decides; time as an explicit input (`--as-of`) | [`docs/adr/0001`](./docs/adr/0001-findings-and-time.md), [`lib/finding.cjs`](./mcp-ecosystem-intelligence/scripts/lib/finding.cjs), [`lib/policy_rules.cjs`](./mcp-ecosystem-intelligence/scripts/lib/policy_rules.cjs), [`lib/clock.cjs`](./mcp-ecosystem-intelligence/scripts/lib/clock.cjs) |

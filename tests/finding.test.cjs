@@ -161,11 +161,12 @@ test('the rule table: stable ids, one row each, every ordered id exists, the ope
   for (const mode of ['gate', 'evidence']) {
     assert.deepEqual([...PR.ORDER[mode]].sort(), active, `${mode} lists every active row exactly once`);
   }
-  // org/* landed with #127; the rest are still claimed for their PRs.
+  // org/* landed with #127; secrets/* with #122; the rest are still claimed for their PRs.
   assert.ok(PR.RULES.filter((r) => r.id.startsWith('org/')).every((r) => r.status === 'active'), 'org/* rows are active');
-  for (const family of ['flows/', 'shadowing/', 'tool-scan/', 'lookalike/', 'secrets/']) {
+  for (const family of ['flows/', 'shadowing/', 'tool-scan/', 'lookalike/']) {
     assert.ok(PR.RULES.some((r) => r.status === 'reserved' && r.id.startsWith(family)), family);
   }
+  assert.equal(PR.RULE_BY_ID.get('secrets/*').status, 'active', '#122 landed as its row');
   assert.equal(PR.rowFor('trust/artifact').id, 'trust/*');
   assert.equal(PR.rowFor('policy/license').id, 'policy/license');
 });

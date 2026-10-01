@@ -37,7 +37,7 @@ Three consequences that are easy to get wrong, so they are written down:
 
 - A host config that exists and cannot be parsed is `2`, not `0` and not `1` —
   from every command that reads one (`status`, `audit`, `doctor`, `budget`,
-  `lock`, `sbom`, `verify --installed`), and a test asserts it for each.
+  `lock`, `sbom`, `secrets`, `verify --installed`), and a test asserts it for each.
   `eval --installed` does the same but is not in that test, because asserting
   it would mean spawning servers. "No findings" would be a claim about servers nothing
   ever saw. A real finding still outranks it, everywhere and including a
@@ -103,7 +103,7 @@ Every JSON document this tool writes carries a schema identifier of the form
 | `mcp-vault/doctor@1` | `mcp-vault doctor --json` |
 | `mcp-vault/entries@1` | `mcp-vault list --json` |
 | `mcp-vault/eval@1` | `mcp-vault eval --json` |
-| `mcp-vault/findings@1` | the `findings` field of `verify --json`, `explain --json`, `lock --check --json` and `approve --json` (see below) |
+| `mcp-vault/findings@1` | the `findings` field of `verify --json`, `explain --json`, `lock --check --json`, `approve --json` and `secrets --json` (see below) |
 | `mcp-vault/health@1` | `mcp-vault health` |
 | `mcp-vault/identity@1` | `mcp-vault identity --json` |
 | `mcp-vault/license-drift@1` | `mcp-vault license-drift --json` |
@@ -114,6 +114,7 @@ Every JSON document this tool writes carries a schema identifier of the form
 | `mcp-vault/policy@1` | `.mcp-vault.policy.json` (read, not written) |
 | `mcp-vault/posture@1` | `mcp-vault posture --json` |
 | `mcp-vault/scan@1` | `mcp-vault scan --json` |
+| `mcp-vault/secrets@1` | `mcp-vault secrets --json` — an envelope for what is not a finding (the masked shape of each value, the recommendation and suggested edit, keyed by finding id); the findings and decisions are `findings@1` under `findings` |
 | `mcp-vault/status@1` | `mcp-vault status --json` |
 | `mcp-vault/token-budget@1` | `mcp-vault budget --json` |
 | `mcp-vault/upgrade-plan@1` | `mcp-vault upgrade --json` |

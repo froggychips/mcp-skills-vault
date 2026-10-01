@@ -421,6 +421,39 @@ test('audits check / fetch: the decision is decide() of its document, the exit c
   assert.deepEqual(audits('check'), { 'audit-source:alice': ['deny', 'audits/import'] });
 });
 
+test('secrets: every decision is decide() of the document\'s own inputs, and the exit code is the decisions\'', () => {
+  // Tokens are assembled at runtime so nothing here looks like a credential
+  // to a push-protection scan; see tests/secrets.test.cjs.
+  const body = (n, seed) => { let x = seed, o = ''; for (let i = 0; i < n; i++) { x = (x * 1103515245 + 12345) & 0x7fffffff; o += 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'[x % 57]; } return o; };
+  const gh = ['gh', 'p_'].join('') + body(36, 1);
+  const cases = {
+    'secrets found': { '.mcp.json': JSON.stringify({ mcpServers: { a: { command: 'npx', env: { GITHUB_TOKEN: gh, MY_API_KEY: body(28, 2) } } } }),
+      '.cursor/mcp.json': JSON.stringify({ mcpServers: { c: { command: 'npx', env: { T: '${env:T}' } } } }) },
+    'clean': { '.mcp.json': JSON.stringify({ mcpServers: { a: { command: 'npx', env: { GITHUB_TOKEN: '${GITHUB_TOKEN}' } } } }) },
+    'unreadable': { '.mcp.json': '{ "mcpServers": { oops' },
+    'unreadable and found': { '.mcp.json': '{ "mcpServers": { oops', '.cursor/mcp.json': JSON.stringify({ mcpServers: { c: { env: { GITHUB_TOKEN: gh } } } }) },
+  };
+  for (const [label, files] of Object.entries(cases)) {
+    const dir = fs.mkdtempSync(path.join(TMP, 'secrets-'));
+    for (const [rel, text] of Object.entries(files)) {
+      fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+      fs.writeFileSync(path.join(dir, rel), text);
+    }
+    const r = run('check_secrets.cjs', ['--json', '--no-git', '--cwd', dir, '--as-of', AS_OF]);
+    const doc = JSON.parse(r.stdout).findings;
+    assert.equal(doc.schema, 'mcp-vault/findings@1', label);
+    assert.equal(doc.as_of, AS_OF, `${label}: --as-of is the instant decided at`);
+    assert.deepEqual(recompute(doc), doc.decisions, `${label}: the printed decisions are not decide()'s`);
+    assert.equal(r.status, F.exitCode(doc.decisions), `${label}: the exit code is not the decisions'`);
+    // The text view renders the same decisions: same exit code, byte-equal
+    // across two runs at the same instant.
+    const t1 = run('check_secrets.cjs', ['--no-git', '--explain', '--cwd', dir, '--as-of', AS_OF]);
+    const t2 = run('check_secrets.cjs', ['--no-git', '--explain', '--cwd', dir, '--as-of', AS_OF]);
+    assert.equal(t1.status, r.status, `${label}: text and --json disagree on the exit code`);
+    assert.equal(t1.stdout, t2.stdout, `${label}: two runs with equal inputs printed different bytes`);
+  }
+});
+
 // ── who decides ────────────────────────────────────────────────────────────
 
 // Commands whose verdict is a Decision from decide() (and prints findings@1).
@@ -437,6 +470,7 @@ const DECIDES_VIA_MODEL = {
   // (row audits/import, `audits fetch|check`); `audits list|add|export` are data.
   signature: 'check_signature.cjs',
   audits:    'audits.cjs',
+  secrets: 'check_secrets.cjs',
 };
 // Commands that still map their own findings to an exit code. Each moves by
 // emitting findings@1 and exiting via decide() — then its line goes.

@@ -34,6 +34,7 @@ function dbEntryCount() {
 const COMMANDS = {
   status:          "status.cjs",
   audit:           "audit_setup.cjs",
+  secrets:         "check_secrets.cjs",
   verify:          "verify_integrity.cjs",
   scan:            "orchestrate.cjs",
   install:         "orchestrate.cjs",
@@ -77,6 +78,7 @@ COMMANDS
   list (ls)         Show every server in the vault DB (filters: --category, --tier, --query)
   doctor            Check local Node / gh / Docker / uvx / Claude MCP config readiness
   audit             Diff installed MCP servers against the vault DB
+  secrets           Plain-text credentials in host configs (value never printed)
   verify            Integrity gate (hashes + advisories) over the whole DB
                     (--installed: over what your hosts actually launch)
   install <pkg>     Integrity gate, then write the host config
