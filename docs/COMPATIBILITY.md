@@ -85,6 +85,7 @@ Every JSON document this tool writes carries a schema identifier of the form
 
 | Identifier | Written by |
 |---|---|
+| `mcp-vault/approve@1` | `mcp-vault approve --json` |
 | `mcp-vault/audit@1` | `mcp-vault audit --json` |
 | `mcp-vault/availability@1` | `mcp-vault availability --json` |
 | `mcp-vault/capabilities@1` | `assets/capabilities.json` (the stored scan) |
@@ -95,7 +96,7 @@ Every JSON document this tool writes carries a schema identifier of the form
 | `mcp-vault/doctor@1` | `mcp-vault doctor --json` |
 | `mcp-vault/entries@1` | `mcp-vault list --json` |
 | `mcp-vault/eval@1` | `mcp-vault eval --json` |
-| `mcp-vault/findings@1` | the `findings` field of `verify --json` and `explain --json` (see below) |
+| `mcp-vault/findings@1` | the `findings` field of `verify --json`, `explain --json`, `lock --check --json` and `approve --json` (see below) |
 | `mcp-vault/health@1` | `mcp-vault health` |
 | `mcp-vault/identity@1` | `mcp-vault identity --json` |
 | `mcp-vault/license-drift@1` | `mcp-vault license-drift --json` |

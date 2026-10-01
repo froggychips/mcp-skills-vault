@@ -55,6 +55,11 @@ const { isExactVersion } = require('./lib/install_cmd.cjs');
 const {
   LOCK_FILENAME, emptyLock, lockEntry, lockPath, readLock, writeLock, diffLock, vendorFiles,
 } = require('./lib/lockfile.cjs');
+const { loadEffectivePolicy } = require('./lib/policy_rules.cjs');
+const { subject, finding, decide, exitCode, findingsDocument, toJson } = require('./lib/finding.cjs');
+const { subjectForTool } = require('./lib/findings_from.cjs');
+const { subjectFacts, toolApprovalModel } = require('./lib/org_policy.cjs');
+const { APPROVALS_KEY, observationFromSurface } = require('./lib/tool_approval.cjs');
 
 const DB_PATH   = path.resolve(__dirname, '../assets/tools_database.json');
 const EVAL_PATH = path.resolve(__dirname, '../assets/eval_results.json');
@@ -345,6 +350,57 @@ async function main(argv) {
       return 2;
     }
     const diff = diffLock(found.lock, fresh);
+    // The verdict is a Decision (docs/adr/0001): every difference is a
+    // finding on its server — one an upgrade does not explain is high, the
+    // rest medium — a server that could not be resolved is `not-run`, and with
+    // `toolApproval: "require"` the approvals are findings `org/tool-approval`
+    // (lib/org_policy.cjs). --check asks "is anything different", so it asks
+    // decide() to fail on a warning.
+    const loaded = loadEffectivePolicy(opts.cwd);
+    const policy = loaded.policy;
+    const subjectOf = new Map(targets.map((t) => [t.name, subjectForTool(t)]));
+    const subjectFor = (name) => subjectOf.get(name) || subject.artifact({ entry: name });
+    const findings = [];
+    const facts = {};
+    for (const srv of diff.servers) {
+      for (const c of srv.changes) {
+        findings.push(finding({
+          rule: `lock/${c.kind}`, subject: subjectFor(srv.name), severity: SUSPICIOUS.has(c.kind) ? 'high' : 'medium',
+          message: `${c.kind}: ${c.detail}`,
+        }));
+      }
+    }
+    for (const e of errors) {
+      findings.push(finding({ rule: 'lock/unresolved', subject: subjectFor(e.name), severity: 'medium', state: 'not-run', message: `could not check ${e.name}: ${e.error}` }));
+    }
+    if (policy.policy_rules && policy.toolApproval === 'require') {
+      const approvals = found.lock[APPROVALS_KEY] || {};
+      for (const tool of targets) {
+        const observed = surfaceByName.get(tool.name);
+        const s = subjectFor(tool.name);
+        const m = toolApprovalModel({
+          subject: s, server: tool.name, approved: approvals[tool.name] || null,
+          observation: observed ? observationFromSurface(observed) : null,
+          currentArtifactId: subjectFacts(tool).artifact_id, asOf: now,
+        });
+        facts[s.id] = { mode: 'approval', org: { tool_approval: m.fact } };
+        findings.push(...m.findings);
+      }
+    }
+    const subjectsSeen = [...new Set([...targets.map((t) => t.name), ...diff.servers.map((x) => x.name)])].map(subjectFor);
+    for (const s of subjectsSeen) if (!facts[s.id]) facts[s.id] = { mode: 'approval' };
+    const decisions = decide(findings, policy, now, { subjects: subjectsSeen, facts, failOn: 'warn' });
+    // The legacy view (lock-check@1 `servers`): the approval rule's outcome,
+    // rendered as a change on its server.
+    for (const d of decisions) {
+      const o = d.rules.find((r) => r.rule === 'org/tool-approval' && r.effect !== 'allow');
+      if (!o) continue;
+      const name = d.subject.entry || d.subject.id;
+      let row = diff.servers.find((x) => x.name === name);
+      if (!row) { row = { name, changes: [] }; diff.servers.push(row); }
+      row.changes.push({ kind: 'tool-unapproved', detail: o.detail });
+    }
+    diff.servers.sort((x, y) => (x.name < y.name ? -1 : x.name > y.name ? 1 : 0));
     const suspicious = diff.servers.filter((s) => s.changes.some((c) => SUSPICIOUS.has(c.kind)));
     if (opts.json) {
       process.stdout.write(`${JSON.stringify({
@@ -355,6 +411,9 @@ async function main(argv) {
         suspicious: suspicious.map((s) => s.name),
         servers: diff.servers,
         errors: errors.map((e) => ({ name: e.name, error: e.error })),
+        // Additive (mcp-vault/findings@1): the same check as findings and the
+        // Decision per server, with the policy and facts it was decided on.
+        findings: toJson(findingsDocument({ asOf: now, findings, decisions, scope: 'lock', policy, facts })),
       }, null, 2)}\n`);
     } else if (!diff.servers.length) {
       process.stdout.write(`${GN}No change${RS} — every locked tree resolves the same as when ${LOCK_FILENAME} was written (${found.lock.generated_at.slice(0, 10)}).\n`);
@@ -373,11 +432,15 @@ async function main(argv) {
     }
     for (const e of errors) process.stderr.write(`${YL}could not check ${e.name}: ${e.error}${RS}\n`);
     // An entry that could not be resolved is not a clean check: --check exists
-    // to answer "is it still the same", and "we don't know" is not a yes.
-    return diff.servers.length || errors.length ? 1 : 0;
+    // to answer "is it still the same", and "we don't know" is not a yes —
+    // `not-run` is unknown, which fails at the warn threshold.
+    return exitCode(decisions) === 1 ? 1 : 0;
   }
 
   // ── write ──
+  // Tool approvals are a person's decision, not something a resolve observes:
+  // carried over untouched, and only `mcp-vault approve` changes them.
+  if (found.lock && found.lock[APPROVALS_KEY]) fresh[APPROVALS_KEY] = found.lock[APPROVALS_KEY];
   writeLock(file, fresh);
   if (opts.json) {
     process.stdout.write(`${JSON.stringify({ schema: 'mcp-vault/lock-write@1', lockfile: file, servers: Object.keys(fresh.servers), errors: errors.map((e) => ({ name: e.name, error: e.error })) }, null, 2)}\n`);

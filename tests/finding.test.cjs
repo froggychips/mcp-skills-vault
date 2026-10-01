@@ -150,12 +150,20 @@ test('the rule table: stable ids, one row each, every ordered id exists, the ope
     assert.ok(['active', 'reserved'].includes(r.status), r.id);
     assert.equal(typeof r.evaluate, 'function', r.id);
   }
+  const active = PR.RULES.filter((r) => r.status === 'active').map((r) => r.id).sort();
   for (const mode of Object.keys(PR.ORDER)) {
     for (const id of PR.ORDER[mode]) assert.ok(PR.RULE_BY_ID.has(id), `${mode}: ${id}`);
-    const active = PR.RULES.filter((r) => r.status === 'active').map((r) => r.id).sort();
+    for (const id of PR.ORDER[mode]) assert.equal(PR.RULE_BY_ID.get(id).status, 'active', `${mode}: ${id} is reserved`);
+    assert.equal(new Set(PR.ORDER[mode]).size, PR.ORDER[mode].length, `${mode} lists a row twice`);
+  }
+  // The two full modes run every rule; `approval` (approve, lock --check) is
+  // a narrower question and runs only the rows that answer it.
+  for (const mode of ['gate', 'evidence']) {
     assert.deepEqual([...PR.ORDER[mode]].sort(), active, `${mode} lists every active row exactly once`);
   }
-  for (const family of ['org/', 'flows/', 'shadowing/', 'tool-scan/', 'lookalike/', 'secrets/']) {
+  // org/* landed with #127; the rest are still claimed for their PRs.
+  assert.ok(PR.RULES.filter((r) => r.id.startsWith('org/')).every((r) => r.status === 'active'), 'org/* rows are active');
+  for (const family of ['flows/', 'shadowing/', 'tool-scan/', 'lookalike/', 'secrets/']) {
     assert.ok(PR.RULES.some((r) => r.status === 'reserved' && r.id.startsWith(family)), family);
   }
   assert.equal(PR.rowFor('trust/artifact').id, 'trust/*');

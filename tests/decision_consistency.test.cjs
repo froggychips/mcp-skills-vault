@@ -29,6 +29,7 @@ const ROOT = path.resolve(__dirname, '..');
 const S    = path.join(ROOT, 'mcp-ecosystem-intelligence', 'scripts');
 const F    = require(path.join(S, 'lib', 'finding.cjs'));
 const PR   = require(path.join(S, 'lib', 'policy_rules.cjs'));
+const ORG  = require(path.join(S, 'lib', 'org_policy.cjs'));
 const DB   = require(path.join(ROOT, 'mcp-ecosystem-intelligence', 'assets', 'tools_database.json')).tools;
 
 const AS_OF = '2026-09-24T12:00:00.000Z';
@@ -43,6 +44,14 @@ const POLICIES = {
     signatures: 'require', provenance: 'require', docker: 'digest', trust: ['verified'], minHealthScore: 70, maxEvidenceAgeDays: 5 },
   licences: { licenses: { allow: ['MIT', 'Apache-2.0'], deny: ['BUSL-1.1'] }, signatures: 'require', docker: 'tag' },
   unverified: { unverified: 'fail' },
+  // Every org/* row (#127): allow and deny lists, a tier floor, required
+  // evidence, a capability ban and tool approval.
+  org: {
+    allow: [{ npmScope: '@modelcontextprotocol' }, { githubOwner: 'github' }, { entry: DB[1].name }, { entry: DB[2].name }],
+    deny: [{ entry: DB[2].name, reason: 'fixture' }],
+    minTier: 'Recommended', requireEvidence: { artifact: 30, advisories: null },
+    denyCapabilities: ['shell'], toolApproval: 'require',
+  },
 };
 const DIRS = {};
 for (const [name, body] of Object.entries(POLICIES)) {
@@ -143,6 +152,7 @@ test('one subject, one answer: the same inputs decide the same way whichever com
       const m = e.explainModel({
         tool, policy: loadPolicy(dir).policy, gateEntry, gateDoc: report.findings,
         trust: null, behav: null, budget: null, evidence: null, asOf: Date.parse(AS_OF),
+        org: ORG.loadOrgContext({ cwd: dir, dbTools: DB, asOf: Date.parse(AS_OF) }),
       });
       const v = report.findings.decisions.find((d) => d.subject.id === m.subject.id);
       assert.ok(v, `${pname} ${name}: verify made no decision for ${m.subject.id}`);
@@ -297,6 +307,43 @@ test('outcomeFails: the family filter, by the outcome\'s rule or a finding it re
   assert.equal(PR.flagsFromArgv([]).failFamilies, null);
 });
 
+// #127: `lock --check` and `approve` exit via decide(); their documents
+// carry the policy and facts, and the legacy `servers` view renders the
+// org/tool-approval outcome.
+test('lock --check and approve: the decision is decide() of the document, and the exit code is its', () => {
+  const dir = fs.mkdtempSync(path.join(TMP, 'approval-'));
+  fs.writeFileSync(path.join(dir, '.mcp-vault.policy.json'), JSON.stringify({ toolApproval: 'require' }));
+  const tools = path.join(dir, 'tools.json');
+  fs.writeFileSync(tools, JSON.stringify({ tools: [{ name: 'q', description: 'Query.', inputSchema: { type: 'object', properties: { sql: { type: 'string' } } } }] }));
+  const check = () => {
+    const r = run('lock.cjs', ['--entry', 'mcp-clickhouse', '--check', '--json', '--cwd', dir]);
+    const out = JSON.parse(r.stdout);
+    const doc = out.findings;
+    assert.equal(doc.schema, 'mcp-vault/findings@1');
+    assert.deepEqual(recompute(doc), doc.decisions, 'lock --check: the printed decisions are not decide()\'s');
+    assert.equal(r.status, F.exitCode(doc.decisions) === 1 ? 1 : 0, 'lock --check: the exit code is not the decisions\'');
+    const unapproved = out.servers.filter((x) => x.changes.some((c) => c.kind === 'tool-unapproved')).map((x) => x.name);
+    const denied = doc.decisions.filter((d) => d.rules.some((o) => o.rule === 'org/tool-approval' && o.effect === 'deny')).map((d) => d.subject.entry);
+    assert.deepEqual(unapproved, denied, 'lock --check: tool-unapproved is not the org/tool-approval outcome');
+    return { r, doc };
+  };
+  assert.equal(run('lock.cjs', ['--entry', 'mcp-clickhouse', '--cwd', dir]).status, 0);
+  let c = check();
+  assert.equal(c.r.status, 1);
+  assert.equal(c.doc.decisions[0].decided_by, 'org/tool-approval');
+
+  for (const extra of [[], ['--tools', tools]]) {
+    const r = run('approve.cjs', ['mcp-clickhouse', '--dry-run', '--json', '--cwd', dir, ...extra]);
+    const doc = JSON.parse(r.stdout).findings;
+    assert.deepEqual(recompute(doc), doc.decisions, 'approve: the printed decisions are not decide()\'s');
+    assert.equal(r.status, F.exitCode(doc.decisions) === 1 ? 1 : 0, 'approve: the exit code is not the decisions\'');
+  }
+  assert.equal(run('approve.cjs', ['mcp-clickhouse', '--cwd', dir]).status, 0);
+  c = check();
+  assert.equal(c.r.status, 0);
+  assert.equal(c.doc.decisions[0].effect, 'allow');
+});
+
 // ── who decides ────────────────────────────────────────────────────────────
 
 // Commands whose verdict is a Decision from decide() (and prints findings@1).
@@ -305,13 +352,16 @@ const DECIDES_VIA_MODEL = {
   explain: 'explain.cjs',
   // `install` is decided by verify's exit code, and refuses --as-of.
   install: 'orchestrate.cjs',
+  // #127: tool approval is findings `org/tool-approval`, and both exit via
+  // decide() (the `approval` rows); --check's differences are findings too.
+  approve: 'approve.cjs',
+  lock:    'lock.cjs',
 };
 // Commands that still map their own findings to an exit code. Each moves by
 // emitting findings@1 and exiting via decide() — then its line goes.
 const LEGACY_DECIDERS = {
   status:          'step 3: installed rows + audit findings → findings; verdict() → decide()',
   audit:           'step 3: categories → findings audit/<category>; --strict is fail_on',
-  lock:            'step 4 (with #127): --check differences → findings on the server; tool approval a row',
   budget:          'step 4: the ceiling is the budget/over row explain already uses',
   doctor:          'step 5: environment checks → findings on a setup subject',
   eval:            'step 5: behaviour → findings; the ceiling rows already exist',
@@ -380,6 +430,12 @@ function stringTokens(src) {
 // here is a place that *prints* an effect, with why.
 const DECISION_WORD_ALLOWLIST = [
   { file: 'explain.cjs', line: /decision: m\.decision\.effect === 'deny' \? 'deny' : 'allow'/, reason: 'the decision@1 view: its two-word vocabulary, read off the Decision' },
+  // `deny` is also the name of a policy@1 key and a value of its `default`
+  // key (#127): policy vocabulary that lib/org_policy.cjs parses, not an effect.
+  { file: 'lib/org_policy.cjs', line: /^\s*default:\s+\['allow', 'deny'\],$/, reason: 'the values the `default` key accepts' },
+  { file: 'lib/org_policy.cjs', line: /^\s*case 'deny': \{$/, reason: 'parsing the `deny` key' },
+  { file: 'lib/org_policy.cjs', line: /^\s*if \(hasAllow\) policy\.default = 'deny';$/, reason: 'an allow list implies `default: deny` in the normalised file' },
+  { file: 'lib/org_policy.cjs', line: /^const LAYERED\s+= new Set\(\['allow', 'deny',/, reason: 'the policy keys merged per layer' },
 ];
 
 test('no code outside lib/finding.cjs and lib/policy_rules.cjs writes an effect', () => {

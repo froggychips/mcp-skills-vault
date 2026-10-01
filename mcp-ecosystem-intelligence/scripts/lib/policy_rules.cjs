@@ -36,7 +36,7 @@
  *               `rules` list), 'policy-line' (verify's POLICY-FAIL/WARN)
  *   evaluate    (ctx) -> [{ rule?, effect, detail, findings? }]
  *
- * ctx: { subject, findings, policy, facts, mode }
+ * ctx: { subject, findings, policy, facts, mode, asOf }
  *   findings  this subject's findings (lib/finding.cjs)
  *   facts     what a rule may read that is not a finding: the DB entry's
  *             licence/health/trust, the stored evidence and trust score,
@@ -66,6 +66,9 @@ const RANK = {
   provenance:           ['prefer', 'require', 'bound'],
   docker:               ['tag', 'digest'],
   contextBudget:        ['warn', 'fail'],
+  // Organisation keys (#127, lib/org_policy.cjs): an allow list implies deny.
+  default:              ['allow', 'deny'],
+  toolApproval:         ['off', 'require'],
   // The exit threshold: which effects fail the run. `deny` always does.
   fail_on:              ['deny', 'unknown', 'warn'],
 };
@@ -337,6 +340,172 @@ const explainRules = [
   },
 ];
 
+// ── organisation rules (#127) ──────────────────────────────────────────────
+//
+// Which servers may run at all, and the org's bar (lib/org_policy.cjs has the
+// keys, the layering and the facts producer). The rows read `ctx.facts.org`,
+// which `orgModel` writes: what a rule can match on (`subject`), the tier and
+// the capability scan as of `asOf`, and the stored evidence. Tool approval is
+// the one input that arrives as findings (`org/tool-approval`, on the
+// server), because `approve` and `lock --check` report it too. Each outcome's
+// detail names the layer and the position of the rule that matched it, so
+// `decided_by` can stay a rule id.
+
+const orgOf = (ctx) => (ctx.policy.policy_rules && ctx.facts && ctx.facts.org) || null;
+const orgLib = () => require('./org_policy.cjs');
+
+const orgRules = [
+  {
+    id: 'org/denylist', status: 'active', thresholded: false, views: ['explain', 'policy-line'],
+    doc: 'a server matched by any deny rule, in any layer — first and final',
+    evaluate(ctx) {
+      const org = orgOf(ctx);
+      if (!org || !org.subject) return [];
+      const { ruleMatches, describeRule } = orgLib();
+      const res = [];
+      for (const layer of ctx.policy.deny || []) {
+        const hit = layer.rules.find((r) => ruleMatches(r, org.subject, false));
+        if (hit) res.push(out('deny', `denied by deny[${hit.index}] (${describeRule(hit)}) in ${layer.source}; the denylist outranks any allow rule`));
+      }
+      return res;
+    },
+  },
+  {
+    id: 'org/allowlist', status: 'active', thresholded: false, views: ['explain', 'policy-line'],
+    doc: 'default deny: a server must match an allow rule in every layer',
+    evaluate(ctx) {
+      const org = orgOf(ctx);
+      if (!org || !org.subject) return [];
+      const { ruleMatches, describeRule } = orgLib();
+      const facts = org.subject;
+      // A denylisted server is not also "allowed": the denylist is final.
+      if ((ctx.policy.deny || []).some((l) => l.rules.some((r) => ruleMatches(r, facts, false)))) return [];
+      const layers = ctx.policy.allow || [];
+      if (ctx.policy.default === 'deny' && !layers.length) return [out('deny', 'the policy denies by default and allows nothing')];
+      return layers.map((layer) => {
+        const hit = layer.rules.find((r) => ruleMatches(r, facts, true));
+        if (hit) return out('allow', `allowed by allow[${hit.index}] (${describeRule(hit)}) in ${layer.source}`);
+        // Say what almost matched: an unbound GitHub owner is a different fix
+        // from not being on the list at all.
+        const near = layer.rules.find((r) => ruleMatches(r, facts, false));
+        const why = near
+          ? `allow[${near.index}] (${describeRule(near)}) names it, but the match is not established — ${near.match === 'githubOwner' ? 'source_binding has not verified the repository' : near.match === 'registryNamespace' ? 'the registry record is not "listed"' : 'the artifact bytes are not known to be the named ones'}`
+          : (facts.in_vault ? 'no allow rule matches it' : `it is not in the vault DB and no allow rule names ${facts.raw_artifact_id || facts.name}`);
+        return out('deny', `not on the allowlist in ${layer.source} (default: deny): ${why}`);
+      });
+    },
+  },
+  {
+    id: 'org/min-tier', status: 'active', thresholded: false, views: ['explain', 'policy-line'],
+    doc: 'tier floor; the tier is a fact computed at asOf, and a server outside the vault has none',
+    evaluate(ctx) {
+      const org = orgOf(ctx);
+      const floor = ctx.policy.minTier;
+      if (!org || !org.subject || !floor) return [];
+      if (!org.tier) return [out('deny', `not in the vault DB, so it has no tier (policy floor: ${floor})`)];
+      const { TIER_ORDER } = require('./tiers.cjs');
+      const ok = TIER_ORDER[org.tier.classification] <= TIER_ORDER[floor];
+      return [out(ok ? 'allow' : 'deny', `tier ${org.tier.classification} ${ok ? 'meets' : 'is below'} the ${floor} floor — ${org.tier.why}`)];
+    },
+  },
+  {
+    id: 'org/evidence/*', status: 'active', thresholded: false, views: ['explain', 'policy-line'],
+    doc: 'a dimension that must be on record, positive, and no older than its limit at asOf',
+    evaluate(ctx) {
+      const org = orgOf(ctx);
+      if (!org || !org.subject || !ctx.policy.requireEvidence) return [];
+      const { DEFAULT_MAX_AGE_DAYS, isPositive, daysBetween } = require('./evidence.cjs');
+      const ev = org.evidence || null;
+      const dims = ev && ev.for_this_artifact ? ev.dimensions || {} : {};
+      const res = [];
+      // Sorted: a findings@1 document carries the policy with sorted keys, and
+      // decide() over the document must list the rules in the same order.
+      for (const dim of Object.keys(ctx.policy.requireEvidence).sort()) {
+        const age = ctx.policy.requireEvidence[dim];
+        const rule = `org/evidence/${dim}`;
+        const limit = age ?? DEFAULT_MAX_AGE_DAYS[dim];
+        const v = dims[dim];
+        // The requirement is that it be on record; a missing record is the
+        // answer, not a missing input.
+        if (!v) { res.push(out('deny', ev && !ev.for_this_artifact ? `the stored evidence is about ${ev.artifact_id}, not this artifact` : `${dim} has never been established for this artifact`, [], rule)); continue; }
+        if (!isPositive(dim, v.status)) { res.push(out('deny', `${dim} is ${v.status} (as of ${v.checked_at || 'unknown'})`, [], rule)); continue; }
+        const when = v.verified_at || v.checked_at;
+        const days = daysBetween(when, ctx.asOf);
+        res.push(days > limit
+          ? out('deny', `${dim}: ${v.status} was established ${days}d ago (${when}); the policy accepts ${limit}d`, [], rule)
+          : out('allow', `${dim}: ${v.status} as of ${when} (within ${limit}d)`, [], rule));
+      }
+      return res;
+    },
+  },
+  {
+    id: 'org/capabilities', status: 'active', thresholded: false, views: ['explain', 'policy-line'],
+    doc: 'the capability scan a denyCapabilities rule needs: missing → unknown, clear → allow',
+    evaluate(ctx) {
+      const org = orgOf(ctx);
+      const layers = ctx.policy.denyCapabilities || [];
+      if (!org || !org.subject || !layers.length) return [];
+      const denied = [...new Set(layers.flatMap((l) => l.capabilities))];
+      const scan = org.capabilities;
+      // Absence is never recorded (lib/capabilities.cjs), and an unscanned
+      // package is an input that is missing — not a verdict either way.
+      if (!scan) return [out('unknown', `${org.subject.raw_artifact_id || org.subject.name} has not been scanned for ${denied.join(', ')} — run \`mcp-vault capabilities --write\``)];
+      const clear = denied.filter((c) => !(c in scan.found));
+      return clear.length
+        ? [out('allow', `${clear.join(', ')} not found in the scan of ${scan.artifact_id} (${scan.checked_at || 'undated'}) — a scan cannot prove absence`)] : [];
+    },
+  },
+  {
+    id: 'org/capability/*', status: 'active', thresholded: false, views: ['explain', 'policy-line'],
+    doc: 'a denied capability found by the scan, unless excused by an exception from the same layer',
+    evaluate(ctx) {
+      const org = orgOf(ctx);
+      const scan = org && org.capabilities;
+      if (!scan || !org.subject) return [];
+      const entry = org.subject.entry;
+      const res = [];
+      for (const layer of ctx.policy.denyCapabilities || []) {
+        for (const cap of layer.capabilities) {
+          if (!(cap in scan.found)) continue;
+          const excused = (ctx.policy.capabilityExceptions || []).some((x) => x.source === layer.source
+            && entry && (x.exceptions[entry] || []).includes(cap));
+          const where = scan.found[cap];
+          const at = where ? ` (${where.file}:${where.line})` : '';
+          res.push(out(excused ? 'allow' : 'deny', excused
+            ? `${cap} found${at}, excused for ${entry} by capabilityExceptions in ${layer.source}`
+            : `${cap} found${at}, and ${layer.source} denies it without an exception for ${entry || org.subject.name}`, [], `org/capability/${cap}`));
+        }
+      }
+      return res;
+    },
+  },
+  {
+    id: 'org/tool-approval', status: 'active', thresholded: false, views: ['explain', 'policy-line'],
+    doc: 'every tool the server offers approved in mcp.lock.json, for the artifact it launches',
+    evaluate(ctx) {
+      if (!ctx.policy.policy_rules || ctx.policy.toolApproval !== 'require') return [];
+      const ta = ctx.facts && ctx.facts.org && ctx.facts.org.tool_approval;
+      const fs = ctx.findings.filter((f) => f.rule === 'org/tool-approval');
+      // `toolApproval: require` asks for an approved surface to be on record:
+      // one nobody observed is not approved, so it refuses (fail closed).
+      const missing = fs.filter((f) => f.state !== 'observed');
+      if (missing.length) return missing.map((f) => out('deny', f.message, [f.id]));
+      if (fs.length) {
+        const n = ta && Number.isInteger(ta.pending) ? ta.pending : fs.length;
+        const server = ta ? ta.server : ctx.subject.id;
+        const head = ta && ta.rebind
+          ? `the approval of ${ta.approved_at} is for ${ta.approved_artifact_id || 'an unrecorded artifact'}, and ${server} now launches ${ta.current_artifact_id}`
+          : ta && !ta.approved_at && ta.count
+            ? `none of ${server}'s ${ta.count} tools are approved`
+            : `${n} tool${n === 1 ? '' : 's'} not approved${ta && ta.approved_at ? ` since ${ta.approved_at}` : ''}`;
+        return [out('deny', `${head}: ${fs.map((f) => f.message).join('; ')} — \`mcp-vault approve ${server}\``, fs.map((f) => f.id))];
+      }
+      if (!ta) return [out('unknown', 'tool approval was not evaluated for this subject')];
+      return [out('allow', `all ${ta.count} tools match the approval of ${ta.approved_at}${ta.removed ? ` (${ta.removed} approved tool(s) no longer offered)` : ''}`)];
+    },
+  },
+];
+
 // ── reserved for the open feature PRs ──────────────────────────────────────
 //
 // Claimed here so that each lands as a row in this table — with this id in
@@ -344,13 +513,6 @@ const explainRules = [
 
 const reserved = (id, owner, doc) => ({ id, status: 'reserved', owner, doc, thresholded: false, views: [], evaluate: () => [] });
 const reservedRules = [
-  reserved('org/denylist', '#127', 'a server matched by any deny rule, in any layer'),
-  reserved('org/allowlist', '#127', 'default deny: a server must match an allow rule in every layer'),
-  reserved('org/min-tier', '#127', 'tier floor (reads the tier as a fact)'),
-  reserved('org/evidence/*', '#127', 'a dimension that must be on record, within an age'),
-  reserved('org/capability/*', '#127', 'a denied capability found by the scan, unless excused by the same layer'),
-  reserved('org/capabilities', '#127', 'the capability scan the rule needs is missing → unknown'),
-  reserved('org/tool-approval', '#127', 'every tool of the server approved in mcp.lock.json'),
   reserved('flows/lethal-trifecta', '#123', 'private data + untrusted content + exfiltration in one session'),
   reserved('flows/untrusted-destructive', '#123', 'untrusted content next to a destructive tool'),
   reserved('shadowing/*', '#123', 'tool names that shadow one another across servers'),
@@ -359,7 +521,7 @@ const reservedRules = [
   reserved('secrets/*', '#122', 'plain-text secrets in host configs'),
 ];
 
-const RULES = Object.freeze([...explainRules, ...policyRules, ...findingRules, ...reservedRules].map((r) => Object.freeze(r)));
+const RULES = Object.freeze([...explainRules, ...policyRules, ...findingRules, ...orgRules, ...reservedRules].map((r) => Object.freeze(r)));
 const RULE_BY_ID = new Map(RULES.map((r) => [r.id, r]));
 
 // Evaluation order, per mode. It is the order the legacy views have always
@@ -368,6 +530,7 @@ const RULE_BY_ID = new Map(RULES.map((r) => [r.id, r]));
 // it: the worst effect wins, and ties go to the first row in this order.
 const ORDER = Object.freeze({
   gate: Object.freeze([
+    'org/denylist', 'org/allowlist', 'org/min-tier', 'org/evidence/*', 'org/capabilities', 'org/capability/*', 'org/tool-approval',
     'trust/*',
     'policy/install-hooks', 'policy/dependency-hooks', 'policy/dependency-advisories',
     'policy/signatures', 'policy/provenance', 'policy/docker-digest', 'policy/unverified',
@@ -376,6 +539,7 @@ const ORDER = Object.freeze({
     'gate/require-provenance', 'gate/fail-dep-advisories', 'finding/severity', 'finding/incomplete',
   ]),
   evidence: Object.freeze([
+    'org/denylist', 'org/allowlist', 'org/min-tier', 'org/evidence/*', 'org/capabilities', 'org/capability/*', 'org/tool-approval',
     'trust/*',
     'policy/signatures', 'policy/provenance', 'policy/dependency-hooks', 'policy/dependency-advisories',
     'policy/unverified', 'policy/install-hooks', 'policy/docker-digest',
@@ -383,6 +547,10 @@ const ORDER = Object.freeze({
     'gate/fail', 'gate/unverified', 'behaviour/*', 'budget/over',
     'gate/require-provenance', 'gate/fail-dep-advisories', 'finding/severity', 'finding/incomplete',
   ]),
+  // `approve` and `lock --check` ask one question — has somebody approved
+  // what this server offers, and is it what was locked — so only these rows
+  // answer it; the entry-quality rows need facts those commands do not have.
+  approval: Object.freeze(['org/tool-approval', 'finding/severity', 'finding/incomplete']),
 });
 
 function rulesFor(mode) {
@@ -494,7 +662,8 @@ function effectivePolicy(base, flags = {}, { defaults = {}, policyRules = true }
 
 /**
  * The one way a command gets a policy: the file(s) that apply to `startDir`
- * (lib/policy.cjs `loadPolicy` — the org layers of #127 plug in there), then
+ * (lib/policy.cjs `loadPolicy`: the org layers — `extends`, MCP_VAULT_ORG_POLICY —
+ * merged stricter-wins by lib/org_policy.cjs `mergeStricter`), then
  * the flags. `noPolicy` keeps the gate's own rules and drops the file's.
  */
 function loadEffectivePolicy(startDir, { flags = {}, noPolicy = false } = {}) {
