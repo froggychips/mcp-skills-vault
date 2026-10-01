@@ -313,8 +313,10 @@ function model({ cwd, opts, asOf, iso, replay, policy }) {
       addFacts(f.subject.id, { mode: 'setup' });
       const d = detail.get(f.id);
       const plus = d && d.fix_suggestion && d.fix_suggestion.lines && d.fix_suggestion.lines.find((l) => l.startsWith('+'));
-      advice[f.id] = plus ? `replace it with ${plus.slice(2)} and set the value in the environment${d.tracked ? '; it is in git history, so rotate it' : ''}`
-        : (d && d.recommendation) || 'move the value to the environment and reference it by name';
+      const rotate = d && d.tracked ? '; it is in git history, so rotate it' : '';
+      const how = secrets.recommendation(f.subject.host, f.subject.scope);
+      advice[f.id] = plus ? `replace it with ${plus.slice(2)} and set the value in the environment${rotate}`
+        : `${how.charAt(0).toLowerCase()}${how.slice(1).replace(/\.$/, '')}${rotate}`;
     }
 
     // 3. flows and shadowing: the servers of one config are one session.
