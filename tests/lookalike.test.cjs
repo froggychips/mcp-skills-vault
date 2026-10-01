@@ -285,19 +285,25 @@ test('CLI audit: lookalike is its own finding, fails --strict, and --allow-looka
   const plain = run('mcp-ecosystem-intelligence/scripts/audit_setup.cjs', args, dir);
   assert.equal(plain.status, 0, 'a default does not become stricter (docs/COMPATIBILITY.md)');
   const doc = JSON.parse(plain.stdout);
-  const f = doc.findings.find((x) => x.server === 'memory');
+  // audit@1 `findings` is the findings@1 document; a row's own fields are
+  // `details` by finding id.
+  const rows = (d) => d.findings.findings.map((x) => ({ ...d.details[x.id], finding: x }));
+  const f = rows(doc).find((x) => x.server === 'memory');
   assert.equal(f.category, 'lookalike');
   assert.equal(f.db_name, 'mcp-server-memory');
   assert.equal(f.technique, 'doubled-letter');
-  assert.equal(doc.findings.find((x) => x.server === 'mine').category, 'unknown');
+  assert.equal(f.finding.rule, 'lookalike/doubled-letter');
+  assert.equal(rows(doc).find((x) => x.server === 'mine').category, 'unknown');
 
   assert.equal(run('mcp-ecosystem-intelligence/scripts/audit_setup.cjs', [...args, '--strict'], dir).status, 1);
   const allowed = run('mcp-ecosystem-intelligence/scripts/audit_setup.cjs', [...args, '--strict', '--allow-lookalike', 'memory'], dir);
-  assert.equal(allowed.status, 0, allowed.stdout);
   const ad = JSON.parse(allowed.stdout);
-  assert.equal(ad.findings.find((x) => x.server === 'memory').category, 'lookalike-allowed');
-  assert.equal(ad.model.schema, 'mcp-vault/findings@1');
-  assert.equal(ad.model.decisions[0].effect, 'allow');
+  const name = ad.findings.decisions.find((x) => x.subject.type === 'name');
+  assert.deepEqual([name.effect, name.fails], ['allow', false], 'the vouched-for name no longer fails --strict');
+  // (The server `mine` is still not in the DB — unknown — which --strict
+  // fails on its own, as verify --installed and status do.)
+  assert.equal(allowed.status, 1, allowed.stdout);
+  assert.deepEqual(ad.findings.decisions.filter((x) => x.fails).map((x) => x.decided_by), ['finding/incomplete']);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -305,7 +311,8 @@ test('CLI audit: a scoped copy is not mistaken for the vetted entry by the subst
   const dir = tmpProject({ mongo: { command: 'npx', args: ['-y', '@evil/mongodb-mcp-server@1.10.0'] } });
   const r = run('mcp-ecosystem-intelligence/scripts/audit_setup.cjs',
     ['--cwd', dir, '--global-config', path.join(dir, 'global.json'), '--json'], dir);
-  const findings = JSON.parse(r.stdout).findings.filter((x) => x.server === 'mongo');
+  const out = JSON.parse(r.stdout);
+  const findings = out.findings.findings.map((x) => out.details[x.id]).filter((x) => x && x.server === 'mongo');
   assert.deepEqual(findings.map((x) => x.category), ['lookalike']);
   assert.equal(findings[0].technique, 'scope-added');
   fs.rmSync(dir, { recursive: true, force: true });

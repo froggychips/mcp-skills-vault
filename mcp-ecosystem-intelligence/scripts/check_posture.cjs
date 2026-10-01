@@ -26,7 +26,7 @@
  * Usage:
  *   node scripts/check_posture.cjs [--json] [--write] [--entry <name>] [--strict]
  *
- * Exit codes:
+ * Exit codes (a Decision per entry, docs/adr/0001 — mode observe):
  *   0  no repository with a report has a failing check
  *   1  at least one does (with --strict)
  *   2  bad arguments, or deps.dev answered for no repository at all — an
@@ -43,6 +43,9 @@ const { mapLimit } = require('./lib/http.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const { buildEvidence, mergeEvidence } = require('./lib/evidence.cjs');
 const { fetchPosture, summarisePosture, repoSlug, POSTURE_CHECKS } = require('./lib/scorecard.cjs');
+const { finding } = require('./lib/finding.cjs');
+const { subjectForTool } = require('./lib/findings_from.cjs');
+const { commandPolicy, decideRun, unanswered } = require('./lib/run_decision.cjs');
 
 const DB_PATH     = path.resolve(__dirname, '../assets/tools_database.json');
 const CONCURRENCY = 6;
@@ -118,6 +121,34 @@ async function checkEntry(tool) {
   return row;
 }
 
+/**
+ * The rows as findings, decided (docs/adr/0001): a failing Scorecard check is
+ * medium (warn: fails under --strict); "no report" is not a finding; a
+ * repository deps.dev did not answer for is `unchecked/posture`, and when it
+ * answered for none, scope/unanswered (exit 2).
+ */
+function postureDecision(rows, tools, { strict = false, asOf }) {
+  const byName = new Map(tools.map((t) => [t.name, t]));
+  const subjectOf = (r) => subjectForTool(byName.get(r.name) || { name: r.name });
+  const nothing = rows.length > 0 && !rows.some((r) => r.posture || r.no_report);
+  const findings = [];
+  for (const r of rows) {
+    const s = subjectOf(r);
+    if (r.posture && r.state === 'weak') {
+      findings.push(finding({
+        rule: 'posture/weak', subject: s, scope: 'posture', severity: 'medium',
+        message: `${r.repository || r.name}: ${(r.findings || []).join('; ') || 'a Scorecard check fails'}`,
+      }));
+    } else if (!r.posture && !r.no_report) {
+      const msg = `${r.repository || r.name}: ${(r.findings || []).join('; ') || 'deps.dev did not answer'}`;
+      findings.push(nothing
+        ? unanswered({ subject: s, scope: 'posture', message: `deps.dev answered for no repository — ${msg}` })
+        : finding({ rule: 'unchecked/posture', subject: s, scope: 'posture', severity: 'info', state: 'not-run', message: msg }));
+    }
+  }
+  return decideRun({ findings, subjects: rows.map(subjectOf), mode: 'observe', scope: 'posture', asOf, policy: commandPolicy({ strict }) });
+}
+
 function main(argv) {
   const opts = parseArgs(argv);
   if (opts.error) { process.stderr.write(`check_posture: ${opts.error}\n\n${HELP}`); return Promise.resolve(2); }
@@ -143,6 +174,7 @@ function main(argv) {
     // an unanswered question. Declaring it in the `else` meant the JSON path
     // threw `noReport is not defined` and its catch turned that into a 2.
     const noReport = rows.filter((r) => r.no_report).length;
+    const run = postureDecision(rows, tools, { strict: opts.strict, asOf: observedAt });
 
     if (opts.write) {
       const byName = new Map(rows.map((r) => [r.name, r]));
@@ -179,6 +211,8 @@ function main(argv) {
         },
         checks_mapped: Object.fromEntries(Object.entries(POSTURE_CHECKS).map(([k, v]) => [k, v.field])),
         entries: rows,
+        // Additive (mcp-vault/findings@1): each entry's Decision.
+        findings: run.document,
       }, null, 2)}\n`);
     } else {
       for (const r of reported) {
@@ -195,14 +229,10 @@ function main(argv) {
       process.stdout.write(`${DM}"No report" is not a finding: Scorecard only covers repositories somebody ran it on.${RS}\n`);
     }
 
-    if (opts.strict && weak.length) return 1;
     // deps.dev answered for nothing at all. "No repository has a failing
-    // check" is a statement about reports we never received.
-    if (rows.length && !reported.length && !noReport) {
-      process.stderr.write('check_posture: deps.dev answered for no repository — nothing was established\n');
-      return 2;
-    }
-    return 0;
+    // check" is a statement about reports we never received: unanswered.
+    if (run.exit === 2) process.stderr.write('check_posture: deps.dev answered for no repository — nothing was established\n');
+    return run.exit;
   });
 }
 
@@ -213,4 +243,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseArgs, checkEntry };
+module.exports = { parseArgs, checkEntry, postureDecision };

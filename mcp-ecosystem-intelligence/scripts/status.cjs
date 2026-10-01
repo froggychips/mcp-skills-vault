@@ -20,12 +20,14 @@
  * Usage:
  *   node scripts/status.cjs [--cwd <dir>] [--json] [--strict] [--as-of <date>]
  *
- * Exit codes:
+ * Exit codes — the Decision's (docs/adr/0001: everything below is a finding,
+ * decided once by decide() in mode `setup`; --strict is the policy's fail_on):
  *   0  nothing installed is blocked, and the environment can run this
  *   1  an installed server is blocked (gone / wrong bytes / live advisory),
- *      or a required environment check failed; with --strict, also drift,
- *      unvetted servers, stale evidence and plain-text secrets in host configs
- *   2  bad arguments / the DB could not be read
+ *      a plain-text secret in a host config, or a required environment check
+ *      failed; with --strict, also drift, unvetted servers, stale evidence
+ *   2  bad arguments / the DB could not be read / a host config could not be
+ *      read (unless something else fails)
  */
 
 'use strict';
@@ -45,11 +47,12 @@ const { asOfFromArgv, requireAsOf } = require('./lib/clock.cjs');
 const budget               = require('./lib/budget.cjs');
 const flows                = require('./lib/flows.cjs');
 const { loadEffectivePolicy } = require('./lib/policy_rules.cjs');
-const { findingsDocument, toJson } = require('./lib/finding.cjs');
-const { runDoctor }        = require('./doctor.cjs');
+const { subject, finding }  = require('./lib/finding.cjs');
+const { classify, unanswered: unansweredFinding } = require('./lib/run_decision.cjs');
+const { runDoctor, doctorFindings } = require('./doctor.cjs');
 const orchestrate          = require('./orchestrate.cjs');
 const auditSetup           = require('./audit_setup.cjs');
-const { scanHostConfigs, redact } = require('./lib/secrets.cjs');
+const { scanHostConfigs, redact, subjectPath } = require('./lib/secrets.cjs');
 
 const DB_PATH   = path.resolve(__dirname, '../assets/tools_database.json');
 const EVAL_PATH = path.resolve(__dirname, '../assets/eval_results.json');
@@ -70,8 +73,7 @@ const HELP = `mcp-vault status — one screen: what is installed, what is wrong,
 
   --cwd      project to read (default: the current directory)
   --json     machine-readable (schema mcp-vault/status@1)
-  --strict   also exit 1 on drift, unvetted servers, stale evidence and
-             plain-text secrets in host configs
+  --strict   also exit 1 on drift, unvetted servers and stale evidence
   --as-of    judge the stored evidence as of this date (YYYY-MM-DD or an
              ISO-8601 instant) instead of now — for reproducing a past answer
 
@@ -106,9 +108,14 @@ function readJson(file) {
 
 /** Can this machine run any of it? Only the things that are not fine. */
 function environment(cwd) {
+  return environmentModel(cwd).block;
+}
+
+/** The environment block, and doctor's checks as findings (one subject). */
+function environmentModel(cwd) {
   const doc = runDoctor({ cwd });
   const problems = doc.checks.filter((c) => c.level !== 'ok');
-  return {
+  return { model: doctorFindings(doc), block: {
     node: process.version,
     counts: doc.counts,
     // A `fail` is a blocker; a `warn` is an optional tool that is absent, and
@@ -117,7 +124,7 @@ function environment(cwd) {
     // Optional tools that are absent. Not a finding about this project — but
     // worth one word, because a missing `uvx` silently limits what installs.
     missing: problems.filter((c) => c.level === 'warn' && c.optional).map((c) => c.name),
-  };
+  } };
 }
 
 /**
@@ -165,9 +172,20 @@ function installed({ cwd, db, evals, asOf }) {
     const key     = typed ? packageKey(typed.artifact) : null;
     const entry   = key ? byPackage.get(key) || null : null;
     const base    = { name: server.name, host: server.host, scope: server.scope || null, launches: redact(withCmd.install_cmd) || null };
+    // The host-config line that launches it: what every finding about this
+    // server is about (the subject `audit` uses for the same line). Kept off
+    // the status@1 row.
+    Object.defineProperty(base, 'subject', {
+      enumerable: false,
+      value: subject.hostConfig({
+        path: subjectPath(server.source || server.name, cwd), line: server.line || null,
+        host: server.host || null, scope: server.scope || null, server: server.name,
+      }),
+    });
 
+    const keep = (row) => Object.defineProperty(row, 'subject', { enumerable: false, value: base.subject });
     if (!entry) {
-      rows.push({ ...base, in_db: false, package: key });
+      rows.push(keep({ ...base, in_db: false, package: key }));
       continue;
     }
 
@@ -182,7 +200,7 @@ function installed({ cwd, db, evals, asOf }) {
     const version_match = (!comparable || !vaultId) ? 'unknown'
       : (pinned && vaultPinned && comparable === vaultId ? 'same' : 'different');
 
-    const row = {
+    const row = keep({
       ...base,
       in_db: true,
       db_entry: entry.name,
@@ -191,7 +209,7 @@ function installed({ cwd, db, evals, asOf }) {
       vault_artifact: vaultId,
       version_match,
       pinned,
-    };
+    });
 
     if (version_match !== 'same') {
       // One finding does survive a version change: an unpublished *name*. The
@@ -231,7 +249,7 @@ function installed({ cwd, db, evals, asOf }) {
     const trust = trustScore(entry.trust_evidence || null, { now: asOf });
     const dims  = (entry.trust_evidence && entry.trust_evidence.dimensions) || {};
     const dates = Object.values(dims).map((d) => d.checked_at).filter(Boolean).sort();
-    rows.push({
+    rows.push(keep({
       ...row,
       tier: tier.classification,
       tier_reason: tier.why,
@@ -239,17 +257,20 @@ function installed({ cwd, db, evals, asOf }) {
       blocking: trust.blocking.map((b) => `${b.dimension}: ${b.status}`),
       oldest_evidence: dates[0] || null,
       stale: staleDimensions(entry.trust_evidence || null, DEFAULT_MAX_AGE_DAYS, asOf).map((s) => s.dimension),
-    });
+    }));
   }
   // A host config that could not be read is not a host with no servers.
   for (const loc of unreadable) {
-    rows.push({
+    rows.push(Object.defineProperty({
       name: `(${loc.host || loc.path})`,
       host: loc.host || null,
       in_db: false,
       unreadable: loc.error || 'unparseable',
       path: loc.path || null,
-    });
+    }, 'subject', {
+      enumerable: false,
+      value: subject.hostConfig({ path: subjectPath(loc.path || loc.host || 'unknown', cwd), host: loc.host || null, scope: loc.scope || null }),
+    }));
   }
   return rows;
 }
@@ -412,129 +433,202 @@ function project({ cwd, db, installedRows, asOf }) {
  * carry no value — type, file, path, length, a masked prefix.
  */
 function secrets(cwd) {
+  return secretsModel(cwd).block;
+}
+
+/** The scan, and its block (counts only: the findings are findings@1's). */
+function secretsModel(cwd) {
   const r = scanHostConfigs({ cwd });
   return {
-    files_read: r.files.length,
-    tracked: r.findings.filter((f) => f.tracked === true).length,
-    findings: r.findings.map(({ fix_suggestion, ...f }) => f),
+    scan: r,
+    block: {
+      files_read: r.files.length,
+      tracked: r.findings.filter((f) => f.tracked === true).length,
+      count: r.findings.length,
+    },
   };
 }
 
 // ── verdict ─────────────────────────────────────────────────────────────────
 
 /**
- * What in this picture should stop a pipeline.
+ * What in this picture should stop a pipeline — as findings, decided once.
  *
+ * Every line below is a finding on a typed subject (docs/adr/0001): the
+ * environment (doctor's checks), each configured server's host-config line
+ * (unvetted, drift, a gone name, stale evidence — and what `audit` says about
+ * the same line), the host configs (plain-text secrets, a config that would
+ * not read), the policy file, and the cross-server flows. They go to
+ * `audit`'s model (auditSetup.auditModel) with status's own beside them, so
+ * one decide() call in mode `setup` answers for all of them, and the exit
+ * code is that Decision's.
+ *
+ * The verdict is a view of it: a line is *blocking* when an outcome resting
+ * on it denies, *worth knowing* when one warns or is unknown where --strict
+ * reaches (fail_on), and *could not answer* when it is scope/unanswered.
  * Blocking and merely-worth-knowing are kept apart on purpose: an unvetted
  * server is a gap in *our* coverage, not a finding about the server, and a
  * default that failed on it would train people to pass --no-strict forever.
  */
-function verdict({ env, installedRows, auditFindings, auditUnreadable = [], secretsBlock = null, setupReport = null, policyErrors = [], strict }) {
-  const blocking   = [];   // something installed must not run  → 1
-  const notable    = [];   // worth knowing, not a blocker      → 1 only with --strict
-  const unanswered = [];   // a question we could not answer    → 2
+function statusModel({
+  cwd, envModel, env, installedRows, auditFindings, auditUnreadable = [], secretScan = null,
+  setupReport = null, policyErrors = [], policyPath = null, policy, asOf,
+}) {
+  const findings = [];
+  const subjects = [];
+  // Rendered lines, in the order they were always printed, each resting on
+  // the findings it was rendered from.
+  const lines = [];
+  const line = (text, ids) => lines.push({ text, ids });
+  const own = (f) => { findings.push(f); return f.id; };
 
-  for (const c of env.failed) {
-    // A config file that exists but does not parse is not a failing
-    // environment, it is a question left unanswered. Doctor reports both as
-    // `fail`; only the parse failures belong in `unanswered`.
-    (/parse failed/i.test(c.detail) ? unanswered : blocking)
-      .push(`environment: ${c.check} — ${c.detail}`);
+  // Plain-text credentials: one line for all of them. A tracked file is
+  // named, because there the value is already in git history.
+  const secretIds = [];
+  if (secretScan) {
+    const m = require('./lib/secrets.cjs').toFindings(secretScan, { cwd });
+    for (const f of m.findings) if (f.rule !== 'scope/unreadable') secretIds.push(own(f));
+    subjects.push(...m.subjects);
+    const n = secretScan.findings.length;
+    if (n) {
+      const tracked = secretScan.findings.filter((f) => f.tracked);
+      const trackedFiles = [...new Set(tracked.map((f) => path.basename(f.file)))];
+      line(`${n} secret${n === 1 ? '' : 's'} in plain text in host configs`
+        + (trackedFiles.length ? ` — ${tracked.length} in git-tracked ${trackedFiles.join(', ')}: rotate` : '')
+        + ' (mcp-vault secrets)', secretIds);
+    }
   }
+
+  // This machine. A config that exists but does not parse is not a failing
+  // environment, it is a question left unanswered — doctor says which.
+  subjects.push(...envModel.subjects);
+  for (const f of envModel.findings) findings.push(f);
+  for (const c of env.failed) line(`environment: ${c.check} — ${c.detail}`, [envModel.ids[c.check]].filter(Boolean));
 
   // One line for all of them, not one line each: eleven near-identical rows
   // push the things that matter off the screen this command exists to fit.
-  const unvetted = installedRows.filter((r) => !r.in_db && !r.unreadable).map((r) => r.name);
+  const unvetted = installedRows.filter((r) => !r.in_db && !r.unreadable);
   if (unvetted.length) {
-    notable.push(`${unvetted.length} configured server${unvetted.length === 1 ? ' is' : 's are'} not in the vault DB, `
-      + `so nothing here has checked ${unvetted.length === 1 ? 'it' : 'them'}: ${unvetted.slice(0, 8).join(', ')}`
-      + (unvetted.length > 8 ? `, +${unvetted.length - 8}` : ''));
+    const ids = unvetted.map((r) => own(finding({
+      rule: 'installed/not-in-vault', subject: r.subject, scope: 'installed', severity: 'medium', state: 'no-data',
+      message: `${r.name}: not in the vault DB, so nothing here has checked it`,
+    })));
+    const names = unvetted.map((r) => r.name);
+    line(`${names.length} configured server${names.length === 1 ? ' is' : 's are'} not in the vault DB, `
+      + `so nothing here has checked ${names.length === 1 ? 'it' : 'them'}: ${names.slice(0, 8).join(', ')}`
+      + (names.length > 8 ? `, +${names.length - 8}` : ''), ids);
   }
 
   for (const r of installedRows) {
+    if (r.subject) subjects.push(r.subject);
     // A host config we could not read is not a host with nothing in it, and it
     // is not a finding about anybody's server either — it is the reason this
-    // report is incomplete. Exit 2, because "nothing blocked" would be a claim
-    // about servers we never saw.
+    // report is incomplete. Unanswered (exit 2), because "nothing blocked"
+    // would be a claim about servers we never saw.
     if (r.unreadable) {
-      unanswered.push(`${r.path || r.name}: host config could not be read — ${r.unreadable}`);
+      line(`${r.path || r.name}: host config could not be read — ${r.unreadable}`,
+        [own(unansweredFinding({ subject: r.subject, scope: 'installed', message: `${r.path || r.name}: host config could not be read — ${r.unreadable}` }))]);
       continue;
     }
     if (!r.in_db) continue;
     // Drift is a finding about *this host*, on every host — the audit below
     // only reads Claude Code's two files, so without this a Cursor-only setup
     // running an unpinned or superseded version came out clean.
+    const text = `${r.name}: ${r.tier_reason}`;
     if (r.version_match === 'unknown') {
       // Our data, not theirs. Blaming a reader's setup for the vault's own
       // malformed entry — and failing their build for it under --strict — is
-      // a finding pointed the wrong way.
-      unanswered.push(`${r.name}: ${r.tier_reason}`);
+      // a finding pointed the wrong way: unanswered.
+      line(text, [own(unansweredFinding({ subject: r.subject, scope: 'installed', message: text }))]);
       continue;
     }
     if (r.version_match !== 'same') {
       // A name that is gone applies whatever version is launched.
-      (r.tier === 'Deprecated' ? blocking : notable).push(`${r.name}: ${r.tier_reason}`);
+      line(text, [own(finding({
+        rule: r.tier === 'Deprecated' ? 'installed/deprecated' : 'installed/drift', subject: r.subject, scope: 'installed',
+        severity: r.tier === 'Deprecated' ? 'high' : 'medium', message: text,
+      }))]);
       continue;
     }
-    if (r.tier === 'Deprecated') blocking.push(`${r.name}: ${r.tier_reason}`);
-    else if (r.stale && r.stale.length) notable.push(`${r.name}: ${r.stale.length} claim(s) past their shelf life (${r.stale.join(', ')})`);
-  }
-
-  // One line, first among the notable ones. Not blocking: a token in a
-  // config says nothing about whether the server may run, and making the
-  // default stricter is a major release (docs/COMPATIBILITY.md). A tracked
-  // file is named, because there the value is already in git history.
-  if (secretsBlock && secretsBlock.findings.length) {
-    const n = secretsBlock.findings.length;
-    const trackedFiles = [...new Set(secretsBlock.findings.filter((f) => f.tracked).map((f) => path.basename(f.file)))];
-    notable.unshift(`${n} secret${n === 1 ? '' : 's'} in plain text in host configs`
-      + (trackedFiles.length ? ` — ${secretsBlock.tracked} in git-tracked ${trackedFiles.join(', ')}: rotate` : '')
-      + ' (mcp-vault secrets)');
+    if (r.tier === 'Deprecated') {
+      line(text, [own(finding({ rule: 'installed/deprecated', subject: r.subject, scope: 'installed', severity: 'high', message: text }))]);
+    } else if (r.stale && r.stale.length) {
+      const t = `${r.name}: ${r.stale.length} claim(s) past their shelf life (${r.stale.join(', ')})`;
+      line(t, [own(finding({ rule: 'installed/stale', subject: r.subject, scope: 'installed', severity: 'medium', state: 'stale', message: t }))]);
+    }
   }
 
   // A policy we could not read is not a policy with nothing in it — said out
-  // loud. Notable rather than unanswered: status never read the policy before
-  // it judged flows, and an exit code that turns 2 on a file it used to ignore
-  // would be a stricter default (docs/COMPATIBILITY.md).
-  for (const e of policyErrors) notable.push(`policy: ${e} — defaults in force for toxicFlows / toolShadowing`);
+  // loud, worth knowing (and so failing --strict, as `audit --strict` does).
+  for (const e of policyErrors) line(`policy: ${e} — defaults in force for toxicFlows / toolShadowing`, []);
 
   // Cross-server findings, as decide() judged them (rows flows/*, shadowing/*):
-  // a deny blocks, a warn is worth knowing (and fails under --strict, which is
-  // the policy's fail_on); allow and unknown stay in --json.
+  // a deny blocks, a warn is worth knowing; allow and unknown stay in --json.
   for (const l of (setupReport && setupReport.hosts || []).flatMap((h) => h.lines)) {
-    const line = `${l.host}: ${l.message}${l.rule.startsWith('flows/') && l.advice ? ` — ${l.advice}` : ''}`;
-    if (l.effect === 'deny') blocking.push(line);
-    else if (l.effect === 'warn') notable.push(line);
+    line(`${l.host}: ${l.message}${l.rule.startsWith('flows/') && l.advice ? ` — ${l.advice}` : ''}`, l.findings);
   }
 
+  // What `audit` says about the same configs, minus what it says about
+  // servers this command already judged for every host (drift), and minus
+  // what is not a finding here: a server the DB does not know is said once,
+  // above; scope and version-unknown are informational.
+  const legacy = auditFindings.filter((f) => {
+    if (!['lookalike', 'drift', 'untrusted', 'heavy-unbounded'].includes(f.category)) return false;
+    return !(f.category === 'drift' && installedRows.some((r) => r.name === f.server && r.version_match !== 'same'));
+  });
+  const model = auditSetup.auditModel({
+    legacy, cwd, projectPath: path.join(cwd, '.mcp.json'), globalPath: path.join(process.env.HOME || '', '.claude.json'),
+    setupJudged: setupReport && setupReport.judged, unreadable: auditUnreadable,
+    policyErrors, policyPath, policy, asOf,
+    extra: { findings, subjects },
+  });
+  // The policy-error lines rest on the audit model's own findings for them.
+  let k = 0;
+  for (const l of lines) if (l.text.startsWith('policy: ') && !l.ids.length) l.ids = model.idsOf(policyErrors[k++]);
   for (const u of auditUnreadable) {
-    const line = `${u.path}: ${u.error}`;
-    if (!unanswered.includes(line)) unanswered.push(line);
+    const text = `${u.path}: ${u.error}`;
+    if (!lines.some((l) => l.text === text)) line(text, model.idsOf(u));
   }
-  for (const f of auditFindings) {
-    if (!auditSetup.STRICT_CATEGORIES.has(f.category)) continue;
-    const line = `${f.server}: ${f.message}`;
-    // The drift loop above already said it, for every host rather than two.
-    if (f.category === 'drift' && installedRows.some((r) => r.name === f.server && r.version_match !== 'same')) continue;
-    if (!notable.includes(line)) notable.push(line);
+  for (const f of legacy) {
+    const text = `${f.server}: ${f.message}`;
+    if (!lines.some((l) => l.text === text)) line(text, model.idsOf(f));
   }
+  return { ...model, lines };
+}
 
-  // A finding outranks an incomplete scope: "one of your servers must not run"
-  // is more actionable than "one of your configs would not parse", and
-  // docs/COMPATIBILITY.md says so. That includes a --strict finding, because
-  // the reader asked to be told about those — and because `audit --strict`
-  // answers the same input the same way. Everything is printed either way.
-  const code = blocking.length ? 1
-    : (strict && notable.length ? 1
-      : (unanswered.length ? 2 : 0));
-  return { blocking, notable, unanswered, exit_code: code };
+/**
+ * The verdict: the model's lines, by what the Decision made of them. A
+ * finding outranks an incomplete scope (exit 1 before 2), and everything is
+ * printed either way.
+ */
+function verdict({ lines = [], decisions = [], exit = 0 }) {
+  const out = { blocking: [], notable: [], unanswered: [] };
+  const bucket = { blocking: out.blocking, notable: out.notable, unanswered: out.unanswered };
+  for (const l of lines) {
+    const c = classify(decisions, l.ids);
+    if (c && !bucket[c].includes(l.text)) bucket[c].push(l.text);
+  }
+  return { ...out, exit_code: exit };
 }
 
 // ── report ──────────────────────────────────────────────────────────────────
 
 const label = (s) => `${B}${String(s).padEnd(16)}${RS}`;
 
-function printReport(r) {
+const FEEDBACK_URL = 'https://github.com/froggychips/mcp-skills-vault/issues/new';
+
+/**
+ * One line pointing at the issue tracker, for a person at a terminal. It is
+ * only printed: nothing is collected, nothing is sent, no network. Not in
+ * --json, not when stdout is a pipe, not in CI (`CI` set, as every CI sets
+ * it) — there it is noise in a log nobody asked to read.
+ */
+function feedbackLine({ isTTY = process.stdout.isTTY, env = process.env } = {}) {
+  const ci = env.CI !== undefined && env.CI !== '' && env.CI !== 'false' && env.CI !== '0';
+  return isTTY && !ci ? `Something wrong, or did this help? → ${FEEDBACK_URL}` : null;
+}
+
+function printReport(r, { feedback = feedbackLine() } = {}) {
   const out = (s) => process.stdout.write(s);
   out(`\n${B}mcp-vault ${r.version}${RS} ${DM}· ${r.cwd} · as of ${r.as_of}${RS}\n\n`);
 
@@ -642,6 +736,7 @@ function printReport(r) {
   out(`\n         scan                what to add for this stack`);
   out(`\n         audit --strict      every drift and scope finding in full`);
   out(`\n         secrets             plain-text credentials in host configs${RS}\n\n`);
+  if (feedback) out(`${DM}${feedback}${RS}\n\n`);
 }
 
 // ── main ────────────────────────────────────────────────────────────────────
@@ -673,7 +768,8 @@ function main(argv) {
   // frozen. --strict is the decision's fail_on, not a branch below.
   const loadedPolicy = loadEffectivePolicy(opts.cwd, { flags: { strict: opts.strict } });
 
-  const env           = environment(opts.cwd);
+  const envModel      = environmentModel(opts.cwd);
+  const env           = envModel.block;
   const installedRows = installed({ cwd: opts.cwd, db, evals, asOf: opts.asOf });
   // The audit's own reads can fail too, and its default settings are the
   // answer that *creates* heavy-unbounded findings, so an unreadable
@@ -686,6 +782,7 @@ function main(argv) {
     db,
     evals,
   });
+  const sec = secretsModel(opts.cwd);
 
   const report = {
     schema:  'mcp-vault/status@1',
@@ -702,24 +799,24 @@ function main(argv) {
     installed:   installedRows,
     context:     context(installedRows, db, evals),
     project:     project({ cwd: opts.cwd, db, installedRows, asOf: opts.asOf }),
-    audit:       auditFindings,
-    secrets:     secrets(opts.cwd),
+    // Counts only (pre-1.0): each secret is a finding in `findings`.
+    secrets:     sec.block,
   };
   const setupReport = setup({
     installedRows, db, evals, capabilities: readJson(CAPS_PATH) || { packages: {} },
     policy: loadedPolicy.policy, asOf: opts.asOf,
   });
   report.setup = { policy: setupReport.policy, hosts: setupReport.hosts };
-  // Additive (mcp-vault/findings@1): the cross-server findings and the
-  // Decisions the Flows line and the verdict's flow lines are a view of.
-  const j = setupReport.judged;
-  report.findings = toJson(findingsDocument({
-    asOf: opts.asOf, findings: j.findings, decisions: j.decisions, scope: 'setup', policy: loadedPolicy.policy, facts: j.facts,
-  }));
-  report.verdict = verdict({
-    env, installedRows, auditFindings, auditUnreadable,
-    secretsBlock: report.secrets, setupReport, policyErrors: loadedPolicy.errors, strict: opts.strict,
+  // Everything on this screen as findings, decided once (docs/adr/0001).
+  const model = statusModel({
+    cwd: opts.cwd, envModel: envModel.model, env, installedRows, auditFindings, auditUnreadable,
+    secretScan: sec.scan, setupReport, policyErrors: loadedPolicy.errors, policyPath: loadedPolicy.path,
+    policy: loadedPolicy.policy, asOf: opts.asOf,
   });
+  // mcp-vault/findings@1: every finding above, the policy and facts it was
+  // decided on, and the Decision per subject — the verdict is a view of it.
+  report.findings = model.document;
+  report.verdict = verdict(model);
 
   if (opts.json) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   else printReport(report);
@@ -731,4 +828,4 @@ if (require.main === module) {
   exitAfterFlush(main(process.argv.slice(2)));
 }
 
-module.exports = { parseArgs, environment, installed, context, setup, project, secrets, verdict, main };
+module.exports = { parseArgs, environment, installed, context, setup, project, secrets, statusModel, verdict, printReport, feedbackLine, FEEDBACK_URL, main };

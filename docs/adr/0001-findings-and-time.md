@@ -89,9 +89,10 @@ bytes; every `--json` document says which `asOf` it used.
   from the document alone — which is what the consistency test checks.
 
 Commands render Decisions; they do not decide. In this PR `verify` (and so
-`install`, which trusts verify's exit code) and `explain` do; the rest are
+`install`, which trusts verify's exit code) and `explain` do; the rest were
 listed in `tests/decision_consistency.test.cjs` as legacy deciders with their
-migration step, and a new command that is not classified fails that test.
+migration step (all moved at step 3, below), and a new command that is not
+classified fails that test.
 
 ### 4. Time
 
@@ -226,6 +227,20 @@ removed, and would freeze an object-shaped `decided_by`. #127 then needs to:
 5. `approve` and `lock --check` emit findings (`org/tool-approval` on the
    server) and exit via `decide()`.
 
-The remaining legacy deciders (`status`, `audit`, `lock --check`, `budget`,
-`doctor` and the drift checks) move the same way, one PR each, by removing
-their entry from the legacy list in the consistency test.
+**Step 3 (done).** The remaining legacy deciders moved together, and the
+legacy list is gone: every command either decides via `decide()` or gives no
+verdict (`health` computes a score; the bar over it is `policy/health`).
+`lib/run_decision.cjs` is the shared path — findings on typed subjects,
+`decide()` in the command's mode, findings@1 under `findings`, the exit code
+the decisions':
+
+| Command | Mode | What decides |
+|---|---|---|
+| `status`, `audit` | `setup` | one document for everything on the screen: `installed/*`, `audit/<category>`, `lookalike/*`, `secrets/*`, `flows/*`, `shadowing/*`, `environment/*` (context in `status`), `policy/unreadable`, `scope/unanswered`; the verdict lines and category lists are views of it |
+| `doctor` | `environment` | `environment/<check>` (failed requirement → deny, absent optional → warn), unparseable config → `scope/unanswered` |
+| `budget` | `budget` | `budget/over` (the gate here, context everywhere else), `--budget` is `maxContextPercent` with `contextBudget: fail` |
+| `availability`, `identity`, `posture`, `capabilities`, `upgrade`, `docker-drift`, `license-drift`, `eval` | `observe` | `finding/severity` / `finding/incomplete` over `<command>/<state>` findings; a subject the source did not cover is `unchecked/<command>` (unknown, never fails); a source that answered for nothing is `scope/unanswered`; eval's drift flags are `eval/surface-drift` |
+
+Two new generic rows: `scope/unanswered` (unknown, never thresholded, makes
+the decision `unanswered` — exit 2 unless something fails) and `unchecked/*`.
+`lock --check` already exited via `decide()` (#127).

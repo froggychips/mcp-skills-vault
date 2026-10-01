@@ -358,3 +358,34 @@ test('the eval records an artifact id only for a launch that names one', () => {
   assert.equal(ok.artifact_id, 'npm:pkg@1.0.0');
   assert.equal(ok.launched_artifact, 'npm:pkg@1.0.0');
 });
+
+// ── the feedback line ──────────────────────────────────────────────────────
+
+test('the feedback line: printed to a person at a terminal, never in --json, a pipe or CI', () => {
+  const dir = project(null);
+  const tty = { isTTY: true, env: {} };
+  assert.match(s.feedbackLine(tty), /issues\/new$/);
+  assert.ok(s.feedbackLine(tty).includes(s.FEEDBACK_URL));
+  assert.equal(s.feedbackLine({ isTTY: true, env: { CI: 'true' } }), null, 'CI=true');
+  assert.equal(s.feedbackLine({ isTTY: true, env: { CI: '1' } }), null, 'any CI');
+  assert.equal(s.feedbackLine({ isTTY: false, env: {} }), null, 'a pipe');
+  assert.ok(s.feedbackLine({ isTTY: true, env: { CI: 'false' } }), 'CI=false is not CI');
+
+  // The text report, rendered as a terminal would get it: the line is last.
+  const report = run(dir, ['--json']).json;
+  const render = (opts) => {
+    let text = '';
+    const write = process.stdout.write;
+    process.stdout.write = (t) => { text += t; return true; };
+    try { s.printReport(report, opts); } finally { process.stdout.write = write; }
+    return text;
+  };
+  const shown = render({ feedback: s.feedbackLine(tty) });
+  assert.equal(shown.trim().split('\n').pop(), s.feedbackLine(tty));
+  assert.ok(!render({ feedback: s.feedbackLine({ isTTY: true, env: { CI: 'true' } }) }).includes(s.FEEDBACK_URL), 'CI=true');
+
+  // And from the CLI, which is never a TTY under spawnSync: neither --json nor
+  // the text form carries it, CI or not.
+  assert.ok(!run(dir, ['--json']).stdout.includes(s.FEEDBACK_URL), '--json');
+  assert.ok(!run(dir).stdout.includes(s.FEEDBACK_URL), 'a pipe');
+});
