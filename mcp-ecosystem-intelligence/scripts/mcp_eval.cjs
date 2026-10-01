@@ -39,7 +39,9 @@
  *                                       exit 1 only when a surface changed and the
  *                                       artifact demonstrably did not
  *   mcp_eval.cjs --fail-tool-scan       exit 1 if a tool description or schema has a
- *                                       high-severity finding (lib/tool_scan.cjs)
+ *                                       high-severity finding (lib/tool_scan.cjs);
+ *                                       with --strict, medium fails too, as --strict
+ *                                       lowers fail_on to warn for every command
  *   mcp_eval.cjs --timeout <ms>         per-entry deadline (default 30s on the host,
  *                                       90s under --sandbox: a container starts cold)
  *   mcp_eval.cjs --sandbox              run each server in a locked-down container (needs docker)

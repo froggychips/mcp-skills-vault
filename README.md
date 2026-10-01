@@ -503,8 +503,9 @@ mcp-vault tool-scan --rules             # the table: id, severity, why
 
 Each match is a finding `tool-scan/<rule>` on the tool it was found in, and
 the verdict is the `tool-scan/*` row of the one policy table: high denies in
-`tool-scan` and in `eval --fail-tool-scan`, medium warns, low is listed with
-`--show-low`. `explain` shows the same outcomes as context beside the gate's
+`tool-scan` and in `eval --fail-tool-scan`, medium warns (and fails under
+`--strict`, which lowers `fail_on` to `warn` for every command), low is listed
+with `--show-low`. `explain` shows the same outcomes as context beside the gate's
 answer ("refused beside the gate"): the integrity gate does not read the scan,
 and explain's exit code is the gate's. Recorded with `eval --record-evidence`
 it also blocks trust through a `tool_descriptions` evidence dimension.
