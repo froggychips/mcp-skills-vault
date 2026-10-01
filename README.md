@@ -936,6 +936,37 @@ host config *launches* (`audit`, `verify --installed`, including a config key th
 is a vault name but launches another package) warns, which fails under `--strict`.
 `--allow-lookalike <name>` is an input to that row: still reported, allowed.
 
+A publisher's own unscoped package is not a dropped-scope copy: `playwright`
+next to the vault's `@playwright/mcp` is Microsoft's. npm does not tie a scope to
+the unscoped name, so a short table in `lib/lookalike.cjs` (`PUBLISHER_UNSCOPED`,
+each row with its source) says which ones are; `@evil/playwright-mcp` and
+`@playwrigth/mcp` are still flagged.
+
+### Unpinned launches in a host config
+
+`verify --installed` / `--config` reads a launch the way its runner does: `npx`
+options in any order (`--yes`, `-q`, `--`, `-p pkg bin`, several `-p`), `npm exec`,
+`pnpx` / `pnpm dlx`, `bunx`, `yarn dlx`, and `uvx` (`--from pkg==1 bin`),
+`uv tool run`, `pipx run`. Every `-p` package is checked, not only the binary's.
+An option it does not know is reported as such, never guessed past. A launch
+whose package comes from somewhere else than the public registry — `--registry`,
+`--userconfig` / `--globalconfig`, `--cache`, `--prefix`, a uv index, project or
+config file, `--find-links`, `pipx run --path`, or the same through the server's
+environment (`npm_config_registry`, `UV_INDEX_URL`, …) — is a
+`config/launch-source-override` finding (unknown, with the reason) and is never
+checked against the public registry as if it came from there. A launch with no
+exact version — none, `@latest`, a range (`^1.2`, `>=1.2`, `~=1.2`; only `==X` /
+`===X` pin on PyPI) — is a
+`config/unpinned-launch` finding on the config line (`path:line`, also in SARIF):
+
+```text
+[UNPINNED] this config launches @playwright/mcp@latest, a tag rather than a version: whatever is
+latest at each start runs. Pin it to the version the vault verified (playwright-mcp): "args": ["-y","@playwright/mcp@0.0.75"].
+```
+
+`"unpinnedLaunch"` in the policy file (`fail` | `warn` | `allow`, default `warn`:
+fails only under `--strict`) sets how loud it is.
+
 ### Public registry page
 
 [`scripts/generate_registry_page.cjs`](./mcp-ecosystem-intelligence/scripts/generate_registry_page.cjs) renders the DB into `docs/site/registry.html` plus `docs/site/registry.json`:

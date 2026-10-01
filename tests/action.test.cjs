@@ -213,12 +213,17 @@ test('action: an invalid input is exit 2, and Enforce fails the job on it', { sk
 test('action: sarif puts the finding on the config line that launches the server', { skip: !HAS_BASH && 'no bash' }, () => {
   const r = runStep('verify', { cwd: path.join(FIXTURES, 'bad'), env: { VAULT_SARIF: 'true' } });
   const sarif = JSON.parse(fs.readFileSync(r.outputs['sarif-file'], 'utf8'));
-  const [result] = sarif.runs[0].results;
-  assert.equal(result.locations[0].physicalLocation.artifactLocation.uri, '.mcp.json');
-  assert.equal(result.locations[0].physicalLocation.region.startLine, 3);
+  const results = sarif.runs[0].results;
+  for (const result of results) {
+    assert.equal(result.locations[0].physicalLocation.artifactLocation.uri, '.mcp.json');
+    assert.equal(result.locations[0].physicalLocation.region.startLine, 3);
+    assert.equal(result.properties.subject, '.mcp.json:3');
+  }
   // The findings model's SARIF: rule ids are finding rules, subjects host-config.
-  assert.equal(result.ruleId, 'pin/missing');
-  assert.equal(result.properties.subject, '.mcp.json:3');
+  // `@latest` is the config's own problem (config/unpinned-launch), and the
+  // gate's "nothing to compare" (pin/missing) is reported beside it.
+  assert.deepEqual(results.map((r) => r.ruleId).sort(), ['config/unpinned-launch', 'pin/missing']);
+  assert.match(results.find((r) => r.ruleId === 'config/unpinned-launch').message.text, /@playwright\/mcp@latest, a tag rather than a version/);
 });
 
 test('action: a version that is not exact is refused before anything is fetched', { skip: !HAS_BASH && 'no bash' }, () => {

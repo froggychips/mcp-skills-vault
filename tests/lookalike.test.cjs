@@ -362,3 +362,42 @@ test('CLI explain: a lookalike gets a deny decision naming the entry it resemble
   assert.equal(run('mcp-ecosystem-intelligence/scripts/explain.cjs', ['zzqx-nothing-like-it', '--cwd', dir], dir).status, 2);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+// ── a publisher's own unscoped package is not a scope-dropped copy ──────────
+
+test('playwright: Microsoft\'s own unscoped package is not an impersonation of @playwright/mcp', () => {
+  // Seen in a public config: `npx -y playwright run-test-mcp-server`.
+  for (const name of ['playwright', 'playwright-core', 'Playwright']) {
+    const r = L.checkName(name, 'npm', INDEX);
+    assert.equal(r.lookalike, false, `${name}: ${JSON.stringify(r.matches)}`);
+  }
+  assert.equal(L.checkServer({ name: 'playwright', install_cmd: 'npx -y playwright run-test-mcp-server' }, INDEX), null);
+  assert.ok(L.publisherScopesOf('playwright').has('playwright'));
+});
+
+test('playwright: real fakes are still flagged — the table is not a free pass for the name', () => {
+  const evil = L.checkName('@evil/playwright-mcp', 'npm', INDEX);
+  assert.equal(evil.lookalike, true);
+  assert.equal(evil.matches[0].db_name, 'playwright-mcp');
+  const typo = L.checkName('@playwrigth/mcp', 'npm', INDEX);
+  assert.equal(typo.lookalike, true);
+  assert.equal(typo.matches[0].technique, 'scope-typo');
+  // Not on the table: an unscoped near-copy of the vault's package name.
+  assert.equal(L.checkName('playwright-mcp-server', 'npm', INDEX).lookalike, true);
+  // A scoped spelling of a table name is not covered by it.
+  assert.deepEqual([...L.publisherScopesOf('@evil/playwright')], []);
+});
+
+test('the publisher table covers exact unscoped npm names only', () => {
+  // `supabase` (the CLI, published by Supabase) is not a copy of anything.
+  assert.equal(L.checkName('supabase', 'npm', INDEX).lookalike, false);
+  // One letter off a table name is not on the table.
+  assert.deepEqual([...L.publisherScopesOf('playwrigth')], []);
+  assert.deepEqual([...L.publisherScopesOf('supabasse')], []);
+  // The table is about npm names; a server key is still a key.
+  assert.deepEqual([...L.publisherScopesOf('supabase-mcp')], []);
+  // Every row names the scope it belongs to as a vault scope or a known one.
+  for (const [scope, names] of Object.entries(L.PUBLISHER_UNSCOPED)) {
+    assert.ok(names.length && names.every((n) => n === n.toLowerCase() && !n.startsWith('@')), scope);
+  }
+});

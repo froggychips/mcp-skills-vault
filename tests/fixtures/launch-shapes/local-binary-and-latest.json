@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "local-cli": {
+      "command": "example-cli",
+      "args": [
+        "mcp",
+        "start"
+      ]
+    },
+    "browser": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ]
+    }
+  }
+}

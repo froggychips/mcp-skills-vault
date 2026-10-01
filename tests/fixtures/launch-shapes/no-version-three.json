@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "devtools": {
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp@latest"
+      ]
+    },
+    "angular": {
+      "command": "npx",
+      "args": [
+        "@angular/cli",
+        "mcp"
+      ]
+    },
+    "thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    }
+  }
+}

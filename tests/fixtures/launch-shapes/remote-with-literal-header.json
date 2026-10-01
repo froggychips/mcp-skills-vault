@@ -1,0 +1,31 @@
+{
+  "mcpServers": {
+    "browser": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest"
+      ]
+    },
+    "devtools": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest"
+      ]
+    },
+    "source": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://git.example.com/acme/example-mcp.git",
+        "example-mcp"
+      ]
+    },
+    "docs": {
+      "url": "https://mcp.example.com/docs",
+      "headers": {
+        "X-Example-Api-Key": "FAKE-EXAMPLE-KEY-0000000000"
+      }
+    }
+  }
+}

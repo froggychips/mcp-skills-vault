@@ -90,6 +90,7 @@ const RANK = {
   toolApproval:         ['off', 'require'],
   toxicFlows:           ['allow', 'warn', 'fail'],
   toolShadowing:        ['allow', 'warn', 'fail'],
+  unpinnedLaunch:       ['allow', 'warn', 'fail'],
   // The exit threshold: which effects fail the run. `deny` always does.
   fail_on:              ['deny', 'unknown', 'warn'],
 };
@@ -684,6 +685,36 @@ const lookalikeRules = [
   },
 ];
 
+// ── what a host config launches (lib/installed.cjs unpinnedLaunch) ─────────
+//
+// A finding about the *config*, on its host-config line: it launches a
+// registry package with no exact version, so each start runs whatever is
+// latest. Not a fact about the vault's DB, and not the gate's "could not
+// verify" — a config that pins the vault's version passes both. The level is
+// `policy.unpinnedLaunch` (fail | warn | allow, default warn: fails only
+// under --strict, as a default does not get stricter in a minor).
+
+const configRules = [
+  {
+    id: 'config/unpinned-launch', status: 'active', thresholded: true, owns_findings: true, views: [],
+    doc: 'A host config that launches a registry package without an exact version (none, a tag, a range); the level is policy.unpinnedLaunch.',
+    evaluate: (ctx) => setJudged(ctx, (r) => r === 'config/unpinned-launch', 'unpinnedLaunch'),
+  },
+  {
+    // A launch whose package comes from somewhere else than the public
+    // registry (--registry, an npmrc, a uv index/project, pipx --path, or the
+    // same through the environment). The gate did not check what runs, so
+    // the answer is `unknown`, with the reason — never `allow`, and never a
+    // check against the public registry standing in for the real source.
+    id: 'config/launch-source-override', status: 'active', thresholded: true, owns_findings: true, views: [],
+    doc: 'A host config that launches a package from an overridden source (registry, npmrc, index, local path): unknown, with the reason.',
+    evaluate(ctx) {
+      return ctx.findings.filter((f) => f.rule === 'config/launch-source-override')
+        .map((f) => out('unknown', f.message, [f.id], f.rule));
+    },
+  },
+];
+
 // ── a command's own run (ADR 0001 step 3) ────────────────────────────────
 //
 // status, audit, doctor, budget and the observers (availability, identity,
@@ -801,7 +832,7 @@ const signatureRules = [
   },
 ];
 
-const RULES = Object.freeze([...explainRules, ...policyRules, ...secretRules, ...findingRules, ...lookalikeRules, ...toolScanRules, ...orgRules, ...setupRules, ...reservedRules, ...signatureRules, ...commandRules].map((r) => Object.freeze(r)));
+const RULES = Object.freeze([...explainRules, ...policyRules, ...secretRules, ...findingRules, ...lookalikeRules, ...configRules, ...toolScanRules, ...orgRules, ...setupRules, ...reservedRules, ...signatureRules, ...commandRules].map((r) => Object.freeze(r)));
 const RULE_BY_ID = new Map(RULES.map((r) => [r.id, r]));
 
 // Evaluation order, per mode. It is the order the legacy views have always
@@ -818,7 +849,7 @@ const ORDER = Object.freeze({
     'gate/fail', 'gate/unverified', 'tool-scan/*', 'behaviour/*', 'budget/over', ...SETUP_ORDER,
     'secrets/*',
     'gate/require-provenance', 'gate/fail-dep-advisories', 'finding/severity', 'finding/incomplete',
-    'lookalike/*',
+    'lookalike/*', 'config/unpinned-launch', 'config/launch-source-override',
     'audits/recorded',
     'db/signature', 'audits/import',
     // A command's own run (step 3): inert here — no gate run emits these.
@@ -833,7 +864,7 @@ const ORDER = Object.freeze({
     'gate/fail', 'gate/unverified', 'tool-scan/*', 'behaviour/*', 'budget/over', ...SETUP_ORDER,
     'secrets/*',
     'gate/require-provenance', 'gate/fail-dep-advisories', 'finding/severity', 'finding/incomplete',
-    'lookalike/*',
+    'lookalike/*', 'config/unpinned-launch', 'config/launch-source-override',
     'audits/recorded',
     'db/signature', 'audits/import',
     // A command's own run (step 3): inert here — no gate run emits these.
@@ -906,9 +937,9 @@ function deepFreeze(o) {
 // tests/decision_consistency.test.cjs checks that no producer emits a family
 // missing here.
 const FINDING_FAMILIES = Object.freeze([
-  'advisories', 'artifact', 'audit', 'audits', 'availability', 'capabilities', 'db', 'dependencies', 'drift',
-  'environment', 'eval', 'evidence', 'flows', 'identity', 'install', 'installed', 'integrity',
-  'license', 'lock', 'lookalike', 'metadata', 'oci', 'org', 'pin', 'policy', 'posture', 'provenance', 'registry', 'scope',
+  'advisories', 'artifact', 'audit', 'audits', 'availability', 'capabilities', 'config', 'db', 'dependencies',
+  'drift', 'environment', 'eval', 'evidence', 'flows', 'identity', 'install', 'installed', 'integrity', 'license',
+  'lock', 'lookalike', 'metadata', 'oci', 'org', 'pin', 'policy', 'posture', 'provenance', 'registry', 'scope',
   'secrets', 'shadowing', 'signature', 'tool-scan', 'unchecked', 'upgrade', 'verify',
 ]);
 const familiesKnown = () => new Set([...FINDING_FAMILIES, ...RULES.map((r) => r.id.split('/')[0])]);

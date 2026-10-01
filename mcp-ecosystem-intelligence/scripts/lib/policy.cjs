@@ -28,6 +28,7 @@
  *     "maxEvidenceAgeDays": 30,       // stored evidence older than this is stale
  *     "toxicFlows": "warn",            // fail | warn | allow  (default warn)
  *     "toolShadowing": "warn",         // fail | warn | allow  (default warn)
+ *     "unpinnedLaunch": "warn",        // fail | warn | allow  (default warn)
  *     "trust": ["verified"],           // acceptable trust tiers
  *     "deep": true,                    // hash artifacts locally
  *     "deps": true                     // resolve and check dependency trees
@@ -83,6 +84,10 @@ const DEFAULTS = {
   // --json and out of the verdict.
   toxicFlows:           'warn',
   toolShadowing:        'warn',
+  // A host config that launches a registry package without an exact version
+  // (`pkg`, `pkg@latest`, `pkg@^1`): whatever the registry resolves at each
+  // start runs, not what anyone reviewed. `config/unpinned-launch`.
+  unpinnedLaunch:       'warn',
   trust:                null,
   deep:                 false,
   deps:                 false,
@@ -101,6 +106,7 @@ const ENUMS = {
   contextBudget:        ['fail', 'warn'],
   toxicFlows:           ['fail', 'warn', 'allow'],
   toolShadowing:        ['fail', 'warn', 'allow'],
+  unpinnedLaunch:       ['fail', 'warn', 'allow'],
 };
 
 /** Nearest policy file at or above `startDir`. */

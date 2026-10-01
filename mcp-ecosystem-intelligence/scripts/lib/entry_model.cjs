@@ -32,7 +32,7 @@
  *   artifactId(artifact)          -> 'npm:@scope/pkg@1.2.3' | 'oci:ghcr.io/o/r@sha256:…'
  */
 
-const { npmPkgName, pypiPkgName, dockerImageRef, dockerDigestPinned, isExactVersion } = require('./install_cmd.cjs');
+const { npmPkgName, pypiPkgName, dockerImageRef, dockerDigestPinned, isExactVersion, parseLaunch } = require('./install_cmd.cjs');
 
 /**
  * Derive the typed form from an entry's existing fields.
@@ -67,7 +67,7 @@ function toTypedEntry(tool) {
   }
 
   // ── git / URL source install (uvx --from, and anything else unparsable) ──
-  if (/^uvx\s+--from/.test(cmd)) {
+  if (/^uvx\s+--from/.test(cmd) && !pypiPkgName(cmd)) {
     const src = parts[parts.indexOf('--from') + 1] || null;
     warnings.push('source install: no released artifact to verify');
     return {
@@ -89,9 +89,10 @@ function toTypedEntry(tool) {
     };
   }
 
-  const sep = isNpm ? '@' : '==';
-  const token = parts.find((t) => t === pkg || t.startsWith(pkg + sep));
-  const inCmd = token && token !== pkg ? token.slice(pkg.length + sep.length) : null;
+  // The version the command asks for, read as the runner reads it
+  // (`-p pkg@1 bin`, `--from pkg==1 bin`, options in any order).
+  const launch = parseLaunch(cmd);
+  const inCmd = launch && !launch.error && launch.version ? launch.version : null;
   // The DB's `version` field is the verified one; a version inside the command
   // that disagrees with it is a finding, not a fact.
   if (inCmd && tool.version && inCmd !== tool.version) {

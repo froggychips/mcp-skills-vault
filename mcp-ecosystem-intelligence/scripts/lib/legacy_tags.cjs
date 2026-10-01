@@ -48,6 +48,10 @@ const TAG_MODEL = Object.freeze({
   // (lib/lookalike.cjs), written after the decision. Read back from a report,
   // the technique is gone, so the family is all the tag can say.
   LOOKALIKE:  { rule: 'lookalike/name',                 severity: 'low',    state: 'observed' },
+  // A rendering of `config/unpinned-launch` on the server's host-config line
+  // (verify --installed / --config), written after the decision.
+  UNPINNED:   { rule: 'config/unpinned-launch',         severity: 'medium', state: 'observed' },
+  OVERRIDE:   { rule: 'config/launch-source-override',  severity: 'medium', state: 'observed' },
   NOTE:       { rule: 'verify/note',                    severity: 'info',   state: 'observed' },
   SKIP:       { rule: 'verify/skipped',                 severity: 'info',   state: 'not-run' },
 });
