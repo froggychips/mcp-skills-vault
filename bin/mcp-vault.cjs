@@ -81,7 +81,8 @@ COMMANDS
   audit             Diff installed MCP servers against the vault DB
   secrets           Plain-text credentials in host configs (value never printed)
   verify            Integrity gate (hashes + advisories) over the whole DB
-                    (--installed: over what your hosts actually launch)
+                    (--installed: over what your hosts actually launch;
+                     --config <path>…: over exactly these config files)
   install <pkg>     Integrity gate, then write the host config
                     (--host claude-code|claude-desktop|cursor|vscode|codex)
   discover          Harvest fresh MCP candidates from npm / gh / README
@@ -122,6 +123,8 @@ COMMON OPTIONS
   --deep            Download artifacts and hash them locally (verify)
   --deps            Resolve and check dependency trees (verify)
   --show-policy     Print the .mcp-vault.policy.json in force (verify)
+  --policy <path>   Use this policy file instead of searching for one (verify)
+  --fail-on <effect> Exit threshold: deny | unknown (= --fail-unverified) | warn (= --strict) (verify)
   --require-signatures  Unsigned npm release = failure (verify)
   --require-provenance  No provenance attestation = failure (verify)
   --allow-unpinned  Allow install to write a launch command with no version pin

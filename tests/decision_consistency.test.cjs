@@ -121,6 +121,37 @@ test('verify: every decision is decide() of the document\'s own inputs, and its 
   }
 });
 
+// #120: `verify --config` (the GitHub Action and the pre-commit hook). Its
+// subjects are host-config lines, --fail-on is the decision's fail_on, and
+// its SARIF is lib/finding.cjs's rendering of the same document.
+test('verify --config: decisions, exit code and SARIF are decide() and toSarif() of the document', () => {
+  const FIX = path.join(ROOT, 'tests', 'fixtures', 'action');
+  const CASES = [['clean', ['.mcp.json', '.vscode/mcp.json']], ['bad', ['.mcp.json']]];
+  const CONFIG_FLAGS = [[], ['--fail-on', 'deny'], ['--fail-on', 'unknown'], ['--fail-on', 'warn'], ['--strict'], ['--no-policy']];
+  for (const [fixture, configs] of CASES) {
+    for (const [pname, dir] of Object.entries(DIRS)) {
+      for (const flags of CONFIG_FLAGS) {
+        const policyArgs = POLICIES[pname] && !flags.includes('--no-policy') ? ['--policy', path.join(dir, '.mcp-vault.policy.json')] : [];
+        const args = ['--offline', '--as-of', AS_OF, ...policyArgs, ...flags, '--config', ...configs];
+        const label = `${fixture} ${pname} ${flags.join(' ') || '(no flags)'}`;
+        const cwd = path.join(FIX, fixture);
+        const spawn = (fmt) => spawnSync(process.execPath, [path.join(S, 'verify_integrity.cjs'), fmt, ...args], { encoding: 'utf8', env: ENV, cwd });
+        const r = spawn('--json');
+        assert.doesNotMatch(r.stderr, /internal:/, `${label}: the decision and the gate's counters disagree`);
+        const doc = JSON.parse(r.stdout).findings;
+        assert.equal(doc.schema, 'mcp-vault/findings@1', label);
+        assert.ok(doc.decisions.length && doc.decisions.every((d) => d.subject.type === 'host-config'), `${label}: subjects are config lines`);
+        assert.deepEqual(recompute(doc), doc.decisions, `${label}: the printed decisions are not decide()'s`);
+        assert.equal(r.status, F.exitCode(doc.decisions), `${label}: the exit code is not the decisions'`);
+        const sarif = spawn('--sarif');
+        assert.equal(sarif.status, r.status, `${label}: --sarif exits differently`);
+        const want = F.toSarif(doc.findings, { decisions: doc.decisions });
+        assert.deepEqual(JSON.parse(sarif.stdout).runs[0].results, want.runs[0].results, `${label}: SARIF is not toSarif() of the document`);
+      }
+    }
+  }
+});
+
 test('explain: its decision, blocking list and exit code are views of decide()', () => {
   for (const [pname, dir] of Object.entries(DIRS)) {
     for (const name of SAMPLE) {

@@ -50,7 +50,7 @@
  *   RULES, RULE_BY_ID, ORDER, RANK, EFFECTS
  *   rulesFor(mode)                       -> ordered active rows
  *   effectivePolicy(base, flags, opts)   -> frozen, normalised policy
- *   loadEffectivePolicy(startDir, opts)  -> { ok, policy, path, found, errors, sources }
+ *   loadEffectivePolicy(startDir, opts)  -> { ok, policy, path, found, errors, sources }  (opts.file: a named policy)
  *   flagsFromArgv(argv)                  -> { strict, failUnverified, … }
  *   entryRuleOutcomes(ctx)               -> legacy evaluateEntry outcomes
  */
@@ -862,12 +862,15 @@ function effectivePolicy(base, flags = {}, { defaults = {}, policyRules = true }
  * merged stricter-wins by lib/org_policy.cjs `mergeStricter`), then
  * the flags. `noPolicy` keeps the gate's own rules and drops the file's.
  */
-function loadEffectivePolicy(startDir, { flags = {}, noPolicy = false } = {}) {
+function loadEffectivePolicy(startDir, { flags = {}, noPolicy = false, file = null } = {}) {
   // Required lazily: lib/policy.cjs is an adapter over this module.
-  const { loadPolicy, DEFAULTS } = require('./policy.cjs');
+  const { loadPolicy, loadPolicyFile, DEFAULTS } = require('./policy.cjs');
+  // `file`: a policy named outright (verify --policy, #120) instead of the
+  // search upwards from startDir; a missing one comes back not-ok, never as
+  // the defaults.
   const loaded = noPolicy
     ? { ok: true, policy: null, path: null, errors: [], found: false, sources: [] }
-    : loadPolicy(startDir);
+    : (file ? loadPolicyFile(file) : loadPolicy(startDir));
   const policy = effectivePolicy(loaded.policy, flags, { defaults: DEFAULTS, policyRules: !noPolicy });
   return {
     ok: loaded.ok, found: loaded.found, path: loaded.path, errors: loaded.errors,

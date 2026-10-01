@@ -1,0 +1,69 @@
+name: action-selftest
+
+# Runs the repository's own action.yml (`uses: ./`) on the fixtures in
+# tests/fixtures/action: the clean config must pass, the unpinned one must fail.
+#
+# Deliberately NOT on pull_request. The runner is self-hosted and a PR's
+# action.yml is PR code; a composite action runs its steps on the host, and
+# `uses: ./` cannot be put inside the container jail the PR jobs use. So a PR
+# is checked by tests/action.test.cjs, which runs these same step scripts with
+# bash inside the jailed unit-tests job, and this workflow confirms the real
+# thing on master — reviewed code only.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - action.yml
+      - .github/workflows/action-selftest.yml
+      - tests/fixtures/action/**
+      - bin/**
+      - mcp-ecosystem-intelligence/scripts/**
+      - mcp-ecosystem-intelligence/assets/tools_database.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    runs-on: self-hosted
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Clean config passes
+        id: clean
+        uses: ./
+        with:
+          paths: |
+            tests/fixtures/action/clean/.mcp.json
+            tests/fixtures/action/clean/.vscode/mcp.json
+
+      - name: Unpinned config fails
+        id: bad
+        continue-on-error: true
+        uses: ./
+        with:
+          paths: tests/fixtures/action/bad/.mcp.json
+
+      - name: Missing configs pass with a note
+        id: none
+        uses: ./
+        with:
+          paths: tests/fixtures/action/does-not-exist/.mcp.json
+
+      - name: Check the outcomes
+        env:
+          CLEAN_EXIT: ${{ steps.clean.outputs.exit-code }}
+          BAD_OUTCOME: ${{ steps.bad.outcome }}
+          BAD_EXIT: ${{ steps.bad.outputs.exit-code }}
+          NONE_EXIT: ${{ steps.none.outputs.exit-code }}
+        run: |
+          set -euo pipefail
+          echo "clean=$CLEAN_EXIT bad=$BAD_OUTCOME/$BAD_EXIT none=$NONE_EXIT"
+          [ "$CLEAN_EXIT" = "0" ] || { echo "::error::clean fixture did not pass"; exit 1; }
+          [ "$BAD_OUTCOME" = "failure" ] && [ "$BAD_EXIT" = "1" ] || { echo "::error::unpinned fixture did not fail"; exit 1; }
+          [ "$NONE_EXIT" = "0" ] || { echo "::error::no-config run did not pass"; exit 1; }

@@ -36,6 +36,10 @@
  *   node scripts/verify_integrity.cjs --installed --allow-lookalike NAME
  *                                                  a lookalike you know is yours: still
  *                                                  reported, no longer fails --strict
+ *   node scripts/verify_integrity.cjs --config PATH…  check only these config files
+ *                                                  (every later bare arg; implies --installed)
+ *   node scripts/verify_integrity.cjs --policy PATH  use this policy file instead
+ *                                                  of searching upwards from --cwd
  *   node scripts/verify_integrity.cjs --fail-unverified  UNVERIFIED → hard failure
  *   node scripts/verify_integrity.cjs --deps       resolve and check dependency trees
  *   node scripts/verify_integrity.cjs --no-policy  ignore .mcp-vault.policy.json
@@ -70,14 +74,16 @@ const { parseImageRef, fetchManifest, ALLOWED_REGISTRIES } = require('./lib/oci.
 const {
   verifyRegistrySignature, provenanceClaim, checkProvenance, keysUrl,
 } = require('./lib/npm_signatures.cjs');
-const { readInstalledServers } = require('./lib/installed.cjs');
+const { readInstalledServers, explicitConfigPaths } = require('./lib/installed.cjs');
 const lookalike = require('./lib/lookalike.cjs');
 const {
   resolveNpmTreeCached, pypiDirectDependencies, summarizeTree,
 } = require('./lib/deps.cjs');
-const { loadEffectivePolicy, flagsFromArgv, rowFor } = require('./lib/policy_rules.cjs');
+const { loadEffectivePolicy, flagsFromArgv, rowFor, RANK } = require('./lib/policy_rules.cjs');
 const { hasOrgRules, loadOrgContext, orgModel } = require('./lib/org_policy.cjs');
-const { decide, exitCode, outcomeFails, findingsDocument, toJson } = require('./lib/finding.cjs');
+const {
+  decide, exitCode, outcomeFails, findingsDocument, toJson, toSarif: findingsToSarif,
+} = require('./lib/finding.cjs');
 const { fromVerifyResults, fromStoredEvidence, foundProblem } = require('./lib/findings_from.cjs');
 const { toTypedEntry, artifactId } = require('./lib/entry_model.cjs');
 const {
@@ -103,7 +109,6 @@ const DB_PATH   = path.resolve(__dirname, '../assets/tools_database.json');
 const CLOCK     = asOfFromArgv(process.argv);
 const AS_OF     = CLOCK.error ? null : CLOCK.asOf;
 const UPDATE    = process.argv.includes('--update');
-const STRICT    = process.argv.includes('--strict');
 const NO_AUDIT  = process.argv.includes('--no-audit');
 const OFFLINE   = process.argv.includes('--offline');
 const CWD = (() => {
@@ -121,11 +126,32 @@ const NO_POLICY = process.argv.includes('--no-policy');
 // per dimension. Trust then becomes a derived value instead of a word someone
 // typed once.
 const RECORD_EVIDENCE = process.argv.includes('--record-evidence');
+// --policy PATH names the file outright (a CI job pointing at a shared policy
+// kept somewhere other than the repo root). Resolved against --cwd; a named
+// file that is missing is refused below, never replaced by the defaults.
+const POLICY_FILE = (() => {
+  const i = process.argv.indexOf('--policy');
+  return i !== -1 && process.argv[i + 1] ? path.resolve(CWD, process.argv[i + 1]) : null;
+})();
+// --fail-on deny|unknown|warn: the exit threshold, said directly (the Action's
+// `fail-on` input). It is not a branch here: it raises the same two switches
+// --fail-unverified and --strict do, so it reaches decide() as the effective
+// policy's `fail_on` and the legacy counters agree with it.
+const FAIL_ON_ARG = (() => {
+  const i = process.argv.indexOf('--fail-on');
+  return i === -1 ? null : (process.argv[i + 1] || '');
+})();
+const RUN_FLAGS = (() => {
+  const f = flagsFromArgv(process.argv);
+  if (FAIL_ON_ARG === 'unknown') f.failUnverified = true;
+  if (FAIL_ON_ARG === 'warn') f.strict = true;
+  return f;
+})();
 // The bar this run holds entries to: the policy file(s) for --cwd, tightened
 // by the flags, normalised and frozen — built by the one function that builds
 // it for every command (lib/policy_rules.cjs). The switches below are read off
 // it rather than re-derived, and `decide()` receives the same object.
-const EFFECTIVE = loadEffectivePolicy(CWD, { flags: flagsFromArgv(process.argv), noPolicy: NO_POLICY });
+const EFFECTIVE = loadEffectivePolicy(CWD, { flags: RUN_FLAGS, noPolicy: NO_POLICY, file: POLICY_FILE });
 const EP = EFFECTIVE.policy;
 const POLICY = {
   ok: EFFECTIVE.ok, policy: EFFECTIVE.file_policy, path: EFFECTIVE.path,
@@ -151,6 +177,8 @@ const ENTRY     = (() => {
 // --strict implies --fail-unverified; an install gate wants the latter without
 // necessarily refusing every entry that ships a postinstall hook.
 const FAIL_UNVERIFIED = EP.gate.fail_unverified;
+// --strict, or --fail-on warn: read off the effective policy like the rest.
+const STRICT = EP.gate.strict;
 // Machine-readable output. --sarif is SARIF 2.1.0 for GitHub code scanning,
 // which puts each finding on the tools_database.json line that caused it.
 const AS_JSON  = process.argv.includes('--json');
@@ -180,7 +208,30 @@ const REQUIRE_PROVENANCE = EP.gate.require_provenance;
 // --installed: verify what the local hosts are configured to launch, instead of
 // what the DB says. The DB is still consulted — for a pin to compare against —
 // but the subjects are the configured servers.
-const INSTALLED = process.argv.includes('--installed');
+// --config PATH (repeatable): the subjects are the servers in exactly these
+// files, and nothing from the home directory. This is what CI and a pre-commit
+// hook want — the configs committed to the repository, judged the same way on
+// every machine — and what `--installed` alone cannot give, because it also
+// reads ~/.claude.json and friends from whoever runs it.
+//
+// Once `--config` appears, every later bare argument is a config path (other
+// than the value of a flag that takes one). That is what lets a pre-commit
+// hook end its entry in `--config`: pre-commit puts the hook's `args` after
+// the entry and the staged file names after those, so
+// `--config --strict .mcp.json .vscode/mcp.json` must read as two configs.
+const VALUE_FLAGS = new Set(['--cwd', '--policy', '--entry', '--fail-on', '--as-of']);
+const CONFIG_PATHS = (() => {
+  const out = [];
+  const argv = process.argv.slice(2);
+  const at = argv.indexOf('--config');
+  if (at === -1) return out;
+  for (let i = at + 1; i < argv.length; i++) {
+    if (VALUE_FLAGS.has(argv[i])) { i++; continue; }
+    if (!argv[i].startsWith('-')) out.push(argv[i]);
+  }
+  return out;
+})();
+const INSTALLED = process.argv.includes('--installed') || CONFIG_PATHS.length > 0;
 // --deps: resolve each package's dependency tree and check it too. An
 // install-time script is far more often in a transitive dependency than in the
 // package itself, so a one-level check is a check at the wrong depth.
@@ -1359,6 +1410,15 @@ function processOfflinePackage(tool, pkg, ecosystem, results) {
   });
 }
 
+// A config path as a host-config subject spells it: relative to the directory
+// the run started in (in CI and pre-commit that is the checkout root, which is
+// what code scanning resolves a SARIF uri against), absolute when outside it.
+function configRef(file, base = process.cwd()) {
+  if (!file) return null;
+  const rel = path.relative(base, file);
+  return (rel && !rel.startsWith('..') && !path.isAbsolute(rel) ? rel : file).split(path.sep).join('/');
+}
+
 // ── main ───────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -1385,6 +1445,22 @@ async function main() {
   if (POLICY.found && !POLICY.ok) {
     console.error(`policy error in ${POLICY.path}:`);
     for (const e of POLICY.errors) console.error(`  - ${e}`);
+    process.exit(2);
+  }
+
+  // `--config` with nothing after it would otherwise fall through to checking
+  // the whole DB and exit 0 — a clean verdict on files nobody looked at.
+  if (process.argv.includes('--config') && !CONFIG_PATHS.length) {
+    console.error('--config needs at least one path.');
+    process.exit(2);
+  }
+  // The thresholds are the policy table's own (lib/policy_rules.cjs RANK).
+  if (FAIL_ON_ARG !== null && !RANK.fail_on.includes(FAIL_ON_ARG)) {
+    console.error(`--fail-on must be ${RANK.fail_on.join(', ').replace(/, (\w+)$/, ' or $1')} (got ${JSON.stringify(FAIL_ON_ARG)}).`);
+    process.exit(2);
+  }
+  if (POLICY_FILE && NO_POLICY) {
+    console.error('--policy and --no-policy contradict each other.');
     process.exit(2);
   }
 
@@ -1440,15 +1516,21 @@ async function main() {
     }
     const servers = readInstalledServers({
       cwd: CWD,
+      paths: CONFIG_PATHS.length ? explicitConfigPaths(CONFIG_PATHS, { cwd: CWD }) : null,
       onUnreadable: (loc) => installedNotes.push({ ...loc, kind: 'unreadable' }),
     });
     if (!servers.length && !installedNotes.length) {
-      const note = `No configured MCP servers found (looked in ${CWD} and the usual host config paths).`;
+      const note = CONFIG_PATHS.length
+        ? `No MCP servers configured in ${CONFIG_PATHS.join(', ')}.`
+        : `No configured MCP servers found (looked in ${CWD} and the usual host config paths).`;
       if (AS_JSON || AS_SARIF) {
         // A machine-readable mode always emits a document, even an empty one:
         // "no output" is not something a caller can distinguish from a crash.
         const empty = toJsonReport({ results: [], asOf: AS_OF, meta: { mode: 'installed', subject: 'installed', note } });
-        process.stdout.write(JSON.stringify(AS_SARIF ? toSarif(empty, {}) : empty, null, 2) + '\n');
+        // Nothing is configured, so nothing was decided — and the document
+        // says that in the findings model too, with the policy it would have used.
+        empty.findings = toJson(findingsDocument({ asOf: AS_OF, scope: 'installed', policy: EP, facts: {} }));
+        process.stdout.write(JSON.stringify(AS_SARIF ? findingsToSarif([], { decisions: [] }) : empty, null, 2) + '\n');
       } else {
         console.error(note);
       }
@@ -1475,6 +1557,9 @@ async function main() {
         license:       known ? known.license : null,
         _installed: {
           host: srv.host, scope: srv.scope, source: srv.source, in_vault: !!known, remote: srv.remote,
+          // Where it is configured, as the host-config subject its findings
+          // are about: the path as code scanning resolves it, and the line.
+          ref: configRef(srv.source), line: srv.line || null,
           // What kind of thing this is decides what "unverifiable" means.
           kind: srv.remote ? 'remote' : (srv.install_cmd ? 'registry' : 'local'),
           command: srv.command,
@@ -1492,7 +1577,7 @@ async function main() {
         name: `${problem.host || 'host'} config (${problem.path})`,
         install_cmd: '(unreadable config)',
         version: null, pkg_integrity: null, source_url: null, trust: 'not-in-vault',
-        _installed: { host: problem.host, scope: problem.scope, source: problem.path, in_vault: false, kind: 'unreadable', command: null },
+        _installed: { host: problem.host, scope: problem.scope, source: problem.path, ref: configRef(problem.path), in_vault: false, kind: 'unreadable', command: null },
         _configError: problem.error,
       });
     }
@@ -1981,10 +2066,18 @@ async function main() {
     }));
     if (AS_SARIF) {
       const raw = fs.readFileSync(DB_PATH, 'utf8');
-      process.stdout.write(JSON.stringify(toSarif(report, {
+      const where = {
         dbPath: path.relative(process.cwd(), DB_PATH).split(path.sep).join('/'),
         lineOf: dbLineIndex(raw),
-      }), null, 2) + '\n');
+      };
+      // Installed servers (--installed / --config): the findings model's own
+      // SARIF, each result on the host-config line that launches the server
+      // (the subject), plus the decisions' finding-less outcomes. Over the DB
+      // the verify-report@1 SARIF stays byte for byte until a major.
+      const sarif = INSTALLED
+        ? findingsToSarif(model.findings, { ...where, decisions })
+        : toSarif(report, where);
+      process.stdout.write(JSON.stringify(sarif, null, 2) + '\n');
     } else {
       process.stdout.write(JSON.stringify(report, null, 2) + '\n');
     }

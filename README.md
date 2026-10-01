@@ -209,6 +209,9 @@ Flags:
 | `--fail-unverified` | Treat `UNVERIFIED` (registry unreachable, unparsable install command, wheel-only PyPI release) as a hard failure. Implied by `--strict` |
 | `--entry <name>` | Check a single DB entry instead of all of them |
 | `--installed` | Verify what the local hosts are configured to launch (`.mcp.json`, `~/.claude.json`, Claude Desktop, Cursor, VS Code, Codex) instead of the DB. Unpinned launch commands, servers not in the vault, and remote endpoints are each reported as what they are |
+| `--config <path>…` | Verify exactly these config files — every later bare argument — and nothing from the home directory. Implies `--installed`; a named file that is missing is exit 2 |
+| `--policy <path>` | Use this policy file instead of the nearest `.mcp-vault.policy.json` |
+| `--fail-on <effect>` | Exit threshold of the decision (`fail_on`): `deny`, `unknown` (= `--fail-unverified`) or `warn` (= `--strict`). Only raises the bar |
 | `--deep` | Download each artifact and hash it locally, instead of comparing the DB pin against metadata from the same registry that serves the tarball. Docker digests are verified by hashing the manifest |
 | `--deps` | Resolve each package's dependency tree (`npm install --package-lock-only --ignore-scripts`, nothing is installed or executed) and check it: transitive install scripts, and every package in the tree against OSV |
 | `--fail-dep-advisories` | A high/critical advisory anywhere in the tree is a failure |
@@ -999,6 +1002,20 @@ Entry schema:
 }
 ```
 
+### In your repo: GitHub Action and pre-commit
+
+```yaml
+- uses: froggychips/mcp-skills-vault@<full commit SHA>   # vX.Y.Z
+```
+
+Checks the servers in the repository's `.mcp.json`, `.vscode/mcp.json` and
+`.cursor/mcp.json` (`verify --offline --fail-on unknown --config …`), writes the
+decisions into the job summary, and optionally uploads SARIF onto the config lines.
+It runs the action's own checkout — no npm install, no token, no network — so
+the SHA in `uses:` is the gate's pin. A `pre-commit` hook (`id: mcp-vault`) does
+the same for staged configs. Inputs, a `pull_request` workflow to copy, and the
+hook: [`docs/GITHUB_ACTION.md`](./docs/GITHUB_ACTION.md).
+
 ### CI
 
 `.github/workflows/security-scan.yml` runs eight jobs across PRs, pushes and two
@@ -1075,6 +1092,7 @@ Everything in this table is scripted and tested; the column says where it lives.
 | Install into any host's config | [`lib/hosts.cjs`](./mcp-ecosystem-intelligence/scripts/lib/hosts.cjs) |
 | Verify what the hosts actually launch (`--installed`) | [`lib/installed.cjs`](./mcp-ecosystem-intelligence/scripts/lib/installed.cjs) |
 | Typosquat / lookalike names refused at install, flagged in audit | [`lib/lookalike.cjs`](./mcp-ecosystem-intelligence/scripts/lib/lookalike.cjs) |
+| One-line GitHub Action and pre-commit hook over a repo's MCP configs | [`action.yml`](./action.yml), [`.pre-commit-hooks.yaml`](./.pre-commit-hooks.yaml) |
 | Token budget for a real config | [`token_budget.cjs`](./mcp-ecosystem-intelligence/scripts/token_budget.cjs) |
 | Machine-readable report + SARIF | [`lib/report.cjs`](./mcp-ecosystem-intelligence/scripts/lib/report.cjs) |
 | Behavioural smoke in a rebuilt jail | [`mcp_eval.cjs`](./mcp-ecosystem-intelligence/scripts/mcp_eval.cjs), [`lib/mcp_stdio.cjs`](./mcp-ecosystem-intelligence/scripts/lib/mcp_stdio.cjs) |
