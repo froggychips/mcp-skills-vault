@@ -3,7 +3,7 @@
  * Is anybody using this?
  *
  * The honest answer has to be measured, and it has to be measured again later,
- * because "33 downloads a month" is the kind of number that gets written into a
+ * because "N downloads a month" is the kind of number that gets written into a
  * document once and then quoted for a year. This is a repo chore, not part of
  * the published CLI — it does not ship in the npm package.
  *
@@ -71,9 +71,29 @@ async function main() {
         days_with_any: dl.data.downloads.filter((d) => d.downloads > 0).length,
         days: dl.data.downloads.length,
         busiest: dl.data.downloads.reduce((m, d) => (d.downloads > m.downloads ? d : m), { downloads: 0 }),
+        // Release days are when mirrors and registry scanners fetch every new
+        // version. If three days carry most of the month, the month is mostly
+        // them; the rest of the days are the background worth watching.
+        top3: (() => {
+          const days = [...dl.data.downloads].sort((a, b) => b.downloads - a.downloads).slice(0, 3);
+          const sum = days.reduce((n, d) => n + d.downloads, 0);
+          const total = dl.data.downloads.reduce((n, d) => n + d.downloads, 0);
+          const rest = dl.data.downloads.filter((d) => !days.includes(d)).map((d) => d.downloads).sort((a, b) => a - b);
+          return {
+            days: days.map((d) => ({ day: d.day, downloads: d.downloads })),
+            share: total ? Math.round((sum / total) * 100) : null,
+            other_days: { count: rest.length, total: rest.reduce((n, x) => n + x, 0), median: rest.length ? rest[Math.floor(rest.length / 2)] : null },
+          };
+        })(),
         start: dl.data.start, end: dl.data.end,
       }
     : { error: dl.error };
+
+  // Per-version downloads over the last week. Two versions fetched almost
+  // equally right after they were published is a crawler pattern: a person
+  // installs the latest one.
+  const byVersion = await get(`https://api.npmjs.org/versions/${encodeURIComponent(PKG)}/last-week`);
+  const versions = byVersion.ok ? byVersion.data.downloads : { error: byVersion.error };
 
   const repo      = gh(`repos/${REPO}`);
   const views     = gh(`repos/${REPO}/traffic/views`);
@@ -101,6 +121,7 @@ async function main() {
   const report = {
     checked_at: new Date().toISOString(),
     npm: downloads,
+    npm_versions_last_week: versions,
     repo: repo.ok
       ? { stars: repo.data.stargazers_count, forks: repo.data.forks_count, watchers: repo.data.subscribers_count }
       : { error: repo.error },
@@ -123,7 +144,12 @@ async function main() {
   const w = (s) => process.stdout.write(`${s}\n`);
   w('');
   w(`npm            ${downloads.error ? `unavailable (${downloads.error})`
-    : `${downloads.total} downloads in ${downloads.days} days, on ${downloads.days_with_any} of them (peak ${downloads.busiest.downloads})`}`);
+    : `${downloads.total} downloads ${downloads.start}…${downloads.end}, on ${downloads.days_with_any} of ${downloads.days} days (peak ${downloads.busiest.downloads})`}`);
+  if (!downloads.error && downloads.top3.share !== null) {
+    w(`               ${downloads.top3.share}% on three days (${downloads.top3.days.map((d) => `${d.day} ${d.downloads}`).join(', ')}); the other ${downloads.top3.other_days.count} days: ${downloads.top3.other_days.total} (median ${downloads.top3.other_days.median}/day)`);
+  }
+  w(`by version/7d  ${versions.error ? `unavailable (${versions.error})`
+    : Object.entries(versions).sort((a, b) => b[1] - a[1]).map(([v, n]) => `${v} ${n}`).join(' · ')}`);
   w(`repo           ${repo.ok ? `${report.repo.stars} stars · ${report.repo.forks} forks · ${report.repo.watchers} watchers` : `unavailable (${repo.error})`}`);
   w(`traffic/14d    ${views.ok ? `${report.traffic.views.total} views (${report.traffic.views.uniques} unique)` : 'views unavailable'}`
     + ` · ${clones.ok ? `${report.traffic.clones.total} clones (${report.traffic.clones.uniques} unique)` : 'clones unavailable'}`);
