@@ -1057,7 +1057,7 @@
       "version": "0.1.0",
       "pkg_integrity": "sha512-HNk4aB9VZzT/BYBYSe0NlbwTukJAp0PyreoQCqff+avNkaHllJq0hGuBO5W2Sk8zbBwwtj5E93b35/6gcvbp4A==",
       "trust": "unverified",
-      "notes": "npm repository.url points to modelcontextprotocol/linear-server (404 \u2014 repo deleted). Real source is jerhadf/linear-mcp-server (original author, 374 days stale). Verifier will WARN on repo mismatch \u2014 this is expected. Best available Linear MCP option but effectively unmaintained.",
+      "notes": "npm repository.url points to modelcontextprotocol/linear-server (404 \u2014 repo deleted). Real source is jerhadf/linear-mcp-server (original author, 374 days stale). Verifier will WARN on repo mismatch \u2014 this is expected. Best available Linear MCP option but effectively unmaintained.\n\n[2026-10-01] Re-checked: modelcontextprotocol/linear-server is still 404; npm's only maintainer (jerhadf) owns jerhadf/linear-mcp-server, so ownership did not change and source_url stays. Only release 0.1.0 (2025-02-17), last repo push 2025-05-01 \u2014 abandoned ~17 months. The source_binding mismatch is the deleted URL, not a different owner.",
       "license": "MIT",
       "trust_evidence": {
         "artifact_id": "npm:linear-mcp-server@0.1.0",
@@ -3196,21 +3196,21 @@
     {
       "name": "@mondaydotcomorg/monday-api-mcp",
       "category": "pm",
-      "install_cmd": "npx -y @mondaydotcomorg/monday-api-mcp",
-      "source_url": "https://github.com/mondaycom/monday-ai",
-      "version": "3.1.2",
-      "pkg_integrity": "sha512-wIV7MAjswiuOU54L08dOflmah+InETFS2/zf6QEfn8Vf4zsMyfZTNfT1QtKXBBRiWg5j4WWEfw6XKQ2/u554jw==",
-      "trust": "unverified",
+      "install_cmd": "npx -y @mondaydotcomorg/monday-api-mcp@3.3.1",
+      "source_url": "https://github.com/mondaycom/mcp",
+      "version": "3.3.1",
+      "pkg_integrity": "sha512-btXD/b+dlIEQ0RuzE/i1lFq0VovEZGJ1KGAOEEfLGeeGmWKVWIm6u0v1ZRzXmZ1K7TBLPceLZpOwD03zV1F00Q==",
+      "trust": "verified",
       "license": "MIT",
       "health_score": 75,
       "est_tools_count": null,
       "toolsets": null,
-      "notes": "MCP server for using the monday.com API\n\n[VERIFIED 2026-05-14] no install hooks at all per `npm view scripts`.",
+      "notes": "MCP server for using the monday.com API\n\n[VERIFIED 2026-05-14] no install hooks at all per `npm view scripts`.\n\n[2026-10-01] Source repo renamed mondaycom/monday-ai \u2192 mondaycom/mcp (same org; GitHub redirects the old slug; all npm maintainers @monday.com). 3.3.1 metadata and its provenance name mondaycom/mcp. Pinned 3.1.2 \u2192 3.3.1: no advisories on either, no new capability, same dependency tree; install_cmd carries the exact version.",
       "stars": 427,
       "last_commit_days": 0,
       "open_issues": 54,
       "trust_evidence": {
-        "artifact_id": "npm:@mondaydotcomorg/monday-api-mcp@3.1.2",
+        "artifact_id": "npm:@mondaydotcomorg/monday-api-mcp@3.3.1",
         "dimensions": {
           "availability": {
             "status": "present",
@@ -3230,12 +3230,16 @@
             "verified_at": "2026-10-01"
           },
           "provenance": {
-            "status": "absent",
-            "checked_at": "2026-10-01"
+            "status": "bound",
+            "checked_at": "2026-10-01",
+            "repository": "https://github.com/mondaycom/mcp",
+            "identity": "https://github.com/mondaycom/mcp/.github/workflows/npm_publish.yml@refs/heads/master",
+            "verified_at": "2026-10-01"
           },
           "source_binding": {
-            "status": "mismatch",
-            "checked_at": "2026-10-01"
+            "status": "verified",
+            "checked_at": "2026-10-01",
+            "verified_at": "2026-10-01"
           },
           "registry": {
             "status": "unlisted",
@@ -3244,6 +3248,12 @@
           "advisories": {
             "status": "clean",
             "checked_at": "2026-10-01",
+            "verified_at": "2026-10-01"
+          },
+          "dependencies": {
+            "status": "advisories-present",
+            "checked_at": "2026-10-01",
+            "count": 537,
             "verified_at": "2026-10-01"
           }
         }
