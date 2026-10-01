@@ -17,7 +17,8 @@ const assert   = require('node:assert/strict');
 const fs       = require('node:fs');
 const path     = require('node:path');
 
-const { parseLaunch, dockerDigestPinned } = require('../mcp-ecosystem-intelligence/scripts/lib/install_cmd.cjs');
+const { launchPinProblem } = require('../mcp-ecosystem-intelligence/scripts/lib/install_cmd.cjs');
+const { applyRefresh } = require('../mcp-ecosystem-intelligence/scripts/verify_integrity.cjs');
 
 const DB = JSON.parse(fs.readFileSync(
   path.join(__dirname, '../mcp-ecosystem-intelligence/assets/tools_database.json'), 'utf8'));
@@ -28,20 +29,8 @@ const ALLOW_UNPINNED = {
   // 'entry-name': 'why this launch cannot name an exact version',
 };
 
-function pinProblem(tool) {
-  const cmd = String(tool.install_cmd || '');
-  if (/^docker\s/.test(cmd)) {
-    return dockerDigestPinned(cmd) ? null : 'docker image is not pinned by @sha256 digest';
-  }
-  const l = parseLaunch(cmd);
-  if (!l) return 'not a registry launch the gate can read (npx/uvx/docker)';
-  if (l.error) return `the gate cannot read this launch: ${l.error}`;
-  if (l.ecosystem !== 'npm' && l.ecosystem !== 'pypi') return `ecosystem ${l.ecosystem} has no registry version to pin`;
-  if (!l.version) return `launches ${l.package} with no version: latest at every start`;
-  if (!l.exact) return `launches ${l.package}@${l.version}, a tag or range rather than a version`;
-  if (l.version !== tool.version) return `launches ${l.version}, but the verified version is ${tool.version}`;
-  return null;
-}
+// The rule itself lives with the parser (lib/install_cmd.cjs launchPinProblem).
+const pinProblem = launchPinProblem;
 
 test('every registry entry launches the exact version it verified; docker by digest', () => {
   const problems = [];
@@ -76,4 +65,25 @@ test('pinProblem reads launches the way the gate does', () => {
   assert.match(t('docker run -i --rm ghcr.io/o/i:latest', null), /digest/);
   assert.equal(t(`docker run -i --rm ghcr.io/o/i@sha256:${'a'.repeat(64)}`, null), null);
   assert.match(t('node server.js', null), /not a registry launch/);
+});
+
+test('--update keeps the invariant: a refreshed version is re-pinned in install_cmd (npm @, PyPI ==)', () => {
+  const npm = applyRefresh({ install_cmd: 'npx -y @scope/pkg@1.0.0 --flag', version: '1.0.0' }, { version: '1.1.0', integrity: 'sha512-x' });
+  assert.equal(npm.install_cmd, 'npx -y @scope/pkg@1.1.0 --flag');
+  assert.equal(npm.pkg_integrity, 'sha512-x');
+  const bare = applyRefresh({ install_cmd: 'npx -y pkg', version: null }, { version: '2.0.0', integrity: 'sha512-y' });
+  assert.equal(bare.install_cmd, 'npx -y pkg@2.0.0');
+  const py = applyRefresh({ install_cmd: 'uvx --from pkg==0.1 pkg-bin', version: '0.1' }, { version: '0.2', integrity: 'sha256-z' });
+  assert.equal(py.install_cmd, 'uvx --from pkg==0.2 pkg-bin');
+  for (const t of [npm, bare, py]) assert.equal(pinProblem(t), null, t.install_cmd);
+
+  // Every registry entry in the DB, refreshed to a new version, still passes.
+  const broken = [];
+  for (const tool of DB.tools) {
+    if (/^docker\s/.test(tool.install_cmd)) continue;
+    const copy = applyRefresh({ ...tool }, { version: '99.0.1', integrity: 'x' });
+    const why = pinProblem(copy);
+    if (why) broken.push(`${tool.name}: ${why}`);
+  }
+  assert.deepEqual(broken, []);
 });

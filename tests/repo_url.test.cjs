@@ -188,3 +188,99 @@ test('one URL normaliser: no script outside lib/repo_url.cjs defines its own', (
   }
   assert.deepEqual(offenders, []);
 });
+
+// ── renames: GitHub answers the old /repos path with a 301 ──
+
+const http = require('../mcp-ecosystem-intelligence/scripts/lib/http.cjs');
+
+/** A stand-in transport: GitHub's actual answers for a renamed repository. */
+function githubTransport(routes) {
+  const seen = [];
+  const transport = async (url) => {
+    seen.push(url);
+    const hit = routes[url];
+    if (!hit) return { status: 404, headers: {}, text: '{"message":"Not Found"}' };
+    return { status: hit.status, headers: hit.headers || {}, text: JSON.stringify(hit.body || {}) };
+  };
+  return { transport, seen };
+}
+const RENAMED = {
+  'https://api.github.com/repos/mondaycom/monday-ai': {
+    status: 301,
+    headers: { location: 'https://api.github.com/repositories/962148723' },
+    body: { message: 'Moved Permanently', url: 'https://api.github.com/repositories/962148723' },
+  },
+  'https://api.github.com/repositories/962148723': { status: 200, body: { full_name: 'mondaycom/mcp' } },
+};
+const getVia = (transport) => (url, opts) => http.getJson(url, { ...opts, retries: 0, transport });
+const NOW = Date.parse('2026-10-01T12:00:00Z');
+
+test('http.getJson: a 301 is not an answer unless the caller asks to follow it', async () => {
+  const { transport } = githubTransport(RENAMED);
+  const plain = await http.getJson('https://api.github.com/repos/mondaycom/monday-ai', { retries: 0, transport });
+  assert.equal(plain.ok, false);
+  assert.equal(plain.status, 301);
+  const followed = await http.getJson('https://api.github.com/repos/mondaycom/monday-ai', { retries: 0, transport, maxRedirects: 2 });
+  assert.equal(followed.ok, true);
+  assert.equal(followed.data.full_name, 'mondaycom/mcp');
+  assert.equal(followed.url, 'https://api.github.com/repositories/962148723');
+  // Bounded: a loop ends as a failure, not a hang.
+  const loop = { 'https://x.example/a': { status: 302, headers: { location: '/a' } } };
+  const looped = await http.getJson('https://x.example/a', { retries: 0, transport: githubTransport(loop).transport, maxRedirects: 3 });
+  assert.equal(looped.ok, false);
+});
+
+test('resolveRepoAlias follows GitHub\'s redirect and records a dated alias', async () => {
+  const { transport, seen } = githubTransport(RENAMED);
+  const tool = { name: 'm', source_url: 'https://github.com/mondaycom/mcp' };
+  const alias = await r.resolveRepoAlias(tool,
+    'https://github.com/mondaycom/monday-ai/tree/master/packages/monday-api-mcp', { get: getVia(transport), now: NOW });
+  assert.deepEqual(alias, { slug: 'mondaycom/monday-ai', resolved_to: 'mondaycom/mcp', resolved_at: '2026-10-01', via: 'github-api' });
+  assert.deepEqual(tool.source_aliases, [alias]);
+  assert.deepEqual(seen, ['https://api.github.com/repos/mondaycom/monday-ai', 'https://api.github.com/repositories/962148723']);
+  // Once known, not asked again.
+  assert.equal(await r.resolveRepoAlias(tool, 'git+https://github.com/mondaycom/monday-ai.git', { get: getVia(transport), now: NOW }), null);
+  assert.equal(seen.length, 2);
+  // And the offline comparison now accepts the old name.
+  assert.equal(r.sourceBinding(tool.source_url, 'https://github.com/mondaycom/monday-ai', { aliases: tool.source_aliases }).state, 'verified');
+});
+
+test('resolveRepoAlias records nothing when GitHub names another repository, 404s, or redirects off the API', async () => {
+  const tool = () => ({ name: 'm', source_url: 'https://github.com/mondaycom/mcp' });
+  const other = githubTransport({
+    'https://api.github.com/repos/someone/fork': { status: 301, headers: { location: 'https://api.github.com/repositories/1' } },
+    'https://api.github.com/repositories/1': { status: 200, body: { full_name: 'someone/elsewhere' } },
+  });
+  let t = tool();
+  assert.equal(await r.resolveRepoAlias(t, 'https://github.com/someone/fork', { get: getVia(other.transport), now: NOW }), null);
+  assert.equal(t.source_aliases, undefined);
+  t = tool();
+  assert.equal(await r.resolveRepoAlias(t, 'https://github.com/gone/repo', { get: getVia(githubTransport({}).transport), now: NOW }), null);
+  const offApi = githubTransport({
+    'https://api.github.com/repos/mondaycom/monday-ai': { status: 301, headers: { location: 'https://evil.example/repositories/1' } },
+    'https://evil.example/repositories/1': { status: 200, body: { full_name: 'mondaycom/mcp' } },
+  });
+  t = tool();
+  assert.equal(await r.resolveRepoAlias(t, 'https://github.com/mondaycom/monday-ai', { get: getVia(offApi.transport), now: NOW }), null);
+  // Same repository: nothing to resolve, no request.
+  const none = githubTransport({});
+  assert.equal(await r.resolveRepoAlias(tool(), 'git+https://github.com/MondayCom/mcp.git', { get: getVia(none.transport), now: NOW }), null);
+  assert.deepEqual(none.seen, []);
+});
+
+test('provenance: a release attested before the rename binds through a recorded alias', () => {
+  const { checkProvenance } = require('../mcp-ecosystem-intelligence/scripts/lib/npm_signatures.cjs');
+  const stored = 'https://github.com/mondaycom/mcp';
+  const claim = { repository: 'https://github.com/mondaycom/monday-ai' };
+  const aliases = [{ slug: 'mondaycom/monday-ai', resolved_to: 'mondaycom/mcp', resolved_at: '2026-10-01', via: 'github-api' }];
+  const without = checkProvenance({ claim, sourceUrl: stored, normalizeRepo: r.aliasAwareRepoKey(stored, []) });
+  assert.equal(without.state, 'mismatch');
+  assert.ok(without.findings.some((f) => /provenance names/.test(f)));
+  const withAlias = checkProvenance({ claim, sourceUrl: stored, normalizeRepo: r.aliasAwareRepoKey(stored, aliases) });
+  assert.notEqual(withAlias.state, 'mismatch');
+  assert.ok(!withAlias.findings.some((f) => /provenance names/.test(f)), withAlias.findings.join('; '));
+  // An alias for another repository does not stretch to this one.
+  const fork = 'https://github.com/fork/mcp';
+  assert.equal(checkProvenance({ claim, sourceUrl: fork, normalizeRepo: r.aliasAwareRepoKey(fork, aliases) }).state, 'mismatch');
+  assert.equal(r.aliasAwareRepoKey(stored, aliases)('https://github.com/MondayCom/Monday-AI/tree/x'), 'github.com/mondaycom/mcp');
+});

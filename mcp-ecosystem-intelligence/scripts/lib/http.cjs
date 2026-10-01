@@ -22,7 +22,9 @@
  *     a token must not be derivable from a cache filename.
  *
  * API:
- *   getJson(url, opts)            -> { ok, status, data, fromCache } | { ok:false, ... }
+ *   getJson(url, opts)            -> { ok, status, data, fromCache, url? } | { ok:false, ... }
+ *                                    opts.maxRedirects (default 0): follow up to N
+ *                                    3xx answers; the result's `url` is the last hop
  *   postJson(url, payload, opts)  -> same shape
  *   mapLimit(items, limit, fn)    -> Promise<results[]>   (order preserved)
  *   backoffDelay(attempt, base)   -> ms                   (pure, testable)
@@ -190,7 +192,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function request(url, {
   method = 'GET', headers = {}, payload = undefined,
   timeoutMs = DEFAULT_TIMEOUT_MS, retries = DEFAULT_RETRIES,
-  cacheTtlMs = 0, transport = once, onRetry = null,
+  cacheTtlMs = 0, transport = once, onRetry = null, maxRedirects = 0,
 } = {}) {
   const body     = payload === undefined ? null : JSON.stringify(payload);
   const cacheable = method.toUpperCase() === 'GET' && cacheTtlMs > 0;
@@ -213,6 +215,21 @@ async function request(url, {
     if (res.status === 304 && cached) {
       writeCache(key, { ...cached, stored_at: Date.now() });
       return { ok: true, status: cached.status, data: cached.data, fromCache: true, attempts: attempt + 1 };
+    }
+
+    // Opt-in: a redirect is only followed for a caller that asked. GitHub
+    // answers a renamed repository's old /repos path with 301 to
+    // /repositories/<id>, and a caller resolving renames needs the far end.
+    // Only GET, only https (once() refuses anything else), bounded.
+    if (maxRedirects > 0 && method.toUpperCase() === 'GET' && [301, 302, 303, 307, 308].includes(res.status)) {
+      const loc = res.headers && res.headers.location;
+      let next = null;
+      try { next = loc ? new URL(loc, url).href : null; } catch { next = null; }
+      if (!next) return { ok: false, status: res.status, error: 'redirect without a usable location', attempts: attempt + 1 };
+      const hop = await request(next, {
+        method, headers, payload, timeoutMs, retries, cacheTtlMs, transport, onRetry, maxRedirects: maxRedirects - 1,
+      });
+      return { ...hop, url: hop.url || next };
     }
 
     if (res.status >= 200 && res.status < 300) {

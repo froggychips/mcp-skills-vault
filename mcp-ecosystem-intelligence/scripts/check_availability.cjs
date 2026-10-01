@@ -241,7 +241,8 @@ async function checkPypi(tool, pkg, { get = getJson } = {}) {
 /**
  * Did the source repository move?
  *
- * GitHub follows renames and transfers transparently, answering 200 with the
+ * GitHub follows renames and transfers: the old path answers 301 to
+ * /repositories/<id> (followed below), and that answers 200 with the
  * *current* full_name — which is exactly what makes it a usable relocation
  * detector: a mismatch between what we stored and what it answers is a move
  * that happened without anyone updating the entry.
@@ -257,6 +258,9 @@ async function checkRepo(tool, { get = getJson } = {}) {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     cacheTtlMs: CACHE_TTL_MS,
+    // A renamed or transferred repository answers its old path with a 301 to
+    // /repositories/<id>; without following it a move read as "lookup failed".
+    maxRedirects: 3,
   });
   if (res.status === 404) return { state: 'repo-gone', detail: `${tool.source_url} returns 404 from the GitHub API` };
   if (!res.ok) return { state: 'unknown', detail: `GitHub lookup failed: ${res.error || `HTTP ${res.status}`}` };

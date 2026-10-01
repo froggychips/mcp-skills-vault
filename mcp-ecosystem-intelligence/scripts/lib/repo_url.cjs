@@ -28,6 +28,12 @@
  *                         -> { state: 'verified'|'mismatch'|'unverified', alias? }
  *                            does a registry's repository field name the
  *                            repository the DB records? (see below)
+ *   aliasAwareRepoKey(sourceUrl, aliases)
+ *                         -> (url) => repoKey, with a recorded earlier name
+ *                            of `sourceUrl` keyed as `sourceUrl` itself
+ *   resolveRepoAlias(tool, declaredUrl, { get, now, token })
+ *                         -> alias added to tool.source_aliases | null
+ *                            (the one networked helper here; `get` is injected)
  */
 
 // Anchored at both ends. The forms that appear in real package metadata:
@@ -144,6 +150,72 @@ function sourceBinding(stored, declared, { aliases = [] } = {}) {
   return { state: 'mismatch' };
 }
 
+/**
+ * `repoKey`, except that an earlier name of `sourceUrl` recorded in `aliases`
+ * keys as `sourceUrl` itself. For comparisons that cannot take an alias list —
+ * the provenance check compares a certificate's repository through a
+ * normaliser, and a release attested before a rename names the old slug.
+ */
+function aliasAwareRepoKey(sourceUrl, aliases) {
+  const ours = githubSlug(sourceUrl);
+  const list = Array.isArray(aliases) ? aliases : [];
+  return (url) => {
+    const slug = githubSlug(url);
+    if (ours && slug && slug !== ours && list.some((a) => a
+      && String(a.slug || '').toLowerCase() === slug
+      && String(a.resolved_to || '').toLowerCase() === ours)) {
+      return repoKey(sourceUrl);
+    }
+    return repoKey(url);
+  };
+}
+
+/**
+ * Refresh only: when a registry names a different GitHub repository than the
+ * DB, ask the GitHub API whether it is the same one under an earlier name.
+ * GitHub answers a renamed or transferred repository's old /repos path with a
+ * 301 to /repositories/<id>; the redirect is followed (`maxRedirects`) and the
+ * far end's `full_name` decides. A confirmed answer is stored on the entry as
+ * a dated alias, so offline comparisons can use it. Returns the alias added,
+ * or null (nothing to resolve, already known, or GitHub said otherwise).
+ *
+ * `get` is lib/http.cjs getJson or a stand-in; `now` is the run's instant.
+ */
+async function resolveRepoAlias(tool, declaredUrl, { get, now, token = null, cacheTtlMs = 0 } = {}) {
+  if (typeof get !== 'function') throw new TypeError('resolveRepoAlias: get is required');
+  const theirs = githubSlug(declaredUrl);
+  const ours = githubSlug(tool && tool.source_url);
+  if (!theirs || !ours || theirs === ours) return null;
+  const known = Array.isArray(tool.source_aliases) ? tool.source_aliases : [];
+  if (known.some((a) => a && String(a.slug).toLowerCase() === theirs && String(a.resolved_to).toLowerCase() === ours)) return null;
+  const res = await get(`https://api.github.com/repos/${theirs}`, {
+    headers: {
+      'Accept':     'application/vnd.github+json',
+      'User-Agent': 'mcp-vault-verify',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    cacheTtlMs,
+    maxRedirects: 3,
+  });
+  if (!res || !res.ok) return null;
+  // The far end of a redirect must still be the GitHub API.
+  if (res.url) {
+    let host = null;
+    try { host = new URL(res.url).hostname; } catch { host = null; }
+    if (host !== 'api.github.com') return null;
+  }
+  const current = String((res.data && res.data.full_name) || '').toLowerCase();
+  if (current !== ours) return null;
+  const alias = {
+    slug: theirs, resolved_to: ours,
+    resolved_at: new Date(now).toISOString().slice(0, 10),
+    via: 'github-api',
+  };
+  tool.source_aliases = [...known.filter((a) => !(a && String(a.slug).toLowerCase() === theirs)), alias];
+  return alias;
+}
+
 module.exports = {
-  githubSlug, githubOwner, isGithubUrl, githubRepoUrl, normalizeGitUrl, repoKey, sourceBinding, GITHUB_URL,
+  githubSlug, githubOwner, isGithubUrl, githubRepoUrl, normalizeGitUrl, repoKey, sourceBinding,
+  aliasAwareRepoKey, resolveRepoAlias, GITHUB_URL,
 };

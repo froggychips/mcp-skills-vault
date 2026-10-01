@@ -569,8 +569,47 @@ function pinInstallCmd(cmd, version) {
   return { parts: pinnedParts, pinned: true, reason: null };
 }
 
+/**
+ * Why a DB entry's install_cmd does not launch exactly what it verified, or
+ * null. npm/PyPI: an exact version equal to `version`, read by parseLaunch the
+ * way the gate reads it; docker: an @sha256 digest. tests/db_pins.test.cjs
+ * holds the whole DB to this.
+ */
+function launchPinProblem(tool) {
+  const cmd = String((tool && tool.install_cmd) || '');
+  if (/^docker\s/.test(cmd)) {
+    // The image is the first non-flag token: a digest in some other argument
+    // is not a pin on what runs.
+    return dockerDigestPinned(dockerImageRef(cmd)) ? null : 'docker image is not pinned by @sha256 digest';
+  }
+  const l = parseLaunch(cmd);
+  if (!l) return 'not a registry launch the gate can read (npx/uvx/docker)';
+  if (l.error) return `the gate cannot read this launch: ${l.error}`;
+  if (l.ecosystem !== 'npm' && l.ecosystem !== 'pypi') return `ecosystem ${l.ecosystem} has no registry version to pin`;
+  if (!l.version) return `launches ${l.package} with no version: latest at every start`;
+  if (!l.exact) return `launches ${l.package}@${l.version}, a tag or range rather than a version`;
+  if (l.version !== tool.version) return `launches ${l.version}, but the verified version is ${tool.version}`;
+  return null;
+}
+
+/**
+ * After a refresh moved `version`, rewrite install_cmd to launch it (npm
+ * `@x`, PyPI `==x`). Returns true when install_cmd now names `version`.
+ * Docker is not handled here: its digest lives in install_cmd itself and is
+ * moved by check_docker_drift, together with pkg_integrity.
+ */
+function repinInstallCmd(tool) {
+  if (!tool || typeof tool.install_cmd !== 'string' || !tool.version) return false;
+  if (/^docker\s/.test(tool.install_cmd)) return false;
+  const r = pinInstallCmd(tool.install_cmd, tool.version);
+  if (!r.pinned) return false;
+  tool.install_cmd = r.parts.join(' ');
+  return true;
+}
 
 module.exports = {
+  launchPinProblem,
+  repinInstallCmd,
   parseLaunch,
   launcherOf,
   canonicalInstallCmd,
