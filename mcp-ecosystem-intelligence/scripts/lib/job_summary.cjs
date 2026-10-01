@@ -1,6 +1,6 @@
 'use strict';
 /**
- * The GitHub Action's job summary: a `verify --json` run's Decisions as a
+ * The GitHub Action's job summary: a run's Decisions as a
  * Markdown table.
  *
  * It renders the findings@1 document the report carries (docs/adr/0001) and
@@ -12,7 +12,7 @@
  * findings model exists to prevent.
  *
  * API:
- *   toMarkdown(report, { base })   -> Markdown (the `verify --json` document)
+ *   toMarkdown(report, { base })   -> Markdown ({ mode, findings: findings@1 } — `check --json` in the Action, or a `verify --json` report)
  */
 
 const path = require('path');

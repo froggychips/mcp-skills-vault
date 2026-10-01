@@ -6,15 +6,16 @@
 #       hooks:
 #         - id: mcp-vault
 #
-# Offline: no network, no token — the staged configs are checked against the
-# pins in the vault DB at `rev`. The package has no dependencies and no install
-# scripts, so pre-commit's `npm install` of it runs nothing but a copy.
-# pre-commit appends the staged file names to `entry`; `--config` takes them
-# all, wherever the hook's `args` land: `args: [--strict]` works as written.
+# Offline: no network, no token — `mcp-vault check` reads the staged configs
+# and checks them against the vault DB at `rev`. The package has no
+# dependencies and no install scripts, so pre-commit's `npm install` of it runs
+# nothing but a copy. pre-commit appends the staged file names to `entry`;
+# `check` takes every bare argument as a config, wherever the hook's `args`
+# land: `args: [--strict]` works as written.
 - id: mcp-vault
-  name: mcp-vault (verify MCP server configs)
-  description: Fail when a committed .mcp.json / .vscode/mcp.json / .cursor/mcp.json launches a server that is unpinned, not in the vault, or does not match its pinned hash.
-  entry: mcp-vault verify --offline --fail-on unknown --config
+  name: mcp-vault (check MCP server configs)
+  description: Fail when a committed .mcp.json / .vscode/mcp.json / .cursor/mcp.json launches a server that is unpinned, not in the vault, does not match its pinned hash, or holds a plain-text secret.
+  entry: mcp-vault check --fail-on unknown
   language: node
   files: '(^|/)(\.mcp\.json|\.vscode/mcp\.json|\.cursor/mcp\.json)$'
   pass_filenames: true

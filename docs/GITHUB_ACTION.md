@@ -55,7 +55,11 @@ With SARIF, so each finding lands on the config line that launches the server:
 What it runs is the action's own checkout — the code at the commit the `uses:`
 line names. The CLI has no dependencies, so nothing is installed from npm and
 no install script exists to run; pinning the action by SHA pins the gate by
-SHA. The job summary gets a table of every server's decision — its effect,
+SHA. It runs `mcp-vault check` over the configs: pins and hashes of known
+packages, stored advisories, launches with no exact version, overridden
+package sources, lookalike names, plain-text secrets (the value is never
+printed) and what the servers of one config do together — one decision, one
+exit code. The job summary gets a table of every server's decision — its effect,
 the rule that decided it (`decided_by`), the config line it came from, and why.
 It is rendered from the report's `mcp-vault/findings@1` decisions; the summary
 and the SARIF judge nothing themselves. In SARIF each finding sits on the
@@ -71,7 +75,7 @@ same commit gives the same answer on every run.
 |---|---|---|
 | `paths` | `.mcp.json .vscode/mcp.json .cursor/mcp.json` | Config files, space- or newline-separated; globs expand (`**/mcp.json`). Missing files are skipped; none found = pass with a note |
 | `policy` | nearest `.mcp-vault.policy.json` | Path to a policy file. A named one that does not exist fails the job |
-| `fail-on` | `unverified` | The decision's exit threshold, passed as `verify --fail-on` (`fail_on`). `error`/`deny`: integrity mismatch, advisory, policy violation. `unverified`/`unknown`: also anything that could not be checked — unpinned, not in the vault, a local command. `warning`/`warn`: also install hooks, repo mismatch (`--strict`). A policy file can raise it, never lower it |
+| `fail-on` | `unverified` | The decision's exit threshold, passed as `check --fail-on` (`fail_on`). `error`/`deny`: integrity mismatch, advisory, policy violation. `unverified`/`unknown`: also anything that could not be checked — unpinned, not in the vault, a local command. `warning`/`warn`: also an unpinned launch, a lookalike name, a risky combination of servers (`--strict`). A policy file can raise it, never lower it |
 | `sarif` | `false` | Upload to code scanning (`security-events: write`) |
 | `offline` | `true` | `false` adds live registry and advisory checks (network; pass `GITHUB_TOKEN` in `env` for the GHSA feed) |
 | `version` | — | Run the published npm package at this exact version instead. Ranges and `latest` are refused. The tarball is fetched with `npm pack --ignore-scripts`, hashed, compared with `integrity`, and unpacked with tar — never `npm install`ed, never run through npx |
@@ -79,19 +83,20 @@ same commit gives the same answer on every run.
 | `node-version` | `22` | For `actions/setup-node` |
 
 Outputs: `exit-code` (0 clean, 1 failures, 2 a config or policy could not be
-read — the decisions' exit code), `report` (the `mcp-vault/verify-report@1`
-JSON, with the decisions under `findings` as `mcp-vault/findings@1`; unset when
-no config was found), `sarif-file`.
+read — the decisions' exit code), `report` (`check --json`: an `mcp-vault/findings@1`
+document — findings, decisions, and the policy and facts they were decided on;
+unset when no config was found), `sarif-file`.
 
 The same check by hand:
 
 ```sh
-npx -y @froggychips/mcp-vault verify --offline --fail-on unknown \
-  --config .mcp.json .vscode/mcp.json
+npx -y @froggychips/mcp-vault check --fail-on unknown .mcp.json .vscode/mcp.json
 ```
 
-`--config` reads exactly the named files and nothing from the home directory —
-unlike `--installed`, whose answer depends on whose machine runs it.
+With no paths, `check` reads the project-scoped configs in the current
+directory. It reads exactly those files and nothing from the home directory —
+unlike `status` and `audit`, whose answer depends on whose machine runs them.
+Offline by default; `--online` adds the registry and advisory checks.
 
 ## pre-commit
 
@@ -106,5 +111,5 @@ repos:
       #   args: [--strict]
 ```
 
-Runs on staged `.mcp.json`, `.vscode/mcp.json` and `.cursor/mcp.json`, offline,
-with `--fail-on unknown` (the same as `--fail-unverified`).
+Runs `mcp-vault check --fail-on unknown` on staged `.mcp.json`,
+`.vscode/mcp.json` and `.cursor/mcp.json`, offline.
