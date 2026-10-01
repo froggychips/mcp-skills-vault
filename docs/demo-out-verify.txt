@@ -1,3 +1,0 @@
-OK    kafka-mcp-server: docker pinned by digest
-
-112 entries checked — 0 failure(s)

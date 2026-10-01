@@ -1,7 +1,7 @@
 <!--
 Use this template for PRs that add a new entry to tools_database.json.
-For promoting candidate → verified, use chore: promote <name> to trust:verified
-and tick the checklist from CONTRIBUTING.md instead.
+There is no promotion PR: `trust` is derived from dated evidence
+(lib/evidence.cjs), not set by hand — see CONTRIBUTING.md.
 -->
 
 ## Server

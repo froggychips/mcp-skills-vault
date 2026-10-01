@@ -72,7 +72,7 @@ const COMMANDS = {
 // `signature` reports on it itself, and must be reachable when it is broken.
 const DB_FREE = new Set(["wrap", "health", "doctor", "signature"]);
 
-const HELP = `mcp-vault — make MCP supply-chain boring.
+const HELP = `mcp-vault — offline security check for MCP configs in CI.
 
 USAGE
   mcp-vault <command> [options]
@@ -105,7 +105,7 @@ COMMANDS
   docker-drift      Detect upstream Docker @sha256 drift
   license-drift     Detect MIT → BSL / SSPL relicensing
   health <args>     Score a candidate by stars / recency / license / registry
-  refresh           Refresh pinned versions + integrity hashes from registries
+  refresh           Refresh GitHub metrics and health scores (--write to save)
   wrap              Generate MCP wrapper boilerplate for a CLI / API tool
   site-registry     Generate registry.html from tools_database.json, every entry's
                     badge + evidence page, and the sub-registry export below
@@ -159,9 +159,9 @@ COMMON OPTIONS
   Each command also accepts its own flags — run with --help for details.
 
 QUICK START
-  npx -y @froggychips/mcp-vault scan --cwd ./my-project
-  npx -y @froggychips/mcp-vault audit --strict
-  npx -y @froggychips/mcp-vault verify --offline
+  npx -y @froggychips/mcp-vault check       # this repo's MCP configs (CI, pre-commit)
+  npx -y @froggychips/mcp-vault status      # every MCP host config on this machine
+  npx -y @froggychips/mcp-vault explain <name>
 
 DOCS  https://github.com/froggychips/mcp-skills-vault
 SITE  https://mcp.froggychips.xyz

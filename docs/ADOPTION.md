@@ -1,114 +1,94 @@
-# Three users
+# First users
 
-A rule for this repository: **no new feature until three real people have used
-this and said something about it.** Everything below is the reasoning and the
-plan; re-run the numbers with `node .github/scripts/adoption.cjs`.
+mcp-vault has no telemetry and never will, so the only way to know whether it
+helps anyone is a person saying so. This page records what the numbers say,
+what happened to the rule this project set itself, and what comes next.
+Re-measure with `node .github/scripts/adoption.cjs`.
 
 ## What the data says
 
-Measured 2026-09-18:
+Measured 2026-10-01:
 
 | Signal | Value |
 |---|---|
-| npm downloads, 30 days | 33, spread over 15 days, peak 5 |
+| npm downloads, 2026-08-31 … 2026-09-29 | **698**, on 20 of 30 days |
+| …on the three release days (17, 18 and 24 Sep) | 563 — about **80%** |
+| …on the other 27 days | 135: 5–10 a day after the first release in the window, 0–5 before it |
+| downloads by version, last 7 days | 0.15.1: 159 · 0.15.2: 156 · 0.14.1: 21 · older: 8 |
+| GitHub, 14 days | **4 views** (4 unique), 826 clones (273 unique), no referrers |
 | stars / forks / watchers | 0 / 0 / 0 |
-| traffic, 14 days | 7 views (6 unique), **41 clones (29 unique)** |
-| referrers | none |
-| issues or PRs from a person other than the owner | **0** (31 from this repo's own bots) |
+| issues or PRs from anyone but the owner | **0** (35 from this repository's own bots) |
 
-The clone-to-view ratio is the part that matters. A person views a repository
-before cloning it; six viewers did not produce twenty-nine cloners. Forty-one
-clones against seven views is the signature of mirrors and crawlers. Combined
-with zero referrers and zero outside issues, the honest reading is that **there
-is no evidence of a single human user yet** — and a few of those 33 downloads
-were this project's own release testing.
+How to read it:
 
-This is not a quality problem, and it is not fixed by shipping more. Zero
-referrers means nobody has a path to the thing. Twenty-four checks do not beat
-one user who can say which of them they actually ran.
+- **The downloads are mostly not people.** Four fifths of the month landed on
+  the days a version was published, and two versions published hours apart
+  were fetched almost equally — the pattern of mirrors and registry scanners
+  pulling every new version. A person installs the latest one.
+- **The clones are not people either.** 826 clones against 4 views: a person
+  looks at a repository before cloning it. Likely sources: this repository's
+  own CI (every job checks it out) and crawlers.
+- **The background is small and real-looking:** 5–10 downloads a day since
+  mid-September. Whether any of them ran `check` on a config of their own is
+  exactly what the data cannot say.
 
-## Why features cannot substitute
+## What happened to the rule
 
-This tool has no telemetry and never will — that is a promise in
-[COMPATIBILITY.md](./COMPATIBILITY.md), not a gap. Which means:
+The previous version of this page set a rule: *no new feature until three
+real people have used this and said something about it.* It was not kept.
+Between 0.15.2 (2026-09-24) and 0.16.0, 31 feature commits landed: `check`
+and the GitHub Action, the pre-commit hook, plaintext secrets, lookalike
+names, tool-description scanning, toxic flows and tool shadowing, organisation
+policy and per-tool approval, the signed DB, signed audit imports, badges, the
+sub-registry export, and one `decide()` under all of it. All of it was built
+before anyone outside the project had used the tool.
 
-- we cannot tell which command anyone runs;
-- we cannot tell whether a check ever fired on real input;
-- we cannot tell whether a finding changed anybody's decision.
+Some of that work changed what the product is — it is now a check for MCP
+configs in CI rather than a registry of servers, and that is the version worth
+putting in front of people. But it was still built on the maintainer's guesses,
+and the schemas, defaults and rule names in 0.16 are those guesses
+([COMPATIBILITY.md](COMPATIBILITY.md) says they may still change).
 
-The only instrument available is a person saying so. Building a twenty-fifth
-check adds a thing nobody asked for to a pile nobody has been through; the next
-useful piece of information is not in the code.
+## What comes next
 
-## What counts as one of the three
+The goal for 0.16.x is **first users, not features.** Work is limited to:
+fixing what is wrong, making `check` and the Action easier to adopt, and
+asking. 1.0 — the point where the compatibility promise starts to bind — comes
+after feedback from those users, not on a date.
 
-Not a download, not a star, not a clone. One of the three is a person who:
+## What counts as a user
 
-1. ran it on a config or project that is theirs, and
+Not a download, a star or a clone. A user is a person who
+
+1. ran `check` (or the Action, or `status`) on a config that is theirs, and
 2. told us something specific that came out of it — a finding they acted on, a
-   number that surprised them, a command that did the wrong thing, or a reason
-   they stopped using it.
+   false positive, a launch shape it could not read, or a reason they stopped.
 
-A "this looks cool" is not one. A "I ran `status`, my `hostinger` server was
-44% of my context window and I had no idea" is — even though it is not a bug
-report, and even though they may never run it again. **A reason they stopped
-counts.** That is the most useful of the three answers and the hardest to get.
+**A reason they stopped counts**, and is the most useful answer.
 
-## What to ask them
+## What to ask
 
-Short, answerable without homework, and not a feature survey:
+Short, answerable without homework, not a feature survey:
 
-> Would you run one command against your MCP setup and tell me what it said?
+> Would you run one command on your repo's MCP config and tell me what it said?
 >
-> `npx -y @froggychips/mcp-vault status`
+> `npx -y @froggychips/mcp-vault check`
 >
-> No network calls, no telemetry, nothing installed or written. It reads your
-> host configs and prints about fifteen lines. Two things I want to know: was
-> anything on that screen news to you, and was anything on it wrong?
+> Offline, no telemetry, nothing installed or written; it reads `.mcp.json`,
+> `.vscode/mcp.json` and `.cursor/mcp.json` in the current directory. Two
+> questions: was anything it flagged news to you, and was anything wrong?
 
-Three sentences, one command, two questions. Not "what features would you
-like" — nobody knows, including us, which is the whole point.
+## Who, and where
 
-## Who
+1. **Teams that commit MCP configs** (`.mcp.json`, `.vscode/mcp.json`,
+   `.cursor/mcp.json`) to shared repositories — they are who the Action is for.
+2. **Maintainers of MCP servers** — they care whether their server is
+   recognised correctly, and their corrections improve the DB directly.
+3. **People who review supply-chain and security tooling** — they will say
+   which claims are overstated.
 
-Three groups, roughly in order of how likely the answer is to be useful:
-
-1. **People who already run several MCP servers.** They have the problem this
-   addresses and a config big enough for `status` to say something surprising.
-   The context-budget number lands hardest here.
-2. **People who maintain an MCP server.** They care about a different half —
-   whether their own entry is right, what `capabilities` says about their
-   package, whether the eval could start it. Their corrections improve the DB
-   directly, which no amount of our own work does.
-3. **People who review supply-chain tooling.** They will tell us which claims
-   are overstated. That is worth more than praise and is the group most likely
-   to reply.
-
-## Where — each of these needs a decision before it happens
-
-Nothing outward has been done. These are candidates, not a checklist:
-
-- the MCP community Discord / the `modelcontextprotocol` GitHub discussions
-- `awesome-mcp-servers`-style lists (this is a scanner, not a server — it fits
-  the "tooling" sections, where those exist)
-- a Show HN, or r/ClaudeAI / r/LocalLLaMA
-- direct messages to maintainers of servers already in the DB, opening with
-  *their* entry rather than with the tool
-- the Anthropic Discord's Claude Code channels
-
-The direct-message route to DB maintainers is the one with the best ratio: the
-opening line is about something of theirs, and every reply corrects real data.
-
-Two notes on doing it honestly. This project does not belong in the official
-MCP registry — that registry lists MCP *servers*, and this is a CLI. And
-anywhere it gets posted, the download number goes with it: 33 downloads and no
-users is the true state, and pretending otherwise would be the one thing this
-repository cannot afford to do.
-
-## The rule, stated plainly
-
-Until three of the above exist, work here is limited to: fixing what is wrong,
-making the existing surface easier to reach, and asking. `mcp-vault status`
-was the last feature — one command instead of six, because the reason to
-build it did not require a user to confirm: nobody has six commands' worth of
-patience for a tool they have not decided to trust yet.
+Candidate places, each a decision before it happens: MCP community discussions,
+lists of MCP tooling (this is a checker, not a server, so not the official
+registry), a Show HN, and direct messages to maintainers of servers in the DB,
+opening with *their* entry. Wherever it is posted, the numbers above go with
+it.

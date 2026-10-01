@@ -2,7 +2,7 @@
 /**
  * The numbers in the documentation, checked against the data they describe.
  *
- * Every count in README.md and SKILL.md was written by hand at some point and
+ * Every count in the documentation (docs/DATABASE.md, the README, SKILL.md) was written by hand at some point and
  * then left alone while the DB moved underneath it. By the time anyone looked,
  * the tier distribution read "20 Core / 76 Recommended / 18 Experimental" for a
  * database holding 20 / 71 / 23 — three wrong numbers in a document whose whole
@@ -30,6 +30,9 @@ const fs     = require('fs');
 const path   = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
+// The DB's figures live on one page, so the README can stay short and still
+// say nothing the data contradicts. The README's own count is checked below.
+const DB_DOC = 'docs/DATABASE.md';
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
 const db    = JSON.parse(read('mcp-ecosystem-intelligence/assets/tools_database.json')).tools;
@@ -47,20 +50,20 @@ function capabilityCounts() {
 
 const count   = (fn) => db.filter(fn).length;
 // The tier is derived, not stored — lib/tiers.cjs explains why. Deriving it
-// here too keeps the README's distribution honest without the DB carrying a
+// here too keeps the documented distribution honest without the DB carrying a
 // copy that goes stale.
 const { classifyEntry, evalIndex } = require('../mcp-ecosystem-intelligence/scripts/lib/tiers.cjs');
 const evalByName = evalIndex(evals);
 // Staleness makes the tier a function of time, so "the distribution" only
 // means something with a date on it. Time is an explicit input here: the
-// README names the date its figures are as of, and that date has to be the
+// page names the date its figures are as of, and that date has to be the
 // date of the newest `checked_at` in the DB — the snapshot the numbers
 // describe. Classified against the wall clock instead, this test went red on
 // its own a week after every evidence refresh (availability and advisories
 // expire in 7 days) with no commit touching anything. Classified against the
-// snapshot without the README saying so, it would keep accepting a historical
+// snapshot without the page saying so, it would keep accepting a historical
 // distribution presented as current. With the date in the prose, the test is
-// deterministic, and refreshing the evidence without refreshing the README
+// deterministic, and refreshing the evidence without refreshing the page
 // fails below until someone rewrites the figures for the new date.
 const SNAPSHOT_NOW = Math.max(0, ...db.flatMap((t) =>
   Object.values(t.trust_evidence?.dimensions || {})
@@ -69,8 +72,8 @@ const SNAPSHOT_NOW = Math.max(0, ...db.flatMap((t) =>
 const SNAPSHOT_DATE = new Date(SNAPSHOT_NOW).toISOString().slice(0, 10);
 /** A dated claim's date must be the snapshot's, or its numbers describe other data. */
 const dated = (date) => assert.equal(date, SNAPSHOT_DATE,
-  `README.md dates this figure "as of ${date}", but the newest evidence in the DB is from ${SNAPSHOT_DATE}.\n`
-  + 'The evidence was refreshed and the README was not: recompute the figures and update the date.');
+  `${DB_DOC} dates this figure "as of ${date}", but the newest evidence in the DB is from ${SNAPSHOT_DATE}.\n`
+  + `The evidence was refreshed and ${DB_DOC} was not: recompute the figures and update the date.`);
 const tierOf  = (t) => classifyEntry(t, evalByName.get(t.name) || null, { now: SNAPSHOT_NOW }).classification;
 const tier    = (name) => count((t) => tierOf(t) === name);
 const withTools = db.filter((t) => Number.isFinite(t.est_tools_count));
@@ -82,59 +85,65 @@ const heaviest  = withTools.reduce((m, t) => (t.est_tools_count > m.est_tools_co
  */
 const CLAIMS = [
   {
-    what:  'DB entry count (scan output example)',
+    what:  'DB entry count (README)',
     file:  'README.md',
-    re:    /^(\d+) entries checked — \d+ failure\(s\)$/m,
+    re:    /curated DB of (\d+) known servers/,
+    expected: () => [db.length],
+  },
+  {
+    what:  'DB entry count (scan output example)',
+    file:  DB_DOC,
+    re:    /^(\d+) entries checked — \d+ failure\(s\)(?:, \d+ unverified)?$/m,
     expected: () => [db.length],
   },
   {
     what:  'DB entry count (Vault DB section)',
-    file:  'README.md',
+    file:  DB_DOC,
     re:    /\*\*(\d+) entries\*\* across ~(\d+) categories/,
     expected: () => [db.length, new Set(db.map((t) => t.category)).size],
   },
   {
     what:  'tier distribution',
-    file:  'README.md',
+    file:  DB_DOC,
     re:    /Distribution as of (\d{4}-\d{2}-\d{2}) \(the date of the newest evidence in the DB\): \*\*(\d+) Core \/ (\d+) Recommended \/ (\d+) Experimental \/ (\d+) Deprecated\*\*/,
     expected: (captured) => (dated(captured[0]),
       [SNAPSHOT_DATE, tier('Core'), tier('Recommended'), tier('Experimental'), tier('Deprecated')]),
   },
   {
     what:  'npm entry count',
-    file:  'README.md',
+    file:  DB_DOC,
     re:    /of the DB's (\d+) npm entries/,
     expected: () => [count((t) => /^npx\s/.test(t.install_cmd || ''))],
   },
   {
     what:  'server count and the tool-surface spread',
-    file:  'README.md',
+    file:  DB_DOC,
     re:    /With (\d+) servers in the DB the spread is wide: `([\w-]+)` = (\d+) tool vs\. `([\w-]+)` = (\d+) tools/,
     // The two named entries are *examples*, and several entries have one tool —
     // so the names are echoed back and checked by `nameCheck` against what they
     // claim to be, rather than compared to one arbitrarily chosen entry. The
     // first version of this test picked its own example and then failed because
-    // the README had named an equally correct one.
+    // the docs had named an equally correct one.
     expected: (captured) => [db.length, captured[1], 1, captured[3], heaviest.est_tools_count],
     nameCheck: (captured) => {
       const light = db.find((t) => t.name === captured[1]);
-      assert.ok(light, `README names \`${captured[1]}\` as a one-tool server; there is no such entry`);
+      assert.ok(light, `${DB_DOC} names \`${captured[1]}\` as a one-tool server; there is no such entry`);
       assert.equal(light.est_tools_count, 1, `${captured[1]} no longer has 1 tool`);
       const heavy = db.find((t) => t.name === captured[3]);
-      assert.ok(heavy, `README names \`${captured[3]}\` as the heaviest server; there is no such entry`);
+      assert.ok(heavy, `${DB_DOC} names \`${captured[3]}\` as the heaviest server; there is no such entry`);
       assert.equal(heavy.est_tools_count, heaviest.est_tools_count,
         `${captured[3]} is no longer the heaviest entry — ${heaviest.name} has ${heaviest.est_tools_count}`);
     },
   },
   {
     what:  'behavioural eval headline',
-    file:  'README.md',
+    file:  DB_DOC,
     re:    /(\d+) of the (\d+) entries with a runnable launch command complete a handshake/,
     expected: () => [evals.filter((r) => r.status === 'pass').length, evals.length],
   },
   {
     what:  'tools observed and their token cost',
-    file:  'README.md',
+    file:  DB_DOC,
     re:    /listing ([\d,]+) tools between them, ≈([\d,]+)k tokens/,
     expected: () => {
       const tools  = evals.reduce((n, r) => n + (r.tool_count || 0), 0);
@@ -144,7 +153,7 @@ const CLAIMS = [
   },
   {
     what:  'derived trust distribution',
-    file:  'README.md',
+    file:  DB_DOC,
     re:    /\*\*(\d+) verified \/ (\d+) candidate \/ (\d+) unverified\*\* as of (\d{4}-\d{2}-\d{2})/,
     expected: (captured) => {
       dated(captured[3]);
@@ -154,7 +163,7 @@ const CLAIMS = [
   },
   {
     what:  'capability counts across the scanned packages',
-    file:  'README.md',
+    file:  DB_DOC,
     re:    /env_access\s+(\d+)\s+shell\s+(\d+)/,
     expected: () => {
       const caps = capabilityCounts();
@@ -163,7 +172,7 @@ const CLAIMS = [
   },
   {
     what:  'how many packages can both shell out and reach the network',
-    file:  'README.md',
+    file:  DB_DOC,
     re:    /(\d+) of those packages can both run other programs and reach the network/,
     expected: () => {
       const pkgs = Object.values(capabilities.packages || {});
@@ -172,8 +181,8 @@ const CLAIMS = [
   },
   {
     what:  'how many packages were scanned, and how many are minified',
-    file:  'README.md',
-    re:    /(\d+) of\n(\d+) ship at least one minified file/,
+    file:  DB_DOC,
+    re:    /(\d+) of\s+(\d+) ship at least one minified file/,
     expected: () => {
       const pkgs = Object.values(capabilities.packages || {});
       return [pkgs.filter((p) => p.coverage && p.coverage.minified).length, pkgs.length];
@@ -181,7 +190,7 @@ const CLAIMS = [
   },
   {
     what:  'provenance dimension counts',
-    file:  'README.md',
+    file:  DB_DOC,
     re:    /provenance\s+bound (\d+), absent (\d+)/,
     expected: () => {
       const by = (status) => count((t) => t.trust_evidence?.dimensions?.provenance?.status === status);
@@ -190,7 +199,7 @@ const CLAIMS = [
   },
   {
     what:  'entries listed in the official registry',
-    file:  'README.md',
+    file:  DB_DOC,
     re:    /(\d+) entries are listed as of (\d{4}-\d{2}-\d{2}) and all of them agree/,
     expected: (captured) => (dated(captured[1]),
       [count((t) => t.trust_evidence?.dimensions?.registry?.status === 'listed'), SNAPSHOT_DATE]),
@@ -224,21 +233,21 @@ for (const claim of CLAIMS) {
 
 test('the eval snapshot distinguishes a handshake from a usable tool list', () => {
   // "40 complete a handshake" and "39 list at least one tool" are different
-  // facts, and the README says both because one server (mcp-atlassian)
+  // facts, and the docs say both because one server (mcp-atlassian)
   // answered tools/list with an empty array. Collapsing them would be the
   // same class of overstatement this whole file exists to prevent.
   const handshake = evals.filter((r) => r.status === 'pass').length;
   const withTools = evals.filter((r) => r.status === 'pass' && r.tool_count > 0).length;
-  const readme = read('README.md');
+  const readme = read(DB_DOC);
   if (handshake !== withTools) {
     assert.match(readme, new RegExp(`${withTools} of (them|those)`),
-      `${handshake} entries pass but only ${withTools} list a tool; README should say both`);
+      `${handshake} entries pass but only ${withTools} list a tool; ${DB_DOC} should say both`);
   }
 });
 
 test('no entry claims a tool count the eval contradicted without the DB being updated', () => {
   // Not a documentation check, but it belongs next to one: the numbers the
-  // README quotes come from these fields, and drift here is what makes the
+  // docs quotes come from these fields, and drift here is what makes the
   // documented figures quietly wrong.
   const drifted = evals.filter((r) => r.tool_count_drift && r.status === 'pass' && r.tool_count > 0);
   const listed = drifted.map((r) => `${r.name} (DB ${r.tool_count_db} → observed ${r.tool_count})`);
@@ -246,8 +255,8 @@ test('no entry claims a tool count the eval contradicted without the DB being up
   // is an observation, so a human decides which is right. It fails only if
   // nothing in the repo acknowledges the drift.
   if (listed.length) {
-    const readme = read('README.md');
+    const readme = read(DB_DOC);
     assert.match(readme, /drift/i,
-      `${listed.length} entries drift from their observed tool count and the README does not mention drift at all:\n  ${listed.join('\n  ')}`);
+      `${listed.length} entries drift from their observed tool count and ${DB_DOC} does not mention drift at all:\n  ${listed.join('\n  ')}`);
   }
 });
