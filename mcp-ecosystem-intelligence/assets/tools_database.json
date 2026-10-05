@@ -1427,7 +1427,7 @@
     {
       "name": "github-mcp-server",
       "category": "vcs",
-      "install_cmd": "docker run -i --rm --cap-drop ALL --security-opt no-new-privileges -e GITHUB_PERSONAL_ACCESS_TOKEN ghcr.io/github/github-mcp-server@sha256:508a0857ec762b1ab1cece29193345b501fab1dd9d1228a7b617062954cecac6",
+      "install_cmd": "docker run -i --rm --cap-drop ALL --security-opt no-new-privileges -e GITHUB_PERSONAL_ACCESS_TOKEN ghcr.io/github/github-mcp-server@sha256:7aaeeec9ae4fe9a736d100c1ff0798f3c219b5009e05f5d3945fcacb13cc196b",
       "source_url": "https://github.com/github/github-mcp-server",
       "stars": 33310,
       "last_commit_days": 0,
@@ -1436,7 +1436,7 @@
       "est_tools_count": 100,
       "toolsets": "--toolsets repos,issues  # 19 presets; combine e.g. repos,pull_requests,code_security",
       "version": "latest@2026-05-09",
-      "pkg_integrity": "sha256-508a0857ec762b1ab1cece29193345b501fab1dd9d1228a7b617062954cecac6",
+      "pkg_integrity": "sha256-7aaeeec9ae4fe9a736d100c1ff0798f3c219b5009e05f5d3945fcacb13cc196b",
       "trust": "verified",
       "notes": "Docker image pinned by digest. Refresh with: docker manifest inspect ghcr.io/github/github-mcp-server.",
       "license": "MIT",
