@@ -1,6 +1,6 @@
 {
   "$schema": "mcp-vault/capabilities@1",
-  "generated_at": "2026-10-01T06:50:31.677Z",
+  "generated_at": "2026-10-05T15:19:26.043Z",
   "note": "Capability presence with evidence, per package version. `found` is a fact; absence is never recorded — see lib/capabilities.cjs.",
   "packages": {
     "npm:@agent-infra/mcp-server-browser@1.2.29": {
